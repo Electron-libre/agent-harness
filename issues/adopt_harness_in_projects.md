@@ -28,7 +28,7 @@ so that an improvement made here reaches them with one command, and a drifted co
 1. [x] Install the `harness` binary (`cargo install --path crates/harness`)
 2. [x] Adopt RetroDoc on branch `adopt-harness` (`harness check`, `just check`, `just test-harness` pass)
 3. [x] Carry into `files/` what RetroDoc revealed (commit here, push on request, re-sync RetroDoc without conflict)
-4. [ ] Adopt the RPG assistant, same checks; redo 3 if new conflicts
+4. [x] Adopt the RPG assistant, same checks; redo 3 if new conflicts
 5. [ ] Report the state of both projects; ask whether to close the issue
 
 ## Decisions
@@ -37,4 +37,5 @@ so that an improvement made here reaches them with one command, and a drifted co
 * Installing the binary in `~/.cargo/bin` is accepted.
 * No spec: the issue changes no behaviour.
 * Project names in this issue are made generic when it is closed.
+* Pinning a `rev` in each project makes the CI drift check reproducible (decided after the second adoption).
 * Follow-ups left open: `cargo install --git ... --rev <branch>` is untested with a branch name; the tool is rebuilt on every cache miss in CI (a prebuilt binary would be a separate issue).
