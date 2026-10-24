@@ -402,3 +402,65 @@ fn set_rev_ignores_array_lines_and_refuses_what_it_cannot_edit() {
     .is_err());
     assert!(set_rev("[harness]\nsource = \"x\"\n", "abc", "a\nb").is_err());
 }
+
+/// A project whose source is the git repository `repo`.
+fn git_project(repo: &TempDir) -> TempDir {
+    let root = tempdir().unwrap();
+    put(
+        root.path(),
+        CONFIG,
+        &format!(
+            "# mine\n[harness]\nsource = \"file://{}\"\n",
+            repo.path().display()
+        ),
+    );
+    root
+}
+
+// spec: SYN-11
+// spec: SYN-16
+#[test]
+fn update_pins_the_resolved_commit_then_syncs_and_reports_both_revisions() {
+    let (repo, first, second) = git_source();
+    let root = git_project(&repo);
+    let cache = tempdir().unwrap();
+    let opts = SyncOptions::default();
+
+    let done = update_in(Some(cache.path()), root.path(), Some("v1"), &opts).unwrap();
+    assert_eq!(done.previous, None);
+    assert_eq!(done.rev, first);
+    assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Added));
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+    let config = get(root.path(), CONFIG).unwrap();
+    assert!(config.starts_with("# mine\n"));
+    assert!(
+        config.contains(&format!("rev = \"{first}\"  # v1\n")),
+        "{config}"
+    );
+
+    let done = update_in(Some(cache.path()), root.path(), None, &opts).unwrap();
+    assert_eq!(done.previous.as_deref(), Some(first.as_str()));
+    assert_eq!(done.rev, second);
+    assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Updated));
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a2"));
+    assert!(get(root.path(), CONFIG)
+        .unwrap()
+        .contains(&format!("rev = \"{second}\"")));
+
+    // Already there: `rev` is rewritten as it was and nothing else happens.
+    let before = get(root.path(), CONFIG);
+    let done = update_in(Some(cache.path()), root.path(), None, &opts).unwrap();
+    assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Unchanged));
+    assert_eq!(get(root.path(), CONFIG), before);
+}
+
+// spec: SYN-14
+#[test]
+fn update_refuses_a_local_directory_source_and_changes_nothing() {
+    let (_source, root) = setup();
+    let before = get(root.path(), CONFIG);
+    let err = update(root.path(), None, &SyncOptions::default()).unwrap_err();
+    assert!(format!("{err:#}").contains("local directory"), "{err:#}");
+    assert_eq!(get(root.path(), CONFIG), before);
+    assert!(get(root.path(), LOCK).is_none());
+}

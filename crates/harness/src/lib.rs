@@ -264,13 +264,17 @@ fn cache_dir() -> Result<PathBuf> {
         .context("no cache directory (set HOME or XDG_CACHE_HOME)")
 }
 
+fn cache_or_default(cache: Option<&Path>) -> Result<PathBuf> {
+    cache.map_or_else(cache_dir, |c| Ok(c.to_path_buf()))
+}
+
 /// Clone (first time) or fetch the git source in `cache`, and return its local directory.
 fn fetch(cache: &Path, url: &str) -> Result<PathBuf> {
     let dir = cache.join("harness").join(&hash(url.as_bytes())[..12]);
     if dir.join(".git").exists() {
         git(Some(&dir), &["fetch", "--quiet", "--tags", "origin"])?;
         // `fetch` leaves `origin/HEAD` alone: follow a default branch the remote renamed (best effort).
-        let _ = git(Some(&dir), &["remote", "set-head", "origin", "--auto"]);
+        let _ = git_output(&dir, &["remote", "set-head", "origin", "--auto"]);
     } else {
         fs::create_dir_all(&dir)?;
         git(None, &["clone", "--quiet", url, &dir.to_string_lossy()])?;
@@ -296,8 +300,8 @@ fn resolve_in(dir: &Path, url: &str, rev: Option<&str>) -> Result<String> {
 }
 
 /// Local checkout of a git source in the user cache, at `rev` (default: the remote's default branch).
-fn checkout(url: &str, rev: Option<&str>) -> Result<PathBuf> {
-    let dir = fetch(&cache_dir()?, url)?;
+fn checkout(cache: Option<&Path>, url: &str, rev: Option<&str>) -> Result<PathBuf> {
+    let dir = fetch(&cache_or_default(cache)?, url)?;
     let commit = resolve_in(&dir, url, rev)?;
     git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
     Ok(dir)
@@ -306,10 +310,6 @@ fn checkout(url: &str, rev: Option<&str>) -> Result<PathBuf> {
 /// `harness.toml` text with `rev` set in the `[harness]` table, every other line left as it is.
 ///
 /// The line becomes `rev = "<commit>"  # <name>`; a missing `rev` is inserted right after `source`.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by `update`, the next deliverable")
-)]
 fn set_rev(text: &str, commit: &str, name: &str) -> Result<String> {
     if name.contains(char::is_control) {
         bail!("invalid revision name {name:?}");
@@ -376,20 +376,25 @@ fn is_table_header(line: &str) -> bool {
         && (after.trim().is_empty() || after.trim_start().starts_with('#'))
 }
 
-fn source_dir(root: &Path, rev_override: Option<&str>) -> Result<PathBuf> {
+/// The `source` and the pinned `rev` of the `[harness]` table.
+fn source_and_rev(root: &Path) -> Result<(String, Option<String>)> {
     let config = read_config(root)?;
     let table = config.get("harness").and_then(toml::Value::as_table);
-    let source = table
-        .and_then(|t| t.get("source"))
-        .and_then(toml::Value::as_str)
+    let text = |key: &str| {
+        table
+            .and_then(|t| t.get(key))
+            .and_then(toml::Value::as_str)
+            .map(str::to_string)
+    };
+    let source = text("source")
         .with_context(|| format!("{CONFIG}: missing `source` in the [harness] table"))?;
-    if is_git_url(source) {
-        let rev = rev_override.or_else(|| {
-            table
-                .and_then(|t| t.get("rev"))
-                .and_then(toml::Value::as_str)
-        });
-        checkout(source, rev)
+    Ok((source, text("rev")))
+}
+
+fn source_dir(cache: Option<&Path>, root: &Path, rev_override: Option<&str>) -> Result<PathBuf> {
+    let (source, rev) = source_and_rev(root)?;
+    if is_git_url(&source) {
+        checkout(cache, &source, rev_override.or(rev.as_deref()))
     } else {
         Ok(root.join(source))
     }
@@ -413,7 +418,7 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
     config.insert("harness".into(), harness.into());
     let mut text = config.to_string();
     let dir = if is_git_url(source) {
-        checkout(source, rev)?
+        checkout(None, source, rev)?
     } else {
         root.join(source)
     };
@@ -429,12 +434,17 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
 /// # Errors
 /// When the configuration or the source cannot be read, or a file cannot be written.
 pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
-    sync_at(root, options, None)
+    sync_at(None, root, options, None)
 }
 
 /// `sync` against `rev` instead of the one in `harness.toml` (a git source only).
-fn sync_at(root: &Path, options: &SyncOptions, rev: Option<&str>) -> Result<Report> {
-    let source = source_dir(root, rev)?;
+fn sync_at(
+    cache: Option<&Path>,
+    root: &Path,
+    options: &SyncOptions,
+    rev: Option<&str>,
+) -> Result<Report> {
+    let source = source_dir(cache, root, rev)?;
     let managed = source.join("files");
     let seeds = source.join("seed");
     if !managed.is_dir() {
@@ -514,6 +524,52 @@ fn sync_at(root: &Path, options: &SyncOptions, rev: Option<&str>) -> Result<Repo
         write_lock(root, &new_lock)?;
     }
     Ok(report)
+}
+
+/// What `update` did: the revision before and after, and the `sync` that followed.
+#[derive(Debug)]
+pub struct UpdateReport {
+    /// The `rev` the project had, if any.
+    pub previous: Option<String>,
+    /// The commit now in `rev`.
+    pub rev: String,
+    pub sync: Report,
+}
+
+/// Move the project to `rev` of its git source (default: the head of the default branch): write the resolved
+/// commit to `rev` in `harness.toml`, then sync.
+///
+/// # Errors
+/// When the source is a local directory, the revision is unknown, or the configuration or sync fails.
+pub fn update(root: &Path, rev: Option<&str>, options: &SyncOptions) -> Result<UpdateReport> {
+    update_in(None, root, rev, options)
+}
+
+fn update_in(
+    cache: Option<&Path>,
+    root: &Path,
+    rev: Option<&str>,
+    options: &SyncOptions,
+) -> Result<UpdateReport> {
+    let (source, previous) = source_and_rev(root)?;
+    if !is_git_url(&source) {
+        bail!("{CONFIG}: `source` is a local directory, which has no revision to update");
+    }
+    let dir = fetch(&cache_or_default(cache)?, &source)?;
+    let commit = resolve_in(&dir, &source, rev)?;
+    let path = root.join(CONFIG);
+    let text = set_rev(
+        &fs::read_to_string(&path)?,
+        &commit,
+        rev.unwrap_or("default branch"),
+    )?;
+    write(&path, text.as_bytes())?;
+    let sync = sync_at(cache, root, options, Some(&commit))?;
+    Ok(UpdateReport {
+        previous,
+        rev: commit,
+        sync,
+    })
 }
 
 /// Managed files modified or deleted since the last sync, one line each.
