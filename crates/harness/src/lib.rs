@@ -434,17 +434,10 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
 /// # Errors
 /// When the configuration or the source cannot be read, or a file cannot be written.
 pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
-    sync_at(None, root, options, None)
+    sync_from(root, &source_dir(None, root, None)?, options)
 }
 
-/// `sync` against `rev` instead of the one in `harness.toml` (a git source only).
-fn sync_at(
-    cache: Option<&Path>,
-    root: &Path,
-    options: &SyncOptions,
-    rev: Option<&str>,
-) -> Result<Report> {
-    let source = source_dir(cache, root, rev)?;
+fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report> {
     let managed = source.join("files");
     let seeds = source.join("seed");
     if !managed.is_dir() {
@@ -531,13 +524,16 @@ fn sync_at(
 pub struct UpdateReport {
     /// The `rev` the project had, if any.
     pub previous: Option<String>,
-    /// The commit now in `rev`.
+    /// The commit the project was moved to, or would be.
     pub rev: String,
+    /// False when nothing was written: `--dry-run`, or a conflict.
+    pub applied: bool,
     pub sync: Report,
 }
 
-/// Move the project to `rev` of its git source (default: the head of the default branch): write the resolved
-/// commit to `rev` in `harness.toml`, then sync.
+/// Move the project to `rev` of its git source (default: the head of the default branch): sync to it, then write
+/// the resolved commit to `rev` in `harness.toml`. A conflict, an unknown revision or an unreadable source leave the project as it was;
+/// an I/O error during the write itself is not rolled back, as for `sync`.
 ///
 /// # Errors
 /// When the source is a local directory, the revision is unknown, or the configuration or sync fails.
@@ -557,17 +553,34 @@ fn update_in(
     }
     let dir = fetch(&cache_or_default(cache)?, &source)?;
     let commit = resolve_in(&dir, &source, rev)?;
+    git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
     let path = root.join(CONFIG);
     let text = set_rev(
         &fs::read_to_string(&path)?,
         &commit,
         rev.unwrap_or("default branch"),
     )?;
-    write(&path, text.as_bytes())?;
-    let sync = sync_at(cache, root, options, Some(&commit))?;
+    // Nothing is written before the dry run shows a clean sync.
+    let preview = sync_from(
+        root,
+        &dir,
+        &SyncOptions {
+            dry_run: true,
+            ..*options
+        },
+    )?;
+    let applied = !options.dry_run && preview.conflicts() == 0;
+    let sync = if applied {
+        let sync = sync_from(root, &dir, options)?;
+        write(&path, text.as_bytes())?;
+        sync
+    } else {
+        preview
+    };
     Ok(UpdateReport {
         previous,
         rev: commit,
+        applied,
         sync,
     })
 }

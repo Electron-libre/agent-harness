@@ -27,5 +27,6 @@ Everything that differs between projects is a value, not code. Scripts read list
 A directory (relative to the project) or a git URL; a git source is cloned in `$XDG_CACHE_HOME/harness` and
 checked out at `rev` (default: the remote's default branch). `rev` pins a commit, not a moving name:
 see [ADR 0002](adr/0002-rev-pins-the-resolved-commit.md). `harness update [--rev <name>]` resolves a name
-(default: the default branch head) to a commit, writes it to `rev`, then syncs; a local directory has no revision
-and is refused.
+(default: the default branch head) to a commit, previews the sync against it (`--dry-run` stops there), and only
+without conflict (or with `--force`) syncs and writes the commit to `rev`; a conflict, an unknown revision or an unreadable source leave the
+project as it was. A local directory has no revision and is refused.

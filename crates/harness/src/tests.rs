@@ -464,3 +464,91 @@ fn update_refuses_a_local_directory_source_and_changes_nothing() {
     assert_eq!(get(root.path(), CONFIG), before);
     assert!(get(root.path(), LOCK).is_none());
 }
+
+/// A project moved to `v1` by `update`, with its repository and cache.
+fn updated_to_v1() -> (TempDir, String, TempDir, TempDir) {
+    let (repo, first, _second) = git_source();
+    let root = git_project(&repo);
+    let cache = tempdir().unwrap();
+    update_in(
+        Some(cache.path()),
+        root.path(),
+        Some("v1"),
+        &SyncOptions::default(),
+    )
+    .unwrap();
+    (repo, first, root, cache)
+}
+
+// spec: SYN-13
+#[test]
+fn update_stops_on_a_conflict_unless_forced_and_writes_nothing() {
+    let (_repo, first, root, cache) = updated_to_v1();
+    put(root.path(), "a.txt", "local");
+    let (config, lock) = (get(root.path(), CONFIG), get(root.path(), LOCK));
+
+    let done = update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &SyncOptions::default(),
+    )
+    .unwrap();
+    assert!(!done.applied);
+    assert_eq!(done.sync.conflicts(), 1);
+    assert_eq!(done.previous.as_deref(), Some(first.as_str()));
+    assert_eq!(get(root.path(), CONFIG), config);
+    assert_eq!(get(root.path(), LOCK), lock);
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("local"));
+
+    let options = SyncOptions {
+        force: true,
+        dry_run: false,
+    };
+    let done = update_in(Some(cache.path()), root.path(), None, &options).unwrap();
+    assert!(done.applied);
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a2"));
+    assert!(!get(root.path(), CONFIG).unwrap().contains(&first));
+}
+
+// spec: SYN-13
+#[test]
+fn update_to_an_unknown_revision_or_an_unreadable_source_changes_nothing() {
+    let (repo, _first, root, cache) = updated_to_v1();
+    let (config, lock) = (get(root.path(), CONFIG), get(root.path(), LOCK));
+    let options = SyncOptions::default();
+
+    assert!(update_in(Some(cache.path()), root.path(), Some("nope"), &options).is_err());
+
+    // A revision without files/: the source cannot be read as a harness.
+    git_in(repo.path(), &["rm", "-rq", "files"]);
+    git_in(repo.path(), &["commit", "--quiet", "-m", "empty"]);
+    assert!(update_in(Some(cache.path()), root.path(), None, &options).is_err());
+
+    let gone = git_project(&tempdir().unwrap());
+    let gone_config = get(gone.path(), CONFIG);
+    assert!(update_in(Some(cache.path()), gone.path(), None, &options).is_err());
+
+    assert_eq!(get(root.path(), CONFIG), config);
+    assert_eq!(get(root.path(), LOCK), lock);
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+    assert_eq!(get(gone.path(), CONFIG), gone_config);
+}
+
+// spec: SYN-15
+#[test]
+fn update_dry_run_reports_the_target_and_writes_nothing() {
+    let (_repo, first, root, cache) = updated_to_v1();
+    let (config, lock) = (get(root.path(), CONFIG), get(root.path(), LOCK));
+    let options = SyncOptions {
+        force: false,
+        dry_run: true,
+    };
+    let done = update_in(Some(cache.path()), root.path(), None, &options).unwrap();
+    assert!(!done.applied);
+    assert_ne!(done.rev, first);
+    assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Updated));
+    assert_eq!(get(root.path(), CONFIG), config);
+    assert_eq!(get(root.path(), LOCK), lock);
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+}

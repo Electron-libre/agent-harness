@@ -36,7 +36,7 @@ source, or to a given one (a tag, for example), then sync.
 
 1. [x] Resolve a revision to a commit hash and rewrite `rev` textually, with ADR 0002 (SYN-11 in part, SYN-12)
 2. [x] `harness update`, nominal path: local source refused, report of previous and new revision (SYN-11, SYN-14, SYN-16)
-3. [ ] Atomicity: conflict, unknown revision, `--dry-run`, `--force` leave the project untouched (SYN-13, SYN-15); spec `accepted` then `implemented`
+3. [x] Atomicity: conflict, unknown revision, `--dry-run`, `--force` leave the project untouched (SYN-13, SYN-15); spec `accepted` then `implemented`
 
 ## Decisions
 

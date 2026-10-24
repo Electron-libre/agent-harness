@@ -39,6 +39,12 @@ enum Command {
         /// Branch, tag or commit; `rev` stores the resolved commit.
         #[arg(long)]
         rev: Option<String>,
+        /// Overwrite managed files modified locally.
+        #[arg(long)]
+        force: bool,
+        /// Print the target revision and what would change, change nothing.
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Fail when a managed file was modified or deleted since the last sync.
     Check,
@@ -61,16 +67,24 @@ fn main() -> ExitCode {
         Command::Sync { force, dry_run } => {
             sync(&cli.root, &SyncOptions { force, dry_run }).map(|report| print_changes(&report))
         }
-        Command::Update { rev } => {
-            update(&cli.root, rev.as_deref(), &SyncOptions::default()).map(|done| {
-                println!(
-                    "rev: {} -> {}",
-                    done.previous.as_deref().unwrap_or("(none)"),
-                    done.rev
-                );
-                print_changes(&done.sync)
-            })
-        }
+        Command::Update {
+            rev,
+            force,
+            dry_run,
+        } => update(&cli.root, rev.as_deref(), &SyncOptions { force, dry_run }).map(|done| {
+            println!(
+                "rev: {} -> {}",
+                done.previous.as_deref().unwrap_or("(none)"),
+                done.rev
+            );
+            let clean = print_changes(&done.sync);
+            if clean && dry_run {
+                println!("dry run: nothing written");
+            } else if !clean {
+                println!("conflicts: nothing written, `rev` unchanged (fix them or use --force)");
+            }
+            clean
+        }),
         Command::Check => check(&cli.root).map(|problems| {
             for problem in &problems {
                 println!("{problem}");
