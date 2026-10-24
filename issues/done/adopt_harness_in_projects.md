@@ -1,7 +1,7 @@
 # Adopt the shared harness in the existing projects
 
 # Goal
-RetroDoc and the RPG assistant each carry their own copy of the harness, adapted by hand. Move both to `harness sync`
+Two existing projects each carry their own copy of the harness, adapted by hand. Move both to `harness sync`
 so that an improvement made here reaches them with one command, and a drifted copy is caught by `just check`.
 
 # Findings
@@ -26,10 +26,10 @@ so that an improvement made here reaches them with one command, and a drifted co
 
 # Tracking
 1. [x] Install the `harness` binary (`cargo install --path crates/harness`)
-2. [x] Adopt RetroDoc on branch `adopt-harness` (`harness check`, `just check`, `just test-harness` pass)
-3. [x] Carry into `files/` what RetroDoc revealed (commit here, push on request, re-sync RetroDoc without conflict)
-4. [x] Adopt the RPG assistant, same checks; redo 3 if new conflicts
-5. [ ] Report the state of both projects; ask whether to close the issue
+2. [x] Adopt the first project on branch `adopt-harness` (`harness check`, `just check`, `just test-harness` pass)
+3. [x] Carry into `files/` what the first project revealed (commit here, push on request, re-sync the first project without conflict)
+4. [x] Adopt the second project, same checks; redo 3 if new conflicts
+5. [x] Report the state of both projects; ask whether to close the issue
 
 ## Decisions
 * Source of each project: git URL of this repository with a `rev`.
