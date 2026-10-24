@@ -3,6 +3,10 @@
 //! Prints each violation and exits 1; prints nothing and exits 0 when the message is valid.
 //! Usage: `echo "$msg" | rust-script .claude/skills/commit-message/commit_check.rs`
 //! or `just check-commit` (checks the message of HEAD).
+//! ```cargo
+//! [dependencies]
+//! toml = "0.8"
+//! ```
 
 use std::io::Read;
 
@@ -10,20 +14,14 @@ const TYPES: [&str; 9] = ["feat", "fix", "refactor", "docs", "test", "perf", "bu
 const BUILT_IN_SCOPES: [&str; 2] = ["docs", "harness"];
 const ATTRIBUTION: [&str; 3] = ["co-authored-by", "generated with", "noreply@anthropic.com"];
 
-/// Strings of `key = ["a", "b"]` (on one or several lines) in `.claude/harness.toml`; empty when absent.
+/// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.
 fn config_list(root: &std::path::Path, key: &str) -> Vec<String> {
     let text = std::fs::read_to_string(root.join(".claude/harness.toml")).unwrap_or_default();
-    let mut offset = 0;
-    for line in text.split_inclusive('\n') {
-        let value = line.strip_prefix(key).map(str::trim_start).and_then(|rest| rest.strip_prefix('='));
-        if let Some(value) = value {
-            let rest = &text[offset + line.len() - value.len()..];
-            let list = rest.split_once('[').and_then(|(_, r)| r.split_once(']')).map_or("", |(list, _)| list);
-            return list.split('"').skip(1).step_by(2).map(str::to_string).collect();
-        }
-        offset += line.len();
-    }
-    Vec::new()
+    let table: toml::Table = text.parse().unwrap_or_default();
+    let list = table.get("project").and_then(|p| p.get(key)).or_else(|| table.get(key));
+    list.and_then(toml::Value::as_array)
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+        .unwrap_or_default()
 }
 
 /// The built-in scopes plus the project's `commit_scopes`.
