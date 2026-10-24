@@ -20,3 +20,11 @@ unreadable file instead of silently falling back to defaults.
 
 # Resources
 * `files/.claude/skills/commit-message/commit_check.rs`, `files/.claude/skills/commit-message/test_commit_check.rs`
+
+# Tracking
+1. [x] Read `harness.toml` once from the git root in `commit_check.rs`, fail with exit 2 and an `error:` line when it cannot be read; tests from a subdirectory, with a missing file, an invalid file and outside a repository.
+
+## Decisions
+* No fallback to the built-in scopes: a missing `harness.toml` is always an error.
+* Outside a git repository the checker fails instead of using the current directory.
+* No spec: the change touches a skill script, not the behaviour of `specs/sync.md`.

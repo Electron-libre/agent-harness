@@ -10,6 +10,8 @@ fn check(script: &Path, message: &str, cwd: &Path) -> (bool, String) {
     let mut child = Command::new("rust-script")
         .arg(script)
         .current_dir(cwd)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -21,17 +23,34 @@ fn check(script: &Path, message: &str, cwd: &Path) -> (bool, String) {
     (out.status.success(), text)
 }
 
+/// Make `dir` a git repository, the root the script resolves the config from.
+fn git_init(dir: &Path) {
+    let status = Command::new("git").arg("init").arg("-q").arg(dir).status().expect("git must be installed");
+    assert!(status.success());
+}
+
 fn main() {
     let script = std::fs::canonicalize(Path::new(file!()).parent().unwrap().join("commit_check.rs")).unwrap();
     // Projects whose harness.toml holds a look-alike key before the real one, or comments inside the list.
     let project = |name: &str, toml: &str| {
         let dir = std::env::temp_dir().join(format!("commit_check_{}_{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join(".claude")).unwrap();
         std::fs::write(dir.join(".claude/harness.toml"), toml).unwrap();
+        git_init(&dir);
         dir
     };
     let lookalike = project("lookalike", "[project]\ncommit_scopes_extra = [\"wrong\"]\ncommit_scopes = [\"right\"]\n");
     let commented = project("commented", "[project]\ncommit_scopes = [\n  \"a\", # a \"quote\" and a ]\n  \"b\",\n]\n");
+    let nested = project("nested", "[project]\ncommit_scopes = [\"deep\"]\n");
+    std::fs::create_dir_all(nested.join("a/b")).unwrap();
+    let nested_cwd = nested.join("a/b");
+    let missing = project("missing", "");
+    std::fs::remove_file(missing.join(".claude/harness.toml")).unwrap();
+    let invalid = project("invalid", "[project\ncommit_scopes = \n");
+    let not_a_repo = std::env::temp_dir().join(format!("commit_check_{}_norepo", std::process::id()));
+    let _ = std::fs::remove_dir_all(&not_a_repo);
+    std::fs::create_dir_all(&not_a_repo).unwrap();
     let long_line = "word ".repeat(16);
     let here = std::env::current_dir().unwrap();
     let cases: Vec<(&str, String, bool, &str, &Path)> = vec![
@@ -56,6 +75,10 @@ fn main() {
         ("look-alike key does not shadow the real one", "feat(right): add flag\n".into(), true, "", &lookalike),
         ("look-alike key is not read as the real one", "feat(wrong): add flag\n".into(), false, "scope", &lookalike),
         ("list with a commented quote and bracket", "feat(b): add flag\n".into(), true, "", &commented),
+        ("config is read from the repository root, not the current directory", "feat(deep): add flag\n".into(), true, "", &nested_cwd),
+        ("missing harness.toml is reported", "feat(docs): add flag\n".into(), false, "harness.toml", &missing),
+        ("invalid harness.toml is reported", "feat(docs): add flag\n".into(), false, "harness.toml", &invalid),
+        ("outside a git repository is reported", "feat(docs): add flag\n".into(), false, "git", &not_a_repo),
     ];
     let mut failed = false;
     for (name, message, should_pass, hint, cwd) in cases {
@@ -66,6 +89,9 @@ fn main() {
             println!("       got pass={passed}, output: {}", output.trim());
         }
         failed |= !ok;
+    }
+    for dir in [&lookalike, &commented, &nested, &missing, &invalid, &not_a_repo] {
+        let _ = std::fs::remove_dir_all(dir);
     }
     std::process::exit(i32::from(failed));
 }
