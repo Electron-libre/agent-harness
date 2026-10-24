@@ -9,7 +9,7 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
@@ -243,18 +243,45 @@ fn resolves(dir: &Path, rev: &str) -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
-/// Local checkout of a git source in the user cache, at `rev` (default: the remote's default branch).
-fn checkout(url: &str, rev: Option<&str>) -> Result<PathBuf> {
-    let cache = std::env::var_os("XDG_CACHE_HOME")
+fn git_output(dir: &Path, args: &[&str]) -> Result<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .stderr(Stdio::inherit())
+        .output()
+        .context("running git")?;
+    if !out.status.success() {
+        bail!("git {} failed", args.join(" "));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn cache_dir() -> Result<PathBuf> {
+    std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))
-        .context("no cache directory (set HOME or XDG_CACHE_HOME)")?;
+        .context("no cache directory (set HOME or XDG_CACHE_HOME)")
+}
+
+/// Clone (first time) or fetch the git source in `cache`, and return its local directory.
+fn fetch(cache: &Path, url: &str) -> Result<PathBuf> {
     let dir = cache.join("harness").join(&hash(url.as_bytes())[..12]);
     if dir.join(".git").exists() {
         git(Some(&dir), &["fetch", "--quiet", "--tags", "origin"])?;
+        // `fetch` leaves `origin/HEAD` alone: follow a default branch the remote renamed (best effort).
+        let _ = git(Some(&dir), &["remote", "set-head", "origin", "--auto"]);
     } else {
         fs::create_dir_all(&dir)?;
         git(None, &["clone", "--quiet", url, &dir.to_string_lossy()])?;
+    }
+    Ok(dir)
+}
+
+/// Full commit hash of `rev` (default: the remote's default branch) in a fetched source.
+fn resolve_in(dir: &Path, url: &str, rev: Option<&str>) -> Result<String> {
+    if rev.is_some_and(|r| r.starts_with('-')) {
+        bail!("{url}: invalid revision {}", rev.unwrap_or_default());
     }
     // A branch name must resolve to the remote branch the fetch just moved, not to a stale local one.
     let candidates = match rev {
@@ -263,13 +290,93 @@ fn checkout(url: &str, rev: Option<&str>) -> Result<PathBuf> {
     };
     let target = candidates
         .iter()
-        .find(|c| resolves(&dir, c))
+        .find(|c| resolves(dir, c))
         .with_context(|| format!("{url}: unknown revision {}", rev.unwrap_or("origin/HEAD")))?;
-    git(Some(&dir), &["checkout", "--quiet", "--detach", target])?;
+    git_output(dir, &["rev-parse", &format!("{target}^{{commit}}")])
+}
+
+/// Local checkout of a git source in the user cache, at `rev` (default: the remote's default branch).
+fn checkout(url: &str, rev: Option<&str>) -> Result<PathBuf> {
+    let dir = fetch(&cache_dir()?, url)?;
+    let commit = resolve_in(&dir, url, rev)?;
+    git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
     Ok(dir)
 }
 
-fn source_dir(root: &Path) -> Result<PathBuf> {
+/// `harness.toml` text with `rev` set in the `[harness]` table, every other line left as it is.
+///
+/// The line becomes `rev = "<commit>"  # <name>`; a missing `rev` is inserted right after `source`.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "used by `update`, the next deliverable")
+)]
+fn set_rev(text: &str, commit: &str, name: &str) -> Result<String> {
+    if name.contains(char::is_control) {
+        bail!("invalid revision name {name:?}");
+    }
+    let line = if name == commit {
+        format!("rev = \"{commit}\"")
+    } else {
+        format!("rev = \"{commit}\"  # {name}")
+    };
+    let key_is = |l: &str, key: &str| {
+        l.trim_start()
+            .strip_prefix(key)
+            .is_some_and(|rest| rest.trim_start().starts_with('='))
+    };
+    let mut in_harness = false;
+    let mut source_at = None;
+    let mut rev_at = None;
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    for (i, l) in lines.iter().enumerate() {
+        let trimmed = l.trim();
+        if is_table_header(trimmed) {
+            in_harness = trimmed.starts_with("[harness]");
+        } else if in_harness && key_is(l, "rev") {
+            rev_at = Some(i);
+        } else if in_harness && key_is(l, "source") {
+            source_at = Some(i);
+        }
+    }
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut out: Vec<String> = lines.iter().map(|l| (*l).to_string()).collect();
+    if let Some(i) = rev_at {
+        let ending = &lines[i][lines[i].trim_end_matches(['\r', '\n']).len()..];
+        out[i] = format!("{line}{ending}");
+    } else if let Some(i) = source_at {
+        if !out[i].ends_with('\n') {
+            out[i].push_str(eol);
+        }
+        out.insert(i + 1, format!("{line}{eol}"));
+    } else {
+        bail!("{CONFIG}: missing `source` in the [harness] table");
+    }
+    let out = out.concat();
+    // Quoted or dotted keys are valid TOML this line-based edit does not see: refuse rather than corrupt.
+    let written = out
+        .parse::<toml::Table>()
+        .ok()
+        .and_then(|t| t.get("harness")?.get("rev")?.as_str().map(|r| r == commit));
+    if written != Some(true) {
+        bail!("{CONFIG}: cannot rewrite `rev` automatically, set `rev = \"{commit}\"` in [harness] by hand");
+    }
+    Ok(out)
+}
+
+/// A `[table]` line, as opposed to a continuation line of a multi-line array such as `["a"],`.
+fn is_table_header(line: &str) -> bool {
+    let Some(rest) = line.strip_prefix('[') else {
+        return false;
+    };
+    let Some((name, after)) = rest.split_once(']') else {
+        return false;
+    };
+    name.chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | ' '))
+        && (after.trim().is_empty() || after.trim_start().starts_with('#'))
+}
+
+fn source_dir(root: &Path, rev_override: Option<&str>) -> Result<PathBuf> {
     let config = read_config(root)?;
     let table = config.get("harness").and_then(toml::Value::as_table);
     let source = table
@@ -277,9 +384,11 @@ fn source_dir(root: &Path) -> Result<PathBuf> {
         .and_then(toml::Value::as_str)
         .with_context(|| format!("{CONFIG}: missing `source` in the [harness] table"))?;
     if is_git_url(source) {
-        let rev = table
-            .and_then(|t| t.get("rev"))
-            .and_then(toml::Value::as_str);
+        let rev = rev_override.or_else(|| {
+            table
+                .and_then(|t| t.get("rev"))
+                .and_then(toml::Value::as_str)
+        });
         checkout(source, rev)
     } else {
         Ok(root.join(source))
@@ -320,7 +429,12 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
 /// # Errors
 /// When the configuration or the source cannot be read, or a file cannot be written.
 pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
-    let source = source_dir(root)?;
+    sync_at(root, options, None)
+}
+
+/// `sync` against `rev` instead of the one in `harness.toml` (a git source only).
+fn sync_at(root: &Path, options: &SyncOptions, rev: Option<&str>) -> Result<Report> {
+    let source = source_dir(root, rev)?;
     let managed = source.join("files");
     let seeds = source.join("seed");
     if !managed.is_dir() {

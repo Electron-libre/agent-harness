@@ -31,3 +31,17 @@ source, or to a given one (a tag, for example), then sync.
 # Hints
 * Tests use a local git repository as the source, never the network.
 * Each project gets its first `rev` by hand from the adoption of the harness; this command replaces that gesture.
+
+# Tracking
+
+1. [x] Resolve a revision to a commit hash and rewrite `rev` textually, with ADR 0002 (SYN-11 in part, SYN-12)
+2. [ ] `harness update`, nominal path: local source refused, report of previous and new revision (SYN-11, SYN-14, SYN-16)
+3. [ ] Atomicity: conflict, unknown revision, `--dry-run`, `--force` leave the project untouched (SYN-13, SYN-15); spec `accepted` then `implemented`
+
+## Decisions
+
+* `rev` stores the full resolved commit hash, the requested name in a trailing comment (ADR 0002, written in deliverable 1).
+* `update` takes `--rev`, `--dry-run` and `--force`; the last two are passed to the `sync`.
+* `rev` is rewritten textually (insert under `source` when absent), no new dependency, comments preserved.
+* `update` does a `sync --dry-run` first and writes nothing on a conflict; a local-path source is refused.
+* Requirements SYN-11 to SYN-16 in `specs/sync.md` (validated, still `draft`).

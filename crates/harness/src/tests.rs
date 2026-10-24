@@ -314,3 +314,91 @@ fn init_escapes_the_source_in_the_config() {
     assert_eq!(harness["source"].as_str(), Some(&*odd.to_string_lossy()));
     assert_eq!(harness["rev"].as_str(), Some("v\"1"));
 }
+
+fn git_in(dir: &Path, args: &[&str]) -> String {
+    git_output(
+        dir,
+        &[
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "commit.gpgsign=false",
+            ],
+            args,
+        ]
+        .concat(),
+    )
+    .unwrap()
+}
+
+/// A git repository with `v1` on its first commit and `main` on its second; returns both hashes.
+fn git_source() -> (TempDir, String, String) {
+    let repo = tempdir().unwrap();
+    git_in(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), "files/a.txt", "a1");
+    git_in(repo.path(), &["add", "."]);
+    git_in(repo.path(), &["commit", "--quiet", "-m", "one"]);
+    git_in(repo.path(), &["tag", "v1"]);
+    let first = git_in(repo.path(), &["rev-parse", "HEAD"]);
+    put(repo.path(), "files/a.txt", "a2");
+    git_in(repo.path(), &["commit", "--quiet", "-am", "two"]);
+    let second = git_in(repo.path(), &["rev-parse", "HEAD"]);
+    (repo, first, second)
+}
+
+// spec: SYN-11
+#[test]
+fn resolves_a_tag_a_branch_a_commit_and_the_default_to_a_full_hash() {
+    let (repo, first, second) = git_source();
+    let cache = tempdir().unwrap();
+    let url = format!("file://{}", repo.path().display());
+    let dir = fetch(cache.path(), &url).unwrap();
+    assert_eq!(resolve_in(&dir, &url, Some("v1")).unwrap(), first);
+    assert_eq!(resolve_in(&dir, &url, Some("main")).unwrap(), second);
+    assert_eq!(resolve_in(&dir, &url, Some(&first)).unwrap(), first);
+    assert_eq!(resolve_in(&dir, &url, None).unwrap(), second);
+    assert!(resolve_in(&dir, &url, Some("nope")).is_err());
+}
+
+// spec: SYN-12
+#[test]
+fn set_rev_changes_only_the_rev_line() {
+    let text = "# mine\n[harness]\nsource = \"x\" # why\nrev = \"old\"  # v0\n\n[project]\nrev = \"keep\"\n";
+    let out = set_rev(text, "abc", "v1").unwrap();
+    assert_eq!(
+        out,
+        "# mine\n[harness]\nsource = \"x\" # why\nrev = \"abc\"  # v1\n\n[project]\nrev = \"keep\"\n"
+    );
+}
+
+// spec: SYN-12
+#[test]
+fn set_rev_inserts_the_rev_after_source_when_missing() {
+    let text = "[harness]\nsource = \"x\"\n\n[project]\na = 1\n";
+    let out = set_rev(text, "abc", "main").unwrap();
+    assert_eq!(
+        out,
+        "[harness]\nsource = \"x\"\nrev = \"abc\"  # main\n\n[project]\na = 1\n"
+    );
+    assert_eq!(set_rev(&out, "abc", "main").unwrap(), out);
+    assert!(set_rev("[project]\n", "abc", "main").is_err());
+}
+
+// spec: SYN-12
+#[test]
+fn set_rev_ignores_array_lines_and_refuses_what_it_cannot_edit() {
+    let text = "[harness]\nextra = [\n  [\"a\"],\n]\nsource = \"x\"\nrev = \"old\"\n";
+    let out = set_rev(text, "abc", "v1").unwrap();
+    assert!(out.ends_with("rev = \"abc\"  # v1\n"), "{out}");
+    assert_eq!(out.matches("rev =").count(), 1);
+    assert!(set_rev(
+        "[harness]\nsource = \"x\"\n\"rev\" = \"old\"\n",
+        "abc",
+        "v1"
+    )
+    .is_err());
+    assert!(set_rev("[harness]\nsource = \"x\"\n", "abc", "a\nb").is_err());
+}
