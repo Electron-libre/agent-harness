@@ -21,3 +21,6 @@ serialiser, so the project's comments and layout survive.
   `check`, it is just no longer what the tool produces.
 * Going back to a tag is one `update --rev <tag>`.
 * The comment is informational: only the hash is read.
+* A pin outlives its branch only while the source still serves the commit. `sync` and `update` fetch a full
+  hash that no ref points to by hash; hosts differ on serving it, and when it is gone the error says to run
+  `harness update`. The CI `cargo install --rev` has the same dependency on the host.

@@ -29,3 +29,11 @@ says how to recover, instead of breaking the check with "unknown revision".
 # Hints
 * Tests use a local git repository as the source whose branch is rewritten after the pin; never the network.
 * Depends on `update_the_harness_to_a_revision` (the `update` command named in the error).
+
+# Tracking
+1. [x] Recover or explain a pinned hash that no ref points to any more (SYN-17): fetch by hash in `resolve_in`, error naming `harness update`, tests on local repositories, docs (ADR 0002, architecture, CI weakness).
+
+## Decisions
+* The fetch by hash is tried for a full hash only; an abbreviated hash or a name keeps "unknown revision".
+* The error says the pinned commit is gone from the source and to run `harness update`.
+* The CI weakness (`cargo install --git --rev`) is documented, the workflow is not changed.

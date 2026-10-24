@@ -30,3 +30,8 @@ see [ADR 0002](adr/0002-rev-pins-the-resolved-commit.md). `harness update [--rev
 (default: the default branch head) to a commit, previews the sync against it (`--dry-run` stops there), and only
 without conflict (or with `--force`) syncs and writes the commit to `rev`; a conflict, an unknown revision or an unreadable source leave the
 project as it was. A local directory has no revision and is refused.
+A pinned commit that a force-push or a deleted branch left without any ref is fetched by its hash (`git fetch
+origin <hash>`); when the source no longer serves it, `sync` and `update` fail naming the commit and `harness
+update`. `check` only compares the project with its lock and never reads the source. The CI step installs the tool
+with `cargo install --git --rev <hash>`, which depends on the same host behaviour: it can fail the same way, and the
+fix is the same `harness update`.

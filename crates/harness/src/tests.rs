@@ -552,3 +552,74 @@ fn update_dry_run_reports_the_target_and_writes_nothing() {
     assert_eq!(get(root.path(), LOCK), lock);
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
 }
+
+/// A source whose pinned commit `first` no branch or tag points to any more; `kept` tells whether the
+/// source still holds it (else it was pruned).
+fn rewritten_source(kept: bool) -> (TempDir, String) {
+    let (repo, first, _second) = git_source();
+    git_in(repo.path(), &["tag", "-d", "v1"]);
+    git_in(
+        repo.path(),
+        &["checkout", "--quiet", "--orphan", "rewritten"],
+    );
+    put(repo.path(), "files/a.txt", "a3");
+    git_in(repo.path(), &["add", "."]);
+    git_in(repo.path(), &["commit", "--quiet", "-m", "three"]);
+    git_in(repo.path(), &["branch", "-M", "main"]);
+    git_in(repo.path(), &["reflog", "expire", "--expire=now", "--all"]);
+    if !kept {
+        git_in(repo.path(), &["gc", "--quiet", "--prune=now"]);
+    }
+    (repo, first)
+}
+
+// spec: SYN-17
+#[test]
+fn a_pinned_hash_no_ref_points_to_any_more_is_fetched_by_hash() {
+    let (repo, first) = rewritten_source(true);
+    let cache = tempdir().unwrap();
+    let url = format!("file://{}", repo.path().display());
+    let dir = fetch(cache.path(), &url).unwrap();
+    assert_eq!(resolve_in(&dir, &url, Some(&first)).unwrap(), first);
+
+    let root = git_project(&repo);
+    let config = get(root.path(), CONFIG).unwrap();
+    put(root.path(), CONFIG, &format!("{config}rev = \"{first}\"\n"));
+    let source = source_dir(Some(cache.path()), root.path(), None).unwrap();
+    assert_eq!(get(&source, "files/a.txt").as_deref(), Some("a1"));
+}
+
+// spec: SYN-17
+#[test]
+fn a_pinned_hash_the_source_does_not_serve_fails_naming_update_and_changes_nothing() {
+    let (repo, first) = rewritten_source(false);
+    let root = git_project(&repo);
+    let config = format!("{}rev = \"{first}\"\n", get(root.path(), CONFIG).unwrap());
+    put(root.path(), CONFIG, &config);
+    let cache = tempdir().unwrap();
+
+    let err = source_dir(Some(cache.path()), root.path(), None).unwrap_err();
+    let message = format!("{err:#}");
+    assert!(message.contains("gone from the source"), "{message}");
+    assert!(message.contains("harness update"), "{message}");
+    assert_eq!(get(root.path(), CONFIG).as_deref(), Some(config.as_str()));
+    assert!(get(root.path(), LOCK).is_none());
+
+    // An abbreviated hash or a name keeps the plain error.
+    let url = format!("file://{}", repo.path().display());
+    let dir = fetch(cache.path(), &url).unwrap();
+    for rev in [&first[..12], "nope"] {
+        let err = resolve_in(&dir, &url, Some(rev)).unwrap_err();
+        assert!(format!("{err:#}").contains("unknown revision"), "{err:#}");
+    }
+}
+
+// spec: SYN-17
+#[test]
+fn only_a_full_hexadecimal_hash_is_fetched_by_hash() {
+    assert!(is_full_hash(&"a1".repeat(20)));
+    assert!(is_full_hash(&"A1".repeat(32)));
+    assert!(!is_full_hash(&"a1".repeat(6)));
+    assert!(!is_full_hash(&"g".repeat(40)));
+    assert!(!is_full_hash("main"));
+}

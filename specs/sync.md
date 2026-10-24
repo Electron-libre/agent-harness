@@ -30,6 +30,7 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-14** (deterministic) `update` must fail, changing nothing, when the source is a local directory, since it has no revision.
 - **SYN-15** (deterministic) `update --dry-run` must report the target revision and what the `sync` would do, and must write nothing.
 - **SYN-16** (deterministic) `update` must report the previous revision (or that there was none), the new one and the files changed.
+- **SYN-17** (deterministic) When `rev` is a full commit hash that no branch or tag of the source points to any more, `sync` and `update` must try to fetch that commit by its hash, and use it when the source serves it. When the source does not, they must fail changing nothing, with an error that names the pinned commit as gone from the source and says to run `harness update`.
 
 ## Scenarios
 
@@ -38,8 +39,11 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-6) Given a project whose file already equals the source but is not in the lock, when `sync` runs, then it is locked and reported as unchanged.
 - (SYN-11) Given a project already at the resolved commit, when `update` runs, then `rev` is rewritten unchanged, the `sync` reports nothing and the run succeeds.
 - (SYN-12) Given a `rev` line with a trailing comment from an earlier update, when `update` runs, then the comment is replaced by the new requested name.
+- (SYN-17) Given an abbreviated hash or a name that does not resolve, the fetch by hash is not tried and the error stays "unknown revision".
 
 ## Non-goals
 
 - Merging a local change with a source change: a drifted file is fixed in the central repository.
 - Fetching more than a branch, tag or commit of a git source.
+- Making `check` depend on the source: it compares the project with its lock only, so the pin cannot break it.
+- Guaranteeing that a host serves an unreferenced commit: it depends on the host.

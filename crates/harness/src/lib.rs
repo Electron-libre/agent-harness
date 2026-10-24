@@ -292,11 +292,25 @@ fn resolve_in(dir: &Path, url: &str, rev: Option<&str>) -> Result<String> {
         Some(rev) => vec![format!("origin/{rev}"), rev.to_string()],
         None => vec!["origin/HEAD".to_string()],
     };
-    let target = candidates
-        .iter()
-        .find(|c| resolves(dir, c))
-        .with_context(|| format!("{url}: unknown revision {}", rev.unwrap_or("origin/HEAD")))?;
-    git_output(dir, &["rev-parse", &format!("{target}^{{commit}}")])
+    if let Some(target) = candidates.iter().find(|c| resolves(dir, c)) {
+        return git_output(dir, &["rev-parse", &format!("{target}^{{commit}}")]);
+    }
+    let rev = rev.unwrap_or("origin/HEAD");
+    if !is_full_hash(rev) {
+        bail!("{url}: unknown revision {rev}");
+    }
+    // No branch or tag points to the pinned commit any more: ask the source for it by hash (hosts differ
+    // on whether they serve it; a refusal is reported below).
+    let _ = git(Some(dir), &["fetch", "--quiet", "origin", rev]);
+    if !resolves(dir, rev) {
+        bail!("{url}: the pinned commit {rev} is gone from the source (or the source is unreachable: see git's message above); run `harness update` to pin a current revision");
+    }
+    git_output(dir, &["rev-parse", &format!("{rev}^{{commit}}")])
+}
+
+/// A 40 (SHA-1) or 64 (SHA-256) hexadecimal digit commit name, as `update` writes it to `rev`.
+fn is_full_hash(rev: &str) -> bool {
+    matches!(rev.len(), 40 | 64) && rev.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Local checkout of a git source in the user cache, at `rev` (default: the remote's default branch).
