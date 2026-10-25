@@ -36,7 +36,7 @@ the review result can be seen.
 
 1. [x] Measure: capture the real `PostToolUse` (`Skill`) and `PreToolUse` (`Bash`) payloads with a temporary git-ignored log hook; record the available fields and whether the review findings are visible
 2. [x] Marker and refusal: `require_code_review.rs` (`record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash` for `git commit`): marker = hash of the diff against `HEAD`, reviewed files, `HEAD`; exit 2 without a valid marker; tests in `test_hooks.rs`
-3. [ ] Escape hatches: files all under `issues/`, user waiver file `.git/claude-review-waived` (fixes on already reviewed files and `HEAD` changed invalidating the marker were done in deliverable 2); one test each
+3. [x] Escape hatches: files all under `issues/`, user waiver file `.git/claude-review-waived` (fixes on already reviewed files and `HEAD` changed invalidating the marker were done in deliverable 2); one test each
 4. [ ] Docs: update step 4.5 of `issue-workflow` and the docs, `just sync`, `just check`, `just test-harness`
 
 ## Decisions
@@ -81,3 +81,14 @@ the review result can be seen.
   parsing and separators, `git -C` (relative to the shell directory), subdirectory cwd, repository without commit,
   failed review recorded, name/length delimiters in the hash, unmoved marker (now in the git directory), the
   fixes-after-review loop. Not fixed: see the lines above.
+
+### Deliverable 3 summary
+
+* Done: a diff under `issues/` only passes (renames listed as deletion plus addition); a waiver file created by
+  the user in the git directory lets one commit through and is removed by the hook; any `Bash` command naming
+  the waiver file is refused (a deterrent: a `Write` of the file is not caught). Documentation is reviewed (not exempt).
+* Verified: `just check`, `just test-harness`. Not verified: the waiver in a linked worktree.
+* Decision: the waiver is one-shot and consumed when the check passes, even if the commit then fails.
+* Code review: waiver creatable by the agent (fixed by refusing commands that name it), rename into `issues/`
+  bypass (fixed with `--no-renames`), wrapping and doc claims (fixed). Not fixed: the waiver can still be written with the `Write` tool (doc says deterrent); waived commits leave no trace;
+  consumed before the commit succeeds; worktree test.

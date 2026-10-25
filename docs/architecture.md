@@ -64,8 +64,11 @@ the marker `claude-code-review.json` in the git directory, never a file of the w
 the working tree against `HEAD` (tracked changes and untracked files, what an add of everything followed by a
 commit commits) and the files it covers. At a commit (`git -C dir` is followed), `check` recomputes the snapshot
 and exits 2, telling the agent to run the review, when the marker is missing, was made before the last commit, or
-the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with nothing to commit
-and a directory outside a repository are let through. The hook sees the review text in the `Skill` response but
+the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with nothing to commit,
+a diff under `issues/` only and a directory outside a repository are let through. Documentation is reviewed like
+code. The user waives the review of the next commit with `touch .git/claude-review-waived`; the hook removes the
+file when it lets that commit through, and refuses any Bash command that names the file. That deters the agent from
+creating one but does not stop a write made by another tool. The hook sees the review text in the `Skill` response but
 does not parse it.
 
 ## The instruction audit

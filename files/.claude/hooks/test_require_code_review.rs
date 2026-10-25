@@ -126,6 +126,32 @@ fn main() {
     run(&hook, "record", &project, &failed_review);
     check("does not record a failed review", commit_attempt(&hook, &project, commit).0 == 2);
 
+    let esc = project.join("esc");
+    fs::create_dir_all(esc.join("issues")).unwrap();
+    sh(&esc, &["init", "-q", "."]);
+    fs::write(esc.join("issues/i.md"), "one\n").unwrap();
+    fs::write(esc.join("code.txt"), "one\n").unwrap();
+    sh(&esc, &["add", "-A"]);
+    sh(&esc, &["commit", "-qm", "init"]);
+    let esc_commit = "git -C esc commit -am x";
+    fs::write(esc.join("issues/i.md"), "two\n").unwrap();
+    check("lets through a commit that only touches issues", commit_attempt(&hook, &project, esc_commit).0 == 0);
+    fs::write(esc.join("issues/j.md"), "new\n").unwrap();
+    check("lets through a new issue file", commit_attempt(&hook, &project, esc_commit).0 == 0);
+    sh(&esc, &["mv", "code.txt", "issues/code.txt"]);
+    check("refuses a code file renamed into issues", commit_attempt(&hook, &project, esc_commit).0 == 2);
+    sh(&esc, &["mv", "issues/code.txt", "code.txt"]);
+    fs::write(esc.join("code.txt"), "two\n").unwrap();
+    check("refuses issues mixed with code", commit_attempt(&hook, &project, esc_commit).0 == 2);
+    fs::write(esc.join("docs.md"), "doc\n").unwrap();
+    fs::write(esc.join("code.txt"), "one\n").unwrap();
+    check("refuses documentation", commit_attempt(&hook, &project, esc_commit).0 == 2);
+    let waiver = esc.join(".git/claude-review-waived");
+    check("refuses a command that creates the waiver", commit_attempt(&hook, &project, "touch esc/.git/claude-review-waived").0 == 2);
+    fs::write(&waiver, "").unwrap();
+    check("lets through a commit the user waived", commit_attempt(&hook, &project, esc_commit).0 == 0);
+    check("consumes the waiver", !waiver.exists() && commit_attempt(&hook, &project, esc_commit).0 == 2);
+
     let fresh = project.join("fresh");
     fs::create_dir_all(&fresh).unwrap();
     sh(&fresh, &["init", "-q", "."]);
