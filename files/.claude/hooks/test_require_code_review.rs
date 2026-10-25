@@ -544,6 +544,50 @@ fn fish_set_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+/// Runs `mode` for `event` with a `git` that only logs its arguments, and returns the logged calls (`None` when the
+/// hook itself failed, so that "no call" never means "did not run").
+fn git_calls(hook: &Path, mode: &str, event: &serde_json::Value) -> Option<Vec<String>> {
+    let root = std::env::temp_dir().join(format!("reviewtest-calls-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let bin = root.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    let log = root.join("calls.log");
+    let fake = bin.join("git");
+    fs::write(&fake, format!("#!/bin/sh\necho \"$*\" >> '{}'\n", log.display())).unwrap();
+    fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
+    let mut child = Command::new("rust-script")
+        .arg(hook)
+        .arg(mode)
+        .env("PATH", path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("rust-script must be installed");
+    child.stdin.take().unwrap().write_all(event.to_string().as_bytes()).unwrap();
+    let ran = child.wait().unwrap().success();
+    let calls = fs::read_to_string(&log).unwrap_or_default().lines().map(String::from).collect();
+    let _ = fs::remove_dir_all(&root);
+    ran.then_some(calls)
+}
+
+fn bash_calls(hook: &Path, command: &str) -> Option<Vec<String>> {
+    git_calls(hook, "check", &serde_json::json!({"tool_name": "Bash", "tool_input": {"command": command}}))
+}
+
+/// A command that is not a commit costs no `git` call: the hook runs on every command of the agent.
+fn cheap_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let skill = |name: &str| serde_json::json!({"tool_name": "Skill", "tool_input": {"skill": name}, "tool_response": {"success": true}});
+    vec![
+        ("a command that is not a commit runs no git", bash_calls(hook, "ls -la") == Some(vec![])),
+        ("a git command that is not a commit runs no git", bash_calls(hook, "git status") == Some(vec![])),
+        ("a commit looks for the top of its work tree", bash_calls(hook, "git commit -m x").is_some_and(|c| c.iter().any(|c| c.contains("--show-toplevel")))),
+        ("a skill other than the review runs no git", git_calls(hook, "record", &skill("update-docs")) == Some(vec![])),
+        ("the review skill records at the top of its work tree", git_calls(hook, "record", &skill("code-review")).is_some_and(|c| c.iter().any(|c| c.contains("--show-toplevel")))),
+    ]
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -678,7 +722,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

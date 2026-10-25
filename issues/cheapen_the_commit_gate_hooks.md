@@ -24,7 +24,7 @@ command is not a commit, and a commit gate must not read large untracked files.
 
 # Tracking
 1. [x] Measure the latency of a plain `ls` (no hook, each hook, both) and of a commit with a large untracked file; decide on deliverable 4
-2. [ ] Test `commit_dirs` before `toplevel` in `main` (a non-commit command runs no `git`)
+2. [x] Test `commit_dirs` before `toplevel` in `main` (a non-commit command runs no `git`)
 3. [ ] Hash untracked files without loading them (`git hash-object --stdin-paths`); the marker still changes with the content
 4. [x] (dropped, see Decisions) Merge the two hooks into one script, only if the measure shows the start dominates (else tick as dropped with the figures)
 
@@ -39,3 +39,6 @@ command is not a commit, and a commit gate must not read large untracked files.
 * Deliverable 4 dropped: merging would save about 2.5 ms per Bash call, which is not worth a coupling of two hooks, a change of the
   declaration and of `harness sync`. The real costs are the early `toplevel` (about 1 ms of the 4.1) and the memory of `snapshot`.
 * Merging `block_ai_attribution` into `require_code_review` is accepted if the measure justifies it.
+* Deliverable 2: `toplevel` is now asked in `record` (after the `code-review` skill) and in `check` (per directory of a commit) only; `native`
+  is unchanged. Test `cheap_checks` (fake `git` logging its calls). Verified: `just check`, `just test-harness`. Not measured again.
+  Code review: 5 findings, all fixed (test fails when the hook fails to run, quoted log path, record path tested, redundant binding removed, directories deduplicated before `toplevel`).

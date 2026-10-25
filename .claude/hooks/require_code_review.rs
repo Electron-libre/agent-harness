@@ -534,15 +534,14 @@ fn main() {
     std::io::stdin().read_to_string(&mut input).ok();
     let event: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
     let project = std::env::var("CLAUDE_PROJECT_DIR").ok().map(PathBuf::from);
-    let cwd = event["cwd"].as_str().map(PathBuf::from).or(project).unwrap_or_else(|| ".".into());
-    let shell_dir = cwd;
-    let cwd = toplevel(&shell_dir);
+    // the top of the work tree costs a `git` call: asked only once the event is known to matter
+    let shell_dir = event["cwd"].as_str().map(PathBuf::from).or(project).unwrap_or_else(|| ".".into());
     match mode.as_str() {
         "record" => {
             let skill = event["tool_input"]["skill"].as_str().unwrap_or_default();
             let succeeded = event["tool_response"]["success"].as_bool() == Some(true);
             if skill.rsplit(':').next() == Some(REVIEW_SKILL) && succeeded {
-                if let Err(e) = record(&cwd) {
+                if let Err(e) = record(&toplevel(&shell_dir)) {
                     eprintln!("Could not record the code review marker: {e}");
                     std::process::exit(1);
                 }
@@ -568,7 +567,9 @@ fn main() {
                 std::process::exit(2);
             }
             let Ok((dirs, _)) = dirs else { return };
-            let mut roots: Vec<PathBuf> = dirs.into_iter().map(|d| d.map_or(cwd.clone(), |d| toplevel(&shell_dir.join(d)))).collect();
+            let mut dirs = dirs;
+            dirs.dedup();
+            let mut roots: Vec<PathBuf> = dirs.into_iter().map(|d| toplevel(&d.map_or(shell_dir.clone(), |d| shell_dir.join(d)))).collect();
             roots.dedup();
             for cwd in roots {
                 if let Some(why) = refusal(&cwd) {
