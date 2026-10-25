@@ -60,7 +60,13 @@ shell directory, or the spec must say plainly why it cannot, and the hook must t
    `'b$c'` / `\$b` no longer refused; not fixed: `--git-dir=$X`, `-C $X`, fish `set -x` (outside REV-7, to file as an
    issue), over-refusal of `echo GIT_DIR=$X` or a message quoting it (fail closed, the user can waive), two parsers
    kept apart.
-4. [ ] Docs (architecture, hook doc, this issue), spec `accepted` then `implemented`, `just sync`
+4. [x] Docs (architecture, hook doc, this issue), spec `accepted` then `implemented`, `just sync`
+   Done: `docs/architecture.md` (review gate), the `//!` of the hook (deliverable 3), `REV` set to `implemented` (the
+   seven requirements are traced; it never stood at `accepted` since its tests came with the code). Verified:
+   `just check-specs`, `just check`, `just test-harness`. Left over: `--git-dir=$X` / `-C $X` / fish `set -x` are not
+   covered, to file as a separate issue if wanted. Code review: the docs now name `env -u`, backticks and the
+   cross-call `export` as a known limit; the `draft` to `implemented` jump is kept (the user validated the requirements,
+   all are traced, `implemented` is enforced like `accepted`).
 
 ## Decisions
 
