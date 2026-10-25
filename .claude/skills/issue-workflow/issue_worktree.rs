@@ -4,7 +4,8 @@
 //! `<stem>` cut from the branch of the main worktree. `finish <stem> [--force]` removes that worktree and branch once the
 //! branch is merged into the branch of the main worktree (ancestor, or every commit has a patch-equivalent there,
 //! which covers a rebase or a squash of one commit); `--force` also accepts a squash of several commits, after the
-//! user agreed, and still refuses a worktree with uncommitted changes. Run both from any worktree of the repository.
+//! user agreed, and still refuses a worktree with uncommitted changes. `start` runs from any worktree; `finish` too, except
+//! from inside the worktree it would remove (it refuses and names the main worktree, `--force` or not).
 //! Usage: `just start-issue issues/foo.md`, `just finish-issue foo` (`just finish-issue foo --force`).
 
 use std::path::{Path, PathBuf};
@@ -87,13 +88,18 @@ fn finish(cwd: &Path, stem: &str, force: bool) -> Result<String, String> {
     if !git_ok(&main, &["rev-parse", "--verify", "-q", &format!("refs/heads/{stem}")]) {
         return Err(format!("no branch {stem}"));
     }
+    let dir = sibling(&main, stem)?;
+    // Removing the directory the caller stands in breaks its shell: refuse, whatever `--force` says.
+    let inside = std::fs::canonicalize(cwd).ok().zip(std::fs::canonicalize(&dir).ok()).is_some_and(|(here, target)| here.starts_with(target));
+    if inside {
+        return Err(format!("the current directory is inside {}: run finish-issue from the main worktree {}; nothing was removed", dir.display(), main.display()));
+    }
     let ancestor = git_ok(&main, &["merge-base", "--is-ancestor", stem, &trunk]);
     // A rebase or a squash of one commit leaves every commit with a patch-equivalent (`-`) on trunk.
     let equivalent = ancestor || git(&main, &["cherry", &trunk, stem]).is_ok_and(|c| !c.lines().any(|l| l.starts_with('+')));
     if !equivalent && !force {
         return Err(format!("the branch {stem} is not merged into {trunk}: merge it first, or pass --force if it was squashed (it deletes work that is not on {trunk}); nothing was removed"));
     }
-    let dir = sibling(&main, stem)?;
     match worktree_of(&main, stem) {
         Some(found) if found != dir => {
             return Err(format!("the branch {stem} is checked out in {}, not in {}: nothing was removed", found.display(), dir.display()));

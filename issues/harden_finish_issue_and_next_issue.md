@@ -24,3 +24,18 @@ whose branch was squash-merged, whatever the number of commits.
 
 # Hints
 * `finish` must never delete work that is not on trunk.
+
+# Tracking
+1. [x] `finish-issue` refuses, with or without `--force`, from inside the worktree to remove (PAR-11).
+2. [ ] A squash of any number of commits counts as merged for `finish-issue` and frees the issue in `next-issue`, by comparing trees (PAR-3, PAR-6, PAR-10); docs of the skill updated.
+
+## Decisions
+* Mode: autonomous.
+* Refuse (do not `cd`) when the cwd is the worktree or inside it; `--force` refuses too; the message names the main worktree.
+* Squash detection: `git merge-tree --write-tree trunk branch` gives trunk's tree (needs git >= 2.38); a git error counts as not merged.
+
+## Deliverable 1 summary
+* Done: `finish` refuses from inside the worktree to remove (canonical cwd under the target), `--force` or not, naming the main worktree; test `finish_refuses_from_inside_the_worktree` (`// spec: PAR-11`) failed first (the worktree was removed under the shell); docs of the skill, architecture and script header updated; spec set `accepted`.
+* Verified: `just check`, `just test-harness`, `just check-harness`.
+* Not verified: a cwd whose symlinks `canonicalize` cannot resolve.
+* Code review: 6 findings. Fixed: the guard now runs before the merged test (an unmerged branch gets the same refusal, tested); the architecture sentence reworded; the spec goes back to `draft` (it was set `accepted` while PAR-3/6/10 are still to be implemented: deliverable 2 sets it). Not fixed: the guard compares only with the sibling path (a branch checked out elsewhere is already refused by the existing `found != dir` check); the test helper's early return for a missing cwd is kept, the `kept` check catches a removal.

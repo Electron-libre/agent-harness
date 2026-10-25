@@ -34,6 +34,9 @@ type Checks = Vec<(&'static str, bool)>;
 
 impl Ctx {
     fn run(&self, cwd: &Path, args: &[&str]) -> (bool, String) {
+        if !cwd.is_dir() {
+            return (false, format!("{} does not exist", cwd.display()));
+        }
         let out = Command::new("rust-script").arg(&self.script).args(args).current_dir(cwd).output().expect("rust-script must be installed");
         (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr))
     }
@@ -154,13 +157,36 @@ fn finish_forces_a_squash_of_several_commits(c: &Ctx) -> Checks {
     ]
 }
 
+// spec: PAR-11
+fn finish_refuses_from_inside_the_worktree(c: &Ctx) -> Checks {
+    let (ok, _) = c.run(&c.repo, &["start", "issues/c.md"]);
+    assert!(ok);
+    let sub = c.wt("c").join("issues");
+    let (inside, msg) = c.run(&c.wt("c"), &["finish", "c"]);
+    let (below, _) = c.run(&sub, &["finish", "c"]);
+    let (forced, _) = c.run(&sub, &["finish", "c", "--force"]);
+    let kept = c.wt("c").is_dir() && branch_exists(&c.repo, "c");
+    commit_file(&c.wt("c"), "c.txt");
+    let (unmerged, unmerged_msg) = c.run(&c.wt("c"), &["finish", "c"]);
+    let (outside_unmerged, _) = c.run(&c.repo, &["finish", "c"]);
+    git_ok(&c.repo, &["merge", "-q", "--ff-only", "c"]);
+    let (outside, _) = c.run(&c.repo, &["finish", "c"]);
+    vec![
+        ("finish refuses from the worktree to remove and names the main worktree", !inside && msg.contains(c.repo.to_str().unwrap())),
+        ("finish refuses from a subdirectory of it, with or without --force", !below && !forced),
+        ("a refusal keeps the worktree and the branch", kept),
+        ("an unmerged branch gets the same refusal from inside", !unmerged && unmerged_msg.contains("inside") && !outside_unmerged),
+        ("finish from the main worktree still removes it", outside && !c.wt("c").exists() && !branch_exists(&c.repo, "c")),
+    ]
+}
+
 fn main() {
     let script = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap().join("issue_worktree.rs");
     let root = std::fs::canonicalize(std::env::temp_dir()).unwrap().join(format!("issue_worktree_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join("issues")).unwrap();
-    for s in ["x", "y", "z", "w", "r", "m", "s"] {
+    for s in ["x", "y", "z", "w", "r", "m", "s", "c"] {
         std::fs::write(repo.join(format!("issues/{s}.md")), format!("# {s}\n")).unwrap();
     }
     git_ok(&repo, &["init", "-q", "-b", "trunk", "."]);
@@ -170,7 +196,7 @@ fn main() {
 
     let c = Ctx { root: root.clone(), repo, script };
     let mut failed = false;
-    for checks in [start_creates_the_worktree(&c), start_refuses_and_changes_nothing(&c), finish_needs_a_merged_branch(&c), finish_removes_only_a_clean_sibling(&c), finish_accepts_a_patch_equivalent_branch(&c), finish_forces_a_squash_of_several_commits(&c)] {
+    for checks in [start_creates_the_worktree(&c), start_refuses_and_changes_nothing(&c), finish_needs_a_merged_branch(&c), finish_removes_only_a_clean_sibling(&c), finish_accepts_a_patch_equivalent_branch(&c), finish_forces_a_squash_of_several_commits(&c), finish_refuses_from_inside_the_worktree(&c)] {
         for (name, ok) in checks {
             println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
             failed |= !ok;
