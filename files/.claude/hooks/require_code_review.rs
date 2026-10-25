@@ -128,9 +128,28 @@ fn environment_repository(words: &[&str]) -> (Option<PathBuf>, Option<PathBuf>) 
     const NAMES: [&str; 2] = ["GIT_DIR", "GIT_WORK_TREE"];
     let (mut prefix, mut shell, mut exported) = ([None::<PathBuf>, None], [None::<PathBuf>, None], [None::<PathBuf>, None]);
     let (mut masked, mut exporting, mut unsetting, mut env_unset) = ([false; 2], false, false, false);
+    // fish `set`: (exports, erases) while its flags are read, until the name or the end of the command
+    let mut fish = None::<(bool, bool)>;
     let mut words = words.iter();
     while let Some(w) = words.next() {
         let named = NAMES.iter().position(|n| w == n);
+        if let Some((export, erase)) = fish.as_mut().filter(|_| w.starts_with('-')) {
+            *export |= *w == "--export" || (!w.starts_with("--") && w.contains('x'));
+            *erase |= *w == "--erase" || (!w.starts_with("--") && w.contains('e'));
+            continue;
+        }
+        if let (Some((export, erase)), true) = (fish.take(), *w != ";") {
+            if let Some(n) = named {
+                if erase {
+                    (prefix[n], shell[n], exported[n]) = (None, None, None);
+                } else if export {
+                    // a substitution leaves the line without a value (`;`): the check of the raw command refuses it
+                    let value = words.as_slice().first().filter(|v| **v != ";").and_then(|_| take_value(&mut words));
+                    exported[n] = value.map(|v| PathBuf::from(v.trim_matches(['"', '\''])));
+                }
+            }
+            continue;
+        }
         if let Some(n) = NAMES.iter().position(|n| w.strip_prefix(n).is_some_and(|v| v.starts_with('='))) {
             let value = Some(PathBuf::from(quoted(&w[NAMES[n].len() + 1..], &mut words).trim_matches(['"', '\''])));
             if exporting {
@@ -141,6 +160,8 @@ fn environment_repository(words: &[&str]) -> (Option<PathBuf>, Option<PathBuf>) 
                 }
                 (prefix[n], shell[n], masked[n]) = (value.clone(), value, false);
             }
+        } else if *w == "set" {
+            fish = Some((false, false));
         } else if *w == ";" {
             (prefix, masked, exporting, unsetting, env_unset) = ([None, None], [false; 2], false, false, false);
         } else if matches!(*w, "export" | "declare" | "typeset") {
@@ -196,6 +217,34 @@ fn undeterminable_variable(command: &str) -> Option<&'static str> {
             }
             value_expands(&command[at + assignment.len()..])
         })
+    })
+}
+
+/// The variable of `environment_repository` a fish `set -x NAME value` of the line gives a value the text does not give
+/// (`$X`, `(cmd)`, backticks, unless in single quotes), `None` when every value is literal. It reads the raw command.
+fn fish_unreadable_variable(command: &str) -> Option<&'static str> {
+    command.match_indices("set").find_map(|(at, _)| {
+        // `reset` or `--set` is not the builtin
+        if command[..at].ends_with(|c: char| c.is_alphanumeric() || c == '_' || c == '-') {
+            return None;
+        }
+        let mut rest = command[at + 3..].strip_prefix(char::is_whitespace)?;
+        let mut export = false;
+        loop {
+            rest = rest.trim_start();
+            let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+            let word = &rest[..end];
+            if let Some(long) = word.strip_prefix("--") {
+                export |= long == "export";
+            } else if let Some(short) = word.strip_prefix('-') {
+                export |= short.contains('x');
+            } else {
+                let name = ["GIT_DIR", "GIT_WORK_TREE"].into_iter().find(|n| *n == word)?;
+                let value = rest[end..].trim_start();
+                return (export && (value.starts_with('(') || value_expands(value))).then_some(name);
+            }
+            rest = &rest[end..];
+        }
     })
 }
 
@@ -383,7 +432,7 @@ fn main() {
                 std::process::exit(2);
             }
             let Some(dirs) = commit_dirs(command) else { return };
-            let unreadable = dirs.as_ref().err().map(|option| format!("the value of {option}")).or_else(|| undeterminable_variable(command).map(str::to_string));
+            let unreadable = dirs.as_ref().err().map(|option| format!("the value of {option}")).or_else(|| undeterminable_variable(command).or_else(|| fish_unreadable_variable(command)).map(str::to_string));
             if let Some(what) = unreadable {
                 eprintln!("Refused: {what} is one the hook cannot read (a variable, a substitution), so the repository the commit lands in is unknown.");
                 eprintln!("Write the path in the command (`git -C dir commit`), or ask the user to waive the review.");

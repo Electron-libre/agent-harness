@@ -40,7 +40,7 @@ fish `set -x GIT_DIR $X`. The hook must refuse such a line (fail closed), as `RE
 # Tracking
 
 1. [x] Refuse an unreadable value of `-C`, `--git-dir` and `--work-tree` (REV-8, options). Verified: `just check`, `just test-harness`, `just check-harness`; not verified: the fish forms (deliverable 2, so the spec stays `draft`). Code review: the fish half of REV-8 is deliverable 2 (not fixed here); a `commit` word after a substitution also refuses a line that does not commit (accepted, fail closed; this very note was refused while it was written in a shell command); the duplicated refusal message was merged, the redundant `unwrap_or_default` removed, the doc rewrapped.
-2. [ ] Read the fish `set -x` / `set --export` / `set -e` forms of `GIT_DIR` and `GIT_WORK_TREE` (REV-8, fish)
+2. [x] Read the fish `set -x` / `set --export` / `set -e` forms of `GIT_DIR` and `GIT_WORK_TREE`. Verified: `just check`, `just test-harness`, `just check-harness`; REV-8 traced and the spec set to `implemented`; not verified: fish forms beyond `set` with flags, a name and a first value (value lists, `set -U` persistence). Code review: no bug confirmed; the false positives suspected after a literal value are covered by new tests (the value stops at the first separator); a second raw-text scanner for `set` next to the word reader is kept, as `undeterminable_variable` already is; doc rewrapped (REV-8, fish)
 
 ## Decisions
 

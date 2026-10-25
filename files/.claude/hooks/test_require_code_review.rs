@@ -348,6 +348,48 @@ fn unreadable_option_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-8
+/// fish sets the environment with `set -x NAME value`, without a `NAME=value` word: read as the assignment, or refused when
+/// the value cannot be read; `set -e` takes it back.
+fn fish_set_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev8b");
+    let mut out = all_refused(
+        hook,
+        &current,
+        &[
+            "set -x GIT_DIR $X; git commit -am x",
+            "set --export GIT_WORK_TREE (mktemp -d); git commit -am x",
+            "set -gx GIT_DIR \"$HOME/o/.git\"; git commit -am x",
+            "set -Ux GIT_WORK_TREE $X\ngit commit -am x",
+            "set -x GIT_DIR ../other/.git; git commit -am x",
+            "set --export --global GIT_WORK_TREE '../other'; git commit -am x",
+            "set -x GIT_WORK_TREE ../a; set -x GIT_WORK_TREE ../other; git commit -am x",
+        ],
+    );
+    // `other` is still unreviewed: only the erase lets these through
+    for (name, command) in [
+        ("set -e takes the export back", "set -x GIT_WORK_TREE ../other; set -e GIT_WORK_TREE; git commit -am x"),
+        ("set --erase takes the export back", "set -gx GIT_DIR ../other/.git; set --erase GIT_DIR; git commit -am x"),
+    ] {
+        out.push((name, commit_attempt(hook, &current, command).0 == 0));
+    }
+    review_done(hook, &other, "code-review");
+    for (name, command) in [
+        ("a fish export naming the reviewed repository passes", "set -x GIT_WORK_TREE ../other; git commit -am x"),
+        ("a local fish variable is no environment of git", "set GIT_DIR $X; git commit -am x"),
+        ("a single-quoted dollar is a literal value", "set -x GIT_WORK_TREE '$X'; git commit -am x"),
+        ("another variable is not read", "set -x MY_GIT_DIR $X; git commit -am x"),
+        ("a dollar elsewhere in the line is no environment", "set -x FOO $X; git commit -m \"$msg\""),
+        ("a dollar after a literal value is no part of it", "set -x GIT_WORK_TREE ../other; git commit -m \"$msg\""),
+        ("a bracket after a literal value is no part of it", "set -x GIT_WORK_TREE ../other; git commit -m \"(wip)\""),
+        ("a shell set before the environment does not swallow it", "set -e && GIT_WORK_TREE=../other git commit -am x"),
+    ] {
+        out.push((name, commit_attempt(hook, &current, command).0 == 0));
+    }
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -482,7 +524,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }
