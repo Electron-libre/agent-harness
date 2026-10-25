@@ -1,7 +1,7 @@
 ---
 id: REV
-status: draft
-adrs: []
+status: implemented
+adrs: [0004]
 ---
 
 # Code review gate

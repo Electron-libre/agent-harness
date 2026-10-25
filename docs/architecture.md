@@ -85,7 +85,8 @@ the text does not show (`$X`, `${X}`, `$(…)`, `(cmd)`, backticks) is refused, 
 earlier command of the session (an `export` in one call, a plain `git commit` in the next) is not seen, so the gate
 cannot cover that case.
 
-A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` installs (`crates/harness/src/gate.rs`;
+A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` installs
+([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md), `crates/harness/src/gate.rs`;
 `.git/hooks` is neither versioned nor cloned, so each clone needs its own `sync`). The installed file is a small `sh`
 script, marked by its second line, that starts `rust-script .claude/hooks/require_code_review.rs native` from the
 work tree and then the `pre-commit` the user already had, which `sync` moved to `pre-commit.user` (it never overwrites a

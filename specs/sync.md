@@ -1,7 +1,7 @@
 ---
 id: SYN
-status: draft
-adrs: [0002]
+status: implemented
+adrs: [0002, 0004]
 ---
 
 # Harness synchronisation
