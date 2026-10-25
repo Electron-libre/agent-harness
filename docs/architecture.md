@@ -26,8 +26,11 @@ Everything that differs between projects is a value, not code. Scripts read list
 
 The hooks are managed (`files/.claude/hooks/`) but their declaration lives in `.claude/settings.json`, which is
 seeded once, so a new hook reaches a project that already adopted the harness only when the declaration is added
-to its file by hand. `harness check` stays lock-only and does not tell when one is missing. The extra hooks to
-declare, under `hooks` in `.claude/settings.json`:
+to its file by hand. `harness check` stays lock-only, so the hygiene test of the settings (`test_settings.rs`, run by
+`just test-harness` and by CI) fails for a hook script nobody declared, and its message gives the event, the matcher
+(the `Declare:` line of the hook's header) and the command to add. An agent that updates the harness runs
+`just test-harness` afterwards and is told what to add. The declaration of the attribution hook, under `hooks`
+in `.claude/settings.json`:
 
 ```json
 "PreToolUse": [

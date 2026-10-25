@@ -34,6 +34,7 @@ down several times and still gets broken, because the harness default reminder a
 # Tracking
 1. [x] The hook `files/.claude/hooks/block_ai_attribution.rs` and its Rust test (`git commit` and `gh pr create|edit`: inline, heredoc, `-F`/`--body-file`; passes a message that only discusses the rule)
 2. [x] Wire it: declaration in `seed/.claude/settings.json` and this repository's `.claude/settings.json`, snippet for existing consumers, docs (`update-docs`), real-case check
+3. [x] A declared-hook check in `test_settings.rs` (asked by the user: the agent that updates the harness must be told)
 
 ## Decisions
 * Mode: autonomous (review of step 4.5 never skipped, local commits, no push).
@@ -48,4 +49,9 @@ down several times and still gets broken, because the harness default reminder a
 ## Deliverable 2 summary
 * Done: the `PreToolUse` declaration in `seed/.claude/settings.json` and `.claude/settings.json`; the snippet for existing consumers and the hook described in `docs/architecture.md`.
 * Verified: `just check`, `just test-harness` (settings hygiene included), `just check-harness`; the hook run by hand on a faulty `git commit` exits 2 with the reason. Not verified: the hook triggered by Claude Code itself in a fresh session (settings are read at session start).
+* Code review: no findings.
+
+## Deliverable 3 summary
+* Done: `test_settings.rs` fails for a hook script of `.claude/hooks/` that `settings.json` does not declare, naming the event, matcher and command; each hook header carries a `Declare:` line. Docs updated.
+* Verified: removing the declaration makes `test_settings.rs` fail with that message; restored, `just check` and `just test-harness` pass. Not verified: a run on a real consumer.
 * Code review: no findings.

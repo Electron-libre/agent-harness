@@ -5,6 +5,8 @@
 //! `--body-file`. Exit 2 sends the reason back to the agent so it rewrites the message. A message that only
 //! talks about the rule passes: a trailer or footer counts only where a line, or a quoted string, starts with it and names the agent.
 //!
+//! Declare: PreToolUse Bash
+//!
 //! ```cargo
 //! [dependencies]
 //! serde_json = "1"
