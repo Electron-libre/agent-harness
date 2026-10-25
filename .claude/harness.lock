@@ -15,7 +15,7 @@ ae9f6efa0dfd5f07e7809685da315d7483da9ac6bb88902b34b8efff2214a5c0  .claude/skills
 a60013a11172cbd4cbfa6974828b99cd4d97da22a6037093571fccecee93c6d0  .claude/skills/create-issue/SKILL.md
 b9827b25ede1d11ff4ec4ae526f8b16c6f9a2a896351eb3e7350982bfb890dc9  .claude/skills/create-issue/check_issue.rs
 d2db744e6291a53f6c90457db7fa2704f044815c4ebbff5fc8c85497eced7894  .claude/skills/create-issue/test_check_issue.rs
-75846cbbdd215667b3852d931281696037770a6f9f455a5c9e89382b20732d07  .claude/skills/issue-workflow/SKILL.md
+d4f6367877a78068aa2f929e8856d82fbe38817fc8b087e7a6d24ac9f3bca5af  .claude/skills/issue-workflow/SKILL.md
 5017f6c21972e6aa501eaf553a331e03464e0f0342486a019a9eee1f838a7578  .claude/skills/issue-workflow/close_issue.rs
 ae87714b3fc1afbc4c73f80e016f15a79191ee5232a051631b33e363c33931e4+x  .claude/skills/issue-workflow/issue_worktree.rs
 59ca70c69792b4c6b4788d6889755b6ea579cf0d59a8fe614e411cd18160af1a  .claude/skills/issue-workflow/next_issue.rs
@@ -23,7 +23,7 @@ ae87714b3fc1afbc4c73f80e016f15a79191ee5232a051631b33e363c33931e4+x  .claude/skil
 a0e48ae02cc30dbc1afbb470d3082637a5af03e47b1cba7e0e1f0bf7d6e3b167+x  .claude/skills/issue-workflow/test_issue_worktree.rs
 b1a0b8f8f0533c10d465909e73ab93dcfa9a600afefd32a33a2ba51d6d9f1726  .claude/skills/issue-workflow/test_next_issue.rs
 72ad3c6cf9cfd9f5fa459b083143e5aceb9e8e9395035d22438ae73f86be270e  .claude/skills/prioritize-issues/SKILL.md
-94ba2226e7aa8be1a7d20f5757f144159dc92717c5a17f76602e852b3dc97fd5+x  .claude/skills/test_skills.rs
+c14862cecbd4f1d2ff7621c8bc08da2739fa51d3b7a9f4f9ac49ce44263aab6b+x  .claude/skills/test_skills.rs
 fb2d21c5484dbad2bd0639f2a326a6385731bee3a4143fb8778807e1169d5e14  .claude/skills/update-docs/SKILL.md
 29eed70a14b2257df2a89b1f737c77fe6b86001dd307e643ff2b2e0eaf1136f3  .claude/skills/write-spec/SKILL.md
 996911f1e1f8327e30136ee12f0ab1eb595cd54f27fd24b8fea2cf255aa34f89  .claude/specs/check_specs.rs

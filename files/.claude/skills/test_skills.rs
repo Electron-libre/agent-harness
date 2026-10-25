@@ -98,6 +98,27 @@ fn check_no_narration(name: &str, text: &str) -> Vec<String> {
         .collect()
 }
 
+// spec: RPT-3, RPT-7
+/// The human review stop of `issue-workflow` keeps its layout and the markers the review hook relies on.
+fn check_review_template(name: &str, text: &str) -> Vec<String> {
+    if name != "issue-workflow" {
+        return Vec::new();
+    }
+    let step = text
+        .split("6. **Human review")
+        .nth(1)
+        .and_then(|s| s.split("\n7. ").next())
+        .unwrap_or_default();
+    if step.is_empty() {
+        return vec![format!("{name}: step 4.6 (human review) not found")];
+    }
+    ["`done`", "`check | result`", "`Code review:`", "`no findings`", "`not verified`", "`decisions needed`"]
+        .iter()
+        .filter(|part| !step.contains(*part))
+        .map(|part| format!("{name}: step 4.6 does not name {part}"))
+        .collect()
+}
+
 fn main() {
     let root = fs::canonicalize(Path::new(file!()).parent().unwrap().join("../..")).unwrap();
     let skills = root.join(".claude/skills");
@@ -150,6 +171,7 @@ fn main() {
         }
         failures.extend(check_output_citation(&name, &text));
         failures.extend(check_no_narration(&name, &text));
+        failures.extend(check_review_template(&name, &text));
         for (skill, passage, why) in REQUIRED_PASSAGES.iter().filter(|(s, _, _)| *s == name) {
             if !text.contains(passage) {
                 failures.push(format!("{skill}: missing '{passage}' ({why})"));
