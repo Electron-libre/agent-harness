@@ -3,4 +3,3 @@
 Open issues in the order to work on them: the first is the next one. Read by `just next-issue`;
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
-- [make_the_agent_reports_concise_and_visual](make_the_agent_reports_concise_and_visual.md) - after the rename removal (same step 0 text); needs a measure first
