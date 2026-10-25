@@ -120,7 +120,9 @@ fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<Strin
 /// work tree wins, then the parent of the innermost `.git` of the path, else the directory itself). With `--git-dir` and
 /// no `--work-tree` there are two, since `git` commits the files of the directory it runs in into that git directory.
 /// The `-C` options accumulate and a relative `--work-tree` or `--git-dir` is taken from the directory they lead to,
-/// wherever they stand on the line, as `git` does. The subcommand is the first word after `git` once the global options
+/// wherever they stand on the line, as `git` does. `GIT_DIR=x` and `GIT_WORK_TREE=x` assigned earlier in the same
+/// command (alone, after `env`, before a wrapper such as `sudo`) count as the two options, which win over them.
+/// The subcommand is the first word after `git` once the global options
 /// (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not a
 /// commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
 fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
@@ -132,8 +134,21 @@ fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
             return None;
         }
         let mut rest = words[i + 1..].iter().take_while(|w| **w != ";");
-        let (mut dir, mut work_tree, mut git_dir) = (None::<PathBuf>, None::<PathBuf>, None::<PathBuf>);
         let path = |v: &str| PathBuf::from(v.trim_matches(['"', '\'']));
+        // `GIT_DIR=x git`, `env GIT_DIR=x git`: the assignments right before `git` name the repository like the options
+        // do, which win over them
+        let (mut git_dir, mut work_tree) = (None::<PathBuf>, None::<PathBuf>);
+        let mut before = words[..i].iter();
+        while let Some(w) = before.next() {
+            if let Some(v) = w.strip_prefix("GIT_DIR=") {
+                git_dir = Some(path(&quoted(v, &mut before)));
+            } else if let Some(v) = w.strip_prefix("GIT_WORK_TREE=") {
+                work_tree = Some(path(&quoted(v, &mut before)));
+            } else if *w == ";" {
+                (git_dir, work_tree) = (None, None);
+            }
+        }
+        let mut dir = None::<PathBuf>;
         loop {
             match rest.next() {
                 Some(&"-C") => {

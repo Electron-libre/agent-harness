@@ -22,7 +22,7 @@ shell directory, or the spec must say plainly why it cannot, and the hook must t
 3. Decide in `issue-workflow` steps 1 to 3, then amend the spec (a new requirement, or the non-goal kept).
 
 # Specs
-* `specs/review-gate.md`: a new requirement `REV-6`, or the non-goal confirmed.
+* `specs/review-gate.md`: a new requirement `REV-7` (`REV-6` is taken), the non-goal narrowed.
 
 # Resources
 * `files/.claude/hooks/require_code_review.rs` (`commit_dir`), `files/.claude/hooks/test_require_code_review.rs`
@@ -31,3 +31,23 @@ shell directory, or the spec must say plainly why it cannot, and the hook must t
 # Hints
 * A variable exported by an earlier command of the session is not in the text of the one the hook sees: only
   failing closed on a suspicious environment could cover it, and the hook cannot read the shell's environment.
+
+# Tracking
+
+1. [x] Read the assignments before `git` (`GIT_DIR=x`, `env GIT_DIR=x`, `GIT_WORK_TREE`), options winning (`REV-7`)
+   Done: `commit_dirs` reads the assignments (and `env` options) right before `git`; 7 refusals and 2 passes in
+   `environment_checks`. Verified: `just check`, `just test-harness`. Not verified: `export` and undeterminable values
+   (deliverables 2 and 3). Code review: fixed the reset on any word between the assignment and `git` (`sudo`, `nohup`
+   bypassed it; only `;` resets now, tests added), the blank line and scenario order in the spec, a long comment line;
+   left to deliverables 2 and 3: `export`, `$X` and `$(…)` (the `(` is split into `;` before the scan, so the
+   undeterminable value must be detected on the raw command); not fixed: `env -C dir` / `--chdir` are ignored (rare, noted).
+2. [ ] Read `export` in the same line; `unset` and `env -u` not refused (`REV-7`)
+3. [ ] Refuse a value that cannot be determined (`$X`, `$(…)`, backticks) (`REV-7`)
+4. [ ] Docs (architecture, hook doc, this issue), spec `accepted` then `implemented`, `just sync`
+
+## Decisions
+
+* Mode: autonomous.
+* Approach: read the variables of the line and refuse an undeterminable value; the non-goal stays for variables exported by an earlier command.
+* `unset` / `env -u` are not refused; an undeterminable value is refused unconditionally.
+* The new requirement is `REV-7` (`REV-6` was already taken).

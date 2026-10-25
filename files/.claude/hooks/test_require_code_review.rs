@@ -240,6 +240,31 @@ fn git_dir_alone_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-7
+/// `GIT_DIR` and `GIT_WORK_TREE` written in front of `git` name the repository as the options do, which win over them.
+fn environment_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, _) = target_fixture(hook, "rev7");
+    let mut out = all_refused(
+        hook,
+        &current,
+        &[
+            "GIT_DIR=../other/.git GIT_WORK_TREE=../other git commit -am x",
+            "GIT_WORK_TREE=../other git commit -am x",
+            "GIT_DIR=../other/.git git commit -am x",
+            "GIT_WORK_TREE='../other' git commit -am x",
+            "env GIT_WORK_TREE=../other git commit -am x",
+            "env -i GIT_DIR=../other/.git git commit -am x",
+            "FOO=1 GIT_WORK_TREE=../other git commit -am x",
+            "GIT_WORK_TREE=../other sudo git commit -am x",
+            "GIT_DIR=../other/.git nohup git commit -am x",
+        ],
+    );
+    out.push(("an option wins over the variable", commit_attempt(hook, &current, "GIT_WORK_TREE=../other git --work-tree ../current commit -am x").0 == 0));
+    out.push(("a variable naming the reviewed repository passes", commit_attempt(hook, &current, "GIT_WORK_TREE=../current git commit -am x").0 == 0));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -374,7 +399,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }
