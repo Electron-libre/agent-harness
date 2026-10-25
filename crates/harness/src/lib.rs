@@ -40,6 +40,8 @@ pub enum Outcome {
     Kept,
     /// A hook of the project's own moved aside so that the managed one can chain it.
     Moved,
+    /// Not done, for the reason given.
+    Skipped(&'static str),
 }
 
 impl fmt::Display for Outcome {
@@ -53,6 +55,7 @@ impl fmt::Display for Outcome {
             Outcome::Conflict => "conflict (modified locally, fix it in the source or use --force)",
             Outcome::Kept => "kept (dropped from the source but modified locally)",
             Outcome::Moved => "moved (your hook now runs after the review gate)",
+            Outcome::Skipped(why) => return write!(f, "skipped ({why})"),
         })
     }
 }

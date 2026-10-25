@@ -93,6 +93,12 @@ hook that is not its own, and stops before writing anything when `pre-commit.use
 `rust-script` is a warning on stderr, not a refusal. `sync` reinstalls the script when it is missing, edited or no longer
 executable, and `--dry-run` only reports. `init` writes `harness.toml` only: the review hook is not there until the first
 `sync`, which installs the gate.
+
+The gate goes to the hooks directory of the repository whose top is the project, so a linked worktree (or a `.git` that
+is a file) installs it once in the hooks of the common git directory, for all its worktrees; a project nested in another
+repository, a directory outside any repository and a source without the review hook get no gate and no error. When
+`core.hooksPath` is set, git reads its hooks elsewhere, often a versioned directory: `sync` then installs nothing,
+reports `skipped (…)` with the line to add to the user's own `pre-commit`, and still succeeds.
 Git runs the hook in the repository that really receives the commit, with `GIT_DIR` and the work tree already
 resolved, so `native` reads no event and no command: it takes the same marker, snapshot, exemptions and waiver as
 `check` from that repository. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is

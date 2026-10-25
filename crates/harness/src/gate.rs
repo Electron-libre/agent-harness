@@ -1,11 +1,11 @@
-//! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-20 so far).
+//! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-22).
 //!
 //! The hook is a small `sh` script that starts the managed `require_code_review.rs native` of the project, then the
 //! `pre-commit` the user already had (moved to `pre-commit.user`, never overwritten).
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use anyhow::{bail, Result};
 
@@ -50,6 +50,8 @@ pub enum State {
     /// Ours, but edited or no longer executable.
     Modified,
     UpToDate,
+    /// `core.hooksPath` sends git to another directory: the gate is not installed there.
+    Redirected,
 }
 
 /// What `sync` will do about the gate, decided before anything is written.
@@ -59,24 +61,38 @@ pub struct Plan {
     state: State,
 }
 
+/// The output of `git args` run in `dir`, `None` when it fails. The repository is the project's, not the one a hook or an
+/// alias that runs `sync` is in.
+fn git_in(dir: &Path, args: &[&str]) -> Option<String> {
+    let out = git_raw(dir, args)?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn git_raw(dir: &Path, args: &[&str]) -> Option<Output> {
+    Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_COMMON_DIR")
+        .env_remove("GIT_INDEX_FILE")
+        .output()
+        .ok()
+}
+
+/// Whether `core.hooksPath` is set for the repository of `root` (`git config` exits 1 for an unset key).
+fn hooks_path_set(root: &Path) -> bool {
+    // any other failure (an unreadable config) is treated as set: better no gate than one in the wrong directory
+    git_raw(root, &["config", "--get", "core.hooksPath"])
+        .is_none_or(|out| out.status.code() != Some(1))
+}
+
 /// The hooks directory of the git repository of `root`, `None` when `root` is not the top of one.
 fn hooks_dir(root: &Path) -> Option<PathBuf> {
-    let git = |args: &[&str]| {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(root)
-            .args(args)
-            // the repository is the project's, not the one a hook or an alias that runs `sync` is in
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_COMMON_DIR")
-            .env_remove("GIT_INDEX_FILE")
-            .output()
-            .ok()?;
-        out.status
-            .success()
-            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
-    };
+    let git = |args: &[&str]| git_in(root, args);
     let top = fs::canonicalize(git(&["rev-parse", "--show-toplevel"])?).ok()?;
     if top != fs::canonicalize(root).ok()? {
         return None;
@@ -112,7 +128,11 @@ pub fn plan(root: &Path, has_review_hook: bool) -> Result<Option<Plan>> {
     let Some(hooks) = hooks_dir(root) else {
         return Ok(None);
     };
-    let state = state(&hooks);
+    let state = if hooks_path_set(root) {
+        State::Redirected
+    } else {
+        state(&hooks)
+    };
     if state == State::Foreign && hooks.join(CHAINED).exists() {
         bail!(
             "{} and {} both exist: merge them by hand, `harness sync` never overwrites a hook of yours",
@@ -128,13 +148,17 @@ impl Plan {
     #[must_use]
     pub fn outcomes(&self) -> Vec<(String, Outcome)> {
         let mut out = Vec::new();
+        if self.state == State::Redirected {
+            let why = "not installed: core.hooksPath is set, so git reads its hooks elsewhere; add `rust-script .claude/hooks/require_code_review.rs native` to your own pre-commit, run from the top of the work tree";
+            return vec![(GATE.to_string(), Outcome::Skipped(why))];
+        }
         if self.state == State::Foreign {
             out.push(("pre-commit -> pre-commit.user".to_string(), Outcome::Moved));
         }
         let outcome = match self.state {
             State::Missing | State::Foreign => Outcome::Added,
             State::Modified => Outcome::Updated,
-            State::UpToDate => Outcome::Unchanged,
+            State::UpToDate | State::Redirected => Outcome::Unchanged,
         };
         out.push((GATE.to_string(), outcome));
         out
@@ -145,7 +169,7 @@ impl Plan {
     /// # Errors
     /// When a file cannot be moved or written.
     pub fn install(&self) -> Result<()> {
-        if self.state == State::UpToDate {
+        if matches!(self.state, State::UpToDate | State::Redirected) {
             return Ok(());
         }
         let hook = self.hooks.join("pre-commit");

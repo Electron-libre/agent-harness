@@ -1,4 +1,4 @@
-//! The native review gate installed by `sync` (SYN-18 to SYN-20).
+//! The native review gate installed by `sync` (SYN-18 to SYN-22).
 
 use std::process::{Command, Output};
 
@@ -275,4 +275,120 @@ fn a_dry_run_reports_the_installation_and_writes_nothing() {
         Some(Outcome::Moved)
     );
     assert!(!root.path().join(".git/hooks/pre-commit.user").exists());
+}
+
+/// The source of `gated()` serves a project at `dir`, which gets the configuration of `root`.
+fn point_at_source(root: &TempDir, dir: &Path) {
+    put(dir, CONFIG, &get(root.path(), CONFIG).unwrap());
+}
+
+// spec: SYN-21
+#[test]
+fn a_linked_worktree_gets_the_gate_in_the_hooks_of_the_common_git_directory() {
+    let (_source, root) = gated();
+    put(root.path(), "f.txt", "x");
+    git_in(root.path(), &["add", "f.txt"]);
+    git_in(root.path(), &["commit", "--quiet", "-m", "init"]);
+    let linked = tempdir().unwrap();
+    let linked_dir = linked.path().join("wt");
+    git_in(
+        root.path(),
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "other",
+            &linked_dir.to_string_lossy(),
+        ],
+    );
+    point_at_source(&root, &linked_dir);
+
+    let report = sync(&linked_dir, &SyncOptions::default()).unwrap();
+    assert_eq!(report.outcome(gate::GATE), Some(Outcome::Added));
+    assert!(
+        get(root.path(), ".git/hooks/pre-commit").is_some_and(|t| t.contains("native review gate"))
+    );
+    let private = fs::read_dir(root.path().join(".git/worktrees"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert!(!private.join("hooks").exists());
+    // once for all the worktrees
+    assert_eq!(
+        sync(&linked_dir, &SyncOptions::default())
+            .unwrap()
+            .outcome(gate::GATE),
+        Some(Outcome::Unchanged)
+    );
+}
+
+// spec: SYN-22
+#[test]
+fn installs_nothing_when_core_hooks_path_is_set_and_says_why() {
+    let (_source, root) = gated();
+    let elsewhere = tempdir().unwrap();
+    git_in(
+        root.path(),
+        &[
+            "config",
+            "core.hooksPath",
+            &elsewhere.path().to_string_lossy(),
+        ],
+    );
+    let report = sync(root.path(), &SyncOptions::default()).unwrap();
+    let outcome = report.outcome(gate::GATE).unwrap();
+    assert!(matches!(outcome, Outcome::Skipped(_)), "{outcome:?}");
+    assert!(outcome.to_string().contains("core.hooksPath"), "{outcome}");
+    assert!(!pre_commit(&root).exists());
+    assert!(fs::read_dir(elsewhere.path()).unwrap().next().is_none());
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+
+    // a relative path, the usual versioned directory, counts too
+    let (_source, root) = gated();
+    git_in(root.path(), &["config", "core.hooksPath", ".githooks"]);
+    let report = sync(root.path(), &SyncOptions::default()).unwrap();
+    assert!(matches!(
+        report.outcome(gate::GATE),
+        Some(Outcome::Skipped(_))
+    ));
+    assert!(!root.path().join(".githooks").exists());
+    assert!(!pre_commit(&root).exists());
+}
+
+// spec: SYN-22
+#[test]
+fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
+    let (source, root) = setup();
+    put(
+        source.path(),
+        &format!("files/{HOOK}"),
+        "// the review hook",
+    );
+    let report = run(&root);
+    assert!(report.outcome(gate::GATE).is_none());
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+
+    let (_source, root) = setup();
+    git_in(root.path(), &["init", "--quiet", "-b", "main"]);
+    let report = run(&root);
+    assert!(report.outcome(gate::GATE).is_none());
+    assert!(!pre_commit(&root).exists());
+
+    // a project inside another repository is not the top of one
+    let (source, root) = setup();
+    put(
+        source.path(),
+        &format!("files/{HOOK}"),
+        "// the review hook",
+    );
+    let outer = tempdir().unwrap();
+    git_in(outer.path(), &["init", "--quiet", "-b", "main"]);
+    let inner = outer.path().join("project");
+    point_at_source(&root, &inner);
+    let report = sync(&inner, &SyncOptions::default()).unwrap();
+    assert!(report.outcome(gate::GATE).is_none());
+    assert!(!outer.path().join(".git/hooks/pre-commit").exists());
 }
