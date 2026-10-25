@@ -99,6 +99,147 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+/// Two repositories side by side: `current` reviewed and unchanged, `other` with a change nobody reviewed.
+/// Returns the shell directory (`current`).
+fn target_fixture(hook: &Path, name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    let root = std::env::temp_dir().join(format!("reviewtest-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let (current, other) = (root.join("current"), root.join("other"));
+    for repo in [&current, &other] {
+        fs::create_dir_all(repo).unwrap();
+        sh(repo, &["init", "-q", "."]);
+        fs::write(repo.join("a.txt"), "one\n").unwrap();
+        sh(repo, &["add", "-A"]);
+        sh(repo, &["commit", "-qm", "init"]);
+        fs::write(repo.join("a.txt"), "two\n").unwrap();
+    }
+    review_done(hook, &current, "code-review");
+    (current, other)
+}
+
+/// The commands of `commands` run from `shell` must all be refused.
+fn all_refused(hook: &Path, shell: &Path, commands: &[&'static str]) -> Vec<(&'static str, bool)> {
+    commands.iter().map(|c| (*c, commit_attempt(hook, shell, c).0 == 2)).collect()
+}
+
+// spec: REV-1
+/// The decision is the one of the repository the commit targets, whichever of the two is reviewed.
+fn target_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev1");
+    let mut out = vec![
+        ("a commit in the reviewed shell repository passes", commit_attempt(hook, &current, "git commit -am x").0 == 0),
+        ("a commit aimed at an unreviewed repository is refused", commit_attempt(hook, &current, "git -C ../other commit -am x").0 == 2),
+    ];
+    review_done(hook, &other, "code-review");
+    fs::write(current.join("new.txt"), "x\n").unwrap();
+    out.push(("a commit aimed at a reviewed repository passes while the shell one is not", commit_attempt(hook, &current, "git -C ../other commit -am x").0 == 0));
+    out.push(("a commit in the unreviewed shell repository is refused", commit_attempt(hook, &current, "git commit -am x").0 == 2));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-2
+/// Several `-C` accumulate: `-C .. -C other` is `../other`.
+fn accumulated_c_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, _) = target_fixture(hook, "rev2");
+    let out = all_refused(hook, &current, &["git -C .. -C other commit -am x", "git -C .. -C 'other' commit -am x"]);
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-3
+/// `--work-tree` names the repository, else `--git-dir` (its parent when it is a `.git`, itself otherwise);
+/// the work tree wins.
+fn work_tree_and_git_dir_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, _) = target_fixture(hook, "rev3");
+    let out = all_refused(
+        hook,
+        &current,
+        &[
+            "git --work-tree ../other commit -am x",
+            "git --git-dir ../other/.git commit -am x",
+            "git --git-dir ../other commit -am x",
+            "git --git-dir ../current/.git --work-tree ../other commit -am x",
+            "git --work-tree ../other --git-dir ../current/.git commit -am x",
+        ],
+    );
+    let mut out = out;
+    // a linked worktree's git directory lies inside the `.git` of its repository
+    sh(&current.parent().unwrap().join("other"), &["worktree", "add", "-q", "-b", "wt", "../wt"]);
+    out.push(("a git directory inside .git targets its repository", commit_attempt(hook, &current, "git --git-dir ../other/.git/worktrees/wt commit -am x").0 == 2));
+    // the reviewed repository as the target, the unreviewed one only named by the other option
+    out.push(("a reviewed work tree wins over an unreviewed git directory", commit_attempt(hook, &current, "git --git-dir ../other/.git --work-tree ../current commit -am x").0 == 0));
+    out.push(("a reviewed git directory passes", commit_attempt(hook, &current, "git --git-dir ../current/.git commit -am x").0 == 0));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-4
+/// Two words or `=value`, quoted or not.
+fn option_forms_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, _) = target_fixture(hook, "rev4");
+    // an unreviewed repository whose name holds a space: a quoted value spans two words of the command
+    let spaced = current.parent().unwrap().join("my other");
+    fs::create_dir_all(&spaced).unwrap();
+    sh(&spaced, &["init", "-q", "."]);
+    fs::write(spaced.join("a.txt"), "one\n").unwrap();
+    sh(&spaced, &["add", "-A"]);
+    sh(&spaced, &["commit", "-qm", "init"]);
+    fs::write(spaced.join("a.txt"), "two\n").unwrap();
+    let out = all_refused(
+        hook,
+        &current,
+        &[
+            "git --work-tree=../other commit -am x",
+            "git --git-dir=../other/.git commit -am x",
+            "git --work-tree '../other' commit -am x",
+            "git --work-tree=\"../other\" commit -am x",
+            "git --git-dir \"../other/.git\" commit -am x",
+            "git --git-dir='../other/.git' --work-tree='../other' commit -am x",
+            "git --work-tree=\"../my other\" commit -am x",
+            "git --git-dir='../my other/.git' commit -am x",
+            "git --work-tree \"../my other\" commit -am x",
+        ],
+    );
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-5
+/// A relative option is taken from the directory the `-C` lead to, before or after them on the line, as `git` does
+/// (the other tests: from the shell directory, `../other`).
+fn relative_option_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, _) = target_fixture(hook, "rev5");
+    let out = all_refused(
+        hook,
+        &current,
+        &[
+            "git -C ../other --git-dir .git commit -am x",
+            "git --git-dir .git -C ../other commit -am x",
+            "git -C .. --work-tree other commit -am x",
+            "git --work-tree other -C .. commit -am x",
+            "git --work-tree other -C . -C .. commit -am x",
+        ],
+    );
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-6
+/// `--git-dir` alone: the files come from the shell directory, the history is the one of the git directory.
+fn git_dir_alone_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev6");
+    let alone = "git --git-dir ../other/.git commit -am x";
+    let mut out = vec![("an unreviewed git directory is refused", commit_attempt(hook, &current, alone).0 == 2)];
+    review_done(hook, &other, "code-review");
+    out.push(("both repositories reviewed pass", commit_attempt(hook, &current, alone).0 == 0));
+    fs::write(current.join("new.txt"), "x\n").unwrap();
+    out.push(("an unreviewed shell directory is refused", commit_attempt(hook, &current, alone).0 == 2));
+    out.push(("with --work-tree only the work tree counts", commit_attempt(hook, &current, "git --git-dir ../other/.git --work-tree ../other commit -am x").0 == 0));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -158,7 +299,8 @@ fn main() {
     check("looks at the repository named by -C", commit_attempt(&hook, &project, "git -C sub commit -am x").0 == 2);
     check("sees a commit in brackets", commit_attempt(&hook, &project, "(git commit -m x)").0 == 2);
     for option in ["--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"] {
-        let spaced = format!("git {option} /x commit -m x");
+        let value = match option { "--git-dir" => "sub/.git", "--work-tree" => "sub", _ => "/x" };
+        let spaced = format!("git {option} {value} commit -m x");
         check(&format!("sees a commit after {option} given as two words"), commit_attempt(&hook, &project, &spaced).0 == 2);
     }
     check("sees a commit after a quoted option value", commit_attempt(&hook, &project, "git --namespace 'a b' commit -m x").0 == 2);
@@ -232,8 +374,10 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for (name, ok) in worktree_checks(&hook) {
-        check(name, ok);
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks] {
+        for (name, ok) in checks(&hook) {
+            check(name, ok);
+        }
     }
 
     let _ = fs::remove_dir_all(&project);

@@ -89,12 +89,12 @@ const SKIPPED_OPTIONS: [&str; 8] =
     ["--no-pager", "--paginate", "-p", "-P", "--no-optional-locks", "--bare", "--no-replace-objects", "--literal-pathspecs"];
 
 /// Global options of `git` that take the next word as value; the same list as `GIT_VALUE_OPTIONS` of
-/// `block_ai_attribution.rs` (a hook is a single file, keep the two in step). `-C` is handled apart: its value is the directory.
+/// `block_ai_attribution.rs` (a hook is a single file, keep the two in step). `--git-dir` and `--work-tree` are also
+/// read apart, as `-C`: their value names the repository.
 const GIT_VALUE_OPTIONS: [&str; 5] = ["--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"];
 
-/// Takes the value of an option from `words`: a quoted value may span several words.
-fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<String> {
-    let first = *words.next()?;
+/// Completes `first`, the start of a value, with the next words of `words` when it opens a quote it does not close.
+fn quoted<'a>(first: &str, words: &mut impl Iterator<Item = &'a &'a str>) -> String {
     let mut value = first.to_string();
     if let Some(quote) = first.chars().next().filter(|c| matches!(c, '"' | '\'')) {
         if first.len() == 1 || !first.ends_with(quote) {
@@ -106,14 +106,24 @@ fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<Strin
             }
         }
     }
-    Some(value)
+    value
 }
 
-/// The directory a `git commit` of the line runs in: `Some(None)` for the current one, `Some(Some(dir))` after
-/// `-C dir`, `None` when no command of the line commits. The subcommand is the first word after `git` once the
-/// global options (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not
-/// a commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
-fn commit_dir(command: &str) -> Option<Option<String>> {
+/// Takes the value of an option from `words`: a quoted value may span several words.
+fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<String> {
+    let first = *words.next()?;
+    Some(quoted(first, words))
+}
+
+/// The directories whose review a `git commit` of the line depends on, `None` when no command of the line commits;
+/// `None` in the list is the shell directory. Normally one: after `-C dir`, `--work-tree dir` or `--git-dir dir` (the
+/// work tree wins, then the parent of the innermost `.git` of the path, else the directory itself). With `--git-dir` and
+/// no `--work-tree` there are two, since `git` commits the files of the directory it runs in into that git directory.
+/// The `-C` options accumulate and a relative `--work-tree` or `--git-dir` is taken from the directory they lead to,
+/// wherever they stand on the line, as `git` does. The subcommand is the first word after `git` once the global options
+/// (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not a
+/// commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
+fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
     // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
     let spaced = command.replace([';', '|', '&', '(', ')', '`'], " ; ");
     let words: Vec<&str> = spaced.split_whitespace().collect();
@@ -122,15 +132,41 @@ fn commit_dir(command: &str) -> Option<Option<String>> {
             return None;
         }
         let mut rest = words[i + 1..].iter().take_while(|w| **w != ";");
-        let mut dir = None;
+        let (mut dir, mut work_tree, mut git_dir) = (None::<PathBuf>, None::<PathBuf>, None::<PathBuf>);
+        let path = |v: &str| PathBuf::from(v.trim_matches(['"', '\'']));
         loop {
             match rest.next() {
-                Some(&"-C") => dir = take_value(&mut rest).map(|d| d.trim_matches(['"', '\'']).to_string()),
+                Some(&"-C") => {
+                    if let Some(v) = take_value(&mut rest) {
+                        dir = Some(dir.map_or(path(&v), |d| d.join(path(&v))));
+                    }
+                }
+                // `--git-dir` and `--work-tree` stay in `GIT_VALUE_OPTIONS` (same list as the other hook) but are read here first
+                Some(&"--work-tree") => work_tree = take_value(&mut rest).map(|v| path(&v)),
+                Some(&"--git-dir") => git_dir = take_value(&mut rest).map(|v| path(&v)),
+                Some(w) if w.starts_with("--work-tree=") => work_tree = Some(path(&quoted(&w["--work-tree=".len()..], &mut rest))),
+                Some(w) if w.starts_with("--git-dir=") => git_dir = Some(path(&quoted(&w["--git-dir=".len()..], &mut rest))),
                 Some(w) if *w == "-c" || GIT_VALUE_OPTIONS.contains(w) => {
                     take_value(&mut rest);
                 }
                 Some(w) if SKIPPED_OPTIONS.contains(w) || GIT_VALUE_OPTIONS.iter().any(|o| w.strip_prefix(o).is_some_and(|v| v.starts_with('='))) => {}
-                other => return (other.map(|w| w.trim_end_matches(['\'', '"'])) == Some("commit")).then_some(dir.clone()),
+                other => {
+                    if other.map(|w| w.trim_end_matches(['\'', '"'])) != Some("commit") {
+                        return None;
+                    }
+                    // the directory `-C` leads to is where the relative paths are taken from
+                    let from_dir = |p: PathBuf| dir.as_ref().map_or(p.clone(), |d| d.join(&p));
+                    let text = |p: PathBuf| Some(p.to_string_lossy().into_owned());
+                    if let Some(w) = work_tree {
+                        return Some(vec![text(from_dir(w))]);
+                    }
+                    let Some(g) = git_dir else { return Some(vec![dir.and_then(text)]) };
+                    let g = from_dir(g);
+                    // the repository holding the git directory: the parent of its innermost `.git`, else itself
+                    let repo = g.ancestors().find(|a| a.file_name().is_some_and(|n| n == ".git")).and_then(Path::parent).map_or(g.clone(), Path::to_path_buf);
+                    let repo = if repo.as_os_str().is_empty() { PathBuf::from(".") } else { repo };
+                    return Some(vec![text(repo), dir.and_then(text)]);
+                }
             }
         }
     })
@@ -232,12 +268,15 @@ fn main() {
                 eprintln!("Refused: only the user waives the code review, by creating {WAIVER} in the git directory.");
                 std::process::exit(2);
             }
-            let Some(dir) = commit_dir(command) else { return };
-            let cwd = dir.map_or(cwd.clone(), |d| toplevel(&shell_dir.join(d)));
-            if let Some(why) = refusal(&cwd) {
-                eprintln!("Refused: {why}.");
-                eprintln!("Run /code-review on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
-                std::process::exit(2);
+            let Some(dirs) = commit_dirs(command) else { return };
+            let mut roots: Vec<PathBuf> = dirs.into_iter().map(|d| d.map_or(cwd.clone(), |d| toplevel(&shell_dir.join(d)))).collect();
+            roots.dedup();
+            for cwd in roots {
+                if let Some(why) = refusal(&cwd) {
+                    eprintln!("Refused: {why}.");
+                    eprintln!("Run /code-review on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
+                    std::process::exit(2);
+                }
             }
         }
         _ => {}

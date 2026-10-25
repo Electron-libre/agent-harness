@@ -74,6 +74,12 @@ not commit (`--dry-run`, a refusal by another hook) leaves it usable, and refuse
 file. That deters the agent from creating one but does not stop a write made by another tool. The hook sees the review
 text in the `Skill` response but does not parse it.
 
+The commit is judged on the repository it targets (spec [`specs/review-gate.md`](../specs/review-gate.md)): the work
+tree of `--work-tree`, else the parent of the innermost `.git` of `--git-dir` (the directory itself without one), else
+the directory the `-C` options lead to, which accumulate as in `git`. With `--git-dir` alone the directory the command
+runs in is checked too, since `git` commits its files into that git directory. The hook reads the text of the
+command only: `GIT_DIR` and `GIT_WORK_TREE` in the environment are not seen.
+
 ## The instruction audit
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory

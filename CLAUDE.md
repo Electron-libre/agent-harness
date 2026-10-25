@@ -13,7 +13,8 @@ The shared agent harness (skills, hooks, scripts, recipes, CI) of the user's pro
   consumer: fix them here.
 - `seed/`: project-owned starting points, copied once.
 - `crates/harness/`: the `harness` binary (`init`, `sync`, `check`).
-- `specs/`: what the tool must do (`sync.md`), traced to its tests by `// spec: ID`.
+- `specs/`: what the tool and its shared hooks must do (one file per capability, see `specs/README.md`), traced to
+  its tests by `// spec: ID`.
 - `issues/`: open issues, ordered in `issues/queue.md` (`just next-issue`); `docs/adr/`: decisions.
 - Parallel agents: one git worktree per issue (`just start-issue`, `just finish-issue`), see
   `docs/architecture.md`.
