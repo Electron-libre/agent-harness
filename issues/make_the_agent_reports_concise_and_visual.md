@@ -29,6 +29,9 @@ Then, candidates that can be combined:
 4. Drop instructions that only produce narration (restating the issue when it is already clear, announcing
    each step).
 
+# Specs
+* `specs/agent-reports.md`: new spec `RPT` (RPT-1 to RPT-7), validated.
+
 # Resources
 * `files/.claude/skills/*/SKILL.md`, `files/AGENTS.md`
 * `skill:prioritize-issues` and `skill:update-docs`: existing table formats to reuse
@@ -39,3 +42,16 @@ Then, candidates that can be combined:
   hook `require_code_review.rs` and the process rely on them. Shorten the form, not the content.
 * The conversation language stays the `user_language` of `.claude/harness.toml`; table headers follow it.
 * Related issue: `drop_the_thread_rename_instructions` touches the same `issue-workflow` step 0; do it first.
+
+# Tracking
+
+1. [x] Shared output rule in `AGENTS.md`, cited by the 7 skills, narration and plan repetition dropped (RPT-1, RPT-2, RPT-6). Verified: `just check`, `just test-harness`, `just check-harness`; not verified: that the agent's real reports got shorter (measured after deliverable 3); RPT-2 "does not restate" only catches the four exact rule phrases. Code review: loose substring matches of the RPT-1, RPT-2 and RPT-6 checks fixed (exact rule phrases, case-folded, narrower narration phrases); not fixed: the spec stays `draft` until RPT-3, 4, 5 and 7 are traced (deliverables 2 and 3), and the heading coupling to `AGENTS.md` is kept since `AGENTS.md` is a managed file.
+2. [ ] Fixed template of the step 4.6 review stop (RPT-3, RPT-7).
+3. [ ] Templates of the resume summary, the final summary, `create-issue` step 6 and the step 1 reformulation (RPT-4, RPT-5).
+
+## Decisions
+
+* Mode: autonomous.
+* The rule lives in `AGENTS.md`; no numeric length limit.
+* Tests: `REQUIRED_PASSAGES` and new checks in `files/.claude/skills/test_skills.rs`, tagged `// spec: RPT-n`.
+* Measure: 347 final agent messages, 130 words on average; the longest (530 to 740 words) are step 1 reformulations, step 4.6 summaries and audit reports.

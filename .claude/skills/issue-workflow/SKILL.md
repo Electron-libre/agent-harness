@@ -9,6 +9,8 @@ The user hands over an issue file in `issues/`. Talk to the user in the `user_la
 commits stay in English). Never skip a validation stop: they are what makes the autonomy safe. The only ones the user can lift are those of
 step 4.6 and 4.8, through the Autonomous mode.
 
+Show the user your results as `AGENTS.md` section "Reports to the user" says.
+
 ## 0. Resume or start
 
 Read the issue file. If it has a `# Tracking` section, the issue is already planned: summarize where it stands (next unchecked

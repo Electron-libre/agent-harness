@@ -8,6 +8,8 @@ description: Write a new issue file in `issues/` with the repo's template (Goal,
 An issue is a Markdown file `issues/<snake_case_name>.md` that `skill:issue-workflow` can later pick up.
 This skill writes it; `check_issue.rs` enforces the mechanical rules. Don't implement anything here.
 
+Show the user your results as `AGENTS.md` section "Reports to the user" says.
+
 ## Procedure
 
 1. **Check for duplicates**: `ls issues issues/done` and skim the titles close to the subject. If one already
