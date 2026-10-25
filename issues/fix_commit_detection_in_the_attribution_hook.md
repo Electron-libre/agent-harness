@@ -26,3 +26,21 @@ and must not scan commands that only mention the words.
 # Hints
 * The shared files hold nothing specific to one project.
 * A hook script is a single file run by `rust-script`: a shared module is not free.
+
+# Tracking
+
+1. [x] Find the `git` and `gh` subcommand after the global options in `writes_message` (tests first)
+
+## Decisions
+
+* Mode: autonomous.
+* No spec: the hooks have no spec (`specs/sync.md` covers the `harness` tool).
+* The option parsing follows `commit_dir` (`require_code_review.rs`) but is not shared: a hook stays a single file.
+* Changed after the code review (a fail-open regression): every flag is skipped and a value is consumed for the known value options (`git`: `-C -c --git-dir --work-tree --namespace --exec-path --super-prefix`; `gh`: `-R --repo --hostname`), quoted values included; newline is a separator.
+
+## Deliverable 1 summary
+
+* Done: `writes_message` finds the subcommand after the global options of `git` and `gh`; tests added for `gh -R/--repo/--hostname`, bracketed and multi-line commits, quoted option values and subcommand, `--git-dir`, `git log --grep commit`, `git show commit`, `gh pr view`, `gh issue create`. Copies synced.
+* Verified: `just check`, `just test-harness`, `just check-harness`.
+* Not verified: real use in a session; an unknown option that takes a value in a separate word before the subcommand hides it (no scan).
+* Code review: 8 findings. Fixed: the fail-open on `--git-dir x`-style options and on quoted values (all flags skipped, value options listed, quoted values consumed), the quoted subcommand, the newline separator, the missing tests, the docs overstating the guarantee; the duplicated option list is gone (the hook no longer needs it). Not fixed: `gh` unknown value options (listed in the docs; the list is the extension point).

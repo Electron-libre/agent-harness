@@ -15,17 +15,46 @@
 use std::io::Read;
 use std::path::Path;
 
-/// Whether the command creates a commit or writes a pull request description.
+/// Options that take the next word as value, before the subcommand of `git` and of `gh`.
+const GIT_VALUE_OPTIONS: [&str; 7] = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"];
+const GH_VALUE_OPTIONS: [&str; 3] = ["-R", "--repo", "--hostname"];
+
+/// Takes the value of an option from `words`: a quoted value may span several words.
+fn skip_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) {
+    let Some(first) = words.next() else { return };
+    if let Some(quote) = first.chars().next().filter(|c| matches!(c, '"' | '\'')) {
+        if first.len() == 1 || !first.ends_with(quote) {
+            words.find(|w| w.ends_with(quote));
+        }
+    }
+}
+
+/// Whether the command creates a commit or writes a pull request description. The subcommand is the first word
+/// after `git` or `gh` once their global options are skipped (the idea of `commit_dir` in `require_code_review.rs`):
+/// every flag, and the value of the options of `GIT_VALUE_OPTIONS` and `GH_VALUE_OPTIONS` given as a separate word.
+/// An unknown option that takes a value would hide the subcommand: add it to the list.
 fn writes_message(command: &str) -> bool {
-    let words: Vec<&str> = command.split_whitespace().collect();
-    words.iter().enumerate().any(|(i, w)| match *w {
-        "git" => words[i + 1..]
-            .iter()
-            .take_while(|w| !matches!(**w, "&&" | "||" | ";" | "|"))
-            .take(12)
-            .any(|w| *w == "commit"),
-        "gh" => matches!(words.get(i + 1..i + 3), Some(["pr", "create" | "edit"])),
-        _ => false,
+    // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
+    let spaced = command.replace([';', '|', '&', '(', ')', '`', '\n'], " ; ");
+    let words: Vec<&str> = spaced.split_whitespace().collect();
+    words.iter().enumerate().any(|(i, w)| {
+        let mut rest = words[i + 1..].iter().take_while(|w| **w != ";");
+        let (is_git, value_options): (bool, &[&str]) = match w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() {
+            Some("git") => (true, &GIT_VALUE_OPTIONS),
+            Some("gh") => (false, &GH_VALUE_OPTIONS),
+            _ => return false,
+        };
+        loop {
+            match rest.next() {
+                Some(w) if value_options.contains(w) => skip_value(&mut rest),
+                Some(w) if w.starts_with('-') => {}
+                Some(w) => {
+                    let sub = w.trim_matches(['\'', '"']);
+                    return if is_git { sub == "commit" } else { sub == "pr" && matches!(rest.next(), Some(&"create" | &"edit")) };
+                }
+                None => return false,
+            }
+        }
     })
 }
 

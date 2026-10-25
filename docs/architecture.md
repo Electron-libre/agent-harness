@@ -45,8 +45,10 @@ in `.claude/settings.json`:
 
 `block_ai_attribution.rs` refuses a `git commit` or `gh pr create|edit` whose message (inline, heredoc, `-F` or
 `--body-file`) credits the agent: a co-author trailer, a "Generated with" footer or a credit line ending with the
-vendor's no-reply address. It reads only the literal command and message files: a message built by `$(cat file)`
-or a shell variable is out of reach. Its patterns are narrower than those of `commit_check.rs` on purpose, so a
+vendor's no-reply address. It finds the subcommand after the global options (`git -C dir commit`,
+`gh -R owner/repo pr create`), so `git log --grep commit` is not scanned; an option that takes a value and is unknown to
+its lists hides the subcommand and the message is not scanned. It reads only the literal command and message
+files: a message built by `$(cat file)` or a shell variable is out of reach. Its patterns are narrower than those of `commit_check.rs` on purpose, so a
 message that discusses the rule passes.
 
 `require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
