@@ -122,6 +122,107 @@ fn all_refused(hook: &Path, shell: &Path, commands: &[&'static str]) -> Vec<(&'s
     commands.iter().map(|c| (*c, commit_attempt(hook, shell, c).0 == 2)).collect()
 }
 
+/// Exit code and stderr of `native` run in `cwd` with `env` added, as git runs a `pre-commit` hook: no event on stdin.
+fn native_run(hook: &Path, cwd: &Path, env: &[(&str, &Path)]) -> (i32, String) {
+    let out = Command::new("rust-script")
+        .arg(hook)
+        .arg("native")
+        .current_dir(cwd)
+        .envs(env.iter().map(|(k, v)| (*k, *v)))
+        .env_remove("CLAUDE_PROJECT_DIR")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("rust-script must be installed");
+    (out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stderr).into_owned())
+}
+
+// spec: REV-9, REV-10
+fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev9");
+    let (code, stderr) = native_run(hook, &other, &[]);
+    let mut out = vec![
+        ("native refuses an unreviewed repository with a message naming the review", code != 0 && stderr.contains("code-review")),
+        ("native lets through a reviewed repository", native_run(hook, &current, &[]).0 == 0),
+    ];
+    // git resolved the repository: the text of the command is not involved
+    let (git_dir, tree) = (other.join(".git"), other.clone());
+    out.push(("native judges the repository named by GIT_DIR and GIT_WORK_TREE", native_run(hook, &current, &[("GIT_DIR", &git_dir), ("GIT_WORK_TREE", &tree)]).0 != 0));
+    review_done(hook, &other, "code-review");
+    fs::write(current.join("new.txt"), "x\n").unwrap();
+    out.push(("native lets through a reviewed GIT_DIR while the current directory is unreviewed", native_run(hook, &current, &[("GIT_DIR", &git_dir), ("GIT_WORK_TREE", &tree)]).0 == 0));
+    out.push(("native refuses the unreviewed current directory", native_run(hook, &current, &[]).0 != 0));
+    let waiver = current.join(".git").join(["claude-review", "waived"].join("-"));
+    fs::write(&waiver, "").unwrap();
+    out.push(("native honours the waiver", native_run(hook, &current, &[]).0 == 0));
+    fs::remove_file(&waiver).unwrap();
+    fs::remove_file(current.join("new.txt")).unwrap();
+    fs::write(current.join("a.txt"), "one\n").unwrap();
+    out.push(("native lets through a repository with nothing to commit", native_run(hook, &current, &[]).0 == 0));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-9, REV-10
+/// The hook as git runs it: installed as `pre-commit`, it refuses a real commit nobody reviewed and lets the reviewed one through.
+fn native_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    use std::os::unix::fs::PermissionsExt;
+    let (current, _other) = target_fixture(hook, "rev9git");
+    let pre_commit = current.join(".git/hooks/pre-commit");
+    fs::write(&pre_commit, format!("#!/bin/sh\nexec rust-script '{}' native\n", hook.display())).unwrap();
+    fs::set_permissions(&pre_commit, fs::Permissions::from_mode(0o755)).unwrap();
+    let commit = |args: &[&str]| {
+        Command::new("git")
+            .args(["-c", "user.email=t@t", "-c", "user.name=t"])
+            .args(args)
+            .current_dir(&current)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+            .success()
+    };
+    let commits = || {
+        let log = Command::new("git").args(["rev-list", "--count", "HEAD"]).current_dir(&current).output().unwrap();
+        String::from_utf8_lossy(&log.stdout).trim().parse::<u32>().unwrap()
+    };
+    let before = commits();
+    let reviewed = commit(&["commit", "-qam", "x"]) && commits() == before + 1;
+    fs::write(current.join("a.txt"), "three\n").unwrap();
+    let refused = !commit(&["commit", "-qam", "y"]);
+    let out = vec![
+        ("git runs the native hook and a reviewed commit -a passes", reviewed),
+        ("git refuses through the native hook a commit nobody reviewed", refused),
+        ("the refused commit left the history alone", commits() == before + 1),
+    ];
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
+// spec: REV-11
+fn native_worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let root = std::env::temp_dir().join(format!("reviewtest-rev11-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let (main, linked) = (root.join("main"), root.join("linked"));
+    fs::create_dir_all(&main).unwrap();
+    sh(&main, &["init", "-q", "."]);
+    fs::write(main.join("a.txt"), "one\n").unwrap();
+    sh(&main, &["add", "-A"]);
+    sh(&main, &["commit", "-qm", "init"]);
+    sh(&main, &["worktree", "add", "-q", "-b", "other", linked.to_str().unwrap()]);
+    fs::write(main.join("a.txt"), "two\n").unwrap();
+    fs::write(linked.join("a.txt"), "two\n").unwrap();
+    review_done(hook, &linked, "code-review");
+    let linked_git = git_dir_of(&linked);
+    let out = vec![
+        ("native lets through a reviewed linked worktree", native_run(hook, &linked, &[("GIT_DIR", &linked_git)]).0 == 0),
+        ("native refuses the unreviewed main worktree", native_run(hook, &main, &[]).0 != 0),
+    ];
+    let _ = fs::remove_dir_all(&root);
+    out
+}
+
 // spec: REV-1
 /// The decision is the one of the repository the commit targets, whichever of the two is reviewed.
 fn target_checks(hook: &Path) -> Vec<(&'static str, bool)> {
@@ -524,7 +625,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

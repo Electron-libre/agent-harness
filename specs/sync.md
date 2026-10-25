@@ -1,6 +1,6 @@
 ---
 id: SYN
-status: implemented
+status: draft
 adrs: [0002]
 ---
 
@@ -31,6 +31,12 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-15** (deterministic) `update --dry-run` must report the target revision and what the `sync` would do, and must write nothing.
 - **SYN-16** (deterministic) `update` must report the previous revision (or that there was none), the new one and the files changed.
 - **SYN-17** (deterministic) When `rev` is a full commit hash that no branch or tag of the source points to any more, `sync` and `update` must try to fetch that commit by its hash, and use it when the source serves it. When the source does not, they must fail changing nothing, with an error that names the pinned commit as gone from the source and says to run `harness update`.
+- **SYN-18** (deterministic) `init` and `sync` must install the native review gate in the hooks directory of the project's git repository: an executable `pre-commit` script that starts with a mark line and runs `rust-script .claude/hooks/require_code_review.rs native` from the work tree, failing the commit with that exit code; when the review hook or `rust-script` is missing, the script must warn on stderr and let the commit through.
+- **SYN-19** (deterministic) When a `pre-commit` without the mark already exists, the installation must move it to `pre-commit.user` and the installed hook must run it after the review gate, passing its arguments and failing the commit when it fails; it must never overwrite the user's hook, and must fail changing nothing when a `pre-commit.user` already exists.
+- **SYN-20** (deterministic) `sync` must reinstall the native gate when it is missing, no longer executable or different from the managed one, and report nothing when it is up to date (idempotent, as SYN-6); `--dry-run` must report the installation and write nothing.
+- **SYN-21** (deterministic) For a linked worktree, or a project whose `.git` is a file, the gate must be installed in the `hooks` directory of the common git directory.
+- **SYN-22** (deterministic) When `core.hooksPath` is set for the project, `sync` must install nothing, report that the native gate is not installed and why, and succeed; a project that is not a git repository, or has no `.claude/hooks/require_code_review.rs`, gets no gate and no error.
+- **SYN-23** (deterministic) `check` must report `missing: native review gate` when the project is a git repository that has the review hook, whose hooks directory lacks the managed gate and where `core.hooksPath` is unset, and `modified: native review gate` when it differs; it must not report it otherwise.
 
 ## Scenarios
 
@@ -40,9 +46,12 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-11) Given a project already at the resolved commit, when `update` runs, then `rev` is rewritten unchanged, the `sync` reports nothing and the run succeeds.
 - (SYN-12) Given a `rev` line with a trailing comment from an earlier update, when `update` runs, then the comment is replaced by the new requested name.
 - (SYN-17) Given an abbreviated hash or a name that does not resolve, the fetch by hash is not tried and the error stays "unknown revision".
+- (SYN-19) Given a user's `pre-commit` that runs a linter, when `sync` runs, then the linter runs after the gate, and a refusal of the gate stops the commit before it.
+- (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
 
 ## Non-goals
 
+- Installing the gate under a `core.hooksPath` the project sets itself.
 - Merging a local change with a source change: a drifted file is fixed in the central repository.
 - Fetching more than a branch, tag or commit of a git source.
 - Making `check` depend on the source: it compares the project with its lock only, so the pin cannot break it.

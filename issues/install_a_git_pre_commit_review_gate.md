@@ -35,3 +35,20 @@ resolved, so the gate no longer depends on reading the repository out of the tex
 # Hints
 * `.git/hooks` is not versioned and not copied by `git clone`: the consumer needs `harness sync` to install it.
 * A consumer may set `core.hooksPath` itself; say what the tool does then instead of ignoring it.
+
+# Tracking
+
+1. [x] `native` mode of `require_code_review.rs` (REV-9, REV-10, REV-11). Done: tests (direct runs, a real `git commit` through an installed `pre-commit`, a linked worktree), `GIT_INDEX_FILE` ignored so `commit -a` sees the real index, `just check` / `test-harness` / `check-harness` green. Not verified: a `--git-dir` commit from a non-trivial cwd through real git (covered by `GIT_DIR` env runs only). Code review: see the commit.
+2. [ ] The Claude hook refuses `--no-verify`, `-n` and `core.hooksPath` on a `git commit` line (REV-12)
+3. [ ] `init` / `sync` install the stub, chain a foreign hook, reinstall on drift (SYN-18, SYN-19, SYN-20)
+4. [ ] Linked worktrees, `core.hooksPath` set by the consumer, project without git (SYN-21, SYN-22)
+5. [ ] `check` reports a missing or modified native gate (SYN-23)
+6. [ ] ADR 0004, docs, `just sync`, specs `accepted` then `implemented`
+
+## Decisions
+
+* Mode: autonomous (commit locally per deliverable, no push, review never skipped).
+* The stub runs `rust-script .claude/hooks/require_code_review.rs native`: one code for the marker and the snapshot.
+* `core.hooksPath` set by the consumer: install nothing, say so, `check` stays silent about it.
+* A foreign `pre-commit` moves to `pre-commit.user` and is chained after the gate; never overwritten.
+* Stub with no review hook or no `rust-script`: warn on stderr, let the commit through.

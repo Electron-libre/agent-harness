@@ -21,6 +21,10 @@
 //! these two variables the text does not give (`$X`, `$(…)`) is refused. A variable exported by an earlier command
 //! of the session is invisible to the hook.
 //!
+//! A third mode, `native`, is run by the git `pre-commit` hook that `harness sync` installs: git has already
+//! resolved the repository (`GIT_DIR`, `GIT_WORK_TREE`, the current directory), so it judges that one whatever the
+//! text of the command was, with the same marker, snapshot, exemptions and waiver as `check`. It reads no event.
+//!
 //! Declare: PostToolUse Skill (argument `record`), PreToolUse Bash (argument `check`)
 //!
 //! ```cargo
@@ -405,8 +409,32 @@ fn refusal(cwd: &Path) -> Option<&'static str> {
     Some("the diff holds files the last code review never saw")
 }
 
+/// Tells the agent the commit waits for a review and exits 2 (the one message of `check` and `native`).
+fn refuse(why: &str) -> ! {
+    eprintln!("Refused: {why}.");
+    eprintln!("Run /code-review on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
+    std::process::exit(2);
+}
+
 fn main() {
     let mode = std::env::args().nth(1).unwrap_or_default();
+    if mode == "native" {
+        // run by git as `pre-commit`: git resolved the repository (`GIT_DIR`, `GIT_WORK_TREE`, the current directory), and
+        // there is no event on stdin to read
+        let here = std::env::current_dir().unwrap_or_else(|_| ".".into());
+        // `git commit -a` hands its hook a temporary index: the review judges the real one, as `check` does; a relative
+        // `GIT_DIR` or `GIT_WORK_TREE` is only valid from this directory, the commands below run from the top of the tree
+        std::env::remove_var("GIT_INDEX_FILE");
+        for name in ["GIT_DIR", "GIT_WORK_TREE"] {
+            if let Some(value) = std::env::var_os(name).filter(|v| Path::new(v).is_relative()) {
+                std::env::set_var(name, here.join(value));
+            }
+        }
+        if let Some(why) = refusal(&toplevel(&here)) {
+            refuse(why);
+        }
+        return;
+    }
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).ok();
     let event: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
@@ -443,9 +471,7 @@ fn main() {
             roots.dedup();
             for cwd in roots {
                 if let Some(why) = refusal(&cwd) {
-                    eprintln!("Refused: {why}.");
-                    eprintln!("Run /code-review on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
-                    std::process::exit(2);
+                    refuse(why);
                 }
             }
         }

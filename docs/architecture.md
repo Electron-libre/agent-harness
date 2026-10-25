@@ -85,6 +85,12 @@ the text does not show (`$X`, `${X}`, `$(…)`, `(cmd)`, backticks) is refused, 
 earlier command of the session (an `export` in one call, a plain `git commit` in the next) is not seen, so the gate
 cannot cover that case.
 
+A third mode, `native`, is meant for the git `pre-commit` hook (installation: [issue](../issues/install_a_git_pre_commit_review_gate.md)).
+Git runs the hook in the repository that really receives the commit, with `GIT_DIR` and the work tree already
+resolved, so `native` reads no event and no command: it takes the same marker, snapshot, exemptions and waiver as
+`check` from that repository. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is
+the same.
+
 ## The instruction audit
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory
