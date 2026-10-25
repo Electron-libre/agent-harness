@@ -18,3 +18,13 @@ words; it must also catch the spaced variants of a trailer.
 
 # Hints
 * A message that only talks about the rule must keep passing.
+
+# Tracking
+1. [x] Catch a trailer written with spaces around the colon or inside the key. Done: `attribution` compares the key before the first colon without spaces, tabs and hyphens. Verified: hook test (3 blocked, 2 allowed cases added), check. Code review: spaced keys beyond the colon (fixed), dropped space in the test (fixed), no false-positive test (fixed); the scope findings belong to deliverable 2.
+2. [ ] Scan only the `git commit` or `gh pr` segment of the command (quote-aware split).
+
+## Decisions
+* Mode: autonomous.
+* An `echo` of a credit chained to a clean commit is allowed; a credit inside the message, including a `$(...)` in it, stays refused.
+* Simplest split: walk the command tracking quotes and `$(...)`, cut at unquoted `;`, `&`, `|`, newline. Known limit: an unquoted heredoc is cut at its newlines.
+* No spec: the hook is not covered by `specs/`.

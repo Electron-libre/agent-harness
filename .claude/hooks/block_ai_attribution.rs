@@ -82,7 +82,9 @@ fn attribution(text: &str) -> Option<&'static str> {
     let names_agent = |s: &str| s.trim_start().starts_with("claude") || s.trim_start().starts_with("anthropic");
     lower.split(['\n', '"', '\'']).find_map(|segment| {
         let start = segment.trim_start_matches(|c: char| !c.is_alphanumeric());
-        if start.strip_prefix("co-authored-by:").is_some_and(names_agent) {
+        // the key may be spaced out: `Co-Authored-By :`, `Co - Authored - By:`
+        let trailer = start.split_once(':').filter(|(key, _)| key.replace([' ', '\t', '-'], "") == "coauthoredby");
+        if trailer.is_some_and(|(_, value)| names_agent(value)) {
             Some("a Co-Authored-By trailer naming Claude or Anthropic")
         } else if start.strip_prefix("generated with").is_some_and(|rest| names_agent(rest.trim_start_matches(['[', ' ']))) {
             Some("a \"Generated with\" footer naming Claude or Anthropic")
