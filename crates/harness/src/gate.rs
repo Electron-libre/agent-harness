@@ -1,4 +1,4 @@
-//! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-22).
+//! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-23).
 //!
 //! The hook is a small `sh` script that starts the managed `require_code_review.rs native` of the project, then the
 //! `pre-commit` the user already had (moved to `pre-commit.user`, never overwritten).
@@ -117,21 +117,41 @@ pub fn state(hooks: &Path) -> State {
     }
 }
 
+/// The hooks directory of the project and what its `pre-commit` is, `None` when the project is not expected to have the
+/// gate (`expected` is false: the review hook is not among its managed files) or is not the top of a git repository.
+/// One decision for `sync` and `check`, so they never disagree about where the gate goes.
+fn inspect(root: &Path, expected: bool) -> Option<(PathBuf, State)> {
+    if !expected {
+        return None;
+    }
+    let hooks = hooks_dir(root)?;
+    let state = if hooks_path_set(root) {
+        State::Redirected
+    } else {
+        state(&hooks)
+    };
+    Some((hooks, state))
+}
+
+/// The line `check` prints when the project should have the gate and does not (or not as managed), `None` when it is
+/// there, cannot be installed (`core.hooksPath`, no repository) or is not expected. `expected` tells whether the review
+/// hook is among the managed files, whether or not it was deleted since.
+#[must_use]
+pub fn problem(root: &Path, expected: bool) -> Option<String> {
+    match inspect(root, expected)?.1 {
+        State::Missing | State::Foreign => Some(format!("missing: {GATE}")),
+        State::Modified => Some(format!("modified: {GATE}")),
+        State::UpToDate | State::Redirected => None,
+    }
+}
+
 /// Decide what to do for the project at `root`, whose managed files include the review hook when `has_review_hook`.
 ///
 /// # Errors
 /// When a `pre-commit` of the user must move to `pre-commit.user` and that file exists already.
 pub fn plan(root: &Path, has_review_hook: bool) -> Result<Option<Plan>> {
-    if !has_review_hook {
+    let Some((hooks, state)) = inspect(root, has_review_hook) else {
         return Ok(None);
-    }
-    let Some(hooks) = hooks_dir(root) else {
-        return Ok(None);
-    };
-    let state = if hooks_path_set(root) {
-        State::Redirected
-    } else {
-        state(&hooks)
     };
     if state == State::Foreign && hooks.join(CHAINED).exists() {
         bail!(

@@ -36,7 +36,7 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-20** (deterministic) `sync` must reinstall the native gate when it is missing, no longer executable or different from the managed one, and report nothing when it is up to date (idempotent, as SYN-6); `--dry-run` must report the installation and write nothing.
 - **SYN-21** (deterministic) For a linked worktree, or a project whose `.git` is a file, the gate must be installed in the `hooks` directory of the common git directory.
 - **SYN-22** (deterministic) When `core.hooksPath` is set for the project, `sync` must install nothing, report that the native gate is not installed and why, and succeed; a project that is not a git repository, or has no `.claude/hooks/require_code_review.rs`, gets no gate and no error.
-- **SYN-23** (deterministic) `check` must report `missing: native review gate` when the project is a git repository that has the review hook, whose hooks directory lacks the managed gate and where `core.hooksPath` is unset, and `modified: native review gate` when it differs; it must not report it otherwise.
+- **SYN-23** (deterministic) `check` must report `missing: native review gate` when the project is a git repository that has the review hook among its managed files (even deleted since), whose hooks directory lacks the managed gate and where `core.hooksPath` is unset, and `modified: native review gate` when it differs; it must not report it otherwise, nor when the `CI` environment variable is set (a fresh clone of a CI run has no git hooks and nobody commits there).
 
 ## Scenarios
 

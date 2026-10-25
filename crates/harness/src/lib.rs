@@ -617,11 +617,23 @@ fn update_in(
     })
 }
 
-/// Managed files modified or deleted since the last sync, one line each.
+/// Managed files modified or deleted since the last sync, one line each, and the native review gate when the project
+/// should have it and does not. Under CI (the `CI` environment variable is set) the gate is not looked at: a fresh
+/// clone has no git hooks, and nobody commits there.
 ///
 /// # Errors
 /// When the project was never synced (no lock file) or the lock cannot be read.
 pub fn check(root: &Path) -> Result<Vec<String>> {
+    check_with(root, in_ci())
+}
+
+/// Whether `CI` says so: set, and not empty, `0` or `false`.
+fn in_ci() -> bool {
+    std::env::var("CI")
+        .is_ok_and(|v| !matches!(v.trim().to_lowercase().as_str(), "" | "0" | "false"))
+}
+
+fn check_with(root: &Path, ci: bool) -> Result<Vec<String>> {
     let Some(lock) = read_lock(root)? else {
         bail!("no {LOCK}: run `harness sync` first");
     };
@@ -632,6 +644,10 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
             Some(print) if print != *locked => Some(format!("modified: {rel}")),
             Some(_) => None,
         })
+        .chain(gate::problem(
+            root,
+            !ci && lock.contains_key(gate::REVIEW_HOOK),
+        ))
         .collect())
 }
 

@@ -392,3 +392,76 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
     assert!(report.outcome(gate::GATE).is_none());
     assert!(!outer.path().join(".git/hooks/pre-commit").exists());
 }
+
+// spec: SYN-23
+#[test]
+fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
+    let (_source, root) = gated();
+    run(&root);
+    assert!(check_with(root.path(), false).unwrap().is_empty());
+
+    let managed = get(root.path(), ".git/hooks/pre-commit").unwrap();
+    fs::write(pre_commit(&root), format!("{managed}# edited\n")).unwrap();
+    set_executable(&pre_commit(&root), true).unwrap();
+    assert_eq!(
+        check_with(root.path(), false).unwrap(),
+        vec!["modified: native review gate"]
+    );
+
+    fs::write(pre_commit(&root), managed.clone()).unwrap();
+    set_executable(&pre_commit(&root), false).unwrap();
+    assert_eq!(
+        check_with(root.path(), false).unwrap(),
+        vec!["modified: native review gate"]
+    );
+
+    fs::remove_file(pre_commit(&root)).unwrap();
+    assert_eq!(
+        check_with(root.path(), false).unwrap(),
+        vec!["missing: native review gate"]
+    );
+
+    // a hook of the user without ours is a missing gate too
+    user_hook(&root, 0);
+    assert_eq!(
+        check_with(root.path(), false).unwrap(),
+        vec!["missing: native review gate"]
+    );
+    fs::remove_file(pre_commit(&root)).unwrap();
+
+    // a gate that cannot be installed is not a problem to report
+    git_in(root.path(), &["config", "core.hooksPath", ".githooks"]);
+    assert!(check_with(root.path(), false).unwrap().is_empty());
+    git_in(root.path(), &["config", "--unset", "core.hooksPath"]);
+
+    // the review hook deleted since the sync is still a managed file: the gate is still expected
+    fs::remove_file(root.path().join(HOOK)).unwrap();
+    assert_eq!(
+        check_with(root.path(), false).unwrap(),
+        vec![
+            format!("missing: {HOOK}"),
+            "missing: native review gate".to_string()
+        ]
+    );
+    // a fresh clone of a CI run has no git hooks
+    assert_eq!(
+        check_with(root.path(), true).unwrap(),
+        vec![format!("missing: {HOOK}")]
+    );
+
+    // a source without the review hook: no gate expected
+    let (_source, plain) = setup();
+    git_in(plain.path(), &["init", "--quiet", "-b", "main"]);
+    run(&plain);
+    assert!(check_with(plain.path(), false).unwrap().is_empty());
+
+    // not a repository
+    let (source, root) = setup();
+    put(
+        source.path(),
+        &format!("files/{HOOK}"),
+        "// the review hook",
+    );
+    run(&root);
+    assert!(check_with(root.path(), false).unwrap().is_empty());
+}
