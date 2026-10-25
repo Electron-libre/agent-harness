@@ -55,7 +55,7 @@ conversation; an optional copy goes outside the repository and outside `/tmp` (w
 # Tracking
 
 1. [x] Skill `audit-instructions`: `SKILL.md` (collect, detect, classify, report; confidentiality; creation through `skill:create-issue`) and its script `audit_sources.rs` (typed user messages, instruction files, memory, with counts), tested in `test_audit_sources.rs`
-2. [ ] Docs: `docs/architecture.md`, `CLAUDE.md`, `README.md` (seven skills)
+2. [x] Docs: `docs/architecture.md` (the other documents name no skill list; n/a)
 3. [ ] Real run on the user's transcripts, report validated, useful proposals filed as issues
 
 ## Decisions

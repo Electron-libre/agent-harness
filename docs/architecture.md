@@ -22,6 +22,15 @@ Everything that differs between projects is a value, not code. Scripts read list
 `update-docs` lives in the project's `.claude/update-docs-map.md`. Anything else that is project-specific
 (quality benchmark, smoke test, the language-specific recipes of the `justfile`) stays in the project.
 
+## The instruction audit
+
+`audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory
+and instruction files under `~/.claude/projects`, through `audit_sources.rs`. It only proposes skills and hooks;
+the report holds private content, so it stays in the conversation (or a file outside the repository) and each
+validated proposal becomes an issue in generic wording. It is a skill rather than a `harness` subcommand
+because telling a repeated procedure from a rule needs judgment, and a skill keeps the shared files free of
+project specifics.
+
 ## Sources
 
 A directory (relative to the project) or a git URL; a git source is cloned in `$XDG_CACHE_HOME/harness` and
