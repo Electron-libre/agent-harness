@@ -17,6 +17,16 @@ Remove the instruction so the agent no longer mentions renaming.
 2. Reword the title line of the `create-issue` template without the `/rename` mention.
 3. Run `just sync` so this repository's own copies follow, then `just check-harness`.
 
+# Tracking
+1. [x] Drop the `/rename` instructions from both skills, sync the copies, check.
+
+## Decisions
+* Mode: autonomous. No spec (no behaviour change); verified by `grep -rn "/rename" files .claude` being empty.
+
+## Summary
+Removed the naming paragraph of step 0 in `issue-workflow` and the `/rename` mention in the `create-issue` template;
+copies synced. Verified: grep empty, `just check`, `just test-harness`, `just check-harness`. Not verified: nothing else.
+
 # Resources
 * `files/.claude/skills/issue-workflow/SKILL.md`
 * `files/.claude/skills/create-issue/SKILL.md`

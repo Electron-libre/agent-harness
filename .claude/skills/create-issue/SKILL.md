@@ -17,7 +17,7 @@ This skill writes it; `check_issue.rs` enforces the mechanical rules. Don't impl
 3. **Write the file** in English (the conversation with the user stays in the `user_language` of `.claude/harness.toml`), with this template:
 
    ```markdown
-   # <Title: what to achieve, imperative; it names the thread via /rename>
+   # <Title: what to achieve, imperative>
 
    # Goal
    <The problem and the expected outcome, in a few sentences.>

@@ -11,12 +11,10 @@ step 4.6 and 4.8, through the Autonomous mode.
 
 ## 0. Resume or start
 
-Read the issue file. Name the thread after the issue: its title is the first `# ` heading of the file
-(e.g. `# Improve Harness`). Run `/rename <title>` if you can; if you can't (a skill can't type a slash
-command), give the user the exact `/rename <title>` line to paste, once, at the start. Do this on resume
-too, since a resumed thread may still carry another name. If it has a `# Tracking` section, the issue is already planned: summarize where it
-stands (next unchecked deliverable) and continue at step 4 in the mode recorded there (none recorded: validation at each deliverable), unless the issue changes a capability whose spec is missing, still `draft` with no
-validated requirements, or not named in its `# Specs` section: then do step 2 first. Otherwise start at step 1.
+Read the issue file. If it has a `# Tracking` section, the issue is already planned: summarize where it stands (next unchecked
+deliverable) and continue at step 4 in the mode recorded there (none recorded: validation at each deliverable), unless the issue
+changes a capability whose spec is missing, still `draft` with no validated requirements, or not named in its `# Specs` section:
+then do step 2 first. Otherwise start at step 1.
 
 ## 1. Reformulate and validate (STOP)
 
