@@ -87,11 +87,13 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let waiver = git_dir_of(&linked).join("claude-review-waived");
     fs::write(&waiver, "").unwrap();
     out.push(("a waiver of the linked worktree lets its commit through", commit_attempt(hook, &linked, commit).0 == 0));
-    out.push(("the waiver is consumed", !waiver.exists()));
+    out.push(("the waiver stays while no commit happened", waiver.exists()));
+    sh(&linked, &["commit", "-qam", "x"]);
     fs::write(linked.join("new.txt"), "x\n").unwrap();
     let main_waiver = git_dir_of(&main).join("claude-review-waived");
     fs::write(&main_waiver, "").unwrap();
     out.push(("the waiver of the main worktree does not cover the linked one", commit_attempt(hook, &linked, commit).0 == 2));
+    out.push(("the commit made consumed the waiver of the linked worktree", !waiver.exists()));
     out.push(("the linked worktree leaves the main waiver alone", main_waiver.exists()));
     let _ = fs::remove_dir_all(&root);
     out
@@ -203,13 +205,30 @@ fn main() {
     check("refuses a command that creates the waiver", commit_attempt(&hook, &project, "touch esc/.git/claude-review-waived").0 == 2);
     fs::write(&waiver, "").unwrap();
     check("lets through a commit the user waived", commit_attempt(&hook, &project, esc_commit).0 == 0);
-    check("consumes the waiver", !waiver.exists() && commit_attempt(&hook, &project, esc_commit).0 == 2);
+    check("keeps the waiver while no commit happened", waiver.exists() && commit_attempt(&hook, &project, esc_commit).0 == 0);
+    sh(&esc, &["add", "-A"]);
+    sh(&esc, &["commit", "-qm", "waived"]);
+    fs::write(esc.join("docs.md"), "doc two\n").unwrap();
+    check("consumes the waiver once a commit happened", commit_attempt(&hook, &project, esc_commit).0 == 2 && !waiver.exists());
+
+    // a waiver spent by a commit is gone at the next check, so the user's new one is not mistaken for it
+    fs::write(&waiver, "").unwrap();
+    check("lets through the commit of a waiver created again", commit_attempt(&hook, &project, esc_commit).0 == 0);
+    sh(&esc, &["add", "-A"]);
+    sh(&esc, &["commit", "-qm", "waived again"]);
+    fs::write(esc.join("issues/k.md"), "new\n").unwrap();
+    check("an issues-only check drops the waiver spent by a commit", commit_attempt(&hook, &project, esc_commit).0 == 0 && !waiver.exists());
 
     let fresh = project.join("fresh");
     fs::create_dir_all(&fresh).unwrap();
     sh(&fresh, &["init", "-q", "."]);
     fs::write(fresh.join("c.txt"), "x\n").unwrap();
     check("refuses the first commit of a repository", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 2);
+    let fresh_waiver = fresh.join(".git/claude-review-waived");
+    fs::write(&fresh_waiver, "").unwrap();
+    check("lets through the first commit the user waived", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
+    check("stamps the waiver of a repository without commit", fs::read_to_string(&fresh_waiver).unwrap().trim() == "no-head");
+    fs::remove_file(&fresh_waiver).unwrap();
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 

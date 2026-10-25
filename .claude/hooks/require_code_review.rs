@@ -10,8 +10,10 @@
 //! the review is over, not when the skill loads. Changes made afterwards (the fixes of the review) pass as long
 //! as they stay in files the review saw. A commit with nothing to commit, an amend of a clean tree
 //! included, one that only touches `issues/`, and a machine without `git` are not gated. The user waives the
-//! review of the next commit by creating `claude-review-waived` in the git directory; the hook removes it when
-//! it lets that commit through, and refuses any `Bash` command naming it (a deterrent, not a barrier: a `Write`
+//! review of the next commit by creating `claude-review-waived` in the git directory; the hook stamps it with
+//! `HEAD` when it lets a commit through and removes it, without using it, at the first check after `HEAD` moved
+//! (a command that does not commit, such as `--dry-run`, leaves it usable; after a commit the user creates it
+//! again), and refuses any `Bash` command naming it (a deterrent, not a barrier: a `Write`
 //! of the file or a name built in pieces is not caught).
 //!
 //! Declare: PostToolUse Skill (argument `record`), PreToolUse Bash (argument `check`)
@@ -30,6 +32,8 @@ const REVIEW_SKILL: &str = "code-review";
 const ISSUES_DIR: &str = "issues/";
 /// Created by the user, in the git directory, to waive the review of the next commit; the hook removes it.
 const WAIVER: &str = "claude-review-waived";
+/// Stamp of a waiver used in a repository without commit.
+const NO_HEAD: &str = "no-head";
 
 /// What the working tree holds relative to `HEAD`.
 #[derive(Debug, PartialEq)]
@@ -160,12 +164,30 @@ fn record(cwd: &Path) -> std::io::Result<()> {
 fn refusal(cwd: &Path) -> Option<&'static str> {
     let snap = snapshot(cwd);
     let path = marker_path(cwd)?;
+    // the waiver is spent by a commit, not by a command that may not commit (`--dry-run`, a refusal of another hook
+    // or of git): it is stamped with `HEAD` when it lets a commit through and dropped once `HEAD` moved
+    let stamp = if snap.head.is_empty() { NO_HEAD } else { snap.head.as_str() };
+    let waiver = git_file(cwd, WAIVER).filter(|w| w.exists());
+    let used = waiver.as_ref().map(|w| std::fs::read_to_string(w).unwrap_or_default().trim().to_string());
+    if let (Some(waiver), Some(used)) = (&waiver, &used) {
+        if !used.is_empty() && used != stamp {
+            std::fs::remove_file(waiver).ok();
+        }
+    }
     if snap.files.is_empty() || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR)) {
         return None;
     }
-    if let Some(waiver) = git_file(cwd, WAIVER).filter(|w| w.exists()) {
-        std::fs::remove_file(waiver).ok();
-        return None;
+    if let (Some(waiver), Some(used)) = (&waiver, &used) {
+        if used == stamp {
+            return None;
+        }
+        if used.is_empty() {
+            // fail closed: a waiver that cannot be stamped could never be spent
+            if std::fs::write(waiver, stamp).is_err() {
+                return Some("the waiver could not be stamped");
+            }
+            return None;
+        }
     }
     let Some(marker) = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else {
         return Some("no code review has run in this project");

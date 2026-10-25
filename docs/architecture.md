@@ -68,10 +68,11 @@ commit commits) and the files it covers. At a commit (`git -C dir` is followed),
 and exits 2, telling the agent to run the review, when the marker is missing, was made before the last commit, or
 the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with nothing to commit,
 a diff under `issues/` only and a directory outside a repository are let through. Documentation is reviewed like
-code. The user waives the review of the next commit with `touch .git/claude-review-waived`; the hook removes the
-file when it lets that commit through, and refuses any Bash command that names the file. That deters the agent from
-creating one but does not stop a write made by another tool. The hook sees the review text in the `Skill` response but
-does not parse it.
+code. The user waives the review of the next commit with `touch .git/claude-review-waived`; the hook stamps the file
+with `HEAD` when it lets a commit through and removes it at the first check after `HEAD` moved, so a command that does
+not commit (`--dry-run`, a refusal by another hook) leaves it usable, and refuses any Bash command that names the
+file. That deters the agent from creating one but does not stop a write made by another tool. The hook sees the review
+text in the `Skill` response but does not parse it.
 
 ## The instruction audit
 
