@@ -3,7 +3,9 @@
 //! Anthropic (a `Co-Authored-By:` trailer, a "Generated with" footer, a line ending with `<noreply@anthropic.com>`).
 //! The message is read from the command itself (inline, heredoc) and from the file given to `-F` or
 //! `--body-file`. Exit 2 sends the reason back to the agent so it rewrites the message. A message that only
-//! talks about the rule passes: a trailer or footer counts only where a line, or a quoted string, starts with it and names the agent.
+//! talks about the rule passes, and so does a command chained to the commit (`git commit -m ok && echo "…"`): only the
+//! commit or `gh` command is scanned, the command line being cut at `;`, `&`, `|` and newlines outside quotes and outside an unquoted `$(...)`;
+//! a command with a heredoc takes the rest of the line. A trailer or footer counts only where a line, or a quoted string, starts with it and names the agent.
 //!
 //! Declare: PreToolUse Bash
 //!
@@ -59,6 +61,53 @@ fn writes_message(command: &str) -> bool {
     })
 }
 
+/// The commands of `command` that write a message. The line is cut at `;`, `&`, `|` and newlines that are outside
+/// quotes, backticks and an unquoted `$(...)`, `<(...)` (and not at the `&` of a redirection such as `2>&1`): a message, even a
+/// heredoc or a substitution inside double quotes, stays in one piece. A command that comes with an unquoted
+/// heredoc (`<<`), its own or an earlier one, takes the rest of the line, which holds the heredoc body.
+fn writing_commands(command: &str) -> Vec<String> {
+    // each part with whether an unquoted `<<` opened a heredoc in it
+    let mut parts = vec![(String::new(), false)];
+    let (mut quote, mut depth, mut tick, mut prev) = (None, 0, false, ' ');
+    let mut chars = command.chars();
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (None, ';' | '&' | '|' | '\n') if depth == 0 && !tick && !(c == '&' && prev == '>') => {
+                parts.push((String::new(), false));
+                prev = c;
+                continue;
+            }
+            (None, '(') if matches!(prev, '$' | '<' | '>') => depth += 1,
+            (None, ')') if depth > 0 => depth -= 1,
+            (None, '`') => tick = !tick,
+            (None, '<') if prev == '<' => parts.last_mut().unwrap().1 = true,
+            (None, '"' | '\'') => quote = Some(c),
+            (Some(q), _) if c == q => quote = None,
+            (Some('"') | None, '\\') => {
+                parts.last_mut().unwrap().0.push(c);
+                if let Some(next) = chars.next() {
+                    parts.last_mut().unwrap().0.push(next);
+                }
+                prev = ' ';
+                continue;
+            }
+            _ => {}
+        }
+        parts.last_mut().unwrap().0.push(c);
+        prev = c;
+    }
+    let mut writers = Vec::new();
+    for (i, (part, _)) in parts.iter().enumerate().filter(|(_, (p, _))| writes_message(p)) {
+        // the body of a heredoc opened up to this command (`cat <<EOF | git commit -F -`) follows it
+        if parts[..=i].iter().any(|(_, heredoc)| *heredoc) {
+            writers.push(parts[i..].iter().map(|(p, _)| p.as_str()).collect::<Vec<_>>().join("\n"));
+            break;
+        }
+        writers.push(part.clone());
+    }
+    writers
+}
+
 /// Files named by `-F`, `--file`, `--body-file` (`--opt file`, `--opt=file`), read from `cwd`.
 fn message_files(command: &str, cwd: &Path) -> Vec<String> {
     let words: Vec<&str> = command.split_whitespace().collect();
@@ -101,7 +150,8 @@ fn main() {
     std::io::stdin().read_to_string(&mut input).ok();
     let event: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
     let Some(command) = event["tool_input"]["command"].as_str() else { return };
-    if !writes_message(command) {
+    let writers = writing_commands(command);
+    if writers.is_empty() {
         return;
     }
     let cwd = event["cwd"]
@@ -109,8 +159,9 @@ fn main() {
         .map(String::from)
         .or_else(|| std::env::var("CLAUDE_PROJECT_DIR").ok())
         .unwrap_or_else(|| ".".into());
-    let found = std::iter::once(command.to_string())
-        .chain(message_files(command, Path::new(&cwd)))
+    let found = writers
+        .iter()
+        .flat_map(|c| std::iter::once(c.clone()).chain(message_files(c, Path::new(&cwd))))
         .find_map(|text| attribution(&text));
     if let Some(what) = found {
         eprintln!("Refused: the commit or pull request text carries an attribution to the agent ({what}).");

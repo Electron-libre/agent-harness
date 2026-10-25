@@ -1,9 +1,9 @@
 # Written by `harness sync`: hashes of the managed files. Do not edit.
-55283be63dfd351fbfa421068fc431202745df5b939784ac1bed10ce2ac298f5+x  .claude/hooks/block_ai_attribution.rs
+f77d06d9108606c2a2a38ae466cf52f03998be1545c9abf55ab54945029e9afa+x  .claude/hooks/block_ai_attribution.rs
 144fa623e8219143f8a9d7165e44fc05472b78ea7dec884fc8d963a4f6b9ce1d+x  .claude/hooks/clippy_gate.rs
 f3da08683417a1f2964cabde5f76b1e5e0154db28ae253db4adbde990eb92640+x  .claude/hooks/format_rust.rs
 07f9e2b6342aca40fa38bddeba2570ba6478d5ce5c626ae8f3c880af4e378034  .claude/hooks/require_code_review.rs
-e39536cdd029cd03039d99c208e69a55bfd909b2f110dbc0c4626af21ff4be0b+x  .claude/hooks/test_block_attribution.rs
+7d75021a7b68f9c7eb490350c3c4cfe13f4a37302d74d34e7e63a55da9bef2c7+x  .claude/hooks/test_block_attribution.rs
 55391f54534526926881d5176332a19af88d52a659b16e428072ff7d33cd3cd4+x  .claude/hooks/test_hooks.rs
 131c1ef70d748bd0799ab3b29e343bde0d9bb31279f48906355e59415452c3c8  .claude/hooks/test_require_code_review.rs
 a5156b485338e209d5ccbda493a376b2331f0d8d10474e64f998292c2c05ab4c  .claude/skills/audit-instructions/SKILL.md
