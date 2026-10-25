@@ -313,6 +313,41 @@ fn undeterminable_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-8
+/// An option whose value cannot be read from the text names a repository the hook cannot see: refused whatever the
+/// reviews; a literal value, or a `$` elsewhere in the line, is not.
+fn unreadable_option_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev8");
+    review_done(hook, &other, "code-review");
+    let mut out = all_refused(
+        hook,
+        &current,
+        &[
+            "git --git-dir=$X commit -am x",
+            "git --git-dir $X commit -am x",
+            "git --git-dir=\"$HOME/o/.git\" commit -am x",
+            "git --work-tree=$X commit -am x",
+            "git --work-tree ${X} commit -am x",
+            "git -C \"$(mktemp -d)\" commit -am x",
+            "git -C $X commit -am x",
+            "git -C `pwd`/../other commit -am x",
+            "git -C ../other --git-dir=$X commit -am x",
+            "git -C \"$X\" -C ../other commit -am x",
+        ],
+    );
+    for (name, command) in [
+        ("a single-quoted dollar in --git-dir is a literal value", "git --git-dir='$X' commit -am x"),
+        ("a single-quoted dollar in -C is a literal value", "git -C '$X' commit -am x"),
+        ("a path without dollar passes", "git --git-dir=../other/.git --work-tree ../other commit -am x"),
+        ("a dollar in the message is no repository", "git -C ../other commit -m \"$msg\""),
+        ("a dollar in a later option is no repository", "git --work-tree ../other commit -am x --author=\"$USER\""),
+    ] {
+        out.push((name, commit_attempt(hook, &current, command).0 == 0));
+    }
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -447,7 +482,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

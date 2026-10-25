@@ -80,8 +80,9 @@ the directory the `-C` options lead to, which accumulate as in `git`. With `--gi
 runs in is checked too, since `git` commits its files into that git directory. `GIT_DIR` and `GIT_WORK_TREE` count as
 the two options (which win over them) when the line sets them before `git`, after `env`, or with `export`, until an
 `unset` or an `env -u`; a line that gives one a value the text does not show (`$X`, `${X}`, `$(…)`, backticks) is
-refused. The hook reads the text of the command only: a variable exported by an earlier command of the session (an
-`export` in one call, a plain `git commit` in the next) is not seen, so the gate cannot cover that case.
+refused, and so is a `-C`, `--git-dir` or `--work-tree` whose value is one of those. The hook reads the text of the
+command only: a variable exported by an earlier command of the session (an `export` in one call, a plain `git commit`
+in the next) is not seen, so the gate cannot cover that case.
 
 ## The instruction audit
 

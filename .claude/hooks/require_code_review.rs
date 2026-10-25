@@ -166,6 +166,24 @@ fn environment_repository(words: &[&str]) -> (Option<PathBuf>, Option<PathBuf>) 
     (dir, tree)
 }
 
+/// Whether the word that opens `value` is expanded by the shell into something the text does not give (`$X`, `${X}`,
+/// `$(…)`, backticks, unless in single quotes or escaped). Quotes and escapes decide where the word ends.
+fn value_expands(value: &str) -> bool {
+    let (mut single, mut double, mut escaped) = (false, false, false);
+    for c in value.chars() {
+        match c {
+            _ if escaped => escaped = false,
+            '\\' if !single => escaped = true,
+            '\'' if !double => single = !single,
+            '"' if !single => double = !double,
+            '$' | '`' if !single => return true,
+            c if !single && !double && (c.is_whitespace() || matches!(c, ';' | '|' | '&')) => break,
+            _ => {}
+        }
+    }
+    false
+}
+
 /// The variable of `environment_repository` the line assigns a value the text does not give (`$X`, `${X}`, `$(…)`,
 /// backticks, unless in single quotes), `None` when every value is literal. It reads the raw command, where the
 /// brackets are still there.
@@ -176,21 +194,7 @@ fn undeterminable_variable(command: &str) -> Option<&'static str> {
             if command[..at].ends_with(|c: char| c.is_alphanumeric() || c == '_') {
                 return false;
             }
-            let value = &command[at + assignment.len()..];
-            // the word of the value: quotes and escapes decide where it ends and whether a `$` expands
-            let (mut single, mut double, mut escaped) = (false, false, false);
-            for c in value.chars() {
-                match c {
-                    _ if escaped => escaped = false,
-                    '\\' if !single => escaped = true,
-                    '\'' if !double => single = !single,
-                    '"' if !single => double = !double,
-                    '$' | '`' if !single => return true,
-                    c if !single && !double && (c.is_whitespace() || matches!(c, ';' | '|' | '&')) => break,
-                    _ => {}
-                }
-            }
-            false
+            value_expands(&command[at + assignment.len()..])
         })
     })
 }
@@ -205,7 +209,9 @@ fn undeterminable_variable(command: &str) -> Option<&'static str> {
 /// as the two options, which win over them. The subcommand is the first word after `git` once the global options
 /// (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not a
 /// commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
-fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
+/// A commit whose `-C`, `--git-dir` or `--work-tree` has a value the text does not give (`value_expands`, or none left
+/// once a substitution split the line) is `Err` with the option: its repository is unknown.
+fn commit_dirs(command: &str) -> Option<Result<Vec<Option<String>>, &'static str>> {
     // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
     let joined = command.replace("\\\n", " ");
     let spaced = joined.replace([';', '|', '&', '(', ')', '`', '\n'], " ; ");
@@ -219,38 +225,61 @@ fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
         // the options set below win over the environment
         let (mut git_dir, mut work_tree) = environment_repository(&words[..i]);
         let mut dir = None::<PathBuf>;
+        let mut unreadable = None::<&'static str>;
+        // the value of a repository option, `None` (and the option remembered) when the text does not give it
+        let mut readable = |option: &'static str, value: Option<String>| {
+            let value = value.filter(|v| !value_expands(v));
+            if value.is_none() {
+                unreadable.get_or_insert(option);
+            }
+            value
+        };
         loop {
             match rest.next() {
                 Some(&"-C") => {
-                    if let Some(v) = take_value(&mut rest) {
+                    if let Some(v) = readable("-C", take_value(&mut rest)) {
                         dir = Some(dir.map_or(path(&v), |d| d.join(path(&v))));
                     }
                 }
                 // `--git-dir` and `--work-tree` stay in `GIT_VALUE_OPTIONS` (same list as the other hook) but are read here first
-                Some(&"--work-tree") => work_tree = take_value(&mut rest).map(|v| path(&v)),
-                Some(&"--git-dir") => git_dir = take_value(&mut rest).map(|v| path(&v)),
-                Some(w) if w.starts_with("--work-tree=") => work_tree = Some(path(&quoted(&w["--work-tree=".len()..], &mut rest))),
-                Some(w) if w.starts_with("--git-dir=") => git_dir = Some(path(&quoted(&w["--git-dir=".len()..], &mut rest))),
+                Some(&"--work-tree") => work_tree = readable("--work-tree", take_value(&mut rest)).map(|v| path(&v)),
+                Some(&"--git-dir") => git_dir = readable("--git-dir", take_value(&mut rest)).map(|v| path(&v)),
+                Some(w) if w.starts_with("--work-tree=") => {
+                    work_tree = readable("--work-tree", Some(quoted(&w["--work-tree=".len()..], &mut rest))).map(|v| path(&v));
+                }
+                Some(w) if w.starts_with("--git-dir=") => {
+                    git_dir = readable("--git-dir", Some(quoted(&w["--git-dir=".len()..], &mut rest))).map(|v| path(&v));
+                }
                 Some(w) if *w == "-c" || GIT_VALUE_OPTIONS.contains(w) => {
                     take_value(&mut rest);
                 }
                 Some(w) if SKIPPED_OPTIONS.contains(w) || GIT_VALUE_OPTIONS.iter().any(|o| w.strip_prefix(o).is_some_and(|v| v.starts_with('='))) => {}
                 other => {
-                    if other.map(|w| w.trim_end_matches(['\'', '"'])) != Some("commit") {
+                    // a substitution splits the line, so the subcommand may stand after the `;` it left: fail closed
+                    let is_commit = |w: &str| w.trim_end_matches(['\'', '"']) == "commit";
+                    if let (None, Some(option)) = (other, unreadable) {
+                        if words[i + 1..].iter().any(|w| is_commit(w)) {
+                            return Some(Err(option));
+                        }
+                    }
+                    if !other.is_some_and(|w| is_commit(w)) {
                         return None;
+                    }
+                    if let Some(option) = unreadable {
+                        return Some(Err(option));
                     }
                     // the directory `-C` leads to is where the relative paths are taken from
                     let from_dir = |p: PathBuf| dir.as_ref().map_or(p.clone(), |d| d.join(&p));
                     let text = |p: PathBuf| Some(p.to_string_lossy().into_owned());
                     if let Some(w) = work_tree {
-                        return Some(vec![text(from_dir(w))]);
+                        return Some(Ok(vec![text(from_dir(w))]));
                     }
-                    let Some(g) = git_dir else { return Some(vec![dir.and_then(text)]) };
+                    let Some(g) = git_dir else { return Some(Ok(vec![dir.and_then(text)])) };
                     let g = from_dir(g);
                     // the repository holding the git directory: the parent of its innermost `.git`, else itself
                     let repo = g.ancestors().find(|a| a.file_name().is_some_and(|n| n == ".git")).and_then(Path::parent).map_or(g.clone(), Path::to_path_buf);
                     let repo = if repo.as_os_str().is_empty() { PathBuf::from(".") } else { repo };
-                    return Some(vec![text(repo), dir.and_then(text)]);
+                    return Some(Ok(vec![text(repo), dir.and_then(text)]));
                 }
             }
         }
@@ -354,11 +383,13 @@ fn main() {
                 std::process::exit(2);
             }
             let Some(dirs) = commit_dirs(command) else { return };
-            if let Some(name) = undeterminable_variable(command) {
-                eprintln!("Refused: {name} is set to a value the hook cannot read (a variable, a substitution), so the repository the commit lands in is unknown.");
+            let unreadable = dirs.as_ref().err().map(|option| format!("the value of {option}")).or_else(|| undeterminable_variable(command).map(str::to_string));
+            if let Some(what) = unreadable {
+                eprintln!("Refused: {what} is one the hook cannot read (a variable, a substitution), so the repository the commit lands in is unknown.");
                 eprintln!("Write the path in the command (`git -C dir commit`), or ask the user to waive the review.");
                 std::process::exit(2);
             }
+            let Ok(dirs) = dirs else { return };
             let mut roots: Vec<PathBuf> = dirs.into_iter().map(|d| d.map_or(cwd.clone(), |d| toplevel(&shell_dir.join(d)))).collect();
             roots.dedup();
             for cwd in roots {
