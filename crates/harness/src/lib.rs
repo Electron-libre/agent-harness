@@ -19,6 +19,8 @@ pub const CONFIG: &str = ".claude/harness.toml";
 /// Hashes of the managed files as last written, relative to the project root.
 pub const LOCK: &str = ".claude/harness.lock";
 
+mod gate;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SyncOptions {
     pub force: bool,
@@ -36,6 +38,8 @@ pub enum Outcome {
     Conflict,
     /// File dropped from the source but modified locally: left as it is, no longer managed.
     Kept,
+    /// A hook of the project's own moved aside so that the managed one can chain it.
+    Moved,
 }
 
 impl fmt::Display for Outcome {
@@ -48,6 +52,7 @@ impl fmt::Display for Outcome {
             Outcome::Unchanged => "unchanged",
             Outcome::Conflict => "conflict (modified locally, fix it in the source or use --force)",
             Outcome::Kept => "kept (dropped from the source but modified locally)",
+            Outcome::Moved => "moved (your hook now runs after the review gate)",
         })
     }
 }
@@ -461,10 +466,16 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
         );
     }
     let lock = read_lock(root)?.unwrap_or_default();
+    // decided first: a hook of the user that cannot be chained stops the sync before it writes anything
+    let files = list(&managed)?;
+    let gate = gate::plan(root, files.iter().any(|f| f == gate::REVIEW_HOOK))?;
+    // installed before the managed files are written, so a failure leaves the project as it was
+    if let (Some(gate), false) = (&gate, options.dry_run) {
+        gate.install()?;
+    }
     let mut new_lock = BTreeMap::new();
     let mut report = Report::default();
 
-    let files = list(&managed)?;
     let file_set: BTreeSet<&String> = files.iter().collect();
     for rel in &files {
         let bytes = fs::read(managed.join(rel))?;
@@ -525,6 +536,10 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
             )?;
         }
         report.entries.push((rel, Outcome::Seeded));
+    }
+
+    if let Some(gate) = gate {
+        report.entries.extend(gate.outcomes());
     }
 
     if !options.dry_run {

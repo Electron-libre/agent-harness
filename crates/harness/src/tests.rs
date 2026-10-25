@@ -5,6 +5,8 @@ use tempfile::{tempdir, TempDir};
 
 use super::*;
 
+mod install_gate;
+
 fn put(dir: &Path, rel: &str, text: &str) {
     let path = dir.join(rel);
     fs::create_dir_all(path.parent().unwrap()).unwrap();

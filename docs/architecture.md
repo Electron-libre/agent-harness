@@ -85,7 +85,14 @@ the text does not show (`$X`, `${X}`, `$(…)`, `(cmd)`, backticks) is refused, 
 earlier command of the session (an `export` in one call, a plain `git commit` in the next) is not seen, so the gate
 cannot cover that case.
 
-A third mode, `native`, is meant for the git `pre-commit` hook (installation: [issue](../issues/install_a_git_pre_commit_review_gate.md)).
+A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` installs (`crates/harness/src/gate.rs`;
+`.git/hooks` is neither versioned nor cloned, so each clone needs its own `sync`). The installed file is a small `sh`
+script, marked by its second line, that starts `rust-script .claude/hooks/require_code_review.rs native` from the
+work tree and then the `pre-commit` the user already had, which `sync` moved to `pre-commit.user` (it never overwrites a
+hook that is not its own, and stops before writing anything when `pre-commit.user` exists too). A missing review hook or
+`rust-script` is a warning on stderr, not a refusal. `sync` reinstalls the script when it is missing, edited or no longer
+executable, and `--dry-run` only reports. `init` writes `harness.toml` only: the review hook is not there until the first
+`sync`, which installs the gate.
 Git runs the hook in the repository that really receives the commit, with `GIT_DIR` and the work tree already
 resolved, so `native` reads no event and no command: it takes the same marker, snapshot, exemptions and waiver as
 `check` from that repository. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is
