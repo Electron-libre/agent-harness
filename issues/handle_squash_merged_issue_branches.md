@@ -36,7 +36,14 @@ issue out of `just next-issue` without the user seeing why.
    is the approach chosen with the user (`-D` after `git cherry` can miss a reverted cherry-pick, `--force` stays the explicit escape);
    the checked-then-removed race is negligible for a single-user flow; the multi-commit test already covers the `+` refusal; unquoted
    `*flags` is the usual just idiom.
-2. [ ] `next-issue` takes an issue only for a worktree or commits off trunk, and reports stale branches (PAR-3, PAR-4)
+2. [x] `next-issue` takes an issue only for a worktree or commits off trunk, and reports stale branches (PAR-3, PAR-4)
+   Done: `next_issue.rs` takes an issue for a worktree or `git cherry` `+` commits (true when git cannot tell), prints `Stale:` lines; existing
+   tests now give taken branches a commit; new `stale_checks`. Spec set to `implemented`, old PAR-3 scenario reworded, architecture.md updated.
+   Verified: `just check`, `just test-harness`, `just check-harness`. Not verified: a multi-commit squash left as a branch is still shown
+   `Taken:` (its commits are not patch-equivalent), the user sees it and `--force`s. Code review: 8 findings. Fixed: `git cherry` on
+   `refs/heads/<name>` (no ambiguity), git queried only for branches named after a queue entry, architecture.md wrapped. Not fixed, by design:
+   an empty branch with no worktree is free (`start-issue` always makes a worktree, agreed with the user); trunk is the branch of the main
+   worktree, as in `finish`; multi-commit squash stays `Taken:` and needs `--force` (documented limit); `Stale:` only covers queue entries.
 
 ## Decisions
 

@@ -99,9 +99,10 @@ Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-is
 `just finish-issue`) gives an issue the worktree `../<repo>-<stem>` on a branch `<stem>`: separate working tree and
 index, shared object store, so one agent's uncommitted files and commits never reach the other. Each worktree has its
 own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a cold build in 4 s; a larger
-project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the branch or the worktree itself:
-`next_issue.rs` reads `git for-each-ref` and `git worktree list`, so every worktree sees it and no file needs
-cleaning. The queue is edited only at merge time: `close_issue.rs` refuses in a linked worktree. The hooks need
+project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:
+`next_issue.rs` reads `git for-each-ref`, `git worktree list` and `git cherry`, so every worktree sees it and no file
+needs cleaning. A leftover branch with neither is listed `Stale:` and `just finish-issue` cleans it (merged by
+ancestry or patch equivalence, `--force` for a squash of several commits). The queue is edited only at merge time: `close_issue.rs` refuses in a linked worktree. The hooks need
 nothing: `require_code_review.rs` keeps its marker and waiver in the git directory of each worktree
 (`git rev-parse --git-path`), and `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees).
 

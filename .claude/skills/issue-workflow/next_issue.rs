@@ -1,8 +1,10 @@
 #!/usr/bin/env rust-script
 //! Print the next issue to work on: the first line of `issues/queue.md`, with its title and the rest of
 //! the queue. Reports (stderr) issues missing from the queue and queue lines without a file.
-//! An issue is taken, and skipped, when a branch named after its stem exists or a git worktree has it checked
-//! out; the mark comes from git alone, so every worktree sees it.
+//! An issue is taken, and skipped, when a git worktree has a branch named after its stem checked out, or when such
+//! a branch holds commits that are not on the branch of the main worktree (patch-equivalent commits count as on
+//! it). A branch with neither (left over after a merge, empty) is reported `Stale:` and takes nothing. The mark
+//! comes from git alone, so every worktree sees it.
 //! Usage: `just next-issue` (from the repo root, or pass the `issues` directory as argument).
 
 use std::path::Path;
@@ -35,28 +37,55 @@ fn git_lines(dir: &Path, args: &[&str]) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// The branches of the repository that holds `dir`, with the path of the worktree that has them checked out,
-/// if any. The branch of the main worktree is left out: it is the trunk, not an issue. Empty outside a git
-/// repository.
-fn branches(dir: &Path) -> Vec<(String, Option<String>)> {
+/// Whether `branch` holds a commit that `trunk` lacks; true when git cannot tell, so unmerged work is never ignored.
+fn has_own_commits(dir: &Path, trunk: &str, branch: &str) -> bool {
+    Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["cherry", trunk, &format!("refs/heads/{branch}")])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .is_none_or(|o| String::from_utf8_lossy(&o.stdout).lines().any(|l| l.starts_with('+')))
+}
+
+/// A local branch: the path of the worktree that has it checked out, if any, and whether it takes its issue.
+struct Branch {
+    name: String,
+    worktree: Option<String>,
+    taken: bool,
+}
+
+/// The branches of the repository that holds `dir`. The branch of the main worktree is left out: it is the trunk,
+/// not an issue. Empty outside a git repository. Only the branches named after one of `stems` are examined for commits.
+fn branches(dir: &Path, stems: &[&str]) -> Vec<Branch> {
     let mut out: Vec<(String, Option<String>)> =
         git_lines(dir, &["for-each-ref", "--format=%(refname:short)", "refs/heads"]).into_iter().map(|b| (b, None)).collect();
     let (mut path, mut first) = (String::new(), true);
+    let mut trunk = String::new();
     for line in git_lines(dir, &["worktree", "list", "--porcelain"]) {
         if let Some(p) = line.strip_prefix("worktree ") {
             path = p.to_string();
         } else if let Some(b) = line.strip_prefix("branch refs/heads/") {
             if first {
                 out.retain(|(name, _)| name != b);
+                trunk = b.to_string();
             } else if let Some(entry) = out.iter_mut().find(|(name, _)| name == b) {
                 entry.1 = Some(path.clone());
             }
             first = false;
+        } else if let Some(h) = line.strip_prefix("HEAD ").filter(|_| first && trunk.is_empty()) {
+            trunk = h.to_string();
         } else if line.is_empty() {
             first = false;
         }
     }
-    out
+    out.into_iter()
+        .map(|(name, worktree)| {
+            let taken = worktree.is_some() || trunk.is_empty() || !stems.contains(&name.as_str()) || has_own_commits(dir, &trunk, &name);
+            Branch { name, worktree, taken }
+        })
+        .collect()
 }
 
 fn main() {
@@ -85,8 +114,10 @@ fn main() {
         drift = true;
     }
 
-    let branches = branches(dir);
-    let taken = |stem: &str| branches.iter().find(|(b, _)| b == stem).map(|(_, path)| path.as_deref());
+    let stems: Vec<&str> = entries.iter().map(|(s, _)| *s).collect();
+    let branches = branches(dir, &stems);
+    let taken = |stem: &str| branches.iter().find(|b| b.name == stem && b.taken).map(|b| b.worktree.as_deref());
+    let stale = |stem: &str| branches.iter().any(|b| b.name == stem && !b.taken);
     let free: Vec<(usize, &(&str, &str))> = entries.iter().enumerate().filter(|(_, (s, _))| taken(s).is_none()).collect();
 
     match free.first() {
@@ -102,6 +133,11 @@ fn main() {
     for (stem, _) in &entries {
         if let Some(path) = taken(stem) {
             println!("Taken: {stem}{}", path.map_or(String::new(), |p| format!(" (worktree {p})")));
+        }
+    }
+    for (stem, _) in &entries {
+        if stale(stem) {
+            println!("Stale: {stem} (branch with no worktree and nothing off the main branch; run `just finish-issue {stem}`)");
         }
     }
     std::process::exit(i32::from(drift));

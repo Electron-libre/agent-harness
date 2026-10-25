@@ -1,6 +1,6 @@
 ---
 id: PAR
-status: draft
+status: implemented
 adrs: [0003]
 ---
 
@@ -27,7 +27,7 @@ deliberate step run from the main branch.
 
 ## Scenarios
 
-- (PAR-3) Given a branch `foo` that exists with no worktree, when `next-issue` runs, then `foo` is skipped and reported as taken without a path.
+- (PAR-3) Given a branch `foo` with a commit that is not on the main branch and no worktree, when `next-issue` runs, then `foo` is skipped and reported as taken without a path.
 - (PAR-4) Given the queue `a`, `b` with `a` taken, when `next-issue` runs, then it prints `b` as next and reports `a` as taken.
 - (PAR-6) Given a branch merged by fast-forward or by rebase, when `finish-issue` runs, then it counts as merged since its tip is an ancestor of the main branch.
 - (PAR-6) Given a branch merged by a rebase or by a squash of one commit, when `finish-issue` runs, then it counts as merged since every commit has a patch-equivalent on the main branch.
