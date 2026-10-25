@@ -84,9 +84,30 @@ fn snapshot(cwd: &Path) -> Snapshot {
 const SKIPPED_OPTIONS: [&str; 8] =
     ["--no-pager", "--paginate", "-p", "-P", "--no-optional-locks", "--bare", "--no-replace-objects", "--literal-pathspecs"];
 
+/// Global options of `git` that take the next word as value; the same list as `GIT_VALUE_OPTIONS` of
+/// `block_ai_attribution.rs` (a hook is a single file, keep the two in step). `-C` is handled apart: its value is the directory.
+const GIT_VALUE_OPTIONS: [&str; 5] = ["--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"];
+
+/// Takes the value of an option from `words`: a quoted value may span several words.
+fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<String> {
+    let first = *words.next()?;
+    let mut value = first.to_string();
+    if let Some(quote) = first.chars().next().filter(|c| matches!(c, '"' | '\'')) {
+        if first.len() == 1 || !first.ends_with(quote) {
+            for w in words.by_ref() {
+                value = format!("{value} {w}");
+                if w.ends_with(quote) {
+                    break;
+                }
+            }
+        }
+    }
+    Some(value)
+}
+
 /// The directory a `git commit` of the line runs in: `Some(None)` for the current one, `Some(Some(dir))` after
 /// `-C dir`, `None` when no command of the line commits. The subcommand is the first word after `git` once the
-/// global options (`SKIPPED_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not
+/// global options (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not
 /// a commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
 fn commit_dir(command: &str) -> Option<Option<String>> {
     // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
@@ -100,11 +121,11 @@ fn commit_dir(command: &str) -> Option<Option<String>> {
         let mut dir = None;
         loop {
             match rest.next() {
-                Some(&"-C") => dir = rest.next().map(|d| d.trim_matches(['"', '\'']).to_string()),
-                Some(&"-c") => {
-                    rest.next();
+                Some(&"-C") => dir = take_value(&mut rest).map(|d| d.trim_matches(['"', '\'']).to_string()),
+                Some(w) if *w == "-c" || GIT_VALUE_OPTIONS.contains(w) => {
+                    take_value(&mut rest);
                 }
-                Some(w) if SKIPPED_OPTIONS.contains(w) || w.starts_with("--git-dir=") || w.starts_with("--work-tree=") => {}
+                Some(w) if SKIPPED_OPTIONS.contains(w) || GIT_VALUE_OPTIONS.iter().any(|o| w.strip_prefix(o).is_some_and(|v| v.starts_with('='))) => {}
                 other => return (other.map(|w| w.trim_end_matches(['\'', '"'])) == Some("commit")).then_some(dir.clone()),
             }
         }

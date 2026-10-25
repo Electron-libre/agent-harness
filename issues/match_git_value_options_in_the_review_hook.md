@@ -19,3 +19,15 @@ bypassed by `git --git-dir X commit`.
 
 # Hints
 * A hook script is a single file run by `rust-script`: a shared module is not free.
+
+# Tracking
+1. [x] Skip the value of every git global option in `commit_dir`, with failing cases first
+
+## Decisions
+* Mode: autonomous.
+* The list is duplicated in both hooks (a hook is a single file) with a cross-reference comment; no spec covers the hook.
+
+## Summary
+* Done: `require_code_review.rs` skips `--git-dir`, `--work-tree`, `--namespace`, `--exec-path`, `--super-prefix` as two words (quoted values included) or `--opt=value`; the new cases, which failed first, now pass; `-c` and `-C` also take a quoted value with spaces.
+* Verified: `just check`, `just test-harness`. Not verified: nothing else.
+* Code review: found the same quoted-value bypass for `-c`/`-C` (fixed with `take_value`); `--exec-path`/`--super-prefix` kept as two words on purpose (over-skipping is harmless, same list as the attribution hook); `--git-dir`/`--work-tree` not used to pick the repository to check (not fixed here, follow-up); unbalanced quote and duplicated code (single-file hooks) accepted.

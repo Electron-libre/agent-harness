@@ -155,6 +155,15 @@ fn main() {
     check("sees a commit ended by a semicolon", commit_attempt(&hook, &project, "git add .;git commit;").0 == 2);
     check("looks at the repository named by -C", commit_attempt(&hook, &project, "git -C sub commit -am x").0 == 2);
     check("sees a commit in brackets", commit_attempt(&hook, &project, "(git commit -m x)").0 == 2);
+    for option in ["--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"] {
+        let spaced = format!("git {option} /x commit -m x");
+        check(&format!("sees a commit after {option} given as two words"), commit_attempt(&hook, &project, &spaced).0 == 2);
+    }
+    check("sees a commit after a quoted option value", commit_attempt(&hook, &project, "git --namespace 'a b' commit -m x").0 == 2);
+    check("sees a commit after --namespace=value", commit_attempt(&hook, &project, "git --namespace=n commit -m x").0 == 2);
+    check("sees a commit after -c with a quoted value", commit_attempt(&hook, &project, "git -c 'user.name=A B' commit -m x").0 == 2);
+    check("looks at the repository named by a quoted -C", commit_attempt(&hook, &project, "git -C 'sub' commit -am x").0 == 2);
+    check("ignores a path named commit after an option value", commit_attempt(&hook, &project, "git --git-dir /x log -- commit").0 == 0);
     check("ignores a path named commit", commit_attempt(&hook, &project, "git log -- commit").0 == 0);
 
     review_done(&hook, &project, "code-review");

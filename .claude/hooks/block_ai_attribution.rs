@@ -15,7 +15,8 @@
 use std::io::Read;
 use std::path::Path;
 
-/// Options that take the next word as value, before the subcommand of `git` and of `gh`.
+/// Options that take the next word as value, before the subcommand of `git` and of `gh`. `require_code_review.rs`
+/// holds the same list for `git` (a hook is a single file, keep the two in step).
 const GIT_VALUE_OPTIONS: [&str; 7] = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"];
 const GH_VALUE_OPTIONS: [&str; 3] = ["-R", "--repo", "--hostname"];
 
