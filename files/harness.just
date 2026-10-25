@@ -33,8 +33,8 @@ check-issue issue:
     rust-script .claude/skills/create-issue/check_issue.rs {{issue}}
 
 # Validate specs/*.md and trace their requirements to the `// spec: ID` comments of the tests.
-check-specs:
-    rust-script .claude/specs/check_specs.rs
+check-specs *args:
+    rust-script .claude/specs/check_specs.rs {{args}}
 
 # Fail when a managed harness file was modified or deleted since the last `harness sync`.
 check-harness:

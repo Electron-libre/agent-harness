@@ -26,3 +26,10 @@ lenient rule. A mistyped prefix or a spec dropped while a managed test still cit
 
 # Hints
 * Consumers must not run the strict mode: they do not have the specs of the managed scripts.
+
+# Tracking
+1. [x] Add `--strict` to `check_specs.rs`, let the managed `check-specs` recipe forward arguments and call it strictly from the root `check`, test both modes, document it in `specs/README.md`.
+
+## Decisions
+* Mode: autonomous. Approach 1 of the issue: the managed `check-specs` recipe forwards its arguments (`check-specs *args`) and stays lenient without them; the root `check` calls `just check-specs --strict`.
+* Verified: `just check`, `just test-harness`, `just check-harness`. Code review (3 rounds): fixed the recipe design, unknown or extra arguments, the README wording and the issue text; left as is: the second-round remarks on `--`, a `strict` parameter of `case` and the tree shared by the last tests (cosmetic), and a lenient bare `just check-specs` (consumers share the recipe).

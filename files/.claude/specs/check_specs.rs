@@ -1,6 +1,7 @@
 #!/usr/bin/env rust-script
 //! Validate `specs/*.md` against `specs/README.md` and trace them to the tests (`// spec: ID`).
-//! Usage: `just check-specs` (from the repo root; an optional argument is another root).
+//! Usage: `just check-specs` (from the repo root; an optional argument is another root; `--strict` also flags the
+//! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
 //! Prints one line per problem, exit 1 if any.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -171,7 +172,7 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
     cited
 }
 
-fn problems(root: &Path) -> Vec<String> {
+fn problems(root: &Path, strict: bool) -> Vec<String> {
     let mut out = Vec::new();
     let mut names: Vec<String> = std::fs::read_dir(root.join("specs"))
         .into_iter()
@@ -197,7 +198,8 @@ fn problems(root: &Path) -> Vec<String> {
     let known: BTreeSet<&str> = specs.iter().flat_map(|s| s.requirements.iter().map(|r| r.id.as_str())).collect();
     for (id, file) in &cited {
         // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
-        let foreign = file.replace('\\', "/").starts_with(".claude/") && !ids.contains_key(id.split('-').next().unwrap_or(""));
+        let foreign = !strict
+            && file.replace('\\', "/").starts_with(".claude/") && !ids.contains_key(id.split('-').next().unwrap_or(""));
         if !known.contains(id.as_str()) && !foreign {
             out.push(format!("{file}: cites `{id}`, which no spec defines"));
         }
@@ -213,8 +215,18 @@ fn problems(root: &Path) -> Vec<String> {
 }
 
 fn main() {
-    let root = PathBuf::from(std::env::args().nth(1).unwrap_or_else(|| ".".to_string()));
-    let found = problems(&root);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(flag) = args.iter().find(|a| a.starts_with('-') && *a != "--strict") {
+        eprintln!("unknown option `{flag}` (usage: check_specs.rs [--strict] [root])");
+        std::process::exit(2);
+    }
+    if args.iter().filter(|a| *a != "--strict").count() > 1 {
+        eprintln!("usage: check_specs.rs [--strict] [root]");
+        std::process::exit(2);
+    }
+    let strict = args.iter().any(|a| a == "--strict");
+    let root = PathBuf::from(args.iter().find(|a| *a != "--strict").map_or(".", String::as_str));
+    let found = problems(&root, strict);
     for p in &found {
         println!("{p}");
     }

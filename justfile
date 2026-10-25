@@ -5,8 +5,10 @@ set allow-duplicate-recipes
 default:
     @just --list
 
-# Format, lint (warning-free), test, then check the specs.
-check: fmt clippy test check-specs
+# Format, lint (warning-free), test, then check the specs. Strict: this repository ships the managed tests, so
+# their citations must resolve to a spec here (consumers stay lenient).
+check: fmt clippy test
+    just check-specs --strict
 
 fmt:
     cargo fmt --all

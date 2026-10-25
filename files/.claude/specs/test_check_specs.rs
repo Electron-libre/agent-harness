@@ -2,6 +2,7 @@
 //! Behavior test for `check_specs.rs`: accepts good specs, flags each violation of `specs/README.md`.
 //! Usage: `just test-harness`.
 
+use std::cell::Cell;
 use std::path::Path;
 use std::process::Command;
 
@@ -12,6 +13,7 @@ fn main() {
     let script = std::fs::canonicalize(Path::new(file!()).parent().unwrap().join("check_specs.rs")).unwrap();
     let tmp = std::env::temp_dir().join(format!("check_specs_test_{}", std::process::id()));
     let mut failed = false;
+    let strict = Cell::new(false);
     let mut case = |name: &str, spec: &str, tests: &str, others: &[(&str, &str)], expect: Option<&str>| {
         let _ = std::fs::remove_dir_all(&tmp);
         for dir in ["specs", "crates/a/src", ".claude/hooks", "docs/adr", "benchmark/x"] {
@@ -24,7 +26,12 @@ fn main() {
         for (path, body) in others {
             std::fs::write(tmp.join(path), body).unwrap();
         }
-        let out = Command::new("rust-script").arg(&script).arg(&tmp).output().expect("rust-script must be installed");
+        let mut command = Command::new("rust-script");
+        command.arg(&script).arg(&tmp);
+        if strict.get() {
+            command.arg("--strict");
+        }
+        let out = command.output().expect("rust-script must be installed");
         let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
         let ok = match expect {
             None => out.status.success() && stdout.is_empty(),
@@ -66,6 +73,23 @@ fn main() {
     case("quality requirement with a missing benchmark file is flagged", &quality, "// spec: RER-1\nfn t() {}\n", &[], Some("reference.yaml"));
     case("quality lines may follow a blank line", &quality.replace("recall\n", "recall\n\n").replace("  benchmark", "\n  benchmark"), "// spec: RER-1\nfn t() {}\n", &[("benchmark/x/reference.yaml", "x")], None);
     case("quality requirement with no metric is flagged", &quality.replace("  metric: recall\n", ""), "// spec: RER-1\nfn t() {}\n", &[("benchmark/x/reference.yaml", "x")], Some("metric"));
+
+    strict.set(true);
+    case("strict: a managed test citing a spec the project lacks is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: PAR-1\nfn t() {}\n")], Some("PAR-1"));
+    case("strict: a managed test citing a defined requirement passes", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: RER-1\nfn t() {}\n")], None);
+
+    case("strict: an unknown id of a present spec is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: RER-9\nfn t() {}\n")], Some("RER-9"));
+    strict.set(false);
+
+    let bad = Command::new("rust-script").arg(&script).arg("--strcit").arg(&tmp.join("missing")).output().expect("rust-script must be installed");
+    let ok = bad.status.code() == Some(2);
+    println!("{} - an unknown option is rejected", if ok { "ok  " } else { "FAIL" });
+    failed |= !ok;
+    // the tree of the last case still holds the unknown id RER-9 under `.claude/`
+    let first = Command::new("rust-script").arg(&script).arg("--strict").arg(&tmp).output().expect("rust-script must be installed");
+    let ok = !first.status.success() && String::from_utf8_lossy(&first.stdout).contains("RER-9");
+    println!("{} - --strict may come before the root", if ok { "ok  " } else { "FAIL" });
+    failed |= !ok;
 
     let _ = std::fs::remove_dir_all(&tmp);
     if failed {
