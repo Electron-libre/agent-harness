@@ -101,5 +101,7 @@ can switch it at any time.
   `issues/done/`, drops the issue from `issues/queue.md` and rewrites `issues/<name>.md` to
   `issues/done/<name>.md` in every other document that cites it) and include the
   move and those edits in the final commit. Never move it unasked.
-- To know which issue comes next, run `just next-issue` (first entry of `issues/queue.md`) instead of reading
-  the issue files. Reordering the queue is the user's call (`skill:prioritize-issues`).
+- To know which issue comes next, run `just next-issue` (first entry of `issues/queue.md` that no branch or
+  worktree has taken) instead of reading the issue files. An issue is taken when a branch named after its stem
+  exists or a worktree has it checked out; never start a taken one, `Every issue of the queue is taken.` means
+  there is nothing to start. Reordering the queue is the user's call (`skill:prioritize-issues`).

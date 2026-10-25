@@ -51,7 +51,16 @@ Decide at `issue-workflow` steps 1 to 3; the candidates can be combined.
    Code review: 6 findings. Fixed: the fixture now lives in its own temp directory, the main git directory is
    resolved like the linked one, the test asserts the main waiver is left alone. Not changed: the `// spec` tag
    stays above the helper that holds the checks (the checker needs a `fn`); the issue wording notes are style only.
-2. [ ] `next-issue` skips taken issues, branch or worktree named after the stem (PAR-3, PAR-4, PAR-5).
+2. [x] `next-issue` skips taken issues, branch or worktree named after the stem (PAR-3, PAR-4, PAR-5).
+   Done: `next_issue.rs` reads `git for-each-ref` and `git worktree list --porcelain`, skips taken issues, prints
+   `Taken: <stem> (worktree <path>)` and `Every issue of the queue is taken.`; unchanged outside git or when
+   nothing is taken. Test `taken_checks` (`// spec: PAR-3, PAR-4, PAR-5`). Docs: `SKILL.md`, `harness.just`.
+   Verified: `just check`, `just test-harness`, `just check-harness`. The branch of the main worktree is never
+   counted as an issue. Not handled: a merged branch left behind keeps its issue taken (`finish-issue`, deliverable 3,
+   deletes it). Code review: git now runs in the repository of the issues directory, the queue position is kept
+   in the listing, tests assert the exact `Taken:` lines and cover a middle entry, a plain directory and the
+   trunk branch; the fixture sets `commit.gpgsign=false` and a branch name. Not changed: the `// spec` tag
+   stays above the helper.
 3. [ ] `start-issue` and `finish-issue` recipes and script (PAR-1, PAR-2, PAR-6, PAR-7).
 4. [ ] `close-issue` refuses to run outside the main worktree; `SKILL.md` documents the merge sequence: rebase, fast-forward, `close-issue`, `finish-issue` (PAR-8).
 5. [ ] Measure `target/` per worktree (disk, cold build), record the decision; ADR if warranted; docs (`architecture.md`, `CLAUDE.md`), `just sync`; spec `implemented`.

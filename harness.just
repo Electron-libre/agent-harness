@@ -16,7 +16,7 @@ check-commits base head:
 close-issue issue:
     rust-script .claude/skills/issue-workflow/close_issue.rs {{issue}}
 
-# Which issue to work on next (first entry of issues/queue.md) and drift between the queue and the files.
+# Which issue to work on next (first entry of issues/queue.md that no branch or worktree has taken) and drift between the queue and the files.
 next-issue:
     rust-script .claude/skills/issue-workflow/next_issue.rs
 
