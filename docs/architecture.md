@@ -91,6 +91,12 @@ resolved, so `native` reads no event and no command: it takes the same marker, s
 `check` from that repository. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is
 the same.
 
+A native hook does not run under `--no-verify` or `-n`, nor once `core.hooksPath` points elsewhere, so `check` refuses
+a commit that carries `--no-verify` (or an abbreviation) or `-n` (alone or in a bundle such as `-anm`), and any command
+that sets `core.hooksPath` (`-c`, `--config-env`, `git config`, `GIT_CONFIG_KEY_n`). The value of `-m` and of the other
+options that take one is not read, and `--get` is let through. Only the Claude hook can refuse these; a commit made by
+another tool is out of reach.
+
 ## The instruction audit
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory

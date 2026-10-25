@@ -24,6 +24,8 @@
 //! A third mode, `native`, is run by the git `pre-commit` hook that `harness sync` installs: git has already
 //! resolved the repository (`GIT_DIR`, `GIT_WORK_TREE`, the current directory), so it judges that one whatever the
 //! text of the command was, with the same marker, snapshot, exemptions and waiver as `check`. It reads no event.
+//! A native hook does not run under `--no-verify` / `-n` or a moved `core.hooksPath`, so `check` refuses a commit
+//! carrying either and any command that sets `core.hooksPath` (`--get` and the words of a message excepted).
 //!
 //! Declare: PostToolUse Skill (argument `record`), PreToolUse Bash (argument `check`)
 //!
@@ -252,6 +254,90 @@ fn fish_unreadable_variable(command: &str) -> Option<&'static str> {
     })
 }
 
+/// Long options of the commit subcommand that take the next word as value.
+const COMMIT_VALUE_OPTIONS: [&str; 12] =
+    ["message", "file", "author", "date", "reuse-message", "reedit-message", "fixup", "squash", "template", "cleanup", "pathspec-from-file", "trailer"];
+
+/// Whether the arguments of a commit skip its hooks: `--no-verify` (or an abbreviation git accepts) and `-n`, alone or
+/// in a bundle (`-anm x`). The value of an option (`-m "fix -n"`, `--message x`) is not read; `--` ends the options.
+fn skips_verification(args: &[&str]) -> bool {
+    let mut args = args.iter();
+    while let Some(w) = args.next() {
+        if *w == "--" {
+            return false;
+        }
+        if let Some(long) = w.strip_prefix("--") {
+            if w.len() >= "--no-v".len() && "--no-verify".starts_with(w) {
+                return true;
+            }
+            if COMMIT_VALUE_OPTIONS.contains(&long) {
+                take_value(&mut args);
+            }
+        } else if let Some(shorts) = w.strip_prefix('-') {
+            for (i, c) in shorts.char_indices() {
+                if c == 'n' {
+                    return true;
+                }
+                // the rest of a bundle after one of these is its value, which is the next word when nothing follows
+                if "mFCctSu".contains(c) {
+                    if i + 1 == shorts.len() && !"Su".contains(c) {
+                        take_value(&mut args);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// The commands of a line, split at the separators and brackets (a heredoc body or a quoted message is cut too, which
+/// can only hide words from the readers below, never add some).
+fn segments(command: &str) -> impl Iterator<Item = &str> {
+    command.split([';', '|', '&', '(', ')', '`', '\n']).filter(|s| !s.trim().is_empty())
+}
+
+/// Whether some commit of the line skips its hooks: `commit_dirs` stops at the first one, so each command is read apart.
+fn skips_hooks(command: &str) -> bool {
+    segments(command).any(|segment| matches!(commit_dirs(segment), Some(Ok((_, true)))))
+}
+
+/// Whether a command of the line sets `core.hooksPath` (`-c core.hooksPath=…`, `--config-env=core.hooksPath=…`,
+/// `git config core.hooksPath value`, `GIT_CONFIG_KEY_n=core.hooksPath`), which moves the hooks away from the native
+/// gate. Reading it (`--get`), unsetting it and the words of a commit message are not setting it; the exemptions hold
+/// for the command they stand in only.
+fn sets_hooks_path(command: &str) -> bool {
+    segments(command).any(|segment| {
+        let words: Vec<&str> = segment.split_whitespace().collect();
+        let mentions_git = words.iter().any(|w| w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() == Some("git") || w.starts_with("GIT_CONFIG"));
+        if !mentions_git || words.iter().any(|w| w.starts_with("--get") || w.starts_with("--unset")) {
+            return false;
+        }
+        let configuring = words.contains(&"config");
+        let mut rest = words.iter();
+        while let Some(w) = rest.next() {
+            if *w == "--message" || (w.starts_with('-') && !w.starts_with("--") && w.ends_with('m')) {
+                take_value(&mut rest);
+                continue;
+            }
+            if let Some(message) = w.strip_prefix("--message=").or_else(|| w.strip_prefix("-m").filter(|m| !m.is_empty() && !w.starts_with("--"))) {
+                quoted(message, &mut rest);
+                continue;
+            }
+            let lower = w.to_lowercase();
+            let assigned = lower.starts_with("core.hookspath=")
+                || lower.starts_with("--config-env=core.hookspath")
+                || (w.starts_with("GIT_CONFIG_KEY") && lower.ends_with("=core.hookspath"))
+                || (w.starts_with("GIT_CONFIG_PARAMETERS") && lower.contains("core.hookspath"));
+            // `git config core.hooksPath value` sets it, `git config core.hooksPath` reads it
+            if assigned || (configuring && lower == "core.hookspath" && rest.len() > 0) {
+                return true;
+            }
+        }
+        false
+    })
+}
+
 /// The directories whose review a `git commit` of the line depends on, `None` when no command of the line commits;
 /// `None` in the list is the shell directory. Normally one: after `-C dir`, `--work-tree dir` or `--git-dir dir` (the
 /// work tree wins, then the parent of the innermost `.git` of the path, else the directory itself). With `--git-dir` and
@@ -262,9 +348,10 @@ fn fish_unreadable_variable(command: &str) -> Option<&'static str> {
 /// as the two options, which win over them. The subcommand is the first word after `git` once the global options
 /// (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not a
 /// commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
+/// The `bool` of an `Ok` tells whether the commit skips the hooks (`skips_verification`).
 /// A commit whose `-C`, `--git-dir` or `--work-tree` has a value the text does not give (`value_expands`, or none left
 /// once a substitution split the line) is `Err` with the option: its repository is unknown.
-fn commit_dirs(command: &str) -> Option<Result<Vec<Option<String>>, &'static str>> {
+fn commit_dirs(command: &str) -> Option<Result<(Vec<Option<String>>, bool), &'static str>> {
     // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
     let joined = command.replace("\\\n", " ");
     let spaced = joined.replace([';', '|', '&', '(', ')', '`', '\n'], " ; ");
@@ -321,18 +408,19 @@ fn commit_dirs(command: &str) -> Option<Result<Vec<Option<String>>, &'static str
                     if let Some(option) = unreadable {
                         return Some(Err(option));
                     }
+                    let skipped = skips_verification(&rest.copied().collect::<Vec<_>>());
                     // the directory `-C` leads to is where the relative paths are taken from
                     let from_dir = |p: PathBuf| dir.as_ref().map_or(p.clone(), |d| d.join(&p));
                     let text = |p: PathBuf| Some(p.to_string_lossy().into_owned());
                     if let Some(w) = work_tree {
-                        return Some(Ok(vec![text(from_dir(w))]));
+                        return Some(Ok((vec![text(from_dir(w))], skipped)));
                     }
-                    let Some(g) = git_dir else { return Some(Ok(vec![dir.and_then(text)])) };
+                    let Some(g) = git_dir else { return Some(Ok((vec![dir.and_then(text)], skipped))) };
                     let g = from_dir(g);
                     // the repository holding the git directory: the parent of its innermost `.git`, else itself
                     let repo = g.ancestors().find(|a| a.file_name().is_some_and(|n| n == ".git")).and_then(Path::parent).map_or(g.clone(), Path::to_path_buf);
                     let repo = if repo.as_os_str().is_empty() { PathBuf::from(".") } else { repo };
-                    return Some(Ok(vec![text(repo), dir.and_then(text)]));
+                    return Some(Ok((vec![text(repo), dir.and_then(text)], skipped)));
                 }
             }
         }
@@ -416,6 +504,13 @@ fn refuse(why: &str) -> ! {
     std::process::exit(2);
 }
 
+/// Refuses what would skip the native `pre-commit` hook, the last-resort gate that only this hook can defend.
+fn refuse_skipped_hook(what: &str) -> ! {
+    eprintln!("Refused: {what} skips the native pre-commit review hook that `harness sync` installs.");
+    eprintln!("Commit without it, or ask the user to waive the review.");
+    std::process::exit(2);
+}
+
 fn main() {
     let mode = std::env::args().nth(1).unwrap_or_default();
     if mode == "native" {
@@ -459,14 +554,20 @@ fn main() {
                 eprintln!("Refused: only the user waives the code review, by creating {WAIVER} in the git directory.");
                 std::process::exit(2);
             }
+            if sets_hooks_path(command) {
+                refuse_skipped_hook("setting core.hooksPath");
+            }
             let Some(dirs) = commit_dirs(command) else { return };
+            if skips_hooks(command) {
+                refuse_skipped_hook("--no-verify or -n");
+            }
             let unreadable = dirs.as_ref().err().map(|option| format!("the value of {option}")).or_else(|| undeterminable_variable(command).or_else(|| fish_unreadable_variable(command)).map(str::to_string));
             if let Some(what) = unreadable {
                 eprintln!("Refused: {what} is one the hook cannot read (a variable, a substitution), so the repository the commit lands in is unknown.");
                 eprintln!("Write the path in the command (`git -C dir commit`), or ask the user to waive the review.");
                 std::process::exit(2);
             }
-            let Ok(dirs) = dirs else { return };
+            let Ok((dirs, _)) = dirs else { return };
             let mut roots: Vec<PathBuf> = dirs.into_iter().map(|d| d.map_or(cwd.clone(), |d| toplevel(&shell_dir.join(d)))).collect();
             roots.dedup();
             for cwd in roots {

@@ -223,6 +223,59 @@ fn native_worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-12
+/// What skips the native hook is refused on a commit line even when the repository is reviewed; the same words in a
+/// message, or in a command that is not a commit, are not.
+fn skipped_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, _other) = target_fixture(hook, "rev12");
+    let refused = [
+        "git commit -n -m x",
+        "git commit --no-verify -m x",
+        "git commit -m x --no-verify",
+        "git commit --no-ver -m x",
+        "git commit -nm x",
+        "git commit -anm x",
+        "git commit -m x -n",
+        "git -C . commit -n -m x",
+        "git commit -m 'a b' --no-verify",
+        "git -c core.hooksPath=/dev/null commit -m x",
+        "git -c core.hookspath=/dev/null commit -m x",
+        "git --config-env=core.hooksPath=H commit -m x",
+        "git config core.hooksPath /dev/null",
+        "git config --local core.hooksPath /dev/null",
+        "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/x git commit -m x",
+        "git commit -m x && git commit -n -m y",
+        "git commit -m a; git commit --no-verify -m b",
+        "git config --get a && git -c core.hooksPath=/x commit -m x",
+        "git -c core.hooksPath=/x commit -m x; echo --get",
+        "git commit -m x --trailer 'a: b' -n",
+    ];
+    let allowed = [
+        "git commit -am x",
+        "git commit -m 'fix -n'",
+        "git commit -m \"fix --no-verify\"",
+        "git commit -mn",
+        "git commit -m x -- -n",
+        "git commit -m \"document core.hooksPath\"",
+        "git commit --message='core.hooksPath' -a",
+        "git config --get core.hooksPath",
+        "git config core.hooksPath",
+        "git config --unset core.hooksPath",
+        "git log --grep core.hooksPath",
+        "git commit -m x --trailer -n",
+        "git commit -F - <<EOF\ncore.hooksPath is documented here\nEOF",
+        "git log -n 5 --grep commit",
+        "git status -n",
+    ];
+    let mut out: Vec<(&'static str, bool)> = refused
+        .iter()
+        .map(|c| (*c, { let (code, stderr) = commit_attempt(hook, &current, c); code == 2 && stderr.contains("native") }))
+        .collect();
+    out.extend(allowed.iter().map(|c| (*c, commit_attempt(hook, &current, c).0 == 0)));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 // spec: REV-1
 /// The decision is the one of the repository the commit targets, whichever of the two is reviewed.
 fn target_checks(hook: &Path) -> Vec<(&'static str, bool)> {
@@ -625,7 +678,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }
