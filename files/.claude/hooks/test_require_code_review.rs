@@ -106,6 +106,43 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-17
+/// `just waive-review` creates the waiver of the worktree it runs in, prints its path and changes nothing else.
+fn recipe_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let recipes = hook.parent().unwrap().join("../../harness.just");
+    let root = std::env::temp_dir().join(format!("reviewtest-rc-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let (main, linked) = (root.join("main"), root.join("linked"));
+    fs::create_dir_all(main.join("sub")).unwrap();
+    sh(&main, &["init", "-q", "."]);
+    fs::write(main.join("a.txt"), "one\n").unwrap();
+    fs::copy(&recipes, main.join("justfile")).unwrap();
+    sh(&main, &["add", "-A"]);
+    sh(&main, &["commit", "-qm", "init"]);
+    sh(&main, &["worktree", "add", "-q", "-b", "other", linked.to_str().unwrap()]);
+    let name = ["claude-review", "waived"].join("-");
+    let status = |dir: &Path| String::from_utf8_lossy(&Command::new("git").args(["status", "--porcelain"]).current_dir(dir).output().unwrap().stdout).to_string();
+    let recipe = |dir: &Path| Command::new("just").arg("waive-review").current_dir(dir).output().unwrap();
+    let mut out = Vec::new();
+
+    let before = status(&main);
+    let run = recipe(&main.join("sub"));
+    let (main_waiver, linked_waiver) = (git_dir_of(&main).join(&name), git_dir_of(&linked).join(&name));
+    out.push(("the recipe runs", run.status.success()));
+    out.push(("it creates the waiver of the main worktree, from a subdirectory", main_waiver.exists()));
+    out.push(("it prints that path", String::from_utf8_lossy(&run.stdout).contains(main_waiver.to_str().unwrap())));
+    out.push(("it changes nothing else in the repository", status(&main) == before));
+    out.push(("it leaves the linked worktree alone", !linked_waiver.exists()));
+
+    let run = recipe(&linked);
+    out.push(("it creates the waiver of a linked worktree", run.status.success() && linked_waiver.exists()));
+    out.push(("it prints the path of the linked worktree", String::from_utf8_lossy(&run.stdout).contains(linked_waiver.to_str().unwrap())));
+    fs::write(linked.join("a.txt"), "two\n").unwrap();
+    out.push(("the hook honours that waiver in the linked worktree", commit_attempt(hook, &linked, "git commit -am x").0 == 0));
+    let _ = fs::remove_dir_all(&root);
+    out
+}
+
 /// Two repositories side by side: `current` reviewed and unchanged, `other` with a change nobody reviewed.
 /// Returns the shell directory (`current`).
 fn target_fixture(hook: &Path, name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
@@ -929,7 +966,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [waiver_write_checks, waiver_mention_checks, worktree_checks, target_checks, accumulated_c_checks, cd_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
+    for checks in [waiver_write_checks, waiver_mention_checks, worktree_checks, recipe_checks, target_checks, accumulated_c_checks, cd_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

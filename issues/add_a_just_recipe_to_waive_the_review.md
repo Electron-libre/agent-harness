@@ -46,7 +46,7 @@ The agent must still not be able to waive its own review.
 # Tracking
 
 1. [x] The hook stops refusing a shell, `eval`, `source` or an interpreter that only names the waiver; the writers stay refused (REV-13, REV-14).
-2. [ ] The recipe `waive-review` in `files/harness.just` creates the waiver at the `git rev-parse --git-path` path and prints it (REV-17).
+2. [x] The recipe `waive-review` in `files/harness.just` creates the waiver at the `git rev-parse --git-path` path and prints it (REV-17).
 3. [ ] The hook refuses a command running the recipe; `SKILL.md` and `docs/architecture.md` point to it; spec `accepted`, then `implemented` (REV-18).
 
 ## Decisions
@@ -62,3 +62,10 @@ The agent must still not be able to waive its own review.
 * Not verified: a live session.
 * Accepted consequence: `sh -c 'touch <waiver>'` and a script that writes the file now pass (stated in REV-13).
 * Code review: 6 findings. Fixed: the comment on heredoc bodies no longer claims they are never code; the list of refused writers in `docs/architecture.md` is complete; a missing space in a test tuple. Not fixed, by decision: shells, `eval` and interpreters passing (the user chose it; REV-13 states that the deterrent covers the writers only, the native hook and the user's waiver being the barrier); the spec staying `draft` with REV-17 and REV-18 untraced (their deliverables are 2 and 3); `curl` kept in the list (it is a writer, `wget` and the like are left to the deterrent's known limits).
+
+## Deliverable 2: summary
+
+* Done: `waive-review` in `files/harness.just` creates the waiver at the absolute `git rev-parse --git-path` path of the worktree it runs in (also from a subdirectory) and prints it (REV-17). Test `recipe_checks` runs it in a main and a linked worktree: path printed, nothing else changed in the repository, the other worktree untouched, the hook honours the waiver. The docs (`SKILL.md`, `docs/architecture.md`) still give the `touch` command: they move to the recipe in deliverable 3, with its refusal.
+* Verified: `just check`, `just test-harness`, `just check-harness` green.
+* Not verified: a live session.
+* Code review: 7 findings. Fixed: the summary no longer points to a missing review. Accepted: until deliverable 3 the hook does not refuse `just waive-review` (the next deliverable, local commits only, no push in between); the test needs `just` and git 2.31+ (the project already requires both for its recipes); a spent waiver is consumed by the hook (stamp on `HEAD`), contrary to one finding. Not fixed: temp directory cleanup on a panic and a future `import` in `harness.just` (same pattern as the other checks, speculative).
