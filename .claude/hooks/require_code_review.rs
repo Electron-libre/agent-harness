@@ -13,8 +13,9 @@
 //! review of the next commit by creating `claude-review-waived` in the git directory; the hook stamps it with
 //! `HEAD` when it lets a commit through and removes it, without using it, at the first check after `HEAD` moved
 //! (a command that does not commit, such as `--dry-run`, leaves it usable; after a commit the user creates it
-//! again), and refuses any `Bash` command naming it (a deterrent, not a barrier: a `Write`
-//! of the file or a name built in pieces is not caught).
+//! again), and refuses a `Bash` command that writes it (a redirection, `touch`, `tee`, `cp`, a shell…; a commit
+//! message or a `grep` that only names it passes; a deterrent, not a barrier: a `Write` of the file or a name built
+//! in pieces is not caught).
 //!
 //! The review judged is the one of the repository the commit lands in, named by `-C`, `--work-tree`, `--git-dir`
 //! and by `GIT_DIR` / `GIT_WORK_TREE` written or exported in the same line (`specs/review-gate.md`). A value of
@@ -324,6 +325,140 @@ fn segments(command: &str) -> impl Iterator<Item = &str> {
     command.split([';', '|', '&', '(', ')', '`', '\n']).filter(|s| !s.trim().is_empty())
 }
 
+/// Commands that create or fill a file, or run text as a program, hence able to create the waiver wherever it stands
+/// among their words.
+const WRITERS: [&str; 17] =
+    ["touch", "tee", "dd", "truncate", "sh", "bash", "zsh", "fish", "dash", "eval", "source", "python", "python3", "perl", "ruby", "node", "curl"];
+/// Commands that write their last word (`cp a waiver`); `cp waiver /tmp/x` only reads it.
+const COPIERS: [&str; 5] = ["cp", "mv", "ln", "install", "rsync"];
+
+/// The commands of a line split at the separators that stand outside quotes, each twice: as written, and with the inside
+/// of quotes, comments and heredoc bodies blanked (same byte offsets), so the words left are the ones the shell runs.
+/// A quoted commit message or a heredoc fed to `git` is text, not a command. Where the text cannot be trusted a command
+/// is kept whole and unblanked, so what it holds is read as code: a quote left open, or a substitution (`$(…)`, backtick)
+/// inside double quotes, which the shell runs.
+fn unquoted_commands(command: &str) -> Vec<(String, String)> {
+    let command = command.replace("\\\n", " ");
+    let blank = |s: &str| "_".repeat(s.len());
+    let (mut commands, mut current, mut masked) = (Vec::new(), String::new(), String::new());
+    let (mut quote, mut tainted, mut tags) = (None::<char>, false, Vec::<String>::new());
+    let mut flush = |current: &mut String, masked: &mut String, tainted: &mut bool| {
+        let (raw, blanked) = (std::mem::take(current), std::mem::take(masked));
+        commands.push((raw.clone(), if std::mem::take(tainted) { raw } else { blanked }));
+    };
+    for line in command.split('\n') {
+        if let Some(tag) = tags.first() {
+            // inside a heredoc body: text for `git` or `cat`, but the words of a program for a shell
+            if line.trim() == tag {
+                tags.remove(0);
+                if tags.is_empty() {
+                    flush(&mut current, &mut masked, &mut tainted);
+                }
+            } else {
+                current.push_str(line);
+                masked.push_str(&blank(line));
+            }
+            current.push('\n');
+            masked.push('\n');
+            continue;
+        }
+        let chars: Vec<char> = line.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let c = chars[i];
+            let mut put = |c: char, hide: bool, current: &mut String, masked: &mut String| {
+                current.push(c);
+                masked.push_str(&if hide { blank(&c.to_string()) } else { c.to_string() });
+            };
+            match quote {
+                Some('\'') => {
+                    quote = if c == '\'' { None } else { quote };
+                    put(c, c != '\'', &mut current, &mut masked);
+                }
+                Some(_) => {
+                    if c == '\\' {
+                        put(c, true, &mut current, &mut masked);
+                        i += 1;
+                        if let Some(&n) = chars.get(i) {
+                            put(n, true, &mut current, &mut masked);
+                        }
+                    } else {
+                        tainted |= c == '`' || (c == '$' && chars.get(i + 1) == Some(&'('));
+                        quote = if c == '"' { None } else { quote };
+                        put(c, c != '"', &mut current, &mut masked);
+                    }
+                }
+                None => match c {
+                    '\\' => {
+                        put(c, true, &mut current, &mut masked);
+                        i += 1;
+                        if let Some(&n) = chars.get(i) {
+                            put(n, true, &mut current, &mut masked);
+                        }
+                    }
+                    '\'' | '"' => {
+                        quote = Some(c);
+                        put(c, false, &mut current, &mut masked);
+                    }
+                    '#' if i == 0 || chars[i - 1].is_whitespace() => {
+                        for &r in &chars[i..] {
+                            put(r, true, &mut current, &mut masked);
+                        }
+                        break;
+                    }
+                    ';' | '|' | '&' | '(' | ')' | '`' => flush(&mut current, &mut masked, &mut tainted),
+                    '<' if chars.get(i + 1) == Some(&'<') && chars.get(i + 2) != Some(&'<') => {
+                        // `<<TAG`, `<<-TAG`, `<<'TAG'`: the lines up to `TAG` are its body
+                        let rest: String = chars[i + 2..].iter().collect();
+                        let tag: String = rest.trim_start_matches(['-', ' ']).chars().take_while(|c| !c.is_whitespace() && !matches!(c, ';' | '|' | '&' | ')')).collect();
+                        let tag = tag.trim_matches(['\'', '"']).to_string();
+                        if tag.chars().next().is_some_and(|f| f.is_alphabetic() || f == '_') {
+                            tags.push(tag);
+                        }
+                        put(c, false, &mut current, &mut masked);
+                    }
+                    _ => put(c, false, &mut current, &mut masked),
+                },
+            }
+            i += 1;
+        }
+        if quote.is_some() || !tags.is_empty() {
+            current.push('\n');
+            masked.push('\n');
+        } else {
+            flush(&mut current, &mut masked, &mut tainted);
+        }
+    }
+    if quote.is_some() {
+        // a quote left open: nothing can be told from the text
+        return vec![(command.clone(), command)];
+    }
+    flush(&mut current, &mut masked, &mut tainted);
+    commands.into_iter().filter(|(s, _)| !s.trim().is_empty()).collect()
+}
+
+/// Whether some command of the line writes the waiver: the name stands in it and either a redirection outside quotes
+/// leads to it, or a command word (not a quoted one, so after `sudo`, `env`, `{`, `then`, `find -exec` as well) creates
+/// files or runs text as a program (`WRITERS`), writes its last word (`COPIERS`) or edits in place (`sed -i`). A commit
+/// message, a `grep` or a `cat` that only names the file is not one. A deterrent, not a barrier.
+fn writes_waiver(command: &str) -> bool {
+    unquoted_commands(command).iter().any(|(segment, masked)| {
+        if !segment.contains(WAIVER) {
+            return false;
+        }
+        let redirected = masked.match_indices('>').any(|(i, _)| {
+            segment[i + 1..].trim_start_matches([' ', '>', '&', '|']).split_whitespace().next().is_some_and(|target| target.contains(WAIVER))
+        });
+        let last = segment.split_whitespace().last().is_some_and(|w| w.contains(WAIVER));
+        let words: Vec<&str> = masked.split(|c: char| c.is_whitespace() || "\"'$(){};`<>".contains(c)).filter(|w| !w.is_empty()).collect();
+        let writer = words.iter().any(|w| {
+            let base = w.rsplit('/').next().unwrap_or(w);
+            WRITERS.contains(&base) || (COPIERS.contains(&base) && last) || (base == "sed" && words.iter().any(|a| a.starts_with("-i") || *a == "--in-place"))
+        });
+        redirected || writer
+    })
+}
+
 /// Whether some commit of the line skips its hooks: `commit_dirs` stops at the first one, so each command is read apart.
 fn skips_hooks(command: &str) -> bool {
     segments(command).any(|segment| matches!(commit_dirs(segment), Some(Ok((_, true)))))
@@ -576,8 +711,11 @@ fn main() {
         }
         "check" => {
             let Some(command) = event["tool_input"]["command"].as_str() else { return };
-            if command.contains(WAIVER) {
+            if writes_waiver(command) {
                 eprintln!("Refused: only the user waives the code review, by creating {WAIVER} in the git directory.");
+                if let Some(path) = git_file(&shell_dir, WAIVER) {
+                    eprintln!("The user creates {} (a command that only names the file is not refused).", path.display());
+                }
                 std::process::exit(2);
             }
             if sets_hooks_path(command) {

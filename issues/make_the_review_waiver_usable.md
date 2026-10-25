@@ -27,3 +27,21 @@ file (commit message, `grep`, docs) without being refused.
 * The hook refuses any Bash command naming the waiver file, so write the tests and this work without that literal
   in a shell command (use a heredoc-free editor tool or build the name in pieces).
 * The deterrent must stay: the agent must not be able to waive its own review.
+
+# Specs
+* `specs/review-gate.md`: REV-13, REV-14, REV-15 (added, validated).
+
+# Tracking
+1. [x] The hook refuses a command that writes the waiver, not one that names it; the refusal gives the exact path (REV-13, REV-14).
+2. [x] The documented command creates a waiver the hook finds from a linked worktree; docs and spec status updated (REV-15).
+
+## Decisions
+* Mode: autonomous.
+* The refusal message also prints the path from `git rev-parse --git-path`.
+* The waiver stays per worktree (REV-11); only the documented command changes.
+
+## Summary (deliverables 1 and 2, autonomous mode)
+* Done: the hook refuses a command that writes the waiver (redirection, writers, copiers, `sed -i`, shells and interpreters) and not one that names it; the refusal prints the path from `git rev-parse --git-path`; `SKILL.md` and `docs/architecture.md` give the `git rev-parse --git-path` command; REV-13 to REV-15 added and traced, spec `implemented`.
+* Verified: `just check`, `just test-harness`, `just check-harness` green.
+* Not verified: a real session with a linked worktree made by `just start-issue` (covered by a test on a `git worktree add` worktree).
+* Code review: 10 findings. Fixed: heredoc fed to a shell, substitution in double quotes, escape in double quotes, command word hidden by keywords/braces/wrapper options/`find -exec`, line continuation, quoted `<<`, apostrophe in a comment or unbalanced quote (the text is then read whole, as code), read-only use of `sed`/`cp` refused, spec tag moved above `worktree_checks`; each has a test. Not fixed: the second splitter next to `segments()` (that one deliberately over-splits to hide words from the commit readers; making it quote-aware would change the commit gate, a separate change). The deterrent stays a deterrent (a `Write` or a name built in pieces is not caught, as before).

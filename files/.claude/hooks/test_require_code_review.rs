@@ -61,6 +61,7 @@ fn git_dir_of(dir: &Path) -> std::path::PathBuf {
     Path::new(String::from_utf8_lossy(&out.stdout).trim()).to_path_buf()
 }
 
+// spec: REV-15
 fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let root = std::env::temp_dir().join(format!("reviewtest-wt-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -84,8 +85,14 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     review_done(hook, &linked, "code-review");
     out.push(("a review in a linked worktree covers it", commit_attempt(hook, &linked, commit).0 == 0));
 
+    // the path the instructions give the user, `git rev-parse --git-path`, is the one the hook reads from a linked worktree
+    let name = ["claude-review", "waived"].join("-");
+    let given = Command::new("git").args(["rev-parse", "--git-path", &name]).current_dir(&linked).output().unwrap();
+    let given = linked.join(String::from_utf8_lossy(&given.stdout).trim());
+    out.push(("the given path is not the waiver of the main worktree", given != git_dir_of(&main).join(&name)));
     let waiver = git_dir_of(&linked).join("claude-review-waived");
-    fs::write(&waiver, "").unwrap();
+    out.push(("the given path is the waiver of the linked worktree", given.parent().unwrap().canonicalize().unwrap() == waiver.parent().unwrap().canonicalize().unwrap()));
+    fs::write(&given, "").unwrap();
     out.push(("a waiver of the linked worktree lets its commit through", commit_attempt(hook, &linked, commit).0 == 0));
     out.push(("the waiver stays while no commit happened", waiver.exists()));
     sh(&linked, &["commit", "-qam", "x"]);
@@ -665,6 +672,70 @@ fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-13
+/// A command that writes the waiver is refused, with the path the user creates; the refusal does not depend on the review.
+fn waiver_write_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let project = std::env::temp_dir().join(format!("reviewtest-ww-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&project);
+    fs::create_dir_all(&project).unwrap();
+    sh(&project, &["init", "-q", "."]);
+    let mut out = Vec::new();
+    for (name, command) in [
+        ("refuses a redirection into the waiver", "echo > .git/claude-review-waived"),
+        ("refuses a redirection with a quoted target", "echo x >> \".git/claude-review-waived\""),
+        ("refuses tee on the waiver", "echo x | tee .git/claude-review-waived"),
+        ("refuses a copy onto the waiver", "sudo cp a .git/claude-review-waived"),
+        ("refuses a shell that names the waiver", "sh -c 'touch .git/claude-review-waived'"),
+        ("refuses a heredoc fed to a shell", "bash <<'EOF'\ntouch .git/claude-review-waived\nEOF"),
+        ("refuses a substitution inside double quotes", "echo \"$(touch .git/claude-review-waived)\""),
+        ("refuses a backtick inside double quotes", "echo \"`touch .git/claude-review-waived`\""),
+        ("refuses a quote closed by an escape", "echo \"\\\"\"; touch .git/claude-review-waived"),
+        ("refuses a command in braces", "{ touch .git/claude-review-waived; }"),
+        ("refuses a command after a keyword", "if true; then touch .git/claude-review-waived; fi"),
+        ("refuses a wrapper with options", "sudo -u me touch .git/claude-review-waived"),
+        ("refuses find -exec", "find . -exec touch .git/claude-review-waived {} +"),
+        ("refuses a continued line", "touch \\\n .git/claude-review-waived"),
+        ("refuses after a quoted heredoc marker", "echo \"use <<EOF\"\ntouch .git/claude-review-waived"),
+        ("refuses after a comment with an apostrophe", "# it's the waiver\ntouch .git/claude-review-waived"),
+        ("refuses an unbalanced quote", "echo 'x; touch .git/claude-review-waived"),
+        ("refuses an edit in place", "sed -i s/a/b/ .git/claude-review-waived"),
+        ("refuses a copy onto the waiver after two heredocs", "cat <<A <<B\na\nA\nb\nB\ncp x .git/claude-review-waived"),
+        ("refuses the waiver created after a commit message", "git commit -qm 'a b'; touch .git/claude-review-waived"),
+    ] {
+        out.push((name, commit_attempt(hook, &project, command).0 == 2));
+    }
+    let (_, message) = commit_attempt(hook, &project, "touch .git/claude-review-waived");
+    out.push(("the refusal gives the path of the waiver", message.contains(".git/claude-review-waived")));
+    let _ = fs::remove_dir_all(&project);
+    out
+}
+
+// spec: REV-14
+/// A command that only names the waiver is not refused for it (a clean repository has nothing to review).
+fn waiver_mention_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let project = std::env::temp_dir().join(format!("reviewtest-wm-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&project);
+    fs::create_dir_all(&project).unwrap();
+    sh(&project, &["init", "-q", "."]);
+    fs::write(project.join("c.txt"), "x\n").unwrap();
+    sh(&project, &["add", "-A"]);
+    sh(&project, &["commit", "-qm", "init"]);
+    let mut out = Vec::new();
+    for (name, command) in [
+        ("lets through a read with sed", "sed -n 1p .git/claude-review-waived"),
+        ("lets through a copy of the waiver", "cp .git/claude-review-waived /tmp/x"),
+        ("lets through a message with backticks in a quoted heredoc", "git commit -q -F - <<'EOF'\ndocs: `touch .git/claude-review-waived`\nEOF"),
+        ("lets through a grep for the waiver", "grep -rn claude-review-waived specs files"),
+        ("lets through a commit message that explains the waiver", "git commit -qm 'run touch .git/claude-review-waived; then tee it'"),
+        ("lets through a commit message that quotes a redirection into the waiver", "git commit -qm \"echo > .git/claude-review-waived\""),
+        ("lets through a commit message in a heredoc", "git commit -q -F - <<'EOF'\ndocs: touch .git/claude-review-waived\nEOF"),
+    ] {
+        out.push((name, commit_attempt(hook, &project, command).0 == 0));
+    }
+    let _ = fs::remove_dir_all(&project);
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -799,7 +870,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
+    for checks in [waiver_write_checks, waiver_mention_checks, worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

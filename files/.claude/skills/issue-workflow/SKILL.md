@@ -63,7 +63,9 @@ validated requirements, or not named in its `# Specs` section: then do step 2 fi
    The hook `require_code_review.rs` enforces it: `git commit` is refused (exit 2) while the diff holds a file
    the last review never saw, so write the tracking and the summary of steps 6 and 7 in the issue **before**
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
-   waive the review, with `touch .git/claude-review-waived`; never create that file yourself.
+   waive the review, with `touch "$(git rev-parse --git-path claude-review-waived)"` (also right in a linked
+   worktree, where `.git` is a file and the waiver is per worktree); never create that file yourself. You can
+   still name it (commit message, `grep`): the hook only refuses a command that writes it.
 6. **Human review (STOP, except in autonomous mode)**: summarize what was done, what was verified and **what was not** (state it
    plainly), decisions needed. The summary has a line `Code review:` with the findings and what was done
    about each (`no findings` if it came back clean); if you did not invoke the review, go back to step 5

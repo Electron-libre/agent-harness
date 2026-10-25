@@ -27,6 +27,9 @@ judgment from inside the repository, where git has already resolved it.
 - **REV-10** (deterministic) `native` must exit non-zero with a message telling the agent to run the code review when it refuses, and must exit zero otherwise.
 - **REV-11** (deterministic) `native` must judge a linked worktree by its own marker and waiver (the git directory of that worktree), and a repository reached through `--git-dir` by that git directory.
 - **REV-12** (deterministic) `check` must refuse a `git commit` line carrying `--no-verify` or `-n` (also in a bundle of short options such as `-nm`; `-am` and a `-n` inside a quoted message are not one), and a line that sets `core.hooksPath` (`-c core.hooksPath=…`, `--config-env=core.hooksPath=…`, `git config core.hooksPath …`), since they skip the native hook; the message must say why.
+- **REV-13** (deterministic) `check` must refuse a `Bash` command that writes the waiver file (`claude-review-waived`): a redirection outside quotes whose target names it, or a command word that creates files or runs text as a program (`touch`, `tee`, `cp`, `mv`, a shell…, also after `sudo` or `env`) among whose words the name stands. The refusal must give the exact path of the waiver of the repository (`git rev-parse --git-path`) and say that only the user creates it.
+- **REV-14** (deterministic) `check` must not refuse a command that only names the waiver file: a `grep` or `cat`, a quoted commit message (also holding `touch …` or a redirection), a heredoc body.
+- **REV-15** (deterministic) The path `git rev-parse --git-path claude-review-waived` gives from a linked worktree must be the waiver `check` and `native` read for that worktree, not the one of the main worktree.
 
 ## Scenarios
 
@@ -39,6 +42,8 @@ judgment from inside the repository, where git has already resolved it.
 - (REV-9) Given a commit whose repository the command text does not name readably, when that repository holds an unreviewed change, then the native hook refuses it, since git resolved the repository.
 - (REV-11) Given a linked worktree reviewed and the main worktree not, then a commit in the linked worktree passes.
 - (REV-12) Given `git commit -m "fix -n"` or `git commit -am x`, then neither counts as `-n`: the decision is that of the reviews.
+- (REV-13) Given `echo x | tee .git/claude-review-waived` or `sh -c 'touch .git/claude-review-waived'`, then the command is refused; given a commit command, a `;`, then `touch .git/claude-review-waived`, the `touch` is refused although the commit message is not.
+- (REV-14) Given a commit whose quoted message holds `echo > .git/claude-review-waived`, or `grep -rn claude-review-waived specs`, then the decision is that of the reviews.
 
 ## Non-goals
 
