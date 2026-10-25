@@ -6,7 +6,8 @@ description: Drive an issue file from `issues/` to done in validated deliverable
 # Work an issue
 
 The user hands over an issue file in `issues/`. Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and
-commits stay in English). Never skip a validation stop: they are what makes the autonomy safe.
+commits stay in English). Never skip a validation stop: they are what makes the autonomy safe. The only ones the user can lift are those of
+step 4.6 and 4.8, through the Autonomous mode.
 
 ## 0. Resume or start
 
@@ -14,7 +15,7 @@ Read the issue file. Name the thread after the issue: its title is the first `# 
 (e.g. `# Improve Harness`). Run `/rename <title>` if you can; if you can't (a skill can't type a slash
 command), give the user the exact `/rename <title>` line to paste, once, at the start. Do this on resume
 too, since a resumed thread may still carry another name. If it has a `# Tracking` section, the issue is already planned: summarize where it
-stands (next unchecked deliverable) and continue at step 4, unless the issue changes a capability whose spec is missing, still `draft` with no
+stands (next unchecked deliverable) and continue at step 4 in the mode recorded there (none recorded: validation at each deliverable), unless the issue changes a capability whose spec is missing, still `draft` with no
 validated requirements, or not named in its `# Specs` section: then do step 2 first. Otherwise start at step 1.
 
 ## 1. Reformulate and validate (STOP)
@@ -38,8 +39,9 @@ validated requirements, or not named in its `# Specs` section: then do step 2 fi
 - Split the work into small deliverables, each independently testable and committable, ordered by value
   and dependency; name the requirements (`ABC-n`) each one makes true. Give your recommended order and why.
 - For each: what it does, how it will be verified.
+- Ask in the same message how to run step 4: **autonomous (default)**, or a validation at each deliverable.
 - **Stop and wait for the user to validate the plan.** Then write it in the issue under `# Tracking`
-  (checklist `1. [ ] …`, plus a `## Decisions` list for the answers given).
+  (checklist `1. [ ] …`, plus a `## Decisions` list for the answers given, starting with the mode).
 
 ## 4. For each deliverable, in order
 
@@ -58,18 +60,32 @@ validated requirements, or not named in its `# Specs` section: then do step 2 fi
    `just test-harness`, then **invoke `/code-review` on the diff with the Skill tool** and wait for its
    findings; reread the docs you changed. Fix what the review finds, or say why a finding is not fixed.
    Re-run `just check` after the fixes. Step 6 cannot start before the review has run.
-6. **Human review (STOP)**: summarize what was done, what was verified and **what was not** (state it
+6. **Human review (STOP, except in autonomous mode)**: summarize what was done, what was verified and **what was not** (state it
    plainly), decisions needed. The summary has a line `Code review:` with the findings and what was done
    about each (`no findings` if it came back clean); if you did not invoke the review, go back to step 5
    instead of presenting the deliverable. Wait for
-   the user's validation. Don't commit before it.
+   the user's validation. Don't commit before it. In autonomous mode, write this summary in the issue and go on.
 7. **Track**: tick the deliverable in the issue's `# Tracking` and note decisions or follow-ups.
-8. **Commit**: after validation, run `skill:commit-message` (message per `AGENTS.md`, validated by its
+8. **Commit**: after validation (autonomous mode: right after step 7), run `skill:commit-message` (message per `AGENTS.md`, validated by its
    checker). Commit only the files of this deliverable (never `git add -A`; leave unrelated or personal
    files such as `settings.local.json`) and report the hash. If the user wants to commit themselves, output
    just the message.
 
-Then move to the next deliverable. Don't chain into it without saying so if the user asked to stop.
+Then move to the next deliverable (autonomous mode: chain into it). Don't chain into it without saying so if the user asked to stop.
+
+## Autonomous mode
+
+The default once the plan is validated, unless the user asked for a validation at each deliverable. An issue whose
+`# Tracking` records no mode (planned before this mode existed) is in per-deliverable validation. The mode is
+recorded first in `## Decisions` of the issue's `# Tracking`, so it survives a `/clear` or a resumed thread. The user
+can switch it at any time.
+
+- **Lifted**: step 4.6 stops and the wait before step 4.8. Write the 4.6 summary (what was done, verified and not,
+  the `Code review:` line) in the issue instead, then commit locally and chain into the next deliverable.
+- **Never lifted**: the review of step 4.5 and its checks, the stops of steps 1 to 3, the Rules on push, deletion and
+  history rewriting (no push).
+- **Stops the chain**: a blocking question, a decision the summary needs from the user, a review finding you can't
+  settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the final summary and ask whether to close the issue.
 
 ## Rules
 
