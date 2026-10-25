@@ -25,7 +25,7 @@ command is not a commit, and a commit gate must not read large untracked files.
 # Tracking
 1. [x] Measure the latency of a plain `ls` (no hook, each hook, both) and of a commit with a large untracked file; decide on deliverable 4
 2. [x] Test `commit_dirs` before `toplevel` in `main` (a non-commit command runs no `git`)
-3. [ ] Hash untracked files without loading them (`git hash-object --stdin-paths`); the marker still changes with the content
+3. [x] Hash untracked files without loading them (`git hash-object --stdin-paths`); the marker still changes with the content
 4. [x] (dropped, see Decisions) Merge the two hooks into one script, only if the measure shows the start dominates (else tick as dropped with the figures)
 
 ## Decisions
@@ -42,3 +42,12 @@ command is not a commit, and a commit gate must not read large untracked files.
 * Deliverable 2: `toplevel` is now asked in `record` (after the `code-review` skill) and in `check` (per directory of a commit) only; `native`
   is unchanged. Test `cheap_checks` (fake `git` logging its calls). Verified: `just check`, `just test-harness`. Not measured again.
   Code review: 5 findings, all fixed (test fails when the hook fails to run, quoted log path, record path tested, redundant binding removed, directories deduplicated before `toplevel`).
+* Deliverable 3: `snapshot` hashes the untracked files with `git hash-object --stdin-paths` (`untracked_hashes`); a name with a line break is
+  hashed alone, a non-file (nested repository, dangling link) counts as `-`, a batch git cannot finish falls back to one call per file. Same
+  1 GB untracked file, `check` on a commit: 1.36 s and 11 MB peak (was 2.65 s and 1.9 GB; the 1.36 s is git reading the file). Tests
+  `streaming_checks` (nothing of the content goes through the hook) and `untracked_content_checks` (the marker follows a same-size content change).
+  Verified: `just check`, `just test-harness`, `just check-harness`. Not verified: a file unreadable for permissions (falls back, untested).
+  Code review: 7 findings. Fixed: `--no-filters` (the content is hashed raw, as before), no git process when nothing is hashable, nested
+  repository and unreadable file now tested. Not fixed: one process per file when a batch fails (rare, only on an unreadable or vanished file);
+  a symlink is hashed by its target as before (the old code had the same blind spot); the new format of the hash retires the pending
+  markers once, accepted in the decisions above.

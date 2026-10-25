@@ -588,6 +588,83 @@ fn cheap_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+/// Untracked files are hashed by `git` itself (their paths on its stdin), never read by the hook and piped to it.
+fn streaming_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let root = std::env::temp_dir().join(format!("reviewtest-stream-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let bin = root.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    fs::write(root.join("big.bin"), vec![b'x'; 1 << 20]).unwrap();
+    let log = root.join("calls.log");
+    // `ls-files` lists the big file; every `hash-object` logs the size of what it is fed
+    let fake = bin.join("git");
+    let script = format!(
+        "#!/bin/sh\ncase \"$1\" in\n  rev-parse) [ \"$2\" = --git-path ] && echo \"$3\" ;;\n  ls-files) printf 'big.bin\\0' ;;\n  hash-object) echo \"$* $(wc -c)\" >> '{}'; echo 0000000000000000000000000000000000000000 ;;\nesac\n",
+        log.display()
+    );
+    fs::write(&fake, script).unwrap();
+    fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
+    let event = serde_json::json!({"tool_name": "Skill", "cwd": root, "tool_input": {"skill": "code-review"}, "tool_response": {"success": true}});
+    let mut child = Command::new("rust-script")
+        .arg(hook)
+        .arg("record")
+        .env("PATH", path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("rust-script must be installed");
+    child.stdin.take().unwrap().write_all(event.to_string().as_bytes()).unwrap();
+    let ran = child.wait().unwrap().success();
+    let fed: Vec<usize> = fs::read_to_string(&log)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.rsplit(' ').next()?.parse().ok())
+        .collect();
+    let _ = fs::remove_dir_all(&root);
+    vec![
+        ("the review ran with the fake git", ran && !fed.is_empty()),
+        ("no content of an untracked file is piped to git", fed.iter().all(|n| *n < 1 << 16)),
+    ]
+}
+
+/// The marker still follows the content of an untracked file, and only that.
+fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let root = std::env::temp_dir().join(format!("reviewtest-untracked-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("sub")).unwrap();
+    sh(&root, &["init", "-q", "."]);
+    fs::write(root.join("a.txt"), "one\n").unwrap();
+    sh(&root, &["add", "-A"]);
+    sh(&root, &["commit", "-qm", "init"]);
+    fs::write(root.join("new.txt"), "aaaa\n").unwrap();
+    fs::write(root.join("odd\nname.txt"), "aaaa\n").unwrap();
+    fs::create_dir_all(root.join("nested")).unwrap();
+    sh(&root.join("nested"), &["init", "-q", "."]);
+    let locked = root.join("locked.txt");
+    fs::write(&locked, "secret\n").unwrap();
+    fs::set_permissions(&locked, std::os::unix::fs::PermissionsExt::from_mode(0o000)).unwrap();
+    let marker = |hook: &Path| {
+        review_done(hook, &root, "code-review");
+        let text = fs::read_to_string(root.join(".git/claude-code-review.json")).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["hash"].as_str().unwrap().to_string()
+    };
+    let first = marker(hook);
+    let mut out = vec![("the marker is stable while nothing changes", marker(hook) == first)];
+    fs::write(root.join("new.txt"), "bbbb\n").unwrap();
+    let second = marker(hook);
+    out.push(("a content change of the same size changes the marker", second != first));
+    fs::write(root.join("odd\nname.txt"), "bbbb\n").unwrap();
+    out.push(("a file with a newline in its name is covered", marker(hook) != second));
+    // a nested repository and an unreadable file do not stop the other files from being hashed
+    fs::write(root.join("new.txt"), "cccc\n").unwrap();
+    out.push(("a nested repository and an unreadable file leave the other files covered", marker(hook) != second));
+    fs::set_permissions(&locked, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
+    let _ = fs::remove_dir_all(&root);
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -722,7 +799,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

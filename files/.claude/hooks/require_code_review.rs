@@ -78,18 +78,45 @@ fn names(bytes: &[u8]) -> Vec<String> {
     bytes.split(|b| *b == 0).filter(|n| !n.is_empty()).map(|n| String::from_utf8_lossy(n).into_owned()).collect()
 }
 
+/// The object id `git` gives the content of each untracked file, which it reads itself (`--stdin-paths`: the content
+/// of a large file never goes through this process). `-` stands for what is not a readable file (a directory such as a
+/// nested repository, a dangling link); a name `--stdin-paths` cannot carry (it holds a line break) is hashed on its own.
+fn untracked_hashes(cwd: &Path, names: &[String]) -> Vec<String> {
+    let hash_one = |name: &str| {
+        let out = git(cwd, &["hash-object", "--no-filters", "--", name], b"");
+        String::from_utf8_lossy(&out).trim().to_string()
+    };
+    let hashable = |name: &String| cwd.join(name).metadata().is_ok_and(|m| m.is_file());
+    let batch: Vec<&String> = names.iter().filter(|n| hashable(n) && !n.contains(['\n', '\r'])).collect();
+    if batch.is_empty() {
+        return names.iter().map(|_| "-".to_string()).collect();
+    }
+    let listing = batch.iter().map(|n| format!("{n}\n")).collect::<String>();
+    let out = git(cwd, &["hash-object", "--no-filters", "--stdin-paths"], listing.as_bytes());
+    let mut batched: Vec<String> = String::from_utf8_lossy(&out).lines().map(str::to_string).collect();
+    // a file git could not read stops the batch: hash each one on its own
+    if batched.len() != batch.len() {
+        batched = batch.iter().map(|n| hash_one(n)).collect();
+    }
+    let mut batched = batch.into_iter().zip(batched).collect::<std::collections::HashMap<_, _>>();
+    names
+        .iter()
+        .map(|n| batched.remove(n).or_else(|| hashable(n).then(|| hash_one(n))).filter(|h| !h.is_empty()).unwrap_or_else(|| "-".into()))
+        .collect()
+}
+
 fn snapshot(cwd: &Path) -> Snapshot {
     let head = String::from_utf8_lossy(&git(cwd, &["rev-parse", "-q", "--verify", "HEAD"], b"")).trim().to_string();
     // the empty tree stands for HEAD in a repository without commit
     let base = if head.is_empty() { "4b825dc642cb6eb9a060e54bf8d69288fbee4904" } else { "HEAD" };
     let mut content = git(cwd, &["diff", base, "--binary", "--no-color", "--no-ext-diff", "--no-textconv"], b"");
     let mut files = names(&git(cwd, &["diff", base, "--name-only", "--no-renames", "-z"], b""));
-    for name in names(&git(cwd, &["ls-files", "--others", "--exclude-standard", "-z"], b"")) {
-        let bytes = std::fs::read(cwd.join(&name)).unwrap_or_default();
-        content.extend(format!("\0{name}\0{}\0", bytes.len()).into_bytes());
-        content.extend(bytes);
-        files.push(name);
+    let untracked = names(&git(cwd, &["ls-files", "--others", "--exclude-standard", "-z"], b""));
+    let hashes = untracked_hashes(cwd, &untracked);
+    for (name, hash) in untracked.iter().zip(hashes) {
+        content.extend(format!("\0{name}\0{hash}\0").into_bytes());
     }
+    files.extend(untracked);
     files.sort();
     let hash = String::from_utf8_lossy(&git(cwd, &["hash-object", "--stdin"], &content)).trim().to_string();
     Snapshot { head, hash, files }
