@@ -31,3 +31,25 @@ the review result can be seen.
   `issue-workflow` asks, but the agent re-runs it often; consider accepting fixes after a review that reported
   findings.
 * The shared files hold nothing specific to one project.
+
+# Tracking
+
+1. [x] Measure: capture the real `PostToolUse` (`Skill`) and `PreToolUse` (`Bash`) payloads with a temporary git-ignored log hook; record the available fields and whether the review findings are visible
+2. [ ] Marker and refusal: `require_code_review.rs` (`record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash` for `git commit`): marker = hash of the staged diff, reviewed files, `HEAD`; exit 2 without a valid marker; tests in `test_hooks.rs`
+3. [ ] Escape hatches: staged files all under `issues/`, user waiver file `.claude/state/review-waived`, fixes on already reviewed files, `HEAD` changed invalidates the marker; one test each
+4. [ ] Wiring and docs: declare both hooks in `seed/.claude/settings.json`, ignore `.claude/state/`, update step 4.5 of `issue-workflow` and the docs, `just sync`, `just check`, `just test-harness`
+
+## Decisions
+
+* Mode: autonomous (validation of steps 4.6 and 4.8 lifted).
+* No spec: the hooks do not change what the `harness` tool does.
+* Measured (deliverable 1): `PostToolUse` on `Skill` gets `tool_input.skill` (`code-review`), `session_id`, `cwd`,
+  `transcript_path` and `tool_response` = `{success, status: "forked", agentId, result}` where `result` is the
+  free text of the review, so the findings are visible but unstructured (no machine-readable "no findings").
+  The `Bash` calls of the forked review agent also fire `PreToolUse` (with `agent_id` and `agent_type` set).
+* The hook does not parse the findings; fixes after a review are accepted when every staged file was already reviewed.
+* Follow-up (not this issue): `block_ai_attribution.rs` `writes_message` misses `gh -R owner/repo pr create ...`
+  (flag between `gh` and `pr`), reported by the review of this run.
+* The marker hashes the staged content (`git diff --cached`), what will actually be committed.
+* The waiver is a file only the user creates, never driven by a sentence of the agent.
+* Docs must be reviewed; only a commit touching nothing but `issues/` is exempt.
