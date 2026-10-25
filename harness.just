@@ -24,9 +24,9 @@ next-issue:
 start-issue issue:
     rust-script .claude/skills/issue-workflow/issue_worktree.rs start {{issue}}
 
-# Remove the worktree and the branch of an issue once its branch is merged into the main branch.
-finish-issue stem:
-    rust-script .claude/skills/issue-workflow/issue_worktree.rs finish {{stem}}
+# Remove the worktree and the branch of an issue once its branch is merged into the main branch (rebase and one-commit squash included); `--force` for a squash of several commits, only after the user agreed.
+finish-issue stem *flags:
+    rust-script .claude/skills/issue-workflow/issue_worktree.rs finish {{stem}} {{flags}}
 
 # Validate a new issue file against the create-issue template.
 check-issue issue:

@@ -106,13 +106,61 @@ fn finish_removes_only_a_clean_sibling(c: &Ctx) -> Checks {
     ]
 }
 
+fn commit_file(wt: &Path, name: &str) {
+    std::fs::write(wt.join(name), format!("{name}\n")).unwrap();
+    git_ok(wt, &["add", "-A"]);
+    git_ok(wt, &["commit", "-qm", name, "--no-verify"]);
+}
+
+// spec: PAR-6
+fn finish_accepts_a_patch_equivalent_branch(c: &Ctx) -> Checks {
+    for stem in ["r", "m"] {
+        let (ok, _) = c.run(&c.repo, &["start", &format!("issues/{stem}.md")]);
+        assert!(ok);
+        commit_file(&c.wt(stem), &format!("{stem}.txt"));
+    }
+    commit_file(&c.repo, "trunk-moved.txt");
+    git_ok(&c.repo, &["cherry-pick", "r"]);
+    git_ok(&c.repo, &["merge", "-q", "--squash", "m"]);
+    git_ok(&c.repo, &["commit", "-qm", "squash m", "--no-verify"]);
+    let (rebased, _) = c.run(&c.repo, &["finish", "r"]);
+    let (squashed, _) = c.run(&c.repo, &["finish", "m"]);
+    vec![
+        ("finish accepts a rebased branch", rebased && !c.wt("r").exists() && !branch_exists(&c.repo, "r")),
+        ("finish accepts a branch squashed from one commit", squashed && !c.wt("m").exists() && !branch_exists(&c.repo, "m")),
+    ]
+}
+
+// spec: PAR-6
+// spec: PAR-10
+fn finish_forces_a_squash_of_several_commits(c: &Ctx) -> Checks {
+    let (ok, _) = c.run(&c.repo, &["start", "issues/s.md"]);
+    assert!(ok);
+    commit_file(&c.wt("s"), "s1.txt");
+    commit_file(&c.wt("s"), "s2.txt");
+    git_ok(&c.repo, &["merge", "-q", "--squash", "s"]);
+    git_ok(&c.repo, &["commit", "-qm", "squash s", "--no-verify"]);
+    let (plain, msg) = c.run(&c.repo, &["finish", "s"]);
+    let kept = c.wt("s").is_dir() && branch_exists(&c.repo, "s");
+    std::fs::write(c.wt("s").join("dirty.txt"), "wip\n").unwrap();
+    let (dirty, _) = c.run(&c.repo, &["finish", "s", "--force"]);
+    let dirty_kept = c.wt("s").is_dir() && branch_exists(&c.repo, "s");
+    std::fs::remove_file(c.wt("s").join("dirty.txt")).unwrap();
+    let (forced, _) = c.run(&c.repo, &["finish", "s", "--force"]);
+    vec![
+        ("finish refuses a multi-commit squash without --force, names --force and keeps both", !plain && kept && msg.contains("--force")),
+        ("finish --force still refuses a worktree with uncommitted changes", !dirty && dirty_kept),
+        ("finish --force removes the worktree and the branch", forced && !c.wt("s").exists() && !branch_exists(&c.repo, "s")),
+    ]
+}
+
 fn main() {
     let script = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap().join("issue_worktree.rs");
     let root = std::fs::canonicalize(std::env::temp_dir()).unwrap().join(format!("issue_worktree_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join("issues")).unwrap();
-    for s in ["x", "y", "z", "w"] {
+    for s in ["x", "y", "z", "w", "r", "m", "s"] {
         std::fs::write(repo.join(format!("issues/{s}.md")), format!("# {s}\n")).unwrap();
     }
     git_ok(&repo, &["init", "-q", "-b", "trunk", "."]);
@@ -122,7 +170,7 @@ fn main() {
 
     let c = Ctx { root: root.clone(), repo, script };
     let mut failed = false;
-    for checks in [start_creates_the_worktree(&c), start_refuses_and_changes_nothing(&c), finish_needs_a_merged_branch(&c), finish_removes_only_a_clean_sibling(&c)] {
+    for checks in [start_creates_the_worktree(&c), start_refuses_and_changes_nothing(&c), finish_needs_a_merged_branch(&c), finish_removes_only_a_clean_sibling(&c), finish_accepts_a_patch_equivalent_branch(&c), finish_forces_a_squash_of_several_commits(&c)] {
         for (name, ok) in checks {
             println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
             failed |= !ok;

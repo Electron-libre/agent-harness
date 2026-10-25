@@ -1,9 +1,11 @@
 #!/usr/bin/env rust-script
 //! Give an issue its own git worktree and branch, so that two agents can work on two issues at once.
 //! `start issues/<stem>.md` creates the worktree `<main worktree>-<stem>` next to the main one, on a new branch
-//! `<stem>` cut from the branch of the main worktree. `finish <stem>` removes that worktree and branch once the
-//! branch is merged into the branch of the main worktree. Run both from any worktree of the repository.
-//! Usage: `just start-issue issues/foo.md`, `just finish-issue foo`.
+//! `<stem>` cut from the branch of the main worktree. `finish <stem> [--force]` removes that worktree and branch once the
+//! branch is merged into the branch of the main worktree (ancestor, or every commit has a patch-equivalent there,
+//! which covers a rebase or a squash of one commit); `--force` also accepts a squash of several commits, after the
+//! user agreed, and still refuses a worktree with uncommitted changes. Run both from any worktree of the repository.
+//! Usage: `just start-issue issues/foo.md`, `just finish-issue foo` (`just finish-issue foo --force`).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -76,7 +78,7 @@ fn start(cwd: &Path, issue: &str) -> Result<String, String> {
     Ok(dir.display().to_string())
 }
 
-fn finish(cwd: &Path, stem: &str) -> Result<String, String> {
+fn finish(cwd: &Path, stem: &str, force: bool) -> Result<String, String> {
     if !valid_stem(stem) {
         return Err(format!("not an issue stem: {stem}"));
     }
@@ -85,8 +87,11 @@ fn finish(cwd: &Path, stem: &str) -> Result<String, String> {
     if !git_ok(&main, &["rev-parse", "--verify", "-q", &format!("refs/heads/{stem}")]) {
         return Err(format!("no branch {stem}"));
     }
-    if !git_ok(&main, &["merge-base", "--is-ancestor", stem, &trunk]) {
-        return Err(format!("the branch {stem} is not merged into {trunk}: merge it first, nothing was removed"));
+    let ancestor = git_ok(&main, &["merge-base", "--is-ancestor", stem, &trunk]);
+    // A rebase or a squash of one commit leaves every commit with a patch-equivalent (`-`) on trunk.
+    let equivalent = ancestor || git(&main, &["cherry", &trunk, stem]).is_ok_and(|c| !c.lines().any(|l| l.starts_with('+')));
+    if !equivalent && !force {
+        return Err(format!("the branch {stem} is not merged into {trunk}: merge it first, or pass --force if it was squashed (it deletes work that is not on {trunk}); nothing was removed"));
     }
     let dir = sibling(&main, stem)?;
     match worktree_of(&main, stem) {
@@ -104,7 +109,8 @@ fn finish(cwd: &Path, stem: &str) -> Result<String, String> {
         }
         None => {}
     }
-    git(&main, &["branch", "-d", stem])?;
+    // `-d` only knows ancestors; the other cases were checked above or forced.
+    git(&main, &["branch", if ancestor { "-d" } else { "-D" }, stem])?;
     Ok(format!("removed the worktree and the branch {stem}"))
 }
 
@@ -112,8 +118,9 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["start", issue] => start(Path::new("."), issue),
-        ["finish", stem] => finish(Path::new("."), stem),
-        _ => Err("usage: issue_worktree.rs start issues/<stem>.md | finish <stem>".to_string()),
+        ["finish", stem] => finish(Path::new("."), stem, false),
+        ["finish", stem, "--force"] | ["finish", "--force", stem] => finish(Path::new("."), stem, true),
+        _ => Err("usage: issue_worktree.rs start issues/<stem>.md | finish <stem> [--force]".to_string()),
     };
     match result {
         Ok(message) => println!("{message}"),

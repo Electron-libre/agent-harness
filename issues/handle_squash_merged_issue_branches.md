@@ -24,3 +24,22 @@ issue out of `just next-issue` without the user seeing why.
 
 # Hints
 * `finish` must never delete work that is not on trunk.
+
+# Tracking
+
+1. [x] `finish-issue` accepts a rebased or one-commit squashed branch (patch equivalence) and `--force` for the rest (PAR-6, PAR-10)
+   Done: `finish` merged test = ancestor or `git cherry` without `+`; `--force` (recipe `finish-issue stem *flags`) accepts the rest, still
+   refuses a dirty worktree; `branch -D` when not an ancestor. Tests `finish_accepts_a_patch_equivalent_branch`,
+   `finish_forces_a_squash_of_several_commits`. SKILL.md updated. Verified: `just check`, `just test-harness`, `just check-harness`.
+   Not verified: a branch with no commit at all (empty `git cherry`) counts as merged, by design. Code review: 8 findings. Fixed: `--force` accepted before the stem too; this line. Not fixed, by design: spec ahead of code
+   (PAR-3/PAR-4 land with deliverable 2, the old PAR-3 scenario is replaced there; spec stays `draft` until then); patch-equivalence
+   is the approach chosen with the user (`-D` after `git cherry` can miss a reverted cherry-pick, `--force` stays the explicit escape);
+   the checked-then-removed race is negligible for a single-user flow; the multi-commit test already covers the `+` refusal; unquoted
+   `*flags` is the usual just idiom.
+2. [ ] `next-issue` takes an issue only for a worktree or commits off trunk, and reports stale branches (PAR-3, PAR-4)
+
+## Decisions
+
+* Mode: autonomous.
+* No pull request detection (no network); `--force` is itself the confirmation, the skill asks the user before the agent uses it.
+* The spec `specs/parallel-issues.md` stays `draft` until the last deliverable.
