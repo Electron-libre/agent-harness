@@ -22,6 +22,30 @@ Everything that differs between projects is a value, not code. Scripts read list
 `update-docs` lives in the project's `.claude/update-docs-map.md`. Anything else that is project-specific
 (quality benchmark, smoke test, the language-specific recipes of the `justfile`) stays in the project.
 
+## Hooks and their declaration
+
+The hooks are managed (`files/.claude/hooks/`) but their declaration lives in `.claude/settings.json`, which is
+seeded once, so a new hook reaches a project that already adopted the harness only when the declaration is added
+to its file by hand. `harness check` stays lock-only and does not tell when one is missing. The extra hooks to
+declare, under `hooks` in `.claude/settings.json`:
+
+```json
+"PreToolUse": [
+  {
+    "matcher": "Bash",
+    "hooks": [
+      { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block_ai_attribution.rs" }
+    ]
+  }
+]
+```
+
+`block_ai_attribution.rs` refuses a `git commit` or `gh pr create|edit` whose message (inline, heredoc, `-F` or
+`--body-file`) credits the agent: a co-author trailer, a "Generated with" footer or a credit line ending with the
+vendor's no-reply address. It reads only the literal command and message files: a message built by `$(cat file)`
+or a shell variable is out of reach. Its patterns are narrower than those of `commit_check.rs` on purpose, so a
+message that discusses the rule passes.
+
 ## The instruction audit
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory

@@ -33,7 +33,7 @@ down several times and still gets broken, because the harness default reminder a
 
 # Tracking
 1. [x] The hook `files/.claude/hooks/block_ai_attribution.rs` and its Rust test (`git commit` and `gh pr create|edit`: inline, heredoc, `-F`/`--body-file`; passes a message that only discusses the rule)
-2. [ ] Wire it: declaration in `seed/.claude/settings.json` and this repository's `.claude/settings.json`, snippet for existing consumers, docs (`update-docs`), real-case check
+2. [x] Wire it: declaration in `seed/.claude/settings.json` and this repository's `.claude/settings.json`, snippet for existing consumers, docs (`update-docs`), real-case check
 
 ## Decisions
 * Mode: autonomous (review of step 4.5 never skipped, local commits, no push).
@@ -44,3 +44,8 @@ down several times and still gets broken, because the harness default reminder a
 * Done: `block_ai_attribution.rs` and `test_block_attribution.rs` (24 cases), synced into this repository.
 * Verified: `just check`, `just test-harness`, `just check-harness`. Not verified: the hook in a live session (not wired yet, deliverable 2).
 * Code review: fixed `git` with many global options, the bare `<noreply@anthropic.com>` match that blocked discussions, and a trailer naming someone else. Not fixed, by design: a trailer in the middle of a line (git does not read it as a trailer), `$(cat file)`, `-F` paths with spaces or `~`, `gh pr comment`/`git tag -m`, and a line that discusses the rule while starting with "Generated with Claude".
+
+## Deliverable 2 summary
+* Done: the `PreToolUse` declaration in `seed/.claude/settings.json` and `.claude/settings.json`; the snippet for existing consumers and the hook described in `docs/architecture.md`.
+* Verified: `just check`, `just test-harness` (settings hygiene included), `just check-harness`; the hook run by hand on a faulty `git commit` exits 2 with the reason. Not verified: the hook triggered by Claude Code itself in a fresh session (settings are read at session start).
+* Code review: no findings.
