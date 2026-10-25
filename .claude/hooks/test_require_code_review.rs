@@ -53,6 +53,50 @@ fn sh(project: &Path, args: &[&str]) {
     assert!(ok, "git {args:?} failed");
 }
 
+// spec: PAR-9
+/// A review recorded in one worktree must not cover another: the marker and the waiver live in the git directory
+/// of each worktree.
+fn git_dir_of(dir: &Path) -> std::path::PathBuf {
+    let out = Command::new("git").args(["rev-parse", "--absolute-git-dir"]).current_dir(dir).output().unwrap();
+    Path::new(String::from_utf8_lossy(&out.stdout).trim()).to_path_buf()
+}
+
+fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let root = std::env::temp_dir().join(format!("reviewtest-wt-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let main = root.join("main");
+    let linked = root.join("linked");
+    fs::create_dir_all(&main).unwrap();
+    sh(&main, &["init", "-q", "."]);
+    fs::write(main.join("a.txt"), "one\n").unwrap();
+    sh(&main, &["add", "-A"]);
+    sh(&main, &["commit", "-qm", "init"]);
+    sh(&main, &["worktree", "add", "-q", "-b", "other", linked.to_str().unwrap()]);
+    let commit = "git commit -am x";
+    fs::write(main.join("a.txt"), "two\n").unwrap();
+    fs::write(linked.join("a.txt"), "two\n").unwrap();
+
+    review_done(hook, &main, "code-review");
+    let mut out = vec![
+        ("a review in the main worktree covers it", commit_attempt(hook, &main, commit).0 == 0),
+        ("the same diff in a linked worktree is still unreviewed", commit_attempt(hook, &linked, commit).0 == 2),
+    ];
+    review_done(hook, &linked, "code-review");
+    out.push(("a review in a linked worktree covers it", commit_attempt(hook, &linked, commit).0 == 0));
+
+    let waiver = git_dir_of(&linked).join("claude-review-waived");
+    fs::write(&waiver, "").unwrap();
+    out.push(("a waiver of the linked worktree lets its commit through", commit_attempt(hook, &linked, commit).0 == 0));
+    out.push(("the waiver is consumed", !waiver.exists()));
+    fs::write(linked.join("new.txt"), "x\n").unwrap();
+    let main_waiver = git_dir_of(&main).join("claude-review-waived");
+    fs::write(&main_waiver, "").unwrap();
+    out.push(("the waiver of the main worktree does not cover the linked one", commit_attempt(hook, &linked, commit).0 == 2));
+    out.push(("the linked worktree leaves the main waiver alone", main_waiver.exists()));
+    let _ = fs::remove_dir_all(&root);
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -159,6 +203,10 @@ fn main() {
     check("refuses the first commit of a repository", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 2);
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
+
+    for (name, ok) in worktree_checks(&hook) {
+        check(name, ok);
+    }
 
     let _ = fs::remove_dir_all(&project);
     std::process::exit(i32::from(failed));

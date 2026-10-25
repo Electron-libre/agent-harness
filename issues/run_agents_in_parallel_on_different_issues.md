@@ -27,8 +27,8 @@ Decide at `issue-workflow` steps 1 to 3; the candidates can be combined.
    compile time against lock contention.
 
 # Specs
-* `specs/` entry for the isolation requirements if a `harness` subcommand or a managed script is added; none
-  if it stays a skill step.
+* `specs/parallel-issues.md` (`PAR`): isolation requirements for `start-issue`, `finish-issue`,
+  `next-issue`, `close-issue` and the hooks.
 
 # Resources
 * `files/.claude/skills/issue-workflow/` (`next_issue.rs`, `close_issue.rs`, `SKILL.md`)
@@ -40,3 +40,29 @@ Decide at `issue-workflow` steps 1 to 3; the candidates can be combined.
   in one must not be needed in the other.
 * A branch cannot be checked out in two worktrees at once.
 * The shared files hold nothing specific to one project.
+
+# Tracking
+
+1. [x] Hooks resolve the git directory per worktree (PAR-9): test in a temporary repo with two worktrees, fix what fails.
+   Done: `require_code_review.rs` already used `git rev-parse --git-path`, so no code change; the test
+   `worktree_checks` in `test_require_code_review.rs` (`// spec: PAR-9`) proves a review and a waiver are per
+   worktree. Verified: `just check`, `just test-harness`, `just check-harness`. The other hooks do not use the git
+   directory.
+   Code review: 6 findings. Fixed: the fixture now lives in its own temp directory, the main git directory is
+   resolved like the linked one, the test asserts the main waiver is left alone. Not changed: the `// spec` tag
+   stays above the helper that holds the checks (the checker needs a `fn`); the issue wording notes are style only.
+2. [ ] `next-issue` skips taken issues, branch or worktree named after the stem (PAR-3, PAR-4, PAR-5).
+3. [ ] `start-issue` and `finish-issue` recipes and script (PAR-1, PAR-2, PAR-6, PAR-7).
+4. [ ] `close-issue` refuses to run outside the main worktree; `SKILL.md` documents the merge sequence: rebase, fast-forward, `close-issue`, `finish-issue` (PAR-8).
+5. [ ] Measure `target/` per worktree (disk, cold build), record the decision; ADR if warranted; docs (`architecture.md`, `CLAUDE.md`), `just sync`; spec `implemented`.
+
+## Decisions
+
+* Mode: autonomous (local commits, no push).
+* A spec is needed (`PAR`): `next-issue`, `start-issue` and `finish-issue` change the behaviour of the tool.
+* Worktrees live outside the repository: `../<repo>-<stem>`, branch `<stem>`.
+* Merge: rebase onto the main branch, then fast-forward.
+* "Taken" is derived from git (branch or worktree), no file.
+* Main branch detection: `main`, then `master`, then the current branch of the main worktree.
+* `close-issue` refuses outside the main worktree (PAR-8).
+* One `target/` per worktree by default, measured in deliverable 5.
