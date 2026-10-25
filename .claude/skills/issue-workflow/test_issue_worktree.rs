@@ -64,7 +64,12 @@ fn start_refuses_and_changes_nothing(c: &Ctx) -> Checks {
     std::fs::create_dir_all(c.wt("z")).unwrap();
     let (occupied, _) = c.run(&c.repo, &["start", "issues/z.md"]);
     std::fs::remove_dir_all(c.wt("z")).unwrap();
+    git_ok(&c.repo, &["checkout", "-q", "--detach"]);
+    let (detached, _) = c.run(&c.repo, &["start", "issues/z.md"]);
+    let detached_clean = !branch_exists(&c.repo, "z") && !c.wt("z").exists();
+    git_ok(&c.repo, &["checkout", "-q", "trunk"]);
     vec![
+        ("start refuses a detached main worktree", !detached && detached_clean),
         ("start refuses an issue whose branch exists", !taken),
         ("start refuses a missing issue file", !missing && !branch_exists(&c.repo, "missing")),
         ("start refuses an issue file the main branch does not hold", !uncommitted && !branch_exists(&c.repo, "new")),

@@ -1,7 +1,7 @@
 ---
 id: PAR
-status: draft
-adrs: []
+status: implemented
+adrs: [0003]
 ---
 
 # Parallel issue isolation
@@ -15,7 +15,7 @@ deliberate step run from the main branch.
 ## Requirements
 
 - **PAR-1** (deterministic) `start-issue` must create a worktree outside the repository, in the sibling directory `<repo>-<stem>`, on a new branch named after the issue stem, and must print its path.
-- **PAR-2** (deterministic) `start-issue` must fail, changing nothing, when the issue file does not exist, when the branch `<stem>` already exists or when the worktree directory already exists.
+- **PAR-2** (deterministic) `start-issue` must fail, changing nothing, when the issue file is not committed on the main branch (missing, or with uncommitted edits), when the main worktree is detached, when the branch `<stem>` already exists or when the worktree directory already exists.
 - **PAR-3** (deterministic) An issue must count as taken when a branch named after its stem exists or a worktree has it checked out; the mark must be derived from git alone, so it is seen from every worktree and needs no file to clean up.
 - **PAR-4** (deterministic) `next-issue` must skip the taken issues, print the first free entry of the queue, and list the taken ones with the worktree path when there is one; when every entry is taken it must say so.
 - **PAR-5** (deterministic) `next-issue` must keep its current output when no issue is taken, and must work outside a git repository.

@@ -15,6 +15,8 @@ The shared agent harness (skills, hooks, scripts, recipes, CI) of the user's pro
 - `crates/harness/`: the `harness` binary (`init`, `sync`, `check`).
 - `specs/`: what the tool must do (`sync.md`), traced to its tests by `// spec: ID`.
 - `issues/`: open issues, ordered in `issues/queue.md` (`just next-issue`); `docs/adr/`: decisions.
+- Parallel agents: one git worktree per issue (`just start-issue`, `just finish-issue`), see
+  `docs/architecture.md`.
 - `AGENTS.md`: commit message format (Conventional Commits, enforced by `just check-commit`).
 
 This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `harness.just`, `script/` and

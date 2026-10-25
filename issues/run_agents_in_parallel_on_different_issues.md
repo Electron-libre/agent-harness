@@ -78,7 +78,16 @@ Decide at `issue-workflow` steps 1 to 3; the candidates can be combined.
    fixed the bare repository case, the guard now runs after the usage check, `SKILL.md` Rules point at
    "Parallel agents" for the closing. Not changed: the guard allows the run when git fails (as outside a repository), the test does not cover a
    detached main worktree or a subdirectory of the linked one.
-5. [ ] Measure `target/` per worktree (disk, cold build), record the decision; ADR if warranted; docs (`architecture.md`, `CLAUDE.md`), `just sync`; spec `implemented`.
+5. [x] Measure `target/` per worktree (disk, cold build), record the decision; ADR if warranted; docs (`architecture.md`, `CLAUDE.md`), `just sync`; spec `implemented`.
+
+   Done: measured a cold `cargo test --no-run` in a fresh worktree of this repository: 4 s wall (20 s CPU, 24
+   cores), 239 MB; kept one `target/` per worktree. ADR 0003, `docs/architecture.md` section "Parallel issues",
+   `CLAUDE.md`; spec `PAR` set to `implemented` (PAR-2 now names the uncommitted and detached refusals).
+   The spec checker now also scans `.claude/` for `// spec:` citations (the tests of the managed scripts live
+   there), with two cases in `test_check_specs.rs`. Not verified: a real two-agent session end to end, a bare
+   main repository. Code review: 6 findings; fixed the detached test, the ADR wording on the merge, the duplicated
+   figures, the `CLAUDE.md` bullet, the `.claude/` assumption in the architecture note. Not changed: the spec
+   stays `implemented` since every requirement is traced; the two-agent session is the user's to run.
 
 ## Decisions
 

@@ -134,7 +134,10 @@ fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            rust_files(&path, found);
+            // copies of the project (agent worktrees) and build output hold no tests of their own
+            if !path.file_name().is_some_and(|n| n == "worktrees" || n == "target") {
+                rust_files(&path, found);
+            }
         } else if path.extension().is_some_and(|e| e == "rs") {
             found.push(path);
         }
@@ -145,7 +148,10 @@ fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
 /// test: only attributes and other comments may come between it and the `fn`; any other place is a problem.
 fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
     let mut files = Vec::new();
-    rust_files(&root.join("crates"), &mut files);
+    // the tests of the crates, and those of the harness scripts, hooks and skills
+    for dir in ["crates", ".claude"] {
+        rust_files(&root.join(dir), &mut files);
+    }
     let mut cited = BTreeMap::new();
     for file in files {
         let Ok(text) = std::fs::read_to_string(&file) else { continue };

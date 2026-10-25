@@ -14,7 +14,7 @@ fn main() {
     let mut failed = false;
     let mut case = |name: &str, spec: &str, tests: &str, others: &[(&str, &str)], expect: Option<&str>| {
         let _ = std::fs::remove_dir_all(&tmp);
-        for dir in ["specs", "crates/a/src", "docs/adr", "benchmark/x"] {
+        for dir in ["specs", "crates/a/src", ".claude/hooks", "docs/adr", "benchmark/x"] {
             std::fs::create_dir_all(tmp.join(dir)).unwrap();
         }
         std::fs::write(tmp.join("docs/adr/0005-incremental.md"), "x").unwrap();
@@ -57,6 +57,8 @@ fn main() {
     case("spec without front matter does not collide with another", "# no front matter\n", TESTS, &[("specs/other.md", "# none either\n")], Some("front matter"));
 
     let quality = SPEC.replace("- **RER-2** (deterministic) A run must resume.", "- **RER-2** (quality) Docs must be good.\n  benchmark: benchmark/x/reference.yaml\n  metric: recall");
+    case("a test of a harness script under .claude traces a requirement", SPEC, "", &[(".claude/hooks/test_h.rs", TESTS)], None);
+    case("a citation under .claude not above a fn is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: RER-1\nlet x = 1;\n")], Some("right above"));
     case("quality requirement with an existing benchmark passes", &quality, "// spec: RER-1\nfn t() {}\n", &[("benchmark/x/reference.yaml", "x")], None);
     case("quality requirement with a missing benchmark file is flagged", &quality, "// spec: RER-1\nfn t() {}\n", &[], Some("reference.yaml"));
     case("quality lines may follow a blank line", &quality.replace("recall\n", "recall\n\n").replace("  benchmark", "\n  benchmark"), "// spec: RER-1\nfn t() {}\n", &[("benchmark/x/reference.yaml", "x")], None);

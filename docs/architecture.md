@@ -82,6 +82,19 @@ validated proposal becomes an issue in generic wording. It is a skill rather tha
 because telling a repeated procedure from a rule needs judgment, and a skill keeps the shared files free of
 project specifics.
 
+## Parallel issues
+
+Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-issue.md), spec
+[`specs/parallel-issues.md`](../specs/parallel-issues.md). `issue_worktree.rs` (`just start-issue`,
+`just finish-issue`) gives an issue the worktree `../<repo>-<stem>` on a branch `<stem>`: separate working tree and
+index, shared object store, so one agent's uncommitted files and commits never reach the other. Each worktree has its
+own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a cold build in 4 s; a larger
+project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the branch or the worktree itself:
+`next_issue.rs` reads `git for-each-ref` and `git worktree list`, so every worktree sees it and no file needs
+cleaning. The queue is edited only at merge time: `close_issue.rs` refuses in a linked worktree. The hooks need
+nothing: `require_code_review.rs` keeps its marker and waiver in the git directory of each worktree
+(`git rev-parse --git-path`), and `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees).
+
 ## Sources
 
 A directory (relative to the project) or a git URL; a git source is cloned in `$XDG_CACHE_HOME/harness` and
