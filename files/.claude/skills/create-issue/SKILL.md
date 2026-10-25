@@ -57,5 +57,5 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    reason to the user, who can move it. If the new issue changes the case for others, say so and suggest
    `skill:prioritize-issues` rather than silently reshuffling. Run `just next-issue` and check it reports
    no drift.
-6. **Deliver**: give the path and a two-line summary. Don't commit unless asked (then
+6. **Deliver**: give the path, rank and one line (no other recap). Don't commit unless asked (then
    `skill:commit-message`), and offer to start `skill:issue-workflow` on it.

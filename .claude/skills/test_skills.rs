@@ -119,6 +119,27 @@ fn check_review_template(name: &str, text: &str) -> Vec<String> {
         .collect()
 }
 
+// spec: RPT-4, RPT-5
+/// The resume summary, the final summary, the delivery of `create-issue` and the reformulation name a layout.
+fn check_report_layouts(name: &str, text: &str) -> Vec<String> {
+    let required: &[&str] = match name {
+        "issue-workflow" => &["`next` / `left` lines", "`goal`, `out of scope`, `questions`", "final summary: a table `deliverable | commit`"],
+        "create-issue" => &["path, rank and one line"],
+        _ => &[],
+    };
+    let mut failures: Vec<String> = required
+        .iter()
+        .filter(|part| !text.contains(*part))
+        .map(|part| format!("{name}: does not name the layout '{part}'"))
+        .collect();
+    for old in ["summarize where it stands", "a two-line summary", "Restate the need in your own words"] {
+        if text.contains(old) {
+            failures.push(format!("{name}: still asks for a free report ('{old}')"));
+        }
+    }
+    failures
+}
+
 fn main() {
     let root = fs::canonicalize(Path::new(file!()).parent().unwrap().join("../..")).unwrap();
     let skills = root.join(".claude/skills");
@@ -172,6 +193,7 @@ fn main() {
         failures.extend(check_output_citation(&name, &text));
         failures.extend(check_no_narration(&name, &text));
         failures.extend(check_review_template(&name, &text));
+        failures.extend(check_report_layouts(&name, &text));
         for (skill, passage, why) in REQUIRED_PASSAGES.iter().filter(|(s, _, _)| *s == name) {
             if !text.contains(passage) {
                 failures.push(format!("{skill}: missing '{passage}' ({why})"));

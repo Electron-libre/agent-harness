@@ -13,15 +13,16 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
 
 ## 0. Resume or start
 
-Read the issue file. If it has a `# Tracking` section, the issue is already planned: summarize where it stands (next unchecked
-deliverable) and continue at step 4 in the mode recorded there (none recorded: validation at each deliverable), unless the issue
+Read the issue file. If it has a `# Tracking` section, the issue is already planned: show where it stands in two `next` / `left` lines (the next unchecked
+deliverable with the recorded mode, the deliverables left by name) and continue at step 4 in the mode recorded there (none recorded: validation at each deliverable), unless the issue
 changes a capability whose spec is missing, still `draft` with no validated requirements, or not named in its `# Specs` section:
 then do step 2 first. Otherwise start at step 1.
 
 ## 1. Reformulate and validate (STOP)
 
 - Read the issue, plus the resources it names (docs, `git log`, the `roadmap` documents of `.claude/harness.toml`, memory).
-- Restate the need in your own words: goal, means, constraints, what is out of scope, open questions.
+- Show, short, only what the issue does not already say: `goal`, `out of scope`, `questions` (plus the means when you
+  propose a different one than the issue's).
 - Ask the questions you can't answer from the repo. Don't ask what has a conventional default.
 - **Stop and wait for the user to validate the understanding.**
 
@@ -92,7 +93,8 @@ can switch it at any time.
 - **Never lifted**: the review of step 4.5 and its checks, the stops of steps 1 to 3, the Rules on push, deletion and
   history rewriting (no push).
 - **Stops the chain**: a blocking question, a decision the summary needs from the user, a review finding you can't
-  settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the final summary and ask whether to close the issue.
+  settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the
+  final summary: a table `deliverable | commit`, then `left` (what remains, if anything); ask whether to close the issue.
 
 ## Parallel agents
 
