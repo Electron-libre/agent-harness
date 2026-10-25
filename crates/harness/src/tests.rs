@@ -571,6 +571,11 @@ fn rewritten_source(kept: bool) -> (TempDir, String) {
     git_in(repo.path(), &["reflog", "expire", "--expire=now", "--all"]);
     if !kept {
         git_in(repo.path(), &["gc", "--quiet", "--prune=now"]);
+        // CI served the commit after the gc alone: fail here, not in the test, if it is still there
+        assert!(
+            !resolves(repo.path(), &first),
+            "the commit is still in the source"
+        );
     }
     (repo, first)
 }
