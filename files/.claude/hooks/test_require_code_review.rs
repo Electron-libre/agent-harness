@@ -282,6 +282,37 @@ fn environment_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-7
+/// A value that cannot be read from the text (`$X`, `$(…)`, backticks) is refused whatever the reviews; a literal one is not.
+fn undeterminable_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev7b");
+    review_done(hook, &other, "code-review");
+    let mut out = all_refused(
+        hook,
+        &current,
+        &[
+            "GIT_DIR=$X git commit -am x",
+            "GIT_WORK_TREE=\"$HOME/o\" git commit -am x",
+            "GIT_WORK_TREE=${X}/o git commit -am x",
+            "export GIT_WORK_TREE=$(pwd)/../other; git commit -am x",
+            "env GIT_DIR=`pwd`/x git commit -am x",
+            "GIT_DIR=\"../other/.git\"$Y git commit -am x",
+        ],
+    );
+    for (name, command) in [
+        ("a single-quoted dollar is a literal value", "GIT_WORK_TREE='$X' git commit -am x"),
+        ("a dollar elsewhere in the line is no environment", "GIT_WORK_TREE=../other git commit -m \"$msg\""),
+        ("another variable is not read", "MY_GIT_DIR=$X git commit -am x"),
+        ("an unset is not refused", "unset GIT_DIR; git commit -am x"),
+        ("a dollar in single quotes inside the word is literal", "GIT_DIR=/a/'b$c'/x git commit -am x"),
+        ("an escaped dollar is literal", "GIT_DIR=/a/\\$b git commit -am x"),
+    ] {
+        out.push((name, commit_attempt(hook, &current, command).0 == 0));
+    }
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 fn main() {
     let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
     let hook = here.join("require_code_review.rs");
@@ -416,7 +447,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks] {
+    for checks in [worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

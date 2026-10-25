@@ -16,6 +16,11 @@
 //! again), and refuses any `Bash` command naming it (a deterrent, not a barrier: a `Write`
 //! of the file or a name built in pieces is not caught).
 //!
+//! The review judged is the one of the repository the commit lands in, named by `-C`, `--work-tree`, `--git-dir`
+//! and by `GIT_DIR` / `GIT_WORK_TREE` written or exported in the same line (`specs/review-gate.md`). A value of
+//! these two variables the text does not give (`$X`, `$(…)`) is refused. A variable exported by an earlier command
+//! of the session is invisible to the hook.
+//!
 //! Declare: PostToolUse Skill (argument `record`), PreToolUse Bash (argument `check`)
 //!
 //! ```cargo
@@ -159,6 +164,35 @@ fn environment_repository(words: &[&str]) -> (Option<PathBuf>, Option<PathBuf>) 
     }
     let [dir, tree] = [0, 1].map(|n| if masked[n] { None } else { prefix[n].take().or(exported[n].take()) });
     (dir, tree)
+}
+
+/// The variable of `environment_repository` the line assigns a value the text does not give (`$X`, `${X}`, `$(…)`,
+/// backticks, unless in single quotes), `None` when every value is literal. It reads the raw command, where the
+/// brackets are still there.
+fn undeterminable_variable(command: &str) -> Option<&'static str> {
+    ["GIT_DIR", "GIT_WORK_TREE"].into_iter().find(|name| {
+        command.match_indices(&format!("{name}=")).any(|(at, assignment)| {
+            // `MY_GIT_DIR=` is another variable
+            if command[..at].ends_with(|c: char| c.is_alphanumeric() || c == '_') {
+                return false;
+            }
+            let value = &command[at + assignment.len()..];
+            // the word of the value: quotes and escapes decide where it ends and whether a `$` expands
+            let (mut single, mut double, mut escaped) = (false, false, false);
+            for c in value.chars() {
+                match c {
+                    _ if escaped => escaped = false,
+                    '\\' if !single => escaped = true,
+                    '\'' if !double => single = !single,
+                    '"' if !single => double = !double,
+                    '$' | '`' if !single => return true,
+                    c if !single && !double && (c.is_whitespace() || matches!(c, ';' | '|' | '&')) => break,
+                    _ => {}
+                }
+            }
+            false
+        })
+    })
 }
 
 /// The directories whose review a `git commit` of the line depends on, `None` when no command of the line commits;
@@ -320,6 +354,11 @@ fn main() {
                 std::process::exit(2);
             }
             let Some(dirs) = commit_dirs(command) else { return };
+            if let Some(name) = undeterminable_variable(command) {
+                eprintln!("Refused: {name} is set to a value the hook cannot read (a variable, a substitution), so the repository the commit lands in is unknown.");
+                eprintln!("Write the path in the command (`git -C dir commit`), or ask the user to waive the review.");
+                std::process::exit(2);
+            }
             let mut roots: Vec<PathBuf> = dirs.into_iter().map(|d| d.map_or(cwd.clone(), |d| toplevel(&shell_dir.join(d)))).collect();
             roots.dedup();
             for cwd in roots {

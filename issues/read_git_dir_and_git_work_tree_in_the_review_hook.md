@@ -51,7 +51,15 @@ shell directory, or the spec must say plainly why it cannot, and the hook must t
    continuation (a bypass that predated this issue) and the assignment to an already exported variable; not fixed
    (over-refusals or exotic, noted): `echo export …` read as an export, `declare` without `-x`, `env -i`, `--unset`,
    a `-u` of another command, the state machine kept as arrays instead of a struct.
-3. [ ] Refuse a value that cannot be determined (`$X`, `$(…)`, backticks) (`REV-7`)
+3. [x] Refuse a value that cannot be determined (`$X`, `$(…)`, backticks) (`REV-7`)
+   Done: `undeterminable_variable` reads the raw command (brackets are still there) and refuses a commit line whose
+   `GIT_DIR=` / `GIT_WORK_TREE=` value holds `$` or a backtick, outside single quotes; `MY_GIT_DIR=` and `unset` are
+   not concerned. Tests written first and seen failing (5 refusals), 4 passes. Verified: `just check`,
+   `just test-harness`. Not verified: values inside a `--git-dir=$X` option or `-C $X` (not in the spec).
+   Code review: fixed `"lit"$X` (a bypass: the value is now scanned with quotes and escapes), and literal
+   `'b$c'` / `\$b` no longer refused; not fixed: `--git-dir=$X`, `-C $X`, fish `set -x` (outside REV-7, to file as an
+   issue), over-refusal of `echo GIT_DIR=$X` or a message quoting it (fail closed, the user can waive), two parsers
+   kept apart.
 4. [ ] Docs (architecture, hook doc, this issue), spec `accepted` then `implemented`, `just sync`
 
 ## Decisions
