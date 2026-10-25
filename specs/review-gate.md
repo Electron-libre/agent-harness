@@ -1,6 +1,6 @@
 ---
 id: REV
-status: draft
+status: implemented
 adrs: [0004]
 ---
 
@@ -32,7 +32,7 @@ judgment from inside the repository, where git has already resolved it.
 - **REV-15** (deterministic) The path `git rev-parse --git-path claude-review-waived` gives from a linked worktree must be the waiver `check` and `native` read for that worktree, not the one of the main worktree.
 - **REV-16** (deterministic) The hook must take the shell directory of a `git commit` from the `cd` (or `pushd`) commands that precede it on the line, as `-C` is taken: a relative one from the directory before it, an absolute one as it is, a `cd` that runs apart (a subshell `( … )`, a backtick substitution, a background command, a pipeline) not moving the shell after it; `-C`, `--work-tree` and `--git-dir` are then read from that directory. A `cd` whose target cannot be determined from the text (`$X`, `$(…)`, `~`, `cd -`, `cd` alone, `popd`, `pushd +1`) outside such a command must make the commit refused, whatever the reviews.
 - **REV-17** (deterministic) The recipe `waive-review` of `harness.just` must create the waiver at the path `git rev-parse --git-path claude-review-waived` gives from the directory it runs in, so that `check` and `native` find it for that worktree (the main one or a linked one, as REV-15), and must print that path. It must change nothing else in the repository.
-- **REV-18** (deterministic) `check` must refuse a `Bash` command that runs the recipe: a command word `just` among whose words `waive-review` stands, whatever the options before it (`just -f x waive-review`, `just --justfile x waive-review`), also after `sudo` or `env`. The refusal must say that only the user waives the review. A command that only names the recipe (`grep`, a quoted commit message, a heredoc body) is not refused, as in REV-14.
+- **REV-18** (deterministic) `check` must refuse a `Bash` command that runs the recipe: the command word `just` (also after `sudo` or `env`, in braces or a substitution) followed by `waive-review`, whatever the options between them (`just -f x waive-review`, `just --justfile x waive-review`). The refusal must say that only the user waives the review. A command that only names the recipe (`grep`, `echo`, a quoted commit message, a heredoc body) is not refused, as in REV-14, nor is a `just` run that reads without running (`--show`, `--dry-run`, `--summary`, `--list`, `--dump`).
 
 ## Scenarios
 

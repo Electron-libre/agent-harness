@@ -13,8 +13,9 @@
 //! review of the next commit by creating `claude-review-waived` in the git directory; the hook stamps it with
 //! `HEAD` when it lets a commit through and removes it, without using it, at the first check after `HEAD` moved
 //! (a command that does not commit, such as `--dry-run`, leaves it usable; after a commit the user creates it
-//! again), and refuses a `Bash` command that writes it (a redirection, `touch`, `tee`, `cp`…; a commit message, a
-//! `grep`, a shell or an interpreter that only names it passes; a deterrent, not a barrier: a `Write` of the file,
+//! again), and refuses a `Bash` command that writes it (a redirection, `touch`, `tee`, `cp`…) or runs the recipe
+//! `just waive-review`, the user's way to create it (a commit message, a `grep`, a shell or an interpreter that only
+//! names it passes; a deterrent, not a barrier: a `Write` of the file,
 //! a script that writes it or a name built in pieces is not caught).
 //!
 //! The review judged is the one of the repository the commit lands in, named by `-C`, `--work-tree`, `--git-dir`
@@ -44,6 +45,8 @@ const REVIEW_SKILL: &str = "code-review";
 const ISSUES_DIR: &str = "issues/";
 /// Created by the user, in the git directory, to waive the review of the next commit; the hook removes it.
 const WAIVER: &str = "claude-review-waived";
+/// The recipe of `harness.just` that creates the waiver: for the user, so the agent running it is refused.
+const WAIVE_RECIPE: &str = "waive-review";
 /// Stamp of a waiver used in a repository without commit.
 const NO_HEAD: &str = "no-head";
 
@@ -459,6 +462,45 @@ fn writes_waiver(command: &str) -> bool {
     })
 }
 
+/// Words that may stand before `just` and leave it the command run: wrappers, keywords, assignments, options and the
+/// value of an option (`sudo -u me just …`).
+const BEFORE_JUST: [&str; 10] = ["sudo", "doas", "env", "command", "exec", "time", "nohup", "then", "do", "else"];
+/// Options of `just` that run nothing (`just --show waive-review` reads the recipe).
+const JUST_READS: [&str; 8] = ["--show", "-s", "--dry-run", "-n", "--summary", "--list", "-l", "--dump"];
+
+/// Whether some command of the line runs the recipe that waives the review: `just` is the command run (alone, or after
+/// wrappers, assignments and options) and the recipe name follows, with any options between, unless one of them only
+/// reads (`JUST_READS`). The name may be quoted, and `just` may stand in braces or a substitution. A commit message or a
+/// `grep` that only names the recipe is not one. A deterrent, like `writes_waiver`.
+fn runs_waive_recipe(command: &str) -> bool {
+    unquoted_commands(command).iter().any(|(segment, masked)| {
+        let (mut just, mut after_option, mut pos) = (false, false, 0);
+        for word in segment.split_inclusive(|c: char| c.is_whitespace() || "\"'$(){};`<>".contains(c)) {
+            let start = pos;
+            pos += word.len();
+            let word = word.trim_end_matches(|c: char| c.is_whitespace() || "\"'$(){};`<>".contains(c));
+            if word.is_empty() {
+                continue;
+            }
+            if !just {
+                let visible = masked.get(start..start + word.len()) == Some(word);
+                if visible && word.rsplit('/').next() == Some("just") {
+                    just = true;
+                } else if visible && (BEFORE_JUST.contains(&word) || word.contains('=') || word.starts_with('-') || after_option) {
+                    after_option = word.starts_with('-');
+                } else {
+                    return false;
+                }
+            } else if JUST_READS.contains(&word) {
+                return false;
+            } else if word == WAIVE_RECIPE {
+                return true;
+            }
+        }
+        false
+    })
+}
+
 /// Whether some commit of the line skips its hooks: `commit_dirs` stops at the first one, so each command is read apart.
 fn skips_hooks(command: &str) -> bool {
     segments(command).any(|segment| matches!(commit_dirs(segment), Some(Ok((_, true)))))
@@ -796,6 +838,10 @@ fn main() {
         }
         "check" => {
             let Some(command) = event["tool_input"]["command"].as_str() else { return };
+            if runs_waive_recipe(command) {
+                eprintln!("Refused: only the user waives the code review, with `just {WAIVE_RECIPE}`; do not run it.");
+                std::process::exit(2);
+            }
             if writes_waiver(command) {
                 eprintln!("Refused: only the user waives the code review, by creating {WAIVER} in the git directory.");
                 if let Some(path) = git_file(&shell_dir, WAIVER) {

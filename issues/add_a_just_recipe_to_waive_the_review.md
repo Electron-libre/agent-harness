@@ -47,7 +47,7 @@ The agent must still not be able to waive its own review.
 
 1. [x] The hook stops refusing a shell, `eval`, `source` or an interpreter that only names the waiver; the writers stay refused (REV-13, REV-14).
 2. [x] The recipe `waive-review` in `files/harness.just` creates the waiver at the `git rev-parse --git-path` path and prints it (REV-17).
-3. [ ] The hook refuses a command running the recipe; `SKILL.md` and `docs/architecture.md` point to it; spec `accepted`, then `implemented` (REV-18).
+3. [x] The hook refuses a command running the recipe; `SKILL.md` and `docs/architecture.md` point to it; spec `accepted`, then `implemented` (REV-18).
 
 ## Decisions
 
@@ -69,3 +69,11 @@ The agent must still not be able to waive its own review.
 * Verified: `just check`, `just test-harness`, `just check-harness` green.
 * Not verified: a live session.
 * Code review: 7 findings. Fixed: the summary no longer points to a missing review. Accepted: until deliverable 3 the hook does not refuse `just waive-review` (the next deliverable, local commits only, no push in between); the test needs `just` and git 2.31+ (the project already requires both for its recipes); a spent waiver is consumed by the hook (stamp on `HEAD`), contrary to one finding. Not fixed: temp directory cleanup on a panic and a future `import` in `harness.just` (same pattern as the other checks, speculative).
+
+## Deliverable 3: summary
+
+* Done: `runs_waive_recipe` in `require_code_review.rs` makes `check` refuse a command where `just` stands as a word the shell runs and `waive-review` (quoted or not) follows, with any options, `sudo`, `env` or a path in between (REV-18); a `grep`, a commit message or a heredoc that only names the recipe passes. `SKILL.md`, `docs/architecture.md` and the hook header point to `just waive-review`; the spec is `implemented`. Tests are in `waiver_write_checks` and `waiver_mention_checks`.
+* Verified: `just check`, `just test-harness`, `just check-harness` green.
+* Known limit: a quoted `"just"`, a name built from quote pieces and an alias or a variable are not seen; a deterrent, like REV-13.
+* Not verified: a live session.
+* Code review: 6 findings. Fixed: `just` in braces, parentheses or a substitution was missed (words are now split like `writes_waiver`); `just --show/--dry-run/--summary/--list/--dump waive-review` was refused though it runs nothing (REV-18 amended to say so); `echo just waive-review` was refused (`just` must now be the command word, after wrappers, assignments and options); tests for each; a missing space in a test tuple. Accepted: name built from quote pieces, alias or variable (deterrent); long lines of `docs/architecture.md` (as the rest of the file).

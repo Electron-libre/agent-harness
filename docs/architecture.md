@@ -68,9 +68,9 @@ commit commits) and the files it covers. At a commit (`git -C dir` is followed),
 and exits 2, telling the agent to run the review, when the marker is missing, was made before the last commit, or
 the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with nothing to commit,
 a diff under `issues/` only and a directory outside a repository are let through. Documentation is reviewed like
-code. The user waives the review of the next commit with `touch "$(git rev-parse --git-path claude-review-waived)"` (right in a linked worktree too); the hook stamps the file
+code. The user waives the review of the next commit with `just waive-review` (it creates the file at the path `git rev-parse --git-path` gives, right in a linked worktree too); the hook stamps the file
 with `HEAD` when it lets a commit through and removes it at the first check after `HEAD` moved, so a command that does
-not commit (`--dry-run`, a refusal by another hook) leaves it usable, and refuses a Bash command that writes the
+not commit (`--dry-run`, a refusal by another hook) leaves it usable, and refuses a Bash command that runs that recipe or writes the
 file (redirection, `touch`, `tee`, `dd`, `truncate`, `cp`, `mv`, `ln`, `install`, `rsync`, `curl`, `sed -i`), not one that only names it (`grep`, a commit message, a shell or an interpreter whose text the hook cannot read). That deters the agent from creating one but does not stop a write made by another tool. The hook sees the review
 text in the `Skill` response but does not parse it.
 

@@ -764,7 +764,7 @@ fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
-// spec: REV-13
+// spec: REV-13, REV-18
 /// A command that writes the waiver is refused, with the path the user creates; the refusal does not depend on the review.
 fn waiver_write_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let project = std::env::temp_dir().join(format!("reviewtest-ww-{}", std::process::id()));
@@ -778,6 +778,20 @@ fn waiver_write_checks(hook: &Path) -> Vec<(&'static str, bool)> {
         ("refuses tee on the waiver", "echo x | tee .git/claude-review-waived"),
         ("refuses a copy onto the waiver", "sudo cp a .git/claude-review-waived"),
         ("refuses curl writing the waiver", "curl -o .git/claude-review-waived http://x"),
+        ("refuses the recipe that waives the review", "just waive-review"),
+        ("refuses the recipe after a cd", "cd x && just waive-review"),
+        ("refuses the recipe with a justfile option", "just -f y waive-review"),
+        ("refuses the recipe with a long justfile option", "just --justfile y waive-review"),
+        ("refuses the recipe after sudo", "sudo just waive-review"),
+        ("refuses the recipe after env", "env X=1 just waive-review"),
+        ("refuses the recipe by path", "/usr/bin/just waive-review"),
+        ("refuses the recipe with a quoted name", "just 'waive-review'"),
+        ("refuses the recipe after a commit", "git commit -qm 'a b'; just waive-review"),
+        ("refuses the recipe in braces", "{ just waive-review; }"),
+        ("refuses the recipe in a substitution", "echo $(just waive-review)"),
+        ("refuses the recipe in parentheses", "(just waive-review)"),
+        ("refuses the recipe after sudo with an option", "sudo -u me just waive-review"),
+        ("refuses the recipe after a keyword", "if true; then just waive-review; fi"),
         ("refuses a substitution inside double quotes", "echo \"$(touch .git/claude-review-waived)\""),
         ("refuses a backtick inside double quotes", "echo \"`touch .git/claude-review-waived`\""),
         ("refuses a quote closed by an escape", "echo \"\\\"\"; touch .git/claude-review-waived"),
@@ -801,7 +815,7 @@ fn waiver_write_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
-// spec: REV-14
+// spec: REV-14, REV-18
 /// A command that only names the waiver is not refused for it (a clean repository has nothing to review).
 fn waiver_mention_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let project = std::env::temp_dir().join(format!("reviewtest-wm-{}", std::process::id()));
@@ -813,6 +827,14 @@ fn waiver_mention_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     sh(&project, &["commit", "-qm", "init"]);
     let mut out = Vec::new();
     for (name, command) in [
+        ("lets through a grep for the recipe", "grep -rn waive-review specs files"),
+        ("lets through a commit message that names the recipe", "git commit -qm 'run just waive-review'"),
+        ("lets through a heredoc that names the recipe", "git commit -q -F - <<'EOF'\ndocs: just waive-review\nEOF"),
+        ("lets through another recipe", "just check-specs"),
+        ("lets through reading the recipe", "just --show waive-review"),
+        ("lets through a dry run of the recipe", "just --dry-run waive-review"),
+        ("lets through the summary piped to a grep", "just --summary | grep waive-review"),
+        ("lets through an echo of the recipe", "echo just waive-review"),
         ("lets through a shell that names the waiver", "sh -c 'touch .git/claude-review-waived'"),
         ("lets through a heredoc fed to a shell", "bash <<'EOF'\ntouch .git/claude-review-waived\nEOF"),
         ("lets through a heredoc fed to an interpreter", "python3 - <<'EOF'\nopen('.git/claude-review-waived', 'w')\nEOF"),
