@@ -37,7 +37,7 @@ the review result can be seen.
 1. [x] Measure: capture the real `PostToolUse` (`Skill`) and `PreToolUse` (`Bash`) payloads with a temporary git-ignored log hook; record the available fields and whether the review findings are visible
 2. [x] Marker and refusal: `require_code_review.rs` (`record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash` for `git commit`): marker = hash of the diff against `HEAD`, reviewed files, `HEAD`; exit 2 without a valid marker; tests in `test_hooks.rs`
 3. [x] Escape hatches: files all under `issues/`, user waiver file `.git/claude-review-waived` (fixes on already reviewed files and `HEAD` changed invalidating the marker were done in deliverable 2); one test each
-4. [ ] Docs: update step 4.5 of `issue-workflow` and the docs, `just sync`, `just check`, `just test-harness`
+4. [x] Docs: update step 4.5 of `issue-workflow` and the docs, `just sync`, `just check`, `just test-harness`
 
 ## Decisions
 
@@ -92,3 +92,10 @@ the review result can be seen.
 * Code review: waiver creatable by the agent (fixed by refusing commands that name it), rename into `issues/`
   bypass (fixed with `--no-renames`), wrapping and doc claims (fixed). Not fixed: the waiver can still be written with the `Write` tool (doc says deterrent); waived commits leave no trace;
   consumed before the commit succeeds; worktree test.
+
+### Deliverable 4 summary
+
+* Done: step 4.5 of `issue-workflow` states the gate, the order (tracking written before the review, fixes to
+  reviewed files pass, `issues/`-only diffs exempt) and that only the user creates the waiver. The architecture
+  doc and the declarations were done in deliverables 2 and 3.
+* Verified: `just sync`, `just check`, `just test-harness`.
