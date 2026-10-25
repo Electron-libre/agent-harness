@@ -24,6 +24,7 @@ fn main() {
         std::fs::write(tmp.join("specs/rerun.md"), spec).unwrap();
         std::fs::write(tmp.join("crates/a/src/t.rs"), tests).unwrap();
         for (path, body) in others {
+            std::fs::create_dir_all(tmp.join(path).parent().unwrap()).unwrap();
             std::fs::write(tmp.join(path), body).unwrap();
         }
         let mut command = Command::new("rust-script");
@@ -65,6 +66,11 @@ fn main() {
     case("citation not above a fn is flagged", SPEC, &format!("{TESTS}// spec: RER-1\nlet x = 1;\n"), &[], Some("right above"));
     case("citation above attributes and a fn passes", SPEC, "// spec: RER-1, RER-2\n#[tokio::test]\n#[ignore]\nasync fn t() {}\n", &[], None);
     case("spec without front matter does not collide with another", "# no front matter\n", TESTS, &[("specs/other.md", "# none either\n")], Some("front matter"));
+
+    case("a test under a module directory named worktrees is traced", SPEC, "// spec: RER-1\nfn t() {}\n", &[("crates/a/src/worktrees/t.rs", "// spec: RER-2\nfn t() {}\n")], None);
+    case("a test under tests/target is traced", SPEC, "// spec: RER-1\nfn t() {}\n", &[("crates/a/tests/target/t.rs", "// spec: RER-2\nfn t() {}\n")], None);
+    case("a citation under src/worktrees is checked", SPEC, TESTS, &[("crates/a/src/worktrees/t.rs", "// spec: RER-9\nfn t() {}\n")], Some("RER-9"));
+    case("agent worktrees under .claude/worktrees are skipped", SPEC, TESTS, &[(".claude/worktrees/x/crates/a/t.rs", "// spec: RER-9\nfn t() {}\n")], None);
 
     let quality = SPEC.replace("- **RER-2** (deterministic) A run must resume.", "- **RER-2** (quality) Docs must be good.\n  benchmark: benchmark/x/reference.yaml\n  metric: recall");
     case("a test of a harness script under .claude traces a requirement", SPEC, "", &[(".claude/hooks/test_h.rs", TESTS)], None);

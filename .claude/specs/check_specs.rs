@@ -130,14 +130,15 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
     spec
 }
 
-fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
+/// Every `.rs` file under `dir`, except under the `skipped` directories (build output and agent worktrees, which hold
+/// no tests of their own): matched by full path, so a module named `target` or `worktrees` is still scanned.
+fn rust_files(dir: &Path, skipped: &[PathBuf], found: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            // copies of the project (agent worktrees) and build output hold no tests of their own
-            if !path.file_name().is_some_and(|n| n == "worktrees" || n == "target") {
-                rust_files(&path, found);
+            if !skipped.contains(&path) {
+                rust_files(&path, skipped, found);
             }
         } else if path.extension().is_some_and(|e| e == "rs") {
             found.push(path);
@@ -150,8 +151,9 @@ fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
 fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
     let mut files = Vec::new();
     // the tests of the crates, and those of the harness scripts, hooks and skills
+    let skipped = [root.join("target"), root.join(".claude/worktrees")];
     for dir in ["crates", ".claude"] {
-        rust_files(&root.join(dir), &mut files);
+        rust_files(&root.join(dir), &skipped, &mut files);
     }
     let mut cited = BTreeMap::new();
     for file in files {
