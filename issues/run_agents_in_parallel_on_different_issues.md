@@ -71,7 +71,13 @@ Decide at `issue-workflow` steps 1 to 3; the candidates can be combined.
    Code review: 6 findings; fixed the pruned directory, the leading `-` and `queue` stems, the uncommitted issue
    file, the detached and bare main worktree. Not changed: a branch with no commit of its own counts as merged
    (it cannot be told from a fast-forwarded one); `git branch -D` discards an abandoned issue.
-4. [ ] `close-issue` refuses to run outside the main worktree; `SKILL.md` documents the merge sequence: rebase, fast-forward, `close-issue`, `finish-issue` (PAR-8).
+4. [x] `close-issue` refuses to run outside the main worktree; `SKILL.md` documents the merge sequence: rebase, fast-forward, `close-issue`, `finish-issue` (PAR-8).
+   Done: `close_issue.rs` refuses (move and `--relink`) in a linked worktree; `SKILL.md` "Parallel agents" gives
+   the merge sequence. Test `refuses_a_linked_worktree` (`// spec: PAR-8`). Verified: `just check`,
+   `just test-harness`, `just check-harness`. Code review: 6 findings;
+   fixed the bare repository case, the guard now runs after the usage check, `SKILL.md` Rules point at
+   "Parallel agents" for the closing. Not changed: the guard allows the run when git fails (as outside a repository), the test does not cover a
+   detached main worktree or a subdirectory of the linked one.
 5. [ ] Measure `target/` per worktree (disk, cold build), record the decision; ADR if warranted; docs (`architecture.md`, `CLAUDE.md`), `just sync`; spec `implemented`.
 
 ## Decisions

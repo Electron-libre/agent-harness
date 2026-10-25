@@ -97,7 +97,10 @@ Two agents can work two issues at once, each in its own git worktree. From the m
 `just start-issue issues/<name>.md`: it creates `../<repo>-<name>` on a branch `<name>`; open the agent there.
 The issue must be committed on the main branch first. While the branch or worktree exists, `just next-issue` skips the issue.
 When the issue is done, merge it from the main worktree (rebase the branch onto the main branch, then
-fast-forward), then run `just finish-issue <name>`: it removes the worktree and the branch only once merged and clean.
+fast-forward), run `just close-issue issues/<name>.md` there, commit the move, then `just finish-issue <name>`:
+it removes the worktree and the branch only once merged and clean. `close-issue` refuses in a linked worktree, so
+the queue is never edited on an issue branch; in that worktree, report the issue as done and leave the closing
+to the merge.
 
 ## Rules
 
@@ -105,7 +108,7 @@ fast-forward), then run `just finish-issue <name>`: it removes the worktree and 
 - Don't re-litigate decisions already recorded in the issue.
 - If something blocks you, say what and propose one recommendation; don't enumerate every option.
 - When the issue is fully done, mark it in the issue and say what, if anything, remains. Then **ask the
-  user whether to close it**; on their agreement run `just close-issue issues/<name>.md` (moves it to
+  user whether to close it** (in a linked worktree, see "Parallel agents": the closing waits for the merge); on their agreement run `just close-issue issues/<name>.md` (moves it to
   `issues/done/`, drops the issue from `issues/queue.md` and rewrites `issues/<name>.md` to
   `issues/done/<name>.md` in every other document that cites it) and include the
   move and those edits in the final commit. Never move it unasked.
