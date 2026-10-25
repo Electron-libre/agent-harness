@@ -91,6 +91,14 @@ can switch it at any time.
 - **Stops the chain**: a blocking question, a decision the summary needs from the user, a review finding you can't
   settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the final summary and ask whether to close the issue.
 
+## Parallel agents
+
+Two agents can work two issues at once, each in its own git worktree. From the main worktree run
+`just start-issue issues/<name>.md`: it creates `../<repo>-<name>` on a branch `<name>`; open the agent there.
+The issue must be committed on the main branch first. While the branch or worktree exists, `just next-issue` skips the issue.
+When the issue is done, merge it from the main worktree (rebase the branch onto the main branch, then
+fast-forward), then run `just finish-issue <name>`: it removes the worktree and the branch only once merged and clean.
+
 ## Rules
 
 - Anything outward-facing or hard to reverse (push, deleting, rewriting history) needs an explicit ask.

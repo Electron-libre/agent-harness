@@ -20,6 +20,14 @@ close-issue issue:
 next-issue:
     rust-script .claude/skills/issue-workflow/next_issue.rs
 
+# Give an issue its own worktree `../<repo>-<stem>` and branch `<stem>`, so two agents can work in parallel.
+start-issue issue:
+    rust-script .claude/skills/issue-workflow/issue_worktree.rs start {{issue}}
+
+# Remove the worktree and the branch of an issue once its branch is merged into the main branch.
+finish-issue stem:
+    rust-script .claude/skills/issue-workflow/issue_worktree.rs finish {{stem}}
+
 # Validate a new issue file against the create-issue template.
 check-issue issue:
     rust-script .claude/skills/create-issue/check_issue.rs {{issue}}

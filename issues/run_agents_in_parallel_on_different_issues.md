@@ -61,7 +61,16 @@ Decide at `issue-workflow` steps 1 to 3; the candidates can be combined.
    in the listing, tests assert the exact `Taken:` lines and cover a middle entry, a plain directory and the
    trunk branch; the fixture sets `commit.gpgsign=false` and a branch name. Not changed: the `// spec` tag
    stays above the helper.
-3. [ ] `start-issue` and `finish-issue` recipes and script (PAR-1, PAR-2, PAR-6, PAR-7).
+3. [x] `start-issue` and `finish-issue` recipes and script (PAR-1, PAR-2, PAR-6, PAR-7).
+   Done: `issue_worktree.rs` (`start`, `finish`), recipes `start-issue` and `finish-issue`, section "Parallel
+   agents" in `SKILL.md`. `start` also refuses an issue file the main branch does not commit (the worktree would
+   not hold it), with uncommitted edits, or when the main worktree is detached or bare. Stems starting with `-`
+   and `queue` are refused. `finish` prunes a worktree directory deleted by hand. Test `test_issue_worktree.rs`,
+   one function per requirement. Verified: `just check`, `just test-harness`, `just check-harness`.
+   Not covered by a test: the detached or bare refusals and the pruned directory.
+   Code review: 6 findings; fixed the pruned directory, the leading `-` and `queue` stems, the uncommitted issue
+   file, the detached and bare main worktree. Not changed: a branch with no commit of its own counts as merged
+   (it cannot be told from a fast-forwarded one); `git branch -D` discards an abandoned issue.
 4. [ ] `close-issue` refuses to run outside the main worktree; `SKILL.md` documents the merge sequence: rebase, fast-forward, `close-issue`, `finish-issue` (PAR-8).
 5. [ ] Measure `target/` per worktree (disk, cold build), record the decision; ADR if warranted; docs (`architecture.md`, `CLAUDE.md`), `just sync`; spec `implemented`.
 
