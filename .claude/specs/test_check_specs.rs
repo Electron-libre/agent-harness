@@ -41,6 +41,9 @@ fn main() {
     case("a draft spec needs no test", &SPEC.replace("accepted", "draft"), "", &[], None);
     case("untraced requirement of an accepted spec is flagged", SPEC, "// spec: RER-1\nfn t() {}\n", &[], Some("RER-2"));
     case("unknown id in a test is flagged", SPEC, &format!("{TESTS}// spec: RER-9\n"), &[], Some("RER-9"));
+    case("a managed test citing a spec the project lacks passes", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: PAR-1\nfn t() {}\n")], None);
+    case("a managed test citing an unknown id of a present spec is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: RER-9\nfn t() {}\n")], Some("RER-9"));
+    case("a crate test citing a spec the project lacks is flagged", SPEC, &format!("{TESTS}// spec: PAR-1\nfn t() {{}}\n"), &[], Some("PAR-1"));
     case("bad status is flagged", &SPEC.replace("accepted", "done"), TESTS, &[], Some("status"));
     case("requirement with another prefix is flagged", &SPEC.replace("**RER-2**", "**ABC-2**"), TESTS, &[], Some("ABC-2"));
     case("duplicate requirement id is flagged", &SPEC.replace("**RER-2**", "**RER-1**"), TESTS, &[], Some("duplicate"));

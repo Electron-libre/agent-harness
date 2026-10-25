@@ -196,7 +196,9 @@ fn problems(root: &Path) -> Vec<String> {
     let cited = citations(root, &mut out);
     let known: BTreeSet<&str> = specs.iter().flat_map(|s| s.requirements.iter().map(|r| r.id.as_str())).collect();
     for (id, file) in &cited {
-        if !known.contains(id.as_str()) {
+        // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
+        let foreign = file.replace('\\', "/").starts_with(".claude/") && !ids.contains_key(id.split('-').next().unwrap_or(""));
+        if !known.contains(id.as_str()) && !foreign {
             out.push(format!("{file}: cites `{id}`, which no spec defines"));
         }
     }
