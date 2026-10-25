@@ -299,6 +299,61 @@ fn target_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: REV-16
+/// A `cd` before the commit moves the shell directory the commit is judged from, relative or absolute, whatever the
+/// separator; a subshell gives it back; a target the text does not give is refused.
+fn cd_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    let (current, other) = target_fixture(hook, "rev16");
+    let absolute: &'static str = Box::leak(format!("cd {} && git commit -am x", other.display()).into_boxed_str());
+    let quoted: &'static str = Box::leak(format!("cd '{}' && git commit -am x", other.display()).into_boxed_str());
+    let mut out = all_refused(
+        hook,
+        &current,
+        &[
+            "cd ../other && git commit -am x",
+            "cd ../other; git commit -am x",
+            "cd ../other\ngit commit -am x",
+            "(cd ../other && git commit -am x)",
+            "cd .. && cd other && git commit -am x",
+            "cd .. && git -C other commit -am x",
+            "cd ../other && git -C . commit -am x",
+            "cd .. && git --work-tree other commit -am x",
+            "pushd ../other && git commit -am x",
+            "cd -- ../other && git commit -am x",
+            "cd ../other && git status && git commit -am x",
+            absolute,
+            quoted,
+            "cd $X && git commit -am x",
+            "cd \"$(mktemp -d)\" && git commit -am x",
+            "cd ~/other && git commit -am x",
+            "cd - && git commit -am x",
+            "cd && git commit -am x",
+            "if cd ../other; then git commit -am x; fi",
+            "builtin cd ../other && git commit -am x",
+            "popd && git commit -am x",
+            "pushd +1 && git commit -am x",
+        ],
+    );
+    for (name, command) in [
+        ("a cd inside a subshell is undone at its end", "(cd ../other && true); git commit -am x"),
+        ("a cd of a commit-free line leaves the shell repository judged", "cd ../other && git status; cd ../current && git commit -am x"),
+        ("a cd back to the reviewed repository passes", "cd ../other && cd ../current && git commit -am x"),
+        ("a cd run in the background does not move the shell", "cd ../other & git commit -am x"),
+        ("a cd of a pipeline does not move the shell", "cd ../other | cat; git commit -am x"),
+        ("a cd in a backtick substitution does not move the shell", "d=`cd ../other && pwd`; git commit -am x"),
+        ("an unreadable cd of a finished subshell is forgotten", "(cd $X && true); git commit -am x"),
+        ("a word cd in a message is no cd", "git commit -m 'cd ../other' -a"),
+    ] {
+        out.push((name, commit_attempt(hook, &current, command).0 == 0));
+    }
+    review_done(hook, &other, "code-review");
+    fs::write(current.join("new.txt"), "x\n").unwrap();
+    out.push(("a cd to a reviewed repository passes while the shell one is not", commit_attempt(hook, &current, "cd ../other && git commit -am x").0 == 0));
+    out.push(("a commit without cd is still refused in the unreviewed shell repository", commit_attempt(hook, &current, "git commit -am x").0 == 2));
+    let _ = fs::remove_dir_all(current.parent().unwrap());
+    out
+}
+
 // spec: REV-2
 /// Several `-C` accumulate: `-C .. -C other` is `../other`.
 fn accumulated_c_checks(hook: &Path) -> Vec<(&'static str, bool)> {
@@ -870,7 +925,7 @@ fn main() {
     review_done(&hook, &fresh, "code-review");
     check("lets through the reviewed first commit", commit_attempt(&hook, &project, "git -C fresh commit -m x").0 == 0);
 
-    for checks in [waiver_write_checks, waiver_mention_checks, worktree_checks, target_checks, accumulated_c_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
+    for checks in [waiver_write_checks, waiver_mention_checks, worktree_checks, target_checks, accumulated_c_checks, cd_checks, work_tree_and_git_dir_checks, option_forms_checks, relative_option_checks, git_dir_alone_checks, environment_checks, undeterminable_checks, unreadable_option_checks, fish_set_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }

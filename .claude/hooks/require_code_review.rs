@@ -500,6 +500,90 @@ fn sets_hooks_path(command: &str) -> bool {
     })
 }
 
+/// The line with a word `;` for each separator and brackets as words of their own, so that `a;git commit` and
+/// `(git commit)` split like `a ; git commit`. A `&&`, `||`, `;` or newline is a plain `;`; a lone `|`, `&` and a
+/// backtick are `;|`, `;&` and ``;` ``, which tell `shell_directory` that the command around them runs apart.
+fn spaced_words(command: &str) -> String {
+    let chars: Vec<char> = command.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        match c {
+            '|' | '&' if chars.get(i + 1) == Some(&c) => {
+                out.push_str(" ; ");
+                i += 1;
+            }
+            // `2>&1`, `&>file`: a redirection
+            '&' if chars.get(i + 1) == Some(&'>') || (i > 0 && chars[i - 1] == '>') => out.push_str(" ; "),
+            '|' => out.push_str(" ;| "),
+            '&' => out.push_str(" ;& "),
+            '`' => out.push_str(" ;` "),
+            ';' | '\n' => out.push_str(" ; "),
+            '(' => out.push_str(" ; ( "),
+            ')' => out.push_str(" ; ) "),
+            _ => out.push(c),
+        }
+        i += 1;
+    }
+    out
+}
+
+/// The directory the `cd` among `words` (the ones before a `git`, the separators of `spaced_words`) lead the shell to,
+/// `None` when there is none, and `"cd"` when a target is not given by the text (`$X`, `$(…)`, `~`, `-`, none, `popd`,
+/// `pushd +1`). Relative targets accumulate. What runs apart does not move the shell: a subshell `( … )`, a backtick
+/// substitution, a background command, a command of a pipeline; the effect of the first three is undone at their end.
+fn shell_directory(words: &[&str]) -> (Option<PathBuf>, Option<&'static str>) {
+    let (mut dir, mut unreadable) = (None::<PathBuf>, None::<&'static str>);
+    let (mut saved, mut backtick, mut piped, mut at_start, mut i) = (Vec::new(), false, false, true, 0);
+    let mut command_start = dir.clone();
+    while i < words.len() {
+        let w = words[i];
+        i += 1;
+        match w {
+            ";" => {
+                (command_start, piped, at_start) = (dir.clone(), false, true);
+            }
+            ";|" => (dir, piped, at_start) = (command_start.clone(), true, true),
+            ";&" => (dir, at_start) = (command_start.clone(), true),
+            "{" | "then" | "do" | "else" | "elif" | "if" | "while" | "until" | "!" | "time" | "builtin" | "command" | "and" | "or" | "begin" | "not" => {}
+            "(" | ";`" if w == "(" || !backtick => {
+                saved.push((dir.clone(), unreadable));
+                backtick |= w == ";`";
+                at_start = true;
+            }
+            ")" | ";`" => {
+                if let Some((d, u)) = saved.pop() {
+                    (dir, unreadable) = (d, u);
+                }
+                backtick &= w != ";`";
+                at_start = false;
+            }
+            "cd" | "pushd" | "popd" if at_start && !piped => {
+                at_start = false;
+                while words.get(i).is_some_and(|a| *a == "--" || (a.len() > 1 && a.starts_with('-') && a[1..].chars().all(|c| "LPe@".contains(c)))) {
+                    i += 1;
+                }
+                let end = words[i..].iter().position(|a| a.starts_with(';') || *a == ")" || *a == "(").map_or(words.len(), |p| i + p);
+                let mut rest = words[i..end].iter();
+                let target = take_value(&mut rest).filter(|v| w != "popd" && !value_expands(v) && !v.starts_with(['~', '-', '+']));
+                i = end - rest.len();
+                match target {
+                    Some(v) => {
+                        let v = PathBuf::from(v.trim_matches(['"', '\'']));
+                        dir = Some(dir.map_or(v.clone(), |d| d.join(&v)));
+                    }
+                    None => {
+                        unreadable.get_or_insert("cd");
+                    }
+                }
+            }
+            _ => at_start = false,
+        }
+    }
+    (dir, unreadable)
+}
+
 /// The directories whose review a `git commit` of the line depends on, `None` when no command of the line commits;
 /// `None` in the list is the shell directory. Normally one: after `-C dir`, `--work-tree dir` or `--git-dir dir` (the
 /// work tree wins, then the parent of the innermost `.git` of the path, else the directory itself). With `--git-dir` and
@@ -509,15 +593,16 @@ fn sets_hooks_path(command: &str) -> bool {
 /// command (alone, after `env`, before a wrapper such as `sudo`), or exported earlier in the line and not unset, count
 /// as the two options, which win over them. The subcommand is the first word after `git` once the global options
 /// (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not a
-/// commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
+/// commit. Brackets, separators and quotes around `git` are ignored; the `cd` before it set the directory the line starts from (`shell_directory`).
 /// The `bool` of an `Ok` tells whether the commit skips the hooks (`skips_verification`).
 /// A commit whose `-C`, `--git-dir` or `--work-tree` has a value the text does not give (`value_expands`, or none left
 /// once a substitution split the line) is `Err` with the option: its repository is unknown.
 fn commit_dirs(command: &str) -> Option<Result<(Vec<Option<String>>, bool), &'static str>> {
     // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
-    let joined = command.replace("\\\n", " ");
-    let spaced = joined.replace([';', '|', '&', '(', ')', '`', '\n'], " ; ");
-    let words: Vec<&str> = spaced.split_whitespace().collect();
+    let spaced = spaced_words(&command.replace("\\\n", " "));
+    // `shell_directory` tells the separators apart; everything else sees a plain `;`
+    let kinded: Vec<&str> = spaced.split_whitespace().collect();
+    let words: Vec<&str> = kinded.iter().map(|w| if w.starts_with(';') { ";" } else { w }).collect();
     words.iter().enumerate().find_map(|(i, w)| {
         if w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() != Some("git") {
             return None;
@@ -526,8 +611,8 @@ fn commit_dirs(command: &str) -> Option<Result<(Vec<Option<String>>, bool), &'st
         let path = |v: &str| PathBuf::from(v.trim_matches(['"', '\'']));
         // the options set below win over the environment
         let (mut git_dir, mut work_tree) = environment_repository(&words[..i]);
-        let mut dir = None::<PathBuf>;
-        let mut unreadable = None::<&'static str>;
+        // the `cd` before `git` lead to the directory the relative paths of `-C` and of the repository options start from
+        let (mut dir, mut unreadable) = shell_directory(&kinded[..i]);
         // the value of a repository option, `None` (and the option remembered) when the text does not give it
         let mut readable = |option: &'static str, value: Option<String>| {
             let value = value.filter(|v| !value_expands(v));

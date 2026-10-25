@@ -30,6 +30,7 @@ judgment from inside the repository, where git has already resolved it.
 - **REV-13** (deterministic) `check` must refuse a `Bash` command that writes the waiver file (`claude-review-waived`): a redirection outside quotes whose target names it, or a command word that creates files or runs text as a program (`touch`, `tee`, `cp`, `mv`, a shell…, also after `sudo` or `env`) among whose words the name stands. The refusal must give the exact path of the waiver of the repository (`git rev-parse --git-path`) and say that only the user creates it.
 - **REV-14** (deterministic) `check` must not refuse a command that only names the waiver file: a `grep` or `cat`, a quoted commit message (also holding `touch …` or a redirection), a heredoc body.
 - **REV-15** (deterministic) The path `git rev-parse --git-path claude-review-waived` gives from a linked worktree must be the waiver `check` and `native` read for that worktree, not the one of the main worktree.
+- **REV-16** (deterministic) The hook must take the shell directory of a `git commit` from the `cd` (or `pushd`) commands that precede it on the line, as `-C` is taken: a relative one from the directory before it, an absolute one as it is, a `cd` that runs apart (a subshell `( … )`, a backtick substitution, a background command, a pipeline) not moving the shell after it; `-C`, `--work-tree` and `--git-dir` are then read from that directory. A `cd` whose target cannot be determined from the text (`$X`, `$(…)`, `~`, `cd -`, `cd` alone, `popd`, `pushd +1`) outside such a command must make the commit refused, whatever the reviews.
 
 ## Scenarios
 
@@ -44,10 +45,11 @@ judgment from inside the repository, where git has already resolved it.
 - (REV-12) Given `git commit -m "fix -n"` or `git commit -am x`, then neither counts as `-n`: the decision is that of the reviews.
 - (REV-13) Given `echo x | tee .git/claude-review-waived` or `sh -c 'touch .git/claude-review-waived'`, then the command is refused; given a commit command, a `;`, then `touch .git/claude-review-waived`, the `touch` is refused although the commit message is not.
 - (REV-14) Given a commit whose quoted message holds `echo > .git/claude-review-waived`, or `grep -rn claude-review-waived specs`, then the decision is that of the reviews.
+- (REV-16) Given the shell directory's repository reviewed and `other` unreviewed, when the command is `cd ../other && git commit -am x`, then the commit is refused; given `(cd ../other && true); git commit -am x`, then the decision is that of the shell directory's repository; given `cd $X && git commit`, then it is refused whatever the reviews.
 
 ## Non-goals
 
 - The environment variables `GIT_DIR` and `GIT_WORK_TREE` exported by an earlier command of the session: the hook only sees the text of the command, not the environment of the shell.
-- Following `cd dir && git commit`: the shell directory is the one the tool reports.
+- A `cd` the line does not run in order (`cd dir || git commit`, a `cd` in a function or a `case` branch) is read as a plain sequence.
 - Stopping `--no-verify` or `core.hooksPath` outside the Claude hook, a commit made by another tool, or an edited or deleted `.git/hooks/pre-commit`: the native hook is a last resort, not a barrier.
 - A target that is not a repository: the commit is let through, as with `-C`; `git` itself fails on it.
