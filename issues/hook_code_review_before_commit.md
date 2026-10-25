@@ -35,9 +35,9 @@ the review result can be seen.
 # Tracking
 
 1. [x] Measure: capture the real `PostToolUse` (`Skill`) and `PreToolUse` (`Bash`) payloads with a temporary git-ignored log hook; record the available fields and whether the review findings are visible
-2. [ ] Marker and refusal: `require_code_review.rs` (`record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash` for `git commit`): marker = hash of the staged diff, reviewed files, `HEAD`; exit 2 without a valid marker; tests in `test_hooks.rs`
-3. [ ] Escape hatches: staged files all under `issues/`, user waiver file `.claude/state/review-waived`, fixes on already reviewed files, `HEAD` changed invalidates the marker; one test each
-4. [ ] Wiring and docs: declare both hooks in `seed/.claude/settings.json`, ignore `.claude/state/`, update step 4.5 of `issue-workflow` and the docs, `just sync`, `just check`, `just test-harness`
+2. [x] Marker and refusal: `require_code_review.rs` (`record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash` for `git commit`): marker = hash of the diff against `HEAD`, reviewed files, `HEAD`; exit 2 without a valid marker; tests in `test_hooks.rs`
+3. [ ] Escape hatches: files all under `issues/`, user waiver file `.git/claude-review-waived` (fixes on already reviewed files and `HEAD` changed invalidating the marker were done in deliverable 2); one test each
+4. [ ] Docs: update step 4.5 of `issue-workflow` and the docs, `just sync`, `just check`, `just test-harness`
 
 ## Decisions
 
@@ -53,3 +53,31 @@ the review result can be seen.
 * The marker hashes the staged content (`git diff --cached`), what will actually be committed.
 * The waiver is a file only the user creates, never driven by a sentence of the agent.
 * Docs must be reviewed; only a commit touching nothing but `issues/` is exempt.
+* Deviation (deliverable 2): the marker hashes the working tree against `HEAD` (tracked and untracked), not
+  `git diff --cached`: the hook runs before the `git add` of `git add -A && git commit`, when nothing is staged yet.
+* The declarations (seed and own `settings.json`) and the architecture doc moved into
+  deliverable 2: `test_settings.rs` fails for an undeclared hook, so the commit would be red otherwise. It also
+  now takes the `.rs` word of a command as the script, since the hook command carries a mode argument.
+* Review of deliverable 2: the marker lives in the git directory (`git rev-parse --git-path claude-code-review.json`),
+  not in `.claude/state/`: a consumer that does not ignore that directory would commit it with `git add -A`.
+  It is per repository, so `git -C dir commit` reads the marker of `dir`. Hence no `.gitignore` entry, and the
+  user waiver of deliverable 3 is a file in the git directory too (`.git/claude-review-waived`).
+* Not fixed, by design: a commit with nothing to commit (clean-tree amend) and a machine without `git` are not
+  gated; `cd dir && git commit` is not followed; the review is recorded at the end of the forked skill (measured),
+  not at load.
+* Moved into deliverable 2: the fixes-after-review rule (files subset), needed because the hook guards the commits of
+  this very issue. Left for deliverable 3: `issues/`-only exemption, waiver.
+* Not fixed (review): quoted text naming the commit command counts as a commit (only refuses a dirty unreviewed
+  tree; it refused a shell command of this very session); the `check` hook starts `rust-script` on each `Bash`
+  call; a nested repository or dangling symlink among untracked files hashes as empty; hashing via a temporary
+  index (add everything, `write-tree`) would be sturdier.
+
+### Deliverable 2 summary
+
+* Done: `require_code_review.rs` (`record`, `check`), its behavior test, declarations in the seed and own settings,
+  the `.rs` script lookup of `test_settings.rs`, the architecture doc. Verified: `just check`, `just test-harness`.
+* Not verified: the hook in a consumer project; a real refusal followed by a review in a live session beyond this one.
+* Code review: four rounds. Fixed: marker inside the hashed content, quoted non-ASCII names (`-z`), subcommand
+  parsing and separators, `git -C` (relative to the shell directory), subdirectory cwd, repository without commit,
+  failed review recorded, name/length delimiters in the hash, unmoved marker (now in the git directory), the
+  fixes-after-review loop. Not fixed: see the lines above.

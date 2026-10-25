@@ -53,9 +53,9 @@ fn main() {
         for group in event.1.as_array().into_iter().flatten() {
             for hook in group["hooks"].as_array().into_iter().flatten() {
                 let cmd = hook["command"].as_str().unwrap_or("");
-                let script = cmd.split_whitespace().last().unwrap_or("").replace("\"$CLAUDE_PROJECT_DIR\"", "");
+                let script = cmd.split_whitespace().rev().find(|w| w.trim_matches('"').ends_with(".rs") && w.contains(".claude/")).or(cmd.split_whitespace().last()).unwrap_or("").replace("\"$CLAUDE_PROJECT_DIR\"", "");
                 let script = script.trim_matches('"').trim_start_matches('/');
-                if !root.join(script).exists() {
+                if script.is_empty() || !root.join(script).exists() {
                     failures.push(format!("hook {} points to a missing script: {script}", event.0));
                 }
             }

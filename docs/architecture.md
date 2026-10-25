@@ -49,6 +49,25 @@ vendor's no-reply address. It reads only the literal command and message files: 
 or a shell variable is out of reach. Its patterns are narrower than those of `commit_check.rs` on purpose, so a
 message that discusses the rule passes.
 
+`require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
+declared twice, one mode per event: `record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash`:
+
+```json
+"PostToolUse": [
+  { "matcher": "Skill", "hooks": [
+    { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs record" } ] }
+]
+```
+
+When the `code-review` skill ends (it runs forked, so the hook fires at the end of the review), `record` writes
+the marker `claude-code-review.json` in the git directory, never a file of the work tree: the `HEAD`, a hash of
+the working tree against `HEAD` (tracked changes and untracked files, what an add of everything followed by a
+commit commits) and the files it covers. At a commit (`git -C dir` is followed), `check` recomputes the snapshot
+and exits 2, telling the agent to run the review, when the marker is missing, was made before the last commit, or
+the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with nothing to commit
+and a directory outside a repository are let through. The hook sees the review text in the `Skill` response but
+does not parse it.
+
 ## The instruction audit
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory
