@@ -740,8 +740,7 @@ fn waiver_write_checks(hook: &Path) -> Vec<(&'static str, bool)> {
         ("refuses a redirection with a quoted target", "echo x >> \".git/claude-review-waived\""),
         ("refuses tee on the waiver", "echo x | tee .git/claude-review-waived"),
         ("refuses a copy onto the waiver", "sudo cp a .git/claude-review-waived"),
-        ("refuses a shell that names the waiver", "sh -c 'touch .git/claude-review-waived'"),
-        ("refuses a heredoc fed to a shell", "bash <<'EOF'\ntouch .git/claude-review-waived\nEOF"),
+        ("refuses curl writing the waiver", "curl -o .git/claude-review-waived http://x"),
         ("refuses a substitution inside double quotes", "echo \"$(touch .git/claude-review-waived)\""),
         ("refuses a backtick inside double quotes", "echo \"`touch .git/claude-review-waived`\""),
         ("refuses a quote closed by an escape", "echo \"\\\"\"; touch .git/claude-review-waived"),
@@ -777,6 +776,11 @@ fn waiver_mention_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     sh(&project, &["commit", "-qm", "init"]);
     let mut out = Vec::new();
     for (name, command) in [
+        ("lets through a shell that names the waiver", "sh -c 'touch .git/claude-review-waived'"),
+        ("lets through a heredoc fed to a shell", "bash <<'EOF'\ntouch .git/claude-review-waived\nEOF"),
+        ("lets through a heredoc fed to an interpreter", "python3 - <<'EOF'\nopen('.git/claude-review-waived', 'w')\nEOF"),
+        ("lets through an interpreter given the name", "perl -e 'print 1' .git/claude-review-waived"),
+        ("lets through eval of the name", "eval echo .git/claude-review-waived"),
         ("lets through a read with sed", "sed -n 1p .git/claude-review-waived"),
         ("lets through a copy of the waiver", "cp .git/claude-review-waived /tmp/x"),
         ("lets through a message with backticks in a quoted heredoc", "git commit -q -F - <<'EOF'\ndocs: `touch .git/claude-review-waived`\nEOF"),

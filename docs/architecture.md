@@ -71,7 +71,7 @@ a diff under `issues/` only and a directory outside a repository are let through
 code. The user waives the review of the next commit with `touch "$(git rev-parse --git-path claude-review-waived)"` (right in a linked worktree too); the hook stamps the file
 with `HEAD` when it lets a commit through and removes it at the first check after `HEAD` moved, so a command that does
 not commit (`--dry-run`, a refusal by another hook) leaves it usable, and refuses a Bash command that writes the
-file (redirection, `touch`, `tee`, `cp`, a shell), not one that only names it (`grep`, a commit message). That deters the agent from creating one but does not stop a write made by another tool. The hook sees the review
+file (redirection, `touch`, `tee`, `dd`, `truncate`, `cp`, `mv`, `ln`, `install`, `rsync`, `curl`, `sed -i`), not one that only names it (`grep`, a commit message, a shell or an interpreter whose text the hook cannot read). That deters the agent from creating one but does not stop a write made by another tool. The hook sees the review
 text in the `Skill` response but does not parse it.
 
 The commit is judged on the repository it targets (spec [`specs/review-gate.md`](../specs/review-gate.md)): the work
