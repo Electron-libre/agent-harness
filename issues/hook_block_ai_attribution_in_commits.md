@@ -30,3 +30,17 @@ down several times and still gets broken, because the harness default reminder a
 # Hints
 * The hook must not block a commit whose message merely discusses the rule (this repository's own history).
 * The shared files hold nothing specific to one project.
+
+# Tracking
+1. [x] The hook `files/.claude/hooks/block_ai_attribution.rs` and its Rust test (`git commit` and `gh pr create|edit`: inline, heredoc, `-F`/`--body-file`; passes a message that only discusses the rule)
+2. [ ] Wire it: declaration in `seed/.claude/settings.json` and this repository's `.claude/settings.json`, snippet for existing consumers, docs (`update-docs`), real-case check
+
+## Decisions
+* Mode: autonomous (review of step 4.5 never skipped, local commits, no push).
+* No spec, no ADR: a hook of the harness changes no behaviour of the `harness` binary. `harness check` stays lock-only (SYN-8), so it does not verify consumers' `settings.json`; they get a documented snippet.
+* The hook has its own, narrower patterns than `commit_check.rs` (a trailer or "generated with" line naming Claude or Anthropic, `<noreply@anthropic.com>`) so a message that merely discusses the rule is not blocked; no shared list.
+
+## Deliverable 1 summary
+* Done: `block_ai_attribution.rs` and `test_block_attribution.rs` (24 cases), synced into this repository.
+* Verified: `just check`, `just test-harness`, `just check-harness`. Not verified: the hook in a live session (not wired yet, deliverable 2).
+* Code review: fixed `git` with many global options, the bare `<noreply@anthropic.com>` match that blocked discussions, and a trailer naming someone else. Not fixed, by design: a trailer in the middle of a line (git does not read it as a trailer), `$(cat file)`, `-F` paths with spaces or `~`, `gh pr comment`/`git tag -m`, and a line that discusses the rule while starting with "Generated with Claude".

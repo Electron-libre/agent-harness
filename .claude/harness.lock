@@ -1,6 +1,8 @@
 # Written by `harness sync`: hashes of the managed files. Do not edit.
+c0ffd8792319a786fd6bcacd90acc0f56edfb5f1cbb03f5f681eb76e8d6f73dd+x  .claude/hooks/block_ai_attribution.rs
 2f55fe402bc359e31d13aedca65575494fc6635cf2b33c52e7077c67696cccba+x  .claude/hooks/clippy_gate.rs
 9d2ab1d640ddff24b72c0076d95b9f8c2264e4432e225f1eaa78f5ec056cd410+x  .claude/hooks/format_rust.rs
+79b63601d9bd083fcd2cc4f932c7a590a71fc8e48818222eeccf3b423c5ceec7+x  .claude/hooks/test_block_attribution.rs
 55391f54534526926881d5176332a19af88d52a659b16e428072ff7d33cd3cd4+x  .claude/hooks/test_hooks.rs
 a5156b485338e209d5ccbda493a376b2331f0d8d10474e64f998292c2c05ab4c  .claude/skills/audit-instructions/SKILL.md
 ec3bb90e7f7ce48972c78c614f713ca3a3e780056387346e8f097595ddfab91c  .claude/skills/audit-instructions/audit_sources.rs
