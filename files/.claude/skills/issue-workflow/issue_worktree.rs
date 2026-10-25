@@ -3,9 +3,9 @@
 //! `start issues/<stem>.md` creates the worktree `<main worktree>-<stem>` next to the main one, on a new branch
 //! `<stem>` cut from the branch of the main worktree. `finish <stem> [--force]` removes that worktree and branch once the
 //! branch is merged into the branch of the main worktree (ancestor, or every commit has a patch-equivalent there,
-//! which covers a rebase or a squash of one commit); `--force` also accepts a squash of several commits, after the
-//! user agreed, and still refuses a worktree with uncommitted changes. `start` runs from any worktree; `finish` too, except
-//! from inside the worktree it would remove (it refuses and names the main worktree, `--force` or not).
+//! or a merge into it would change no file, which covers a rebase and a squash of any number of commits); `--force` also
+//! accepts a branch whose work is not on it, after the user agreed, and still refuses a worktree with uncommitted
+//! changes. `start` runs from any worktree; `finish` too, except from inside the worktree it would remove (it refuses and names the main worktree, `--force` or not).
 //! Usage: `just start-issue issues/foo.md`, `just finish-issue foo` (`just finish-issue foo --force`).
 
 use std::path::{Path, PathBuf};
@@ -95,10 +95,16 @@ fn finish(cwd: &Path, stem: &str, force: bool) -> Result<String, String> {
         return Err(format!("the current directory is inside {}: run finish-issue from the main worktree {}; nothing was removed", dir.display(), main.display()));
     }
     let ancestor = git_ok(&main, &["merge-base", "--is-ancestor", stem, &trunk]);
-    // A rebase or a squash of one commit leaves every commit with a patch-equivalent (`-`) on trunk.
+    // A rebase leaves every commit with a patch-equivalent (`-`) on trunk.
     let equivalent = ancestor || git(&main, &["cherry", &trunk, stem]).is_ok_and(|c| !c.lines().any(|l| l.starts_with('+')));
-    if !equivalent && !force {
-        return Err(format!("the branch {stem} is not merged into {trunk}: merge it first, or pass --force if it was squashed (it deletes work that is not on {trunk}); nothing was removed"));
+    // A squash: merging the branch into trunk would change no file, so the merge tree is trunk's tree
+    // (keep in sync with `has_own_commits` of `next_issue.rs`; git before 2.38 lacks `--write-tree` and counts as not merged).
+    let merged = equivalent || {
+        let tree = git(&main, &["merge-tree", "--write-tree", &trunk, stem]).ok().and_then(|t| t.lines().next().map(str::to_string));
+        tree.is_some() && tree == git(&main, &["rev-parse", &format!("{trunk}^{{tree}}")]).ok()
+    };
+    if !merged && !force {
+        return Err(format!("the branch {stem} is not merged into {trunk}: merge it first, or pass --force to drop it (it deletes work that is not on {trunk}; squash detection needs git 2.38); nothing was removed"));
     }
     match worktree_of(&main, stem) {
         Some(found) if found != dir => {

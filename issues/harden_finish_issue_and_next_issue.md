@@ -27,7 +27,7 @@ whose branch was squash-merged, whatever the number of commits.
 
 # Tracking
 1. [x] `finish-issue` refuses, with or without `--force`, from inside the worktree to remove (PAR-11).
-2. [ ] A squash of any number of commits counts as merged for `finish-issue` and frees the issue in `next-issue`, by comparing trees (PAR-3, PAR-6, PAR-10); docs of the skill updated.
+2. [x] A squash of any number of commits counts as merged for `finish-issue` and frees the issue in `next-issue`, by comparing trees (PAR-3, PAR-6, PAR-10); docs of the skill updated.
 
 ## Decisions
 * Mode: autonomous.
@@ -39,3 +39,9 @@ whose branch was squash-merged, whatever the number of commits.
 * Verified: `just check`, `just test-harness`, `just check-harness`.
 * Not verified: a cwd whose symlinks `canonicalize` cannot resolve.
 * Code review: 6 findings. Fixed: the guard now runs before the merged test (an unmerged branch gets the same refusal, tested); the architecture sentence reworded; the spec goes back to `draft` (it was set `accepted` while PAR-3/6/10 are still to be implemented: deliverable 2 sets it). Not fixed: the guard compares only with the sibling path (a branch checked out elsewhere is already refused by the existing `found != dir` check); the test helper's early return for a missing cwd is kept, the `kept` check catches a removal.
+
+## Deliverable 2 summary
+* Done: `finish` and `next_issue.rs` treat a branch as merged when `git merge-tree --write-tree trunk branch` yields trunk's tree (any git error counts as not merged); tests for a squash of several commits (finish accepts it, next-issue reports it `Stale:`), a squashed branch whose file trunk rewrote afterwards (kept, taken), and `--force` for work not on trunk (all failed first for the squash); skill doc and architecture updated; spec set `accepted` then `implemented`.
+* Verified: `just check`, `just test-harness`, `just check-harness`.
+* Not verified: git older than 2.38 (no `--write-tree`: counts as not merged, the safe side). ADR 0003 left as is (its "not a squash" wording was already historical).
+* Code review: 5 findings. Fixed: the PAR-10 test starts its own worktree; stale comment; "keep in sync" notes (the scripts are standalone, so the helper stays duplicated); the refusal message names the git 2.38 requirement. Not fixed: `merge-tree --write-tree` writes loose tree objects on each `next-issue` run (only for branches not patch-equivalent; `gc` collects them, a cheaper check would not cover a squash).

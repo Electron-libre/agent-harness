@@ -2,8 +2,8 @@
 //! Print the next issue to work on: the first line of `issues/queue.md`, with its title and the rest of
 //! the queue. Reports (stderr) issues missing from the queue and queue lines without a file.
 //! An issue is taken, and skipped, when a git worktree has a branch named after its stem checked out, or when such
-//! a branch holds commits that are not on the branch of the main worktree (patch-equivalent commits count as on
-//! it). A branch with neither (left over after a merge, empty) is reported `Stale:` and takes nothing. The mark
+//! a branch holds work that is not on the branch of the main worktree (patch-equivalent commits and a squash of any
+//! number of commits count as on it: merging the branch would change no file). A branch with neither (left over after a merge, empty) is reported `Stale:` and takes nothing. The mark
 //! comes from git alone, so every worktree sees it.
 //! Usage: `just next-issue` (from the repo root, or pass the `issues` directory as argument).
 
@@ -37,16 +37,26 @@ fn git_lines(dir: &Path, args: &[&str]) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Whether `branch` holds a commit that `trunk` lacks; true when git cannot tell, so unmerged work is never ignored.
+/// Whether `branch` holds work that `trunk` lacks; true when git cannot tell, so unmerged work is never ignored.
+/// No work when every commit has a patch-equivalent on `trunk` (`git cherry`), or when merging the branch into `trunk`
+/// would change no file (a squash of any number of commits): the merge tree is then the tree of `trunk`. Keep in sync
+/// with `finish` of `issue_worktree.rs`.
 fn has_own_commits(dir: &Path, trunk: &str, branch: &str) -> bool {
-    Command::new("git")
+    let branch = format!("refs/heads/{branch}");
+    let equivalent = Command::new("git")
         .arg("-C")
         .arg(dir)
-        .args(["cherry", trunk, &format!("refs/heads/{branch}")])
+        .args(["cherry", trunk, &branch])
         .output()
         .ok()
         .filter(|o| o.status.success())
-        .is_none_or(|o| String::from_utf8_lossy(&o.stdout).lines().any(|l| l.starts_with('+')))
+        .is_some_and(|o| !String::from_utf8_lossy(&o.stdout).lines().any(|l| l.starts_with('+')));
+    if equivalent {
+        return false;
+    }
+    let merged = git_lines(dir, &["merge-tree", "--write-tree", trunk, &branch]).first().cloned();
+    let trunk_tree = git_lines(dir, &["rev-parse", &format!("{trunk}^{{tree}}")]).first().cloned();
+    merged.is_none() || merged != trunk_tree
 }
 
 /// A local branch: the path of the worktree that has it checked out, if any, and whether it takes its issue.

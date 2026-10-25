@@ -100,9 +100,9 @@ Two agents can work two issues at once, each in its own git worktree. From the m
 The issue must be committed on the main branch first. While the branch or worktree exists, `just next-issue` skips the issue.
 When the issue is done, merge it from the main worktree (rebase the branch onto the main branch, then
 fast-forward), run `just close-issue issues/<name>.md` there, commit the move, then `just finish-issue <name>`:
-run it from the main worktree (it refuses inside the worktree to remove, `--force` or not): it removes the worktree and the branch only once merged (fast-forward, rebase or squash of one commit are detected) and clean.
-A squash of several commits is not detected: after the user agreed, run `just finish-issue <name> --force`, which deletes the branch even though
-its commits are not on the main branch. `close-issue` refuses in a linked worktree, so
+run it from the main worktree (it refuses inside the worktree to remove, `--force` or not): it removes the worktree and the branch only once merged (fast-forward, rebase or squash of any number of commits are detected, the last by comparing trees) and clean.
+When the work is not on the main branch, `finish-issue` refuses: after the user agreed, run `just finish-issue <name> --force`, which deletes the branch even though
+its work is not on the main branch. `close-issue` refuses in a linked worktree, so
 the queue is never edited on an issue branch; in that worktree, report the issue as done and leave the closing
 to the merge.
 

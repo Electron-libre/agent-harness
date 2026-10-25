@@ -86,17 +86,17 @@ fn taken_checks(script: &Path) -> Vec<(&'static str, bool)> {
 }
 
 // spec: PAR-3, PAR-4
-/// A branch with no worktree and nothing off the main branch (left over, empty, or merged by rebase or squash) does not
+/// A branch with no worktree and nothing off the main branch (left over, empty, or merged by rebase or squash of any number of commits) does not
 /// take its issue: it is reported as stale, with the command that removes it.
 fn stale_checks(script: &Path) -> Vec<(&'static str, bool)> {
     let root = std::env::temp_dir().join(format!("next_issue_stale_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join("issues")).unwrap();
-    for s in ["a", "b", "c"] {
+    for s in ["a", "b", "c", "d", "e"] {
         std::fs::write(repo.join(format!("issues/{s}.md")), format!("# Title {s}\n")).unwrap();
     }
-    std::fs::write(repo.join("issues/queue.md"), "- [a](a.md) - one\n- [b](b.md) - two\n- [c](c.md) - three\n").unwrap();
+    std::fs::write(repo.join("issues/queue.md"), "- [a](a.md) - one\n- [b](b.md) - two\n- [c](c.md) - three\n- [d](d.md) - four\n- [e](e.md) - five\n").unwrap();
     git(&repo, &["init", "-q", "-b", "trunk", "."]);
     git(&repo, &["add", "-A"]);
     git(&repo, &["commit", "-qm", "init", "--no-verify"]);
@@ -108,11 +108,25 @@ fn stale_checks(script: &Path) -> Vec<(&'static str, bool)> {
     branch_with_commit(&repo, "b");
     git(&repo, &["cherry-pick", "b"]);
     branch_with_commit(&repo, "c");
+    // d: two commits squash-merged into trunk. e: the same, then trunk changes the squashed file again.
+    for name in ["d", "e"] {
+        branch_with_commit(&repo, name);
+        git(&repo, &["checkout", "-q", name]);
+        std::fs::write(repo.join(format!("{name}.txt")), "more work\n").unwrap();
+        git(&repo, &["commit", "-qam", "more", "--no-verify"]);
+        git(&repo, &["checkout", "-q", "trunk"]);
+        git(&repo, &["merge", "-q", "--squash", name]);
+        git(&repo, &["commit", "-qm", &format!("squash {name}"), "--no-verify"]);
+    }
+    std::fs::write(repo.join("e.txt"), "trunk rewrote it\n").unwrap();
+    git(&repo, &["commit", "-qam", "rewrite e", "--no-verify"]);
     let out = run();
     let checks = vec![
         ("an empty branch does not take the issue and is reported stale", out.contains("Next: issues/a.md") && out.contains("Stale: a") && out.contains("finish-issue a")),
         ("a branch merged by rebase is reported stale", out.contains("Stale: b") && !out.contains("Taken: b")),
         ("a branch with commits off the main branch stays taken", out.contains("Taken: c") && !out.contains("Stale: c")),
+        ("a branch squash-merged from several commits is reported stale", out.contains("Stale: d") && !out.contains("Taken: d")),
+        ("a squashed branch whose file trunk changed afterwards stays taken", out.contains("Taken: e") && !out.contains("Stale: e")),
     ];
     let _ = std::fs::remove_dir_all(&root);
     checks
