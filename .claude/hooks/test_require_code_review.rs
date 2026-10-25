@@ -257,8 +257,25 @@ fn environment_checks(hook: &Path) -> Vec<(&'static str, bool)> {
             "FOO=1 GIT_WORK_TREE=../other git commit -am x",
             "GIT_WORK_TREE=../other sudo git commit -am x",
             "GIT_DIR=../other/.git nohup git commit -am x",
+            "export GIT_DIR=../other/.git GIT_WORK_TREE=../other; git commit -am x",
+            "export GIT_WORK_TREE=../other && git commit -am x",
+            "export FOO=1 GIT_WORK_TREE=../other; echo hi; git commit -am x",
+            "GIT_WORK_TREE=../other; export GIT_WORK_TREE; git commit -am x",
+            "declare -x GIT_WORK_TREE=../other; git commit -am x",
+            "export GIT_WORK_TREE=../other\ngit commit -am x",
+            "git \\\n  -C ../other commit -am x",
+            "export GIT_WORK_TREE=../a; GIT_WORK_TREE=../other; git commit -am x",
         ],
     );
+    // `unset` takes the export back; a plain assignment is no environment of `git`
+    for (name, command) in [
+        ("an unset takes the export back", "export GIT_WORK_TREE=../other; unset GIT_WORK_TREE; git commit -am x"),
+        ("a shell variable that is not exported is no environment of git", "GIT_WORK_TREE=../other; git commit -am x"),
+        ("env -u hides an exported variable", "export GIT_WORK_TREE=../other; env -u GIT_WORK_TREE git commit -am x"),
+        ("an unset hides a variable exported afterwards by name", "GIT_WORK_TREE=../other; unset GIT_WORK_TREE; export GIT_WORK_TREE; git commit -am x"),
+    ] {
+        out.push((name, commit_attempt(hook, &current, command).0 == 0));
+    }
     out.push(("an option wins over the variable", commit_attempt(hook, &current, "GIT_WORK_TREE=../other git --work-tree ../current commit -am x").0 == 0));
     out.push(("a variable naming the reviewed repository passes", commit_attempt(hook, &current, "GIT_WORK_TREE=../current git commit -am x").0 == 0));
     let _ = fs::remove_dir_all(current.parent().unwrap());

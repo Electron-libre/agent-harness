@@ -41,7 +41,16 @@ shell directory, or the spec must say plainly why it cannot, and the hook must t
    bypassed it; only `;` resets now, tests added), the blank line and scenario order in the spec, a long comment line;
    left to deliverables 2 and 3: `export`, `$X` and `$(…)` (the `(` is split into `;` before the scan, so the
    undeterminable value must be detected on the raw command); not fixed: `env -C dir` / `--chdir` are ignored (rare, noted).
-2. [ ] Read `export` in the same line; `unset` and `env -u` not refused (`REV-7`)
+2. [x] Read `export` in the same line; `unset` and `env -u` not refused (`REV-7`)
+   Done: `environment_repository` reads the environment of the command: prefix assignments, `export`/`declare`/`typeset`
+   until an `unset`, a plain `VAR=x;` exported by a later `export NAME`, `env -u NAME`; a newline separates commands.
+   Verified: `just check`, `just test-harness` (6 refusals, 4 passes). Not verified: I wrote the code before running the
+   new tests, so I did not see them fail first. Code review: fixed valueless `export NAME` and `declare -x` (bypass),
+   `env -u`, newline as separator, the helper extracted from `commit_dirs`; not fixed: `export` inside a subshell
+   `( … )` counts as global (over-refuses), `unset -f`, `env -C` (rare, noted). Review 2: fixed the `\` + newline
+   continuation (a bypass that predated this issue) and the assignment to an already exported variable; not fixed
+   (over-refusals or exotic, noted): `echo export …` read as an export, `declare` without `-x`, `env -i`, `--unset`,
+   a `-u` of another command, the state machine kept as arrays instead of a struct.
 3. [ ] Refuse a value that cannot be determined (`$X`, `$(…)`, backticks) (`REV-7`)
 4. [ ] Docs (architecture, hook doc, this issue), spec `accepted` then `implemented`, `just sync`
 

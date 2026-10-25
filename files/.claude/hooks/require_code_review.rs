@@ -115,19 +115,66 @@ fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<Strin
     Some(quoted(first, words))
 }
 
+/// The `GIT_DIR` and `GIT_WORK_TREE` the environment of a command gives `git`, read from the words before it: the
+/// assignments of the command itself (alone, after `env`, before a wrapper such as `sudo`), and those exported earlier
+/// in the line (`export`, `declare`, `typeset`; a plain assignment is exported by a later `export NAME`) until an
+/// `unset`. `env -u NAME` hides the variable for its command.
+fn environment_repository(words: &[&str]) -> (Option<PathBuf>, Option<PathBuf>) {
+    const NAMES: [&str; 2] = ["GIT_DIR", "GIT_WORK_TREE"];
+    let (mut prefix, mut shell, mut exported) = ([None::<PathBuf>, None], [None::<PathBuf>, None], [None::<PathBuf>, None]);
+    let (mut masked, mut exporting, mut unsetting, mut env_unset) = ([false; 2], false, false, false);
+    let mut words = words.iter();
+    while let Some(w) = words.next() {
+        let named = NAMES.iter().position(|n| w == n);
+        if let Some(n) = NAMES.iter().position(|n| w.strip_prefix(n).is_some_and(|v| v.starts_with('='))) {
+            let value = Some(PathBuf::from(quoted(&w[NAMES[n].len() + 1..], &mut words).trim_matches(['"', '\''])));
+            if exporting {
+                exported[n] = value;
+            } else {
+                if exported[n].is_some() {
+                    exported[n] = value.clone();
+                }
+                (prefix[n], shell[n], masked[n]) = (value.clone(), value, false);
+            }
+        } else if *w == ";" {
+            (prefix, masked, exporting, unsetting, env_unset) = ([None, None], [false; 2], false, false, false);
+        } else if matches!(*w, "export" | "declare" | "typeset") {
+            exporting = true;
+        } else if *w == "unset" {
+            unsetting = true;
+        } else if *w == "-u" {
+            env_unset = true;
+        } else if let Some(n) = named {
+            if unsetting {
+                (prefix[n], shell[n], exported[n]) = (None, None, None);
+            } else if env_unset {
+                masked[n] = true;
+            } else if exporting && shell[n].is_some() {
+                exported[n] = shell[n].clone();
+            }
+            env_unset = false;
+        } else {
+            env_unset = false;
+        }
+    }
+    let [dir, tree] = [0, 1].map(|n| if masked[n] { None } else { prefix[n].take().or(exported[n].take()) });
+    (dir, tree)
+}
+
 /// The directories whose review a `git commit` of the line depends on, `None` when no command of the line commits;
 /// `None` in the list is the shell directory. Normally one: after `-C dir`, `--work-tree dir` or `--git-dir dir` (the
 /// work tree wins, then the parent of the innermost `.git` of the path, else the directory itself). With `--git-dir` and
 /// no `--work-tree` there are two, since `git` commits the files of the directory it runs in into that git directory.
 /// The `-C` options accumulate and a relative `--work-tree` or `--git-dir` is taken from the directory they lead to,
 /// wherever they stand on the line, as `git` does. `GIT_DIR=x` and `GIT_WORK_TREE=x` assigned earlier in the same
-/// command (alone, after `env`, before a wrapper such as `sudo`) count as the two options, which win over them.
-/// The subcommand is the first word after `git` once the global options
+/// command (alone, after `env`, before a wrapper such as `sudo`), or exported earlier in the line and not unset, count
+/// as the two options, which win over them. The subcommand is the first word after `git` once the global options
 /// (`SKIPPED_OPTIONS`, `GIT_VALUE_OPTIONS`, `-C dir`, `-c key=value`) are skipped; any other option means it is not a
 /// commit. Brackets, separators and quotes around `git` are ignored; `cd dir && git commit` is not followed.
 fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
     // every separator and bracket becomes a word `;` so that `a;git commit` and `(git commit)` split like `a ; git commit`
-    let spaced = command.replace([';', '|', '&', '(', ')', '`'], " ; ");
+    let joined = command.replace("\\\n", " ");
+    let spaced = joined.replace([';', '|', '&', '(', ')', '`', '\n'], " ; ");
     let words: Vec<&str> = spaced.split_whitespace().collect();
     words.iter().enumerate().find_map(|(i, w)| {
         if w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() != Some("git") {
@@ -135,19 +182,8 @@ fn commit_dirs(command: &str) -> Option<Vec<Option<String>>> {
         }
         let mut rest = words[i + 1..].iter().take_while(|w| **w != ";");
         let path = |v: &str| PathBuf::from(v.trim_matches(['"', '\'']));
-        // `GIT_DIR=x git`, `env GIT_DIR=x git`: the assignments right before `git` name the repository like the options
-        // do, which win over them
-        let (mut git_dir, mut work_tree) = (None::<PathBuf>, None::<PathBuf>);
-        let mut before = words[..i].iter();
-        while let Some(w) = before.next() {
-            if let Some(v) = w.strip_prefix("GIT_DIR=") {
-                git_dir = Some(path(&quoted(v, &mut before)));
-            } else if let Some(v) = w.strip_prefix("GIT_WORK_TREE=") {
-                work_tree = Some(path(&quoted(v, &mut before)));
-            } else if *w == ";" {
-                (git_dir, work_tree) = (None, None);
-            }
-        }
+        // the options set below win over the environment
+        let (mut git_dir, mut work_tree) = environment_repository(&words[..i]);
         let mut dir = None::<PathBuf>;
         loop {
             match rest.next() {
