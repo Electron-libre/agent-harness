@@ -38,6 +38,9 @@ directory; `--relink` keeps checking `.`. Out of scope: any other change to what
 1. [x] Guard on the issue's worktree: `linked_worktree(dir)` runs `git` in the given directory, `main` validates the
    issue path before the guard; verified by a by-path case in `refuses_a_linked_worktree` of `test_close_issue.rs`;
    makes true PAR-8 (amended).
+2. [x] Fixes of the `high` review: also refuse when the caller is in a linked worktree (closing the main worktree's
+   issue by path from a linked one passed after deliverable 1), clearer refusal message; verified by a reverse case in
+   `refuses_a_linked_worktree`; makes true PAR-8 (amended again).
 
 ## Decisions
 - Mode: autonomous
@@ -47,5 +50,16 @@ directory; `--relink` keeps checking `.`. Out of scope: any other change to what
 - done: the PAR-8 guard runs `git` in the issue's `issues/` directory (`.` for `--relink`), after the path is validated.
 - checks: `just check` ok, `just test-harness` ok, specs ok (PAR-8 amended), docs ok (architecture, details.md).
 - red: `FAIL - the linked worktree's issue is refused by path from the main one`
+- Code review: no findings
+- not verified: none.
+
+## Deliverable 2
+- done: the guard checks both the caller's directory and the issue's directory; the message says to merge, then close
+  in the main worktree.
+- checks: `just check` ok, `just test-harness` ok, specs ok (PAR-8 and its scenarios), docs ok (architecture, details.md).
+- red: `FAIL - the main worktree's issue is refused by path from a linked one`
+- High review: 6 findings. Fixed: regression, missing reverse test, spec wording, message. Not fixed: the guard lets
+  the close through when `git worktree list` or a canonicalize fails (predates this issue, rare); the extra
+  `git rev-parse` per close (one process, keeps the guard independent of the relink).
 - Code review: no findings
 - not verified: none.

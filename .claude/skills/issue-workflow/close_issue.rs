@@ -3,8 +3,8 @@
 //! Uses `git mv` when the file is tracked, a plain rename otherwise. Refuses to overwrite.
 //! Then rewrites every `issues/foo.md` mentioned in the other text files of the repo to
 //! `issues/done/foo.md`, so no document keeps pointing at the old path.
-//! Refuses an issue of a linked git worktree, whatever the caller's directory: the queue is edited at merge
-//! time, on the main worktree.
+//! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: the
+//! queue is edited at merge time, on the main worktree.
 //! Usage: `just close-issue issues/foo.md`; `just close-issue --relink` fixes the references to
 //! every issue already in `issues/done/` (run it once to repair old dangling paths).
 //! ```cargo
@@ -107,7 +107,7 @@ fn linked_worktree(dir: &Path) -> Option<String> {
     }
     let main = list.lines().find_map(|l| l.strip_prefix("worktree "))?;
     let same = std::fs::canonicalize(main).ok()? == std::fs::canonicalize(&top).ok()?;
-    (!same).then(|| format!("{} is a linked worktree: close the issue from the main worktree {main}, after merging its branch", top.display()))
+    (!same).then(|| format!("{} is a linked worktree: merge its branch, then close the issue in the main worktree {main}", top.display()))
 }
 
 /// Exit with an error when `dir` is in a linked worktree (PAR-8).
@@ -152,6 +152,7 @@ fn main() {
         eprintln!("{arg} is not an issue file directly under an `issues/` directory");
         std::process::exit(1);
     }
+    refuse_linked_worktree(Path::new("."));
     refuse_linked_worktree(dir);
     let done = dir.join("done");
     let target = done.join(name);

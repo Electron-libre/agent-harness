@@ -18,6 +18,6 @@ When the issue is done, merge it from the main worktree (rebase the branch onto 
 fast-forward), run `just close-issue issues/<name>.md` there, commit the move, then `just finish-issue <name>`:
 run it from the main worktree (it refuses inside the worktree to remove, `--force` or not): it removes the worktree and the branch only once merged (fast-forward, rebase or squash of any number of commits are detected, the last by comparing trees) and clean.
 When the work is not on the main branch, `finish-issue` refuses: after the user agreed, run `just finish-issue <name> --force`, which deletes the branch even though
-its work is not on the main branch. `close-issue` refuses an issue of a linked worktree, even named by path from the main one, so
+its work is not on the main branch. `close-issue` refuses in a linked worktree and an issue of one named by path from the main one, so
 the queue is never edited on an issue branch; in that worktree, report the issue as done and leave the closing
 to the merge.
