@@ -42,3 +42,4 @@ measures; it does not judge.
 - Judging a session (good, bad, rule broken): the detectors and the report are other issues.
 - The price in money of the tokens: models and prices change; the tokens by kind are enough to price later.
 - A complete list of the line types: an unknown type is counted, not an error.
+- Counting the slash commands the user types (`<command-name>…`): the typed-message filter drops them, so they count in neither `validations` nor `other_messages`; measured at 0.3 % of the typed messages on 2026-10-26 (`issues/done/count_typed_slash_commands_as_interventions.md`), a `slash_commands` column by command name is the candidate if they become a usual way to steer the work.
