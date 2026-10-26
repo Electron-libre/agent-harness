@@ -64,6 +64,9 @@ not a `harness` subcommand.
    verified by fixture git repositories (pinned, self, unpinned, unreadable); makes true EVA-8.
 3. [x] Archive: `--archive <file>` merges the rows; verified by a fixture archive; makes true EVA-11 (spec
    `accepted`).
+4. [x] Fixes of the `high` review: module stamp (EVA-13), removed worktrees and archive (EVA-7, EVA-14),
+   `--first-parent`, submodules, refusal prefix, stop answers, line by line reading, `tempfile`; verified by
+   `test_session_metrics.rs`.
 
 ## Decisions
 - Mode: autonomous
@@ -95,3 +98,13 @@ not a `harness` subcommand.
 - done: `--archive <file>` merges the rows (written through a `.partial` file then renamed); an archive with other
   columns is refused and left as is (added to EVA-11); spec `accepted`; architecture and README.
 - red: `unknown option --archive`, the four merge checks failed.
+
+## Deliverable 4 (fixes of the `high` review)
+- Fixed: stale `rust-script` builds of an included module (EVA-13, stamp checked by the test); removed issue
+  worktrees and the archive keeping a resolved project and revision (EVA-7, EVA-14); `--first-parent`; submodules;
+  exact refusal prefix and `.rs` file names (EVA-5); stop answers no longer match `4k` (EVA-4); transcripts read
+  line by line, a non UTF-8 line counted unreadable; `tempfile` in the test.
+- Not fixed: one set of git calls per session (194 sessions in 2.7 s, not worth a cache).
+- Out of the requirements: typed slash commands, now `issues/count_typed_slash_commands_as_interventions.md`
+  (5 occurrences over all the transcripts).
+- red: the eight checks of the findings failed (counts, projects, revisions, archive, stamp).

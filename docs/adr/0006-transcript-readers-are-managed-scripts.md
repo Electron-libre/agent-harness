@@ -20,3 +20,6 @@ them stay where they are.
 * One place to adapt when the transcript format moves.
 * A script must stay at a fixed path relative to the module: moving one moves the `#[path]`.
 * The module cannot be unit-tested by `cargo test`; the behaviour tests of the scripts cover it (`just test-harness`).
+* `rust-script` rebuilds a script only when its own text changes, not when an included module does (a `path`
+  dependency is no better). Each including script therefore carries `// transcripts.rs sha256: <hex>`, and the test
+  fails with the line to write when it is stale: a change of the module edits every script that includes it.

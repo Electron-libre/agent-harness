@@ -9,11 +9,12 @@
 //! serde_json = "1"
 //! ```
 
+// transcripts.rs sha256: b30dc7325385743c5d4a5a6b7ba0ace159ee209332256005dab8beb364d6634f
 #[path = "../../transcripts/transcripts.rs"]
 mod transcripts;
 
 use std::path::{Path, PathBuf};
-use transcripts::{projects, projects_root, read_lines, sessions, sorted_entries, typed_text};
+use transcripts::{for_each_line, projects, projects_root, sessions, sorted_entries, typed_text};
 
 /// One line per message: tab, carriage return and backslash are escaped along with the newline.
 fn escape(text: &str) -> String {
@@ -42,14 +43,7 @@ fn main() {
         for session in sessions(&project) {
             session_count += 1;
             let stem = session.file_stem().unwrap().to_string_lossy().into_owned();
-            let (lines, skipped) = match read_lines(&session) {
-                Ok(read) => read,
-                Err(e) => {
-                    eprintln!("cannot read {}: {e}", session.display());
-                    continue;
-                }
-            };
-            for line in &lines {
+            let read = for_each_line(&session, |line| {
                 if let Some(c) = line["cwd"].as_str().filter(|c| !cwds.iter().any(|k| k == c)) {
                     cwds.push(c.to_string());
                 }
@@ -59,7 +53,14 @@ fn main() {
                         println!("{name}\t{stem}\t{}", escape(&t));
                     }
                 }
-            }
+            });
+            let skipped = match read {
+                Ok(skipped) => skipped,
+                Err(e) => {
+                    eprintln!("cannot read {}: {e}", session.display());
+                    continue;
+                }
+            };
             if skipped > 0 {
                 eprintln!("{}: {skipped} unreadable lines skipped", session.display());
             }

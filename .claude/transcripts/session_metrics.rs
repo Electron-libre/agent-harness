@@ -12,6 +12,7 @@
 //! toml = "0.8"
 //! ```
 
+// transcripts.rs sha256: b30dc7325385743c5d4a5a6b7ba0ace159ee209332256005dab8beb364d6634f
 #[path = "transcripts.rs"]
 mod transcripts;
 
@@ -20,7 +21,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use transcripts::{projects, projects_root, read_lines, sessions, subagents, typed_text};
+use transcripts::{for_each_line, projects, projects_root, sessions, subagents, typed_text};
 
 const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
@@ -70,17 +71,25 @@ fn push_distinct(list: &mut Vec<String>, value: Option<&str>) {
     }
 }
 
-/// A plain validation, or the answers to the questions of a stop (`1 a, 2 c`).
+/// A plain validation, or the answers to the questions of a stop (`1 a, 2 c`; one answer needs its space, so a
+/// reply such as `4k` is not one).
 fn is_validation(text: &str) -> bool {
     let t = text.trim().to_lowercase();
     let t = t.trim_end_matches(['.', '!']).trim();
     let answer = |item: &str| {
-        let item: String = item.chars().filter(|c| !c.is_whitespace()).collect();
-        let digits = item.trim_end_matches(|c: char| c.is_ascii_lowercase());
-        let letters = item.len() - digits.len();
-        letters == 1 && !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())
+        let item = item.trim();
+        let Some(letter) = item.chars().last().filter(|c| ('a'..='h').contains(c)) else { return false };
+        let number = item[..item.len() - letter.len_utf8()].trim_end();
+        !number.is_empty() && number.chars().all(|c| c.is_ascii_digit())
     };
-    VALIDATIONS.contains(&t) || (!t.is_empty() && t.split(',').all(answer))
+    let items: Vec<&str> = t.split(',').collect();
+    let answers = items.iter().all(|i| answer(i)) && (items.len() > 1 || t.contains(' '));
+    VALIDATIONS.contains(&t) || answers
+}
+
+/// A refusal of a hook: `PreToolUse:<tool> hook error:`, the tool name holding no space.
+fn is_refusal(text: &str) -> bool {
+    text.strip_prefix("PreToolUse:").and_then(|rest| rest.split_once(" hook error:")).is_some_and(|(tool, _)| !tool.is_empty() && !tool.contains(char::is_whitespace))
 }
 
 /// The text of a tool result: its string content, or its text parts joined.
@@ -92,25 +101,24 @@ fn result_text(block: &Value) -> String {
     }
 }
 
-/// The hook a refusal names: the stem of the first `.rs` file its text cites, `unknown` when none.
+/// The hook a refusal names: the stem of the first `.rs` file name its text cites, `unknown` when none.
 fn hook_name(text: &str) -> String {
-    let Some(end) = text.find(".rs") else { return "unknown".into() };
-    let stem: String = text[..end].chars().rev().take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
-    if stem.is_empty() { "unknown".into() } else { stem.chars().rev().collect() }
+    let name_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';
+    for (end, _) in text.match_indices(".rs") {
+        let ends_name = !text[end + 3..].starts_with(name_char);
+        let stem: String = text[..end].chars().rev().take_while(|c| name_char(*c)).collect();
+        if ends_name && !stem.is_empty() {
+            return stem.chars().rev().collect();
+        }
+    }
+    "unknown".into()
 }
 
 impl Session {
     fn read(&mut self, path: &Path, main: bool) {
-        let (lines, unreadable) = match read_lines(path) {
-            Ok(read) => read,
-            Err(e) => {
-                eprintln!("cannot read {}: {e}", path.display());
-                return;
-            }
-        };
-        self.unreadable += unreadable as u64;
-        for line in &lines {
-            self.line(line, main);
+        match for_each_line(path, |line| self.line(line, main)) {
+            Ok(unreadable) => self.unreadable += unreadable as u64,
+            Err(e) => eprintln!("cannot read {}: {e}", path.display()),
         }
     }
 
@@ -178,7 +186,7 @@ impl Session {
         let blocks = line["message"]["content"].as_array().map(Vec::as_slice).unwrap_or_default();
         for block in blocks.iter().filter(|b| b["type"] == "tool_result" && b["is_error"].as_bool() == Some(true)) {
             let text = result_text(block);
-            if text.starts_with("PreToolUse:") && text.contains(" hook error:") {
+            if is_refusal(&text) {
                 *self.hooks.entry(hook_name(&text)).or_default() += 1;
             }
         }
@@ -223,10 +231,22 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// The main worktree of the repository holding `cwd` (a linked worktree counts with its main repository).
-fn repository(cwd: &str) -> Option<PathBuf> {
-    let common = git(Path::new(cwd), &["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
-    Path::new(&common).parent().map(Path::to_path_buf)
+/// The main worktree of the repository holding `cwd`: a linked worktree counts with its main repository, a submodule
+/// or a separate git directory is its own work tree. A removed issue worktree `<repo>-<branch>` (ADR 0003) counts
+/// with `<repo>` when that one still exists.
+fn repository(cwd: &str, branches: &[String]) -> Option<PathBuf> {
+    let dir = Path::new(cwd);
+    if !dir.exists() {
+        let name = dir.file_name()?.to_string_lossy().into_owned();
+        let repo = branches.iter().find_map(|b| name.strip_suffix(&format!("-{b}")).map(|r| dir.with_file_name(r)))?;
+        return repository(repo.to_str()?, &[]);
+    }
+    let common = PathBuf::from(git(dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?);
+    if common.file_name().is_some_and(|n| n == ".git") {
+        common.parent().map(Path::to_path_buf)
+    } else {
+        git(dir, &["rev-parse", "--show-toplevel"]).map(PathBuf::from)
+    }
 }
 
 /// The project of a session: the name of its repository, else the last component of `cwd`.
@@ -241,7 +261,7 @@ fn revision(repo: &Path, start: &str) -> String {
     let branch = ["origin/HEAD", "main", "master"].into_iter().find(|b| git(repo, &["rev-parse", "--verify", "-q", &format!("{b}^{{commit}}")]).is_some());
     let Some(branch) = branch else { return String::new() };
     let before = format!("--before={start}");
-    let last = |path: &str| git(repo, &["log", "-1", "--format=%H", &before, branch, "--", path]).filter(|c| !c.is_empty());
+    let last = |path: &str| git(repo, &["log", "-1", "--first-parent", "--format=%H", &before, branch, "--", path]).filter(|c| !c.is_empty());
     let Some(commit) = last(".claude/harness.toml") else { return String::new() };
     let Some(text) = git(repo, &["show", &format!("{commit}:.claude/harness.toml")]) else { return String::new() };
     let Ok(config) = text.parse::<toml::Table>() else { return String::new() };
@@ -252,6 +272,17 @@ fn revision(repo: &Path, start: &str) -> String {
         (None, Some(".")) => last("files").map(|c| format!("self:{c}")).unwrap_or_default(),
         (None, _) => "unpinned".to_string(),
     }
+}
+
+/// The new row of an archived session, keeping the archived project and revision when the new one lost its revision
+/// (the repository is gone or unreadable since).
+fn keep_resolved(old: &str, new: &str) -> String {
+    let (old, mut new): (Vec<&str>, Vec<&str>) = (old.split('\t').collect(), new.split('\t').collect());
+    if new.get(3).is_some_and(|r| r.is_empty()) && old.get(3).is_some_and(|r| !r.is_empty()) {
+        new[1] = old[1];
+        new[3] = old[3];
+    }
+    new.join("\t")
 }
 
 /// Merges `rows` into the archive at `path`: a session already there is replaced, one absent from `rows` is kept, and
@@ -269,7 +300,13 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
     let session = |row: &str| row.split('\t').next().unwrap_or_default().to_string();
     let start = |row: &str| row.split('\t').nth(6).unwrap_or_default().to_string();
     let mut merged: BTreeMap<String, String> = lines.filter(|l| !l.is_empty()).map(|l| (session(l), l.to_string())).collect();
-    merged.extend(rows.iter().map(|r| (session(r), r.clone())));
+    for row in rows {
+        let new = match merged.get(&session(row)) {
+            Some(old) => keep_resolved(old, row),
+            None => row.clone(),
+        };
+        merged.insert(session(row), new);
+    }
     let mut merged: Vec<String> = merged.into_values().collect();
     merged.sort_by_key(|r| start(r));
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -318,7 +355,7 @@ fn main() {
             }
             let id = path.file_stem().unwrap().to_string_lossy().into_owned();
             let cwd = session.cwd.clone().unwrap_or_default();
-            let repo = repositories.entry(cwd.clone()).or_insert_with(|| if cwd.is_empty() { None } else { repository(&cwd) });
+            let repo = repositories.entry(cwd.clone()).or_insert_with(|| if cwd.is_empty() { None } else { repository(&cwd, &session.issues) });
             let start = session.start.as_ref().map(|(_, text)| text.as_str()).unwrap_or_default();
             let revision = repo.as_deref().filter(|_| !start.is_empty()).map(|r| revision(r, start)).unwrap_or_default();
             rows.push(session.row(&id, &project_name(&cwd, repo.as_deref()), &revision));

@@ -137,7 +137,8 @@ No text of a message is printed, so `--archive <file>` can merge the rows into a
 (a session replaced by its new row, a session whose transcript is gone kept): the history then outlives the retention
 of the transcripts. The transcript reading (projects, sessions, sub-agents, the typed-message filter)
 lives once in `transcripts.rs`, which `audit_sources.rs` includes too
-([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)).
+([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)); each including script carries the SHA-256 of the
+module, since `rust-script` would otherwise keep running the build of the old one.
 
 ## Parallel issues
 

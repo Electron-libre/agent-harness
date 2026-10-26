@@ -1,6 +1,7 @@
 //! Reading of the Claude Code transcripts, shared by the scripts that read them (`#[path]` include, ADR 0006):
 //! the projects directory, its projects and sessions, the sub-agent transcripts of a session, the parsed lines and
-//! the filter of the messages the user typed.
+//! the filter of the messages the user typed. `rust-script` rebuilds a script only when its own text changes, so each
+//! script that includes this module carries its SHA-256 (`// transcripts.rs sha256: <hex>`, checked by the tests).
 #![allow(dead_code)]
 
 use serde_json::Value;
@@ -40,17 +41,22 @@ pub fn subagents(session: &Path) -> Vec<PathBuf> {
     jsonl_files(&session.with_extension("").join("subagents"))
 }
 
-/// The parsed lines of a transcript and the count of non-empty lines that are not valid JSON.
-pub fn read_lines(path: &Path) -> std::io::Result<(Vec<Value>, usize)> {
-    let text = std::fs::read_to_string(path)?;
-    let (mut lines, mut unreadable) = (Vec::new(), 0);
-    for line in text.lines().filter(|l| !l.trim().is_empty()) {
-        match serde_json::from_str::<Value>(line) {
-            Ok(value) => lines.push(value),
+/// Calls `f` on each parsed line of a transcript, one at a time; returns the count of non-empty lines that are not
+/// valid JSON.
+pub fn for_each_line(path: &Path, mut f: impl FnMut(&Value)) -> std::io::Result<usize> {
+    use std::io::BufRead;
+    let mut unreadable = 0;
+    for line in std::io::BufReader::new(std::fs::File::open(path)?).split(b'\n') {
+        let line = line?;
+        if line.trim_ascii().is_empty() {
+            continue;
+        }
+        match serde_json::from_slice::<Value>(&line) {
+            Ok(value) => f(&value),
             Err(_) => unreadable += 1,
         }
     }
-    Ok((lines, unreadable))
+    Ok(unreadable)
 }
 
 /// The text a user typed in a transcript line; `None` for tool results, meta and sidechain lines, injected text and other types.
