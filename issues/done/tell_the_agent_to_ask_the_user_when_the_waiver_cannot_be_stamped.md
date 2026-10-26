@@ -57,7 +57,7 @@ while the commit stays refused. That refusal should tell the agent to ask the us
 
 * done: a waiver that cannot be stamped waives nothing (the review judges the commit) and a refusal names it by its
   path; `Refusal` struct instead of a pair; `refuse()` doc comment fixed; the test skips the case under root; REV-10
-  and `docs/architecture.md` updated; follow-up `issues/refuse_a_review_waiver_that_cannot_be_read.md` (high review
+  and `docs/architecture.md` updated; follow-up `issues/done/refuse_a_review_waiver_that_cannot_be_read.md` (high review
   finding 4).
 * checks: `just check` ok, `just test-harness` ok, `just check-harness` ok, code review `low`: no findings.
 * red: `FAIL - native refuses an unreviewed diff whose waiver it cannot stamp` (and the two other new checks).
