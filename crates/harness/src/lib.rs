@@ -64,6 +64,8 @@ impl fmt::Display for Outcome {
 #[derive(Debug, Default)]
 pub struct Report {
     pub entries: Vec<(String, Outcome)>,
+    /// What the project's settings lack or run in vain once synced (SYN-27): printed, never a failure.
+    pub warnings: Vec<String>,
 }
 
 impl Report {
@@ -548,6 +550,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
 
     if !options.dry_run {
         write_lock(root, &new_lock)?;
+        report.warnings = settings::warnings(root, new_lock.contains_key(gate::REVIEW_HOOK));
     }
     Ok(report)
 }

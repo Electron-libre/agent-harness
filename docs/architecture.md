@@ -28,7 +28,8 @@ The hooks are managed (`files/.claude/hooks/`) but their declaration lives in `.
 seeded once, so a new hook reaches a project that already adopted the harness only when the declaration is added
 to its file by hand. `harness check` compares the project with its lock and warns of what the settings lack or run in
 vain: a deny rule of the review waiver, a hook under `.claude/hooks/` the project no longer has (a hook the source
-dropped), an attribution left on. It does not look for a hook nobody declared, so the hygiene test of the settings
+dropped), an attribution left on. `harness sync` and `harness update` print the same warnings once the files are
+written, so the sync that deletes a hook the settings still run says so at once. It does not look for a hook nobody declared, so the hygiene test of the settings
 (`test_settings.rs`, run by `just test-harness` and by CI) fails for a hook script nobody declared, and its message
 gives the event, the matcher (the `Declare:` line of the hook's header) and the command to add. An agent that
 updates the harness runs `just test-harness` afterwards and is told what to add.
@@ -61,7 +62,7 @@ the review of the next commit with `just waive-review` (it creates `claude-revie
 `.claude/settings.json` (`Bash(just waive-review)`, `Bash(just waive-review *)`, `Edit(//**/claude-review-waived)`)
 make Claude Code refuse the agent the recipe and an edit of the file; they match the command the agent usually writes,
 not a `touch` or a script. The settings file is seeded, so a project synced before a rule existed lacks it: `harness check`
-prints a `warning:` line for each missing rule (`DENY_RULES` of `crates/harness/src/gate.rs`) without failing.
+prints a `warning:` line for each missing rule (`DENY_RULES` of `crates/harness/src/settings.rs`) without failing.
 
 A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` installs
 ([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md), `crates/harness/src/gate.rs`;

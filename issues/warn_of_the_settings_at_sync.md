@@ -27,3 +27,26 @@ the sync that deletes a hook the source dropped (SYN-5): from then on the settin
 
 # Hints
 * `sync` is also run by `update`: the warnings should come out once.
+
+# Tracking
+
+1. [x] `Report` carries the settings warnings, filled by `sync_from` after a real sync and printed to stderr by `sync`
+   and `update` (once) (SYN-27, real sync).
+2. [ ] Under `--dry-run`, the warnings are judged on the state the sync would leave: hooks it would remove are
+   missing, hooks it would add are present (SYN-27, dry run); spec `accepted`.
+
+## Decisions
+
+* Mode: autonomous.
+* Approach 1: every warning at each sync, as `check` does (not only when a hook was removed).
+* Approach 3: `--dry-run` judges the state the sync would leave.
+* A new requirement SYN-27 rather than rewording SYN-24 to SYN-26.
+
+## Deliverable 1
+
+* done: `Report.warnings` filled by `sync_from` after a real sync, printed to stderr by `print_changes` (so once for
+  `sync` and for `update`); README, `docs/architecture.md` (and the stale `gate.rs` path of `DENY_RULES`) updated.
+* checks: `just check` ok, `just test-harness` ok, specs ok (SYN-27 traced, spec `draft` until deliverable 2).
+* code review: no findings.
+* not verified: the exit code of the binary on a warning is not tested end to end (`print_changes` returns
+  `conflicts() == 0`, unchanged).

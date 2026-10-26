@@ -50,12 +50,15 @@ enum Command {
     Check,
 }
 
-/// Print what changed; true when nothing is in conflict.
+/// Print what changed, and the warnings on the settings to stderr; true when nothing is in conflict.
 fn print_changes(report: &Report) -> bool {
     for (path, outcome) in &report.entries {
         if *outcome != Outcome::Unchanged {
             println!("{outcome}: {path}");
         }
+    }
+    for warning in &report.warnings {
+        eprintln!("{warning}");
     }
     report.conflicts() == 0
 }

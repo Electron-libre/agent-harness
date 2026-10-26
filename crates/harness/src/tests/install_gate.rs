@@ -650,3 +650,49 @@ fn the_seeded_settings_give_check_nothing_to_warn_of() {
     }
     assert_eq!(settings::warnings(root.path(), true), Vec::<String>::new());
 }
+
+const GONE: &str = "warning: .claude/settings.json runs the missing hook .claude/hooks/gone.rs";
+
+/// Settings that run `.claude/hooks/gone.rs`, attribution off.
+fn running_gone() -> String {
+    quiet(&serde_json::json!({"Stop": [{"hooks": [
+        {"type": "command", "command": "rust-script .claude/hooks/gone.rs"},
+    ]}]}))
+}
+
+// spec: SYN-27
+#[test]
+fn sync_warns_of_the_hook_it_removed_that_the_settings_still_run() {
+    let (source, root) = setup();
+    put(source.path(), "files/.claude/hooks/gone.rs", "// a hook");
+    put(root.path(), ".claude/settings.json", &running_gone());
+    assert!(run(&root).warnings.is_empty());
+
+    fs::remove_file(source.path().join("files/.claude/hooks/gone.rs")).unwrap();
+    let report = run(&root);
+    assert_eq!(
+        report.outcome(".claude/hooks/gone.rs"),
+        Some(Outcome::Removed)
+    );
+    assert_eq!(report.warnings, vec![GONE.to_string()]);
+    // a warning is not a conflict: the sync succeeds
+    assert_eq!(report.conflicts(), 0);
+}
+
+// spec: SYN-27
+#[test]
+fn update_reports_the_warnings_of_its_sync_once() {
+    let (repo, _first, _second) = git_source();
+    let root = git_project(&repo);
+    put(root.path(), ".claude/settings.json", &running_gone());
+    let cache = tempdir().unwrap();
+    let done = update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &SyncOptions::default(),
+    )
+    .unwrap();
+    assert!(done.applied);
+    assert_eq!(done.sync.warnings, vec![GONE.to_string()]);
+}
