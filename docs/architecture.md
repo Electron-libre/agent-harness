@@ -161,6 +161,15 @@ project had no harness then is skipped. `--summary` counts the
 findings per rule and revision over the sessions where the rule applied, so a rule that rarely applies does not read
 as respected.
 
+`.claude/transcripts/delivered_quality.rs [repo]` measures the quality of the delivered work from the git history
+instead (spec [`specs/delivered-quality.md`](../specs/delivered-quality.md)): one row per file of `issues/done/`. The
+commits of an issue are those of the default branch touching its file, from the first whose version holds
+`# Tracking` to the one that moves it to `issues/done/`, except the closes of other issues that only rewrite a
+citation. Its files (issue files, `docs/` and `harness.lock` left out) give the `fix` and `revert` commits of the
+next `--window-days` (30) after the close; its plan lines give the deliverables; the revision is the one in force just
+before its first commit, so an issue that changes the harness is measured with the harness it was made with. These
+are signals, not verdicts: a later fix may come from a new need.
+
 ## Parallel issues
 
 Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-issue.md), spec

@@ -30,5 +30,7 @@ them into a file kept outside the repositories, so the history outlives the tran
 see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue,
 the commit message format and no AI attribution, the conversation language),
 apart from what a gate blocked, and counts them per rule and harness revision.
+`rust-script .claude/transcripts/delivered_quality.rs [repo]` prints one row per done issue: its commits and
+deliverables, the fixes inside it, and the fixes and reverts of its files in the 30 days after its close.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

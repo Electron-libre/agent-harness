@@ -164,7 +164,8 @@ pub fn project_name(cwd: &str, repo: Option<&Path>) -> String {
     repo.and_then(Path::file_name).or_else(|| Path::new(cwd).file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-fn default_branch(repo: &Path) -> Option<&'static str> {
+/// The default branch of `repo`: `origin/HEAD`, else `main`, else `master`.
+pub fn default_branch(repo: &Path) -> Option<&'static str> {
     ["origin/HEAD", "main", "master"].into_iter().find(|b| git(repo, &["rev-parse", "--verify", "-q", &format!("{b}^{{commit}}")]).is_some())
 }
 

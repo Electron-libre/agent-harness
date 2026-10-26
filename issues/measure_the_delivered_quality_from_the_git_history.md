@@ -32,3 +32,44 @@ happened to it afterwards: fixes, reverts, review findings, failed checks, rewor
 # Hints
 * A fix after a feature may come from a new need, not a defect: report it as a signal, not a verdict.
 * Consumers have their own scopes and history; read their git log, never copy it into this repository.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+One TSV row of quality signals per done issue of a repository: fixes and reverts of its files after the close,
+fixes inside it, review findings from its file, failed checks and typed messages from its sessions. Out of scope:
+judging an issue, the report (`report_the_harness_evolution_by_revision`). Means: a managed script
+`delivered_quality.rs` next to `transcripts.rs` (ADR 0006), with its own spec `specs/delivered-quality.md` (QUA)
+rather than new EVA requirements, as `rule-breaches.md` did.
+
+## Plan
+1. [x] Git signals: `delivered_quality.rs` with the issue commits, `deliverables`, `fixes_in_issue`, `fixes_after`,
+   `reverts_after`, `revision`; verified by `test_delivered_quality.rs` on fixture repositories; makes true QUA-1 to
+   QUA-5, QUA-10.
+2. [ ] Review findings read from the done issue file, and `issue-workflow` step 3.6 records the count first
+   (`Code review: <n> findings`); verified by fixture issue files and `test_skills.rs`; makes true QUA-6.
+3. [ ] Transcript signals: sessions, failed checks, typed messages per issue; verified by fixture transcripts with
+   commits in their span; makes true QUA-7, QUA-8.
+4. [ ] `--summary` per revision, docs (architecture, README, report issue resources); verified by the test; makes
+   true QUA-9 (spec `accepted`).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 041d1a71c21479f93b3e9e93ec166e5f5ed4985f
+- Window of the later fixes and reverts: 30 days after the close, `--window-days` to change it.
+- Review findings: read the count when the line has one, else empty; `issue-workflow` step 3.6 now asks for the
+  count first.
+- Commits of an issue: those touching its file from the first holding `# Tracking` to the close (QUA-2), not
+  `Base commit` (recorded in 9 of 42 done issues).
+
+## Deliverable 1
+- done: `delivered_quality.rs` (issue commits, deliverables, fixes inside, fixes and reverts after, revision),
+  `default_branch` of `transcripts.rs` made public (scripts restamped), architecture and README.
+- red: the script did not exist, every check failed; then the old issues with their plan under `# Tracking` (no
+  `## Plan`) and the revision taken at the issue's own first commit (QUA-3 and QUA-5 amended).
+- Smoke run on this repository: 39 rows in 0.6 s; the three issues closed after `origin/HEAD` have none (not pushed).
+- Code review: 4 findings, all fixed: a hash pasted into the doc comment of `transcripts.rs` (scripts restamped), a
+  dead filter, a fix in the same second as the close missed (QUA-4 now reads "after it in the history"),
+  `--projects` accepted but unused (left to deliverable 3).
