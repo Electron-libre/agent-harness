@@ -6,6 +6,7 @@ use tempfile::{tempdir, TempDir};
 use super::*;
 
 mod install_gate;
+mod retention;
 
 fn put(dir: &Path, rel: &str, text: &str) {
     let path = dir.join(rel);

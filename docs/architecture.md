@@ -39,6 +39,12 @@ No hook guards the attribution: the seeded settings turn it off at the source (`
 "sessionUrl": false}`), `commit_check.rs` rejects a credit line in a message (run by `skill:commit-message` and by CI
 through `just check-commits`), and `harness check` warns of settings that leave it on.
 
+The transcripts of the sessions are what the harness is evaluated from, across several of its revisions, and Claude
+Code deletes them after `cleanupPeriodDays` (30 days by default). The sweep deletes those of every project with the
+value of the session that runs it, so only the user settings, which the harness never writes, keep them all.
+`harness check`, `sync` and `update` warn, outside CI, when the user settings keep them less than 365 days or a
+settings file of the project lowers the period (`settings::retention`).
+
 The Stop hook `clippy_gate.rs` blocks the end of a turn while `cargo clippy` reports a problem in a project with a
 `Cargo.toml` and a changed `.rs` file outside the `.claude` directories, whose scripts are not crate code (spec
 [`specs/clippy-gate.md`](../specs/clippy-gate.md)). What it prints is billed to the agent at each turn, so it sends one

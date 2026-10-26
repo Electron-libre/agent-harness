@@ -5,6 +5,7 @@
 //! written, so a later sync tells a local edit from a source change.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
@@ -651,6 +652,34 @@ pub fn check(root: &Path) -> Result<Checked> {
 fn in_ci() -> bool {
     std::env::var("CI")
         .is_ok_and(|v| !matches!(v.trim().to_lowercase().as_str(), "" | "0" | "false"))
+}
+
+/// The warnings on the retention of the transcripts (SYN-28), printed by `check`, `sync` and `update`; none under CI.
+/// Kept out of `check` and `sync`, which read the project only: these read the user settings too.
+#[must_use]
+pub fn retention_warnings(root: &Path) -> Vec<String> {
+    let user = user_settings(
+        std::env::var_os("CLAUDE_CONFIG_DIR"),
+        std::env::var_os("HOME"),
+    );
+    retention_with(root, in_ci(), &user)
+}
+
+fn retention_with(root: &Path, ci: bool, user: &Path) -> Vec<String> {
+    if ci {
+        return Vec::new();
+    }
+    settings::retention(root, user)
+}
+
+/// The user settings of Claude Code: `settings.json` in `config_dir` (`CLAUDE_CONFIG_DIR`), or else in `~/.claude`.
+fn user_settings(config_dir: Option<OsString>, home: Option<OsString>) -> PathBuf {
+    let dir = config_dir
+        .filter(|d| !d.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| home.map(|h| PathBuf::from(h).join(".claude")))
+        .unwrap_or_else(|| PathBuf::from("~/.claude"));
+    dir.join("settings.json")
 }
 
 fn check_with(root: &Path, ci: bool) -> Result<Checked> {

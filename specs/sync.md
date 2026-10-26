@@ -41,6 +41,7 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-25** (deterministic) `check` must print `warning: .claude/settings.json runs the missing hook <path>` for each hook command of the `hooks` table of the project's `.claude/settings.json` that names a file under `.claude/hooks/` the project does not have, when that settings file exists; the warning goes to stderr and must not make `check` fail. A hook the source dropped is deleted by `sync` (SYN-5), but the seeded settings keep running it.
 - **SYN-26** (deterministic) `check` must print `warning: .claude/settings.json does not turn off the attribution` when the project's `.claude/settings.json` exists and its `attribution` is neither `false` nor an object whose `commit` and `pr` are both empty strings; the warning goes to stderr and must not make `check` fail.
 - **SYN-27** (deterministic) `sync` and `update` must print the warnings of SYN-24 to SYN-26 to stderr, once, judged on the project as the sync leaves it, and must not fail because of them: a hook the sync removed is missing, one it added is present. Under `--dry-run` they must judge the project as the sync would leave it, writing nothing. The deleting `sync` is how a project loses a hook its settings still run (SYN-5): it must say so at once, not at the next `check`.
+- **SYN-28** (deterministic) `check`, `sync` and `update` must print `warning: the transcripts are deleted after <n> days (cleanupPeriodDays); set it to at least 365 in <user settings>` when the `cleanupPeriodDays` of the user settings (`settings.json` in `CLAUDE_CONFIG_DIR`, or else in `~/.claude`) is missing, not a number or below 365 (`<n>` is 30, the default, when it is missing or not a number), and `warning: <file> sets cleanupPeriodDays to <n> days, below 365` for each of the project's `.claude/settings.json` and `.claude/settings.local.json` that sets a number below 365; the warning goes to stderr, comes out once, must not make them fail, and is not printed when the `CI` environment variable is set. Claude Code deletes the transcripts of every project after this period, with the value of whichever session sweeps: the evaluation of the harness reads them over several revisions.
 
 ## Scenarios
 
@@ -57,6 +58,7 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-27) Given a source that dropped a hook the settings run, when `sync --dry-run` runs, then it warns that the settings run the missing hook, though the file is still there.
 - (SYN-27) Given an `update` that applies, then the warnings of its sync come out once, not once for the dry run that precedes it and once for the sync.
 - (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
+- (SYN-28) Given user settings that cannot be read or are not valid JSON, then the retention warning is printed as if `cleanupPeriodDays` were missing: Claude Code then pauses its sweep, but the value in force is unknown.
 
 ## Non-goals
 
@@ -64,4 +66,6 @@ by hand, and learns at once when a managed file drifted from it.
 - Merging a local change with a source change: a drifted file is fixed in the central repository.
 - Fetching more than a branch, tag or commit of a git source.
 - Making `check` depend on the source: it compares the project with its lock only, so the pin cannot break it.
+- Rewriting the user settings: `harness` warns of the retention, the user raises it.
+- Reading the managed settings of an organisation, which can override the retention.
 - Guaranteeing that a host serves an unreferenced commit: it depends on the host.

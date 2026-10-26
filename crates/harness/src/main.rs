@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use harness::{check, init, sync, update, Outcome, Report, SyncOptions};
+use harness::{check, init, retention_warnings, sync, update, Outcome, Report, SyncOptions};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -46,7 +46,7 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn when the settings lack a deny rule of the review waiver, run a missing hook or leave the attribution on.
+    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn when the settings lack a deny rule of the review waiver, run a missing hook or leave the attribution on, or Claude Code keeps the transcripts less than a year.
     Check,
 }
 
@@ -65,6 +65,7 @@ fn print_changes(report: &Report) -> bool {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let warns_of_retention = !matches!(cli.command, Command::Init { .. });
     let result = match cli.command {
         Command::Init { source, rev } => init(&cli.root, &source, rev.as_deref()).map(|()| true),
         Command::Sync { force, dry_run } => {
@@ -98,6 +99,11 @@ fn main() -> ExitCode {
             checked.problems.is_empty()
         }),
     };
+    if warns_of_retention && result.is_ok() {
+        for warning in retention_warnings(&cli.root) {
+            eprintln!("{warning}");
+        }
+    }
     match result {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::from(1),

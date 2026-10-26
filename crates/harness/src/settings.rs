@@ -1,5 +1,6 @@
 //! The warnings of `check` and `sync` on the project's `.claude/settings.json` (`specs/sync.md`, SYN-24 to SYN-27). Seeded once,
-//! the file is never rewritten by `sync`, so a project learns this way of what a later harness expects of it.
+//! the file is never rewritten by `sync`, so a project learns this way of what a later harness expects of it. Also the
+//! retention of the transcripts in the user settings, which the harness never writes (SYN-28).
 
 use std::fs;
 use std::io::ErrorKind;
@@ -15,6 +16,12 @@ pub const DENY_RULES: [&str; 3] = [
 ];
 /// The settings of the project, relative to its root.
 const SETTINGS: &str = ".claude/settings.json";
+/// The settings of the project kept out of git, relative to its root.
+const LOCAL_SETTINGS: &str = ".claude/settings.local.json";
+/// The days Claude Code keeps the transcripts when `cleanupPeriodDays` is unset.
+const DEFAULT_RETENTION: &str = "30";
+/// The days of transcripts the evaluation of the harness needs to span several revisions.
+const MIN_RETENTION: f64 = 365.0;
 /// Where the hooks the settings run live, relative to the root of the project.
 const HOOKS: &str = ".claude/hooks/";
 /// What may come before `HOOKS` in a word of a hook command, quotes removed, for the path to be the project's.
@@ -102,4 +109,44 @@ fn attribution_off(settings: &Value) -> bool {
         || ["commit", "pr"]
             .iter()
             .all(|key| attribution[*key].as_str() == Some(""))
+}
+
+/// The retention warnings (SYN-28): the user settings at `user` keep the transcripts less than `MIN_RETENTION` days
+/// (unreadable or unset: the default), and each settings file of the project that sets a lower number. Claude Code sweeps
+/// the transcripts of every project with the value of the session that runs the sweep.
+pub fn retention(root: &Path, user: &Path) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let days = read_json(user).and_then(|settings| retention_days(&settings));
+    if days
+        .as_ref()
+        .is_none_or(|d| d.as_f64().is_some_and(|d| d < MIN_RETENTION))
+    {
+        let days = days.map_or_else(|| DEFAULT_RETENTION.to_string(), |d| d.to_string());
+        warnings.push(format!(
+            "warning: the transcripts are deleted after {days} days (cleanupPeriodDays); set it to at least {MIN_RETENTION} in {}",
+            user.display()
+        ));
+    }
+    for rel in [SETTINGS, LOCAL_SETTINGS] {
+        if let Some(days) =
+            read_json(&root.join(rel)).and_then(|settings| retention_days(&settings))
+        {
+            if days.as_f64().is_some_and(|d| d < MIN_RETENTION) {
+                warnings.push(format!(
+                    "warning: {rel} sets cleanupPeriodDays to {days} days, below {MIN_RETENTION}"
+                ));
+            }
+        }
+    }
+    warnings
+}
+
+/// The file at `path` parsed as JSON, `None` when it cannot be read or parsed.
+fn read_json(path: &Path) -> Option<Value> {
+    serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
+}
+
+/// `cleanupPeriodDays` when it is a number.
+fn retention_days(settings: &Value) -> Option<Value> {
+    Some(settings["cleanupPeriodDays"].clone()).filter(Value::is_number)
 }

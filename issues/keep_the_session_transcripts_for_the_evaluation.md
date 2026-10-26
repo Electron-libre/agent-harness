@@ -30,3 +30,41 @@ project settings too) and whether a project value changes the cleanup of every p
 # Hints
 * Urgent by nature: every day without it loses one day of history.
 * The harness must not rewrite the user settings; warn or document only.
+
+# Specs
+* `specs/sync.md`: adds SYN-28 (retention warning of `check`, `sync` and `update`).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Measured (Claude Code docs, settings reference): `cleanupPeriodDays` is read from any settings file, but the sweep
+deletes the transcripts of every project with the value of the session that runs it, so only the user settings protect
+them all; a project value below it shortens the history of every project. Out of scope: rewriting the user settings,
+archiving compact extracts (moved to `extract_session_metrics_from_the_transcripts`, which owns the metrics).
+
+## Plan
+1. [x] Retention warning: `check`, `sync` and `update` warn when the user settings keep the transcripts less than
+   365 days or a project settings file lowers it; verified by unit tests on fixture settings in a tempdir; makes true
+   SYN-28.
+2. [ ] Docs: `README.md` says the evaluation needs a longer retention and which user setting to raise; the archive
+   point moves to `issues/extract_session_metrics_from_the_transcripts.md`; verified by `just check`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: b410ad5
+- 2026-10-26: `cleanupPeriodDays` set to 365 in the user settings by the agent, with the user's agreement.
+- Warning threshold: 365 days.
+- The archive of compact extracts moves to `extract_session_metrics_from_the_transcripts`.
+
+## Deliverable 1
+
+* done: `settings::retention` and `harness::retention_warnings`, printed by `main` after `check`, `sync` and `update`
+  (once, not under CI); `specs/sync.md` SYN-28 `accepted`; README and `docs/architecture.md` updated.
+* red: `cannot find function retention_with` / `user_settings` (8 errors) before the code.
+* checks: `just check` ok, `just test-harness` ok.
+* code review: no findings.
+* smoke test: `harness check` silent with the user settings at 365; with `CLAUDE_CONFIG_DIR=/tmp/nowhere` it warns
+  and exits 0; with `CI=1` it is silent.
+* not verified: nothing.

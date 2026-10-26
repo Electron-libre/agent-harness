@@ -11,7 +11,8 @@ harness sync                       # managed files copied, project-owned ones se
 harness update [--rev <tag|branch|commit>] [--dry-run] [--force]  # git source: sync to it, then pin the commit in `rev`
 harness check                      # fails if a managed file was modified or deleted, or the git review gate is missing;
                                    # warns when .claude/settings.json lacks a deny rule of the review waiver,
-                                   # runs a missing hook or leaves the attribution on (sync and update warn too)
+                                   # runs a missing hook or leaves the attribution on (sync and update warn too),
+                                   # and when Claude Code keeps the transcripts less than a year
 ```
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).
