@@ -33,7 +33,7 @@ nothing on success and little on failure, and run the Stop hook only when there 
 # Tracking
 1. [x] Clippy gate: short format, at most 40 diagnostics, stamp of the last passing run (CLG-1 to CLG-5).
 2. [x] Quiet recipes: `test-harness` (`files/harness.just`), `check`, `clippy`, `test` (`justfile`) print nothing on success, only the failures otherwise.
-3. [ ] Docs: the cheapest model setup and the measures before/after in `docs/architecture.md`.
+3. [x] Docs: the cheapest model setup and the measures before/after in `docs/architecture.md`.
 
 ## Decisions
 * Mode: autonomous.
@@ -57,3 +57,10 @@ nothing on success and little on failure, and run the Stop hook only when there 
 * red: `FAIL - test-harness passes and prints nothing when every script passes`, `... names the failing script`, `... hides the passing lines`.
 * Code review (low): no findings.
 * not verified: a consumer whose own `justfile` recipes stay verbose (project-owned, out of reach).
+
+## Deliverable 3
+* done: `docs/architecture.md` section "The cost of a turn": the measures before/after and the model split (strong model for steps 1 to 3 and the `high` review, cheaper one for step 4), left to the user's settings.
+* checks: `just check` ok, `just test-harness` ok; no test (docs only).
+* red: none.
+* Code review (low): it looked at the commits of deliverable 1 again and repeated the `Cargo.toml` / `clippy.toml` stamp finding; not fixed, a non-goal of `specs/clippy-gate.md`.
+* not verified: the Claude Code names cited (`/model opusplan`, `CLAUDE_CODE_SUBAGENT_MODEL`) against the current Claude Code docs.

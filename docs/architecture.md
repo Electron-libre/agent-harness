@@ -128,6 +128,26 @@ ancestry, patch equivalence, or a merge that would change no file, which covers 
 nothing: `require_code_review.rs` keeps its marker and waiver in the git directory of each worktree
 (`git rev-parse --git-path`), and `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees).
 
+## The cost of a turn
+
+Everything a check prints is read by the agent and billed as tokens, every turn it runs. Measured on this repository
+(bytes / 4 ≈ tokens):
+
+| Output | Before | After |
+|---|---|---|
+| `just check`, success | 86 lines, 5.6 kB | nothing |
+| `just test-harness`, success | 267 lines, 12.7 kB | nothing |
+| clippy gate, 3 errors | 35 lines, 1.9 kB | 4 lines, 0.4 kB |
+| clippy gate, end of turn with no new Rust change | a full clippy run | no run |
+
+The model is the other lever, and the shared settings deliberately do not choose it: it depends on the user's plan
+and the project. The setup that costs least for `issue-workflow` is a strong model where judgment matters (steps 1
+to 3: reformulation, spec, plan; the final `high` review) and a cheaper one for the mechanical part (step 4: test,
+code, docs, the `low` review, the commit). In Claude Code, `/model opusplan` does this split by plan mode (plan
+in plan mode with Opus, act with Sonnet); otherwise switch with `/model` after the plan is validated. Forked
+skills and sub-agents follow the session model unless the user sets `CLAUDE_CODE_SUBAGENT_MODEL` in their own
+settings.
+
 ## Sources
 
 A directory (relative to the project) or a git URL; a git source is cloned in `$XDG_CACHE_HOME/harness` and
