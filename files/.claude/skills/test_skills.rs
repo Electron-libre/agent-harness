@@ -17,6 +17,12 @@ const BUILT_IN_ROOT_DOCS: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 /// Passages a skill must keep, as (skill, passage, why).
 const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ("audit-instructions", "rule_breaches.rs --summary", "the rules broken often feed the audit as hook candidates"),
+    ("audit-instructions", "skill:evaluate-harness", "the audit points to the skill that measures whether the rules paid off"),
+    ("evaluate-harness", "harness_report.rs", "the tables come from the report script, not from the agent's arithmetic"),
+    ("evaluate-harness", "fixed_context.rs", "the fixed context of each revision is measured"),
+    ("evaluate-harness", "delivered_quality.rs", "the quality axis reads each repository with done issues"),
+    ("evaluate-harness", "--anonymous", "a report that lands in a shared file names no project"),
+    ("evaluate-harness", "never a pass or a fail", "numbers become targets once shown: trends only"),
     ("issue-workflow", "## Autonomous mode", "section defining the autonomous mode"),
     ("issue-workflow", "autonomous (default)", "plan validation asks autonomous or per-deliverable validation"),
     ("issue-workflow", "recorded first in `## Decisions`", "mode recorded in the issue so it survives a /clear"),

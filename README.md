@@ -40,5 +40,6 @@ them per harness revision.
 [--context <file>]` joins the outputs of these scripts into one markdown table per axis (efficiency, quality, rules,
 skills, fixed context), a row per group of consecutive revisions with enough sessions (`--min-sessions`, 10), the
 model, version and project mix next to the numbers (`--anonymous` keeps only the count of projects).
+The skill `evaluate-harness` runs them all and reports the trend per axis.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

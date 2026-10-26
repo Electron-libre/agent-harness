@@ -6,7 +6,8 @@ description: Read the instructions the user gave the agent over time (CLAUDE.md,
 # Audit the instructions
 
 Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and issues stay in English). A recurring multi-step
-procedure is a skill, a rule the agent must never break is a hook. Propose only: create nothing here.
+procedure is a skill, a rule the agent must never break is a hook. Propose only: create nothing here. What an adopted
+skill, hook or rule brought afterwards is measured by `skill:evaluate-harness`.
 
 Show the user your results as `AGENTS.md` section "Reports to the user" says.
 

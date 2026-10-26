@@ -57,7 +57,7 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
    REP-8.
 3. [x] Report, other axes: quality, rules, skills, fixed context tables; verified by the same test; makes true
    REP-6, REP-7 (spec `accepted`).
-4. [ ] Skill `evaluate-harness`: runs the scripts (a quality summary per repository) and reports the trend per axis;
+4. [x] Skill `evaluate-harness`: runs the scripts (a quality summary per repository) and reports the trend per axis;
    architecture, README, `audit-instructions` cross-reference; verified by `test_skills.rs`.
 
 ## Decisions
@@ -92,3 +92,11 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
 - red: the eight checks of the new tables failed (no table printed).
 - Smoke run on the real data: every table in under 0.1 s; the rules table is the longest (one row per rule and group).
 - Code review: no findings (noted: a group with no rule row of its revisions has no row in `## Rules`, as REP-6 says).
+
+## Deliverable 4
+- done: skill `evaluate-harness` (collect the five outputs in a temporary directory, read the trend per axis
+  against the confounders, report `metric | groups | trend`, `--anonymous` for a shared file, never commit);
+  `audit-instructions` points to it; architecture, README.
+- red: `evaluate-harness: skill missing` for the five passages of `test_skills.rs`.
+- Code review: 1 finding, fixed: the outputs went to bare relative names, so in the repository; every path now
+  goes under the `mktemp -d` directory.

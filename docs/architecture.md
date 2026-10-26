@@ -115,8 +115,8 @@ another tool is out of reach.
 
 ## The instruction audit
 
-`audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory
-and instruction files under `~/.claude/projects`, through `audit_sources.rs` (which shares the transcript reading of
+`audit-instructions` and `evaluate-harness` are the skills that read outside the repository. The audit reads the
+user's session transcripts, memory and instruction files under `~/.claude/projects`, through `audit_sources.rs` (which shares the transcript reading of
 the evaluation, below), and the summary of `rule_breaches.rs`, whose rules broken often are hook candidates. It only
 proposes skills and hooks;
 the report holds private content, so it stays in the conversation (or a file outside the repository) and each
@@ -192,7 +192,9 @@ not weigh as ten) stand the sample size and the mix of models, Claude Code versi
 only their count), the confounders a reader must weigh before reading a trend. The other tables come with their input: the quality
 signals summed over the revisions of a group and over the repositories given (`--quality` once per repository), the
 rules per group with the share of the sessions where they applied that broke them, the skill calls and hook refusals
-with the skills shipped and never called (`--context`), and the mean fixed context.
+with the skills shipped and never called (`--context`), and the mean fixed context. The skill `evaluate-harness`
+runs the five scripts into a temporary directory and reports the trend per axis next to the confounders; the
+numbers are never turned into a pass or a fail, since they would become targets.
 
 ## Parallel issues
 
