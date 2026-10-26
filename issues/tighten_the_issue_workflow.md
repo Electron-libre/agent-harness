@@ -46,13 +46,14 @@ and cleaner.
 2. [x] Steps 1 and 3 may be one stop for an issue that changes no capability and fits one deliverable.
 3. [x] Slimmer skill: "Parallel agents" and the waiver details move to `issue-workflow/details.md`; the four report
    rules are inlined in `issue-workflow` only.
-4. [ ] End-of-issue `high` review on `main..HEAD`, fixes of the findings on deliverables 1 to 3.
+4. [x] End-of-issue `high` review on `4b50d41..HEAD`, fixes of the findings on deliverables 1 to 3.
 
 ## Decisions
 
 - Mode: autonomous.
 - No spec: the issue changes the text of a shared skill, no capability.
-- Review level: `low` per deliverable, `high` once at the end of the issue on `main..HEAD`.
+- Base commit: `4b50d41` (the work is on `main`, so `main..HEAD` would be empty).
+- Review level: `low` per deliverable, `high` once at the end of the issue on `4b50d41..HEAD`.
 - Report rules: inlined in `issue-workflow` only; the six other skills keep citing `AGENTS.md`.
 - Refactor step: a cleanup by hand under green tests, no `/simplify`.
 - The moved passages go to a shared file of the skill (`details.md`), not to `docs/architecture.md`, which consumers
@@ -115,3 +116,32 @@ and cleaner.
 - Code review: no findings.
 - not verified: that an agent opens `details.md` when a worktree or a waiver comes up.
 - decisions needed: none.
+- note: the `low` review left `test_skills.rs` out; the `high` review of deliverable 4 covered it.
+
+### 4. End-of-issue high review
+
+- done: `/code-review high` on `4b50d41..HEAD`, 9 findings:
+
+| finding | outcome |
+|---|---|
+| the fix commit after a clean-tree review is refused by the gate | fixed: the fixes are one more deliverable with their own `low` review |
+| no human stop for those fixes in per-deliverable mode | fixed: same, steps 4.2 to 4.8 apply |
+| no way to find the base of the issue (`main..HEAD` empty on `main`) | fixed: step 3 records the base commit; this issue's decision corrected to `4b50d41` |
+| the link check fails on `#anchor`, a title or `mailto:` | fixed: anchor and title dropped, schemes skipped |
+| the checks read only `SKILL.md`, not `details.md` | fixed: every markdown file of a skill is checked |
+| `red:` says "step 2" and nothing for a deliverable without test | fixed: step 4.2, `none` without test |
+| the inlined report rules can drift from `AGENTS.md` | not fixed: decision (b) of step 1 |
+| the gate's refusal names no level | outside the deliverables: `issues/name_the_review_level_in_the_gate_message.md` |
+| the linked-worktree closing written three times | fixed: the Rules line only points to "Parallel agents" |
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `just test-harness`, `just check-harness` | pass |
+| docs | none to change |
+| code review | `low` on the fixes, see below |
+
+- red: none (the link check was verified by hand: a missing file fails; an anchor, a title and `mailto:` pass).
+- not verified: an end-of-issue review run by an agent on another issue.
+- decisions needed: none.
+- Code review (`low`, on the fixes): no findings.

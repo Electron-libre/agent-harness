@@ -48,7 +48,8 @@ then do step 2 first. Otherwise start at step 1.
 - For each: what it does, how it will be verified.
 - Ask in the same message how to run step 4: **autonomous (default)**, or a validation at each deliverable.
 - **Stop and wait for the user to validate the plan.** Then write it in the issue under `# Tracking`
-  (checklist `1. [ ] …`, plus a `## Decisions` list for the answers given, starting with the mode).
+  (checklist `1. [ ] …`, plus a `## Decisions` list for the answers given, starting with the mode and the base
+  commit of the issue, `git rev-parse HEAD`).
 
 ## 4. For each deliverable, in order
 
@@ -74,7 +75,8 @@ then do step 2 first. Otherwise start at step 1.
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
    waive the review: never do it yourself ([details.md](details.md), "Review waiver").
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
-   review), one line `red:` with the failure message the test of step 2 gave before the code, then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
+   review), one line `red:` with the failure message the test of step 4.2 gave before the code (`none` for a deliverable
+   with no test), then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
    clean), then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
    not invoke the review, go back to step 5 instead of presenting the deliverable. Wait for the user's validation.
    Don't commit before it. In autonomous mode, write this summary in the issue and go on.
@@ -85,8 +87,9 @@ then do step 2 first. Otherwise start at step 1.
    just the message.
 
 Then move to the next deliverable (autonomous mode: chain into it). Don't chain into it without saying so if the user asked to stop.
-After the last deliverable, invoke `/code-review high` once on the whole diff of the issue (its commits since the
-plan) and fix its findings as in step 5, in one more commit.
+After the last deliverable, invoke `/code-review high` once on the whole issue (`<base>..HEAD`, the base commit
+recorded in `## Decisions`); its fixes are one more deliverable, steps 4.2 to 4.8 with their own `low` review (the
+commit gate only knows the files that review saw).
 
 ## Autonomous mode
 
@@ -116,7 +119,7 @@ closing to the merge.
 - Don't re-litigate decisions already recorded in the issue.
 - If something blocks you, say what and propose one recommendation; don't enumerate every option.
 - When the issue is fully done, mark it in the issue and say what, if anything, remains. Then **ask the
-  user whether to close it** (in a linked worktree, see "Parallel agents": the closing waits for the merge); on their agreement run `just close-issue issues/<name>.md` (moves it to
+  user whether to close it** (in a linked worktree, see "Parallel agents"); on their agreement run `just close-issue issues/<name>.md` (moves it to
   `issues/done/`, drops the issue from `issues/queue.md` and rewrites `issues/<name>.md` to
   `issues/done/<name>.md` in every other document that cites it) and include the
   move and those edits in the final commit. Never move it unasked.

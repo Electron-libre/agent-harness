@@ -2,7 +2,7 @@
 //! Structural check of the project skills: frontmatter is valid, `name` matches the directory,
 //! and every skill (`skill:<name>`), repo doc (`` `AGENTS.md` ``, `` `docs/….md` ``) or section of `AGENTS.md`
 //! (`` `AGENTS.md` section "<heading>" ``) a skill references actually exists, as does every file of its own
-//! directory it links (`[x](details.md)`).
+//! directory it links (`[x](details.md)`); every markdown file of a skill is checked, not only `SKILL.md`.
 //! Usage: `just test-harness` (or `rust-script .claude/skills/test_skills.rs`).
 //! ```cargo
 //! [dependencies]
@@ -83,6 +83,16 @@ fn main() {
             failures.push(format!("{name}: description missing or too short"));
         }
 
+        // the references below are checked in every markdown file of the skill, not only `SKILL.md`
+        let mut extra: Vec<_> = fs::read_dir(entry.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "md") && !p.ends_with("SKILL.md"))
+            .collect();
+        extra.sort();
+        let text = extra.iter().fold(text, |acc, p| acc + "\n" + &fs::read_to_string(p).unwrap_or_default());
+
         // `skill:<name>` references
         for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || ":-".contains(c))) {
             if let Some(target) = word.strip_prefix("skill:").filter(|t| !t.is_empty()) {
@@ -99,8 +109,10 @@ fn main() {
         }
         // relative markdown links outside code spans, resolved in the skill's directory
         let prose = text.split('`').step_by(2).collect::<Vec<_>>().join(" ");
-        for target in prose.split("](").skip(1).filter_map(|t| t.split(')').next()) {
-            if !target.contains("://") && !target.starts_with('#') && !entry.path().join(target).exists() {
+        for link in prose.split("](").skip(1).filter_map(|t| t.split(')').next()) {
+            // drop the title and the anchor; a target with a scheme (`https:`, `mailto:`) is not a file
+            let target = link.split([' ', '#']).next().unwrap_or_default();
+            if !target.is_empty() && !target.contains(':') && !entry.path().join(target).exists() {
                 failures.push(format!("{name}: links the missing file '{target}'"));
             }
         }
