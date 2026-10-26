@@ -184,6 +184,13 @@ from the tree of the oldest commit of the default branch where the revision is i
 commit itself for `self:`), with the list of the skills it ships. The shared hooks print nothing in a session but their
 refusals, already counted.
 
+`.claude/transcripts/harness_report.rs` joins these outputs (it reads their TSV files, never the transcripts) into
+one markdown table per axis. The revisions are taken in the order of their first session and cut into groups of
+consecutive revisions holding at least `--min-sessions` (10) sessions, since a `self:` revision often covers one issue;
+the last group, when short, shows only its size. Next to the numbers (medians per session, so one long session does
+not weigh as ten) stand the sample size and the mix of models, Claude Code versions and projects (`--anonymous` keeps
+only their count), the confounders a reader must weigh before reading a trend.
+
 ## Parallel issues
 
 Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-issue.md), spec

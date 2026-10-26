@@ -52,7 +52,7 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
 ## Plan
 1. [x] Fixed context: `fixed_context.rs`, bytes of `CLAUDE.md`, `AGENTS.md` and skill descriptions per project and
    revision; verified by `test_fixed_context.rs` on fixture transcripts and repositories; makes true REP-1, REP-2.
-2. [ ] Report, efficiency axis: `harness_report.rs` reads the inputs, groups the revisions, prints the efficiency
+2. [x] Report, efficiency axis: `harness_report.rs` reads the inputs, groups the revisions, prints the efficiency
    table with the confounders; verified by `test_harness_report.rs` on fixture TSV files; makes true REP-3 to REP-5,
    REP-8.
 3. [ ] Report, other axes: quality, rules, skills, fixed context tables; verified by the same test; makes true
@@ -76,3 +76,12 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
 - Smoke run on the real transcripts: 44 rows in 3 s; the skill descriptions cost 1.9 to 3.1 kB per revision.
 - Code review: 2 findings, both fixed: a description over several lines (`>` block) counted 1 byte, a nested `name:`
   counted (REP-2 amended, fixture extended).
+
+## Deliverable 2
+- done: `harness_report.rs` (inputs checked by header, groups of consecutive revisions closed at `--min-sessions`,
+  hashes cut to 7, `## Efficiency` table with medians and the model, version and project mix, `--anonymous`);
+  architecture, README; REP-3 to REP-5 made precise (headings, median, input token columns).
+- red: the script did not exist, every check but the refusals failed.
+- Smoke run on the real transcripts: 77 sessions with a revision, 6 groups of 10 to 17 sessions and a last one `too few`.
+- Code review: 1 finding, not fixed here: the other inputs are read but print no table yet, deliverable 3; a second
+  review after the tracking was written: no findings.
