@@ -35,8 +35,8 @@ it. It reports trends, never a pass or a fail.
 ## Non-goals
 
 - A verdict or a threshold on the agent's behaviour: numbers become targets once shown; the report gives trends.
-- Causes: model, Claude Code version and project change with the revision; the report shows them, a replay
-  (`issues/replay_done_issues_to_compare_harness_revisions.md`) isolates them.
+- Causes: model, Claude Code version and project change with the revision; the report shows them, a targeted
+  revert of the suspected change confirms a trend.
 - The false positives of the hook refusals and the skills called where another fits: they need judgment.
 - The text a hook prints in a session: the shared hooks print only on a refusal, already counted.
 - Archiving the report: the session rows have their archive (EVA-11) and the git signals can be recomputed.
