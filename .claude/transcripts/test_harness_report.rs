@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
+const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
+const CONTEXT: &str = "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
 const SELF: &str = "self:1111111111111111111111111111111111111111";
 
 /// A session row: the columns that vary, the others fixed (input 1, output 10, cache read 2, cache creation 3).
@@ -68,8 +71,8 @@ fn base<'a>(project: &'a str, revision: &'a str, day: u32, turns: u64) -> S<'a> 
 fn sessions() -> Vec<S<'static>> {
     let mut list: Vec<S> = (1..=4).map(|t| S { others: u64::from(t > 2), ..base("p1", "r-c", 20, t) }).collect();
     list.push(base("p0", "", 1, 99));
-    list.extend((1..=6).map(|t| S { issues: "i1", ..base("p1", SELF, 2, t) }));
-    list.extend((7..=9).map(|t| S { issues: "i1", models: "m1,m2", ..base("p2", "r-b", 10, t) }));
+    list.extend((1..=6).map(|t| S { issues: "i1", skills: "code-review=2", hooks: if t == 1 { "require_code_review=1" } else { "" }, ..base("p1", SELF, 2, t) }));
+    list.extend((7..=9).map(|t| S { issues: "i1", models: "m1,m2", skills: "files:commit-message=1", ..base("p2", "r-b", 10, t) }));
     list.extend((10..=11).map(|t| base("p1", "r-b", 11, t)));
     list
 }
@@ -138,6 +141,44 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+// spec: REP-6, REP-7
+fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let rows: Vec<String> = sessions().iter().enumerate().map(|(i, s)| s.row(i)).collect();
+    let sessions = write(&tmp.join("axes-sessions.tsv"), SESSIONS, &rows);
+    let breaches = write(&tmp.join("breaches.tsv"), BREACHES, &[format!("x-rule\t{SELF}\t8\t1\t3\t0"), "x-rule\tr-b\t4\t1\t1\t2".into(), "a-rule\tr-b\t2\t0\t0\t0".into(), "x-rule\tr-c\t1\t1\t1\t0".into()]);
+    let quality_a = write(&tmp.join("quality-a.tsv"), QUALITY, &[format!("{SELF}\t2\t4\t6\t1\t1\t0\t2\t3\t2\t1\t3\t4"), "zzz\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9".into()]);
+    let quality_b = write(&tmp.join("quality-b.tsv"), QUALITY, &["r-b\t1\t1\t2\t0\t0\t0\t1\t\t1\t0\t1\t0".into()]);
+    let context = write(
+        &tmp.join("context.tsv"),
+        CONTEXT,
+        &[format!("p1\t{SELF}\tc1\t100\t200\t300\tcode-review,commit-message,write-spec"), "p1\tr-b\tc2\t201\t400\t500\taudit,code-review,commit-message".into(), "p2\tr-b\t\t\t\t\t".into()],
+    );
+    let arg = |s: &'static str| std::ffi::OsStr::new(s);
+    let (ok, out, err) = run(dir, &[arg("--sessions"), sessions.as_os_str(), arg("--breaches"), breaches.as_os_str(), arg("--quality"), quality_a.as_os_str(), arg("--quality"), quality_b.as_os_str(), arg("--context"), context.as_os_str()]);
+    if !ok {
+        println!("{err}");
+    }
+    let t = tables(&out);
+    let first = "self:1111111..r-b";
+    let (quality, rules, skills, fixed) = (t.get("Quality"), t.get("Rules"), t.get("Skills"), t.get("Fixed context"));
+    let rule_rows: Vec<String> = rules.map(|r| r.iter().skip(1).filter(|c| c[0] == first).map(|c| c[2..].join(" ")).collect()).unwrap_or_default();
+    let few = |table: Option<&Vec<Vec<String>>>| table.is_some_and(|r| r.iter().filter(|c| c[0] == "r-c").count() == 1 && r.iter().any(|c| c[0] == "r-c" && c[1] == "4" && c[2..].iter().all(|v| v == "too few")));
+    let too_few = [quality, rules, skills, fixed].into_iter().all(few);
+    let (_, bare, _) = run(dir, &[arg("--sessions"), sessions.as_os_str()]);
+    let bare = tables(&bare);
+    vec![
+        ("quality sums over the revisions and files of a group, other revisions left out", ok && cell(quality, first, "issues") == "3" && cell(quality, first, "commits") == "8" && cell(quality, first, "issue_sessions") == "3" && cell(quality, first, "other_messages") == "4"),
+        ("an empty value empties its sum and its ratio", cell(quality, first, "review_findings").is_empty() && cell(quality, first, "findings_per_review").is_empty()),
+        ("fixes after per issue with two decimals", cell(quality, first, "fixes_after_per_issue") == "0.33"),
+        ("one rules row per rule of the group, sorted, sums and share", rule_rows == ["a-rule 2 0 0 0 0%", "x-rule 12 2 4 2 17%"]),
+        ("skill calls and hook refusals summed, most frequent first", cell(skills, first, "calls") == "code-review=12, files:commit-message=3" && cell(skills, first, "hook_refusals") == "require_code_review=1"),
+        ("unused skills of the revisions, a prefixed call counting", cell(skills, first, "unused") == "audit, write-spec"),
+        ("fixed context means over the rows with bytes, rounded half up", cell(fixed, first, "claude_md_bytes") == "151" && cell(fixed, first, "agents_md_bytes") == "300" && cell(fixed, first, "skill_description_bytes") == "400" && cell(fixed, first, "total_bytes") == "851"),
+        ("a group with too few sessions is one row of `too few` in every table", too_few),
+        ("a table whose input is not given is not printed", bare.contains_key("Skills") && !bare.contains_key("Quality") && !bare.contains_key("Rules") && !bare.contains_key("Fixed context")),
+    ]
+}
+
 // spec: REP-3
 fn refusal_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let good = write(&tmp.join("good.tsv"), SESSIONS, &[base("p1", "r", 1, 1).row(0)]);
@@ -156,7 +197,7 @@ fn refusal_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
 fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let temp = tempfile::tempdir().unwrap();
-    let checks: Vec<_> = efficiency_checks(&dir, temp.path()).into_iter().chain(refusal_checks(&dir, temp.path())).collect();
+    let checks: Vec<_> = efficiency_checks(&dir, temp.path()).into_iter().chain(axes_checks(&dir, temp.path())).chain(refusal_checks(&dir, temp.path())).collect();
     let mut failed = false;
     for (name, ok) in checks {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });

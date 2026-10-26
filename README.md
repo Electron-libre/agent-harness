@@ -36,8 +36,9 @@ reviews and their findings, and the failed checks and typed messages of the sess
 them per harness revision.
 `rust-script .claude/transcripts/fixed_context.rs` prints, per project and harness revision, the bytes of `CLAUDE.md`,
 `AGENTS.md` and the skill descriptions that every session pays, and the skills the revision ships.
-`rust-script .claude/transcripts/harness_report.rs --sessions <file> [--min-sessions <n>] [--anonymous]` turns the rows of
-`session_metrics.rs` into one markdown table per axis, a row per group of consecutive revisions with enough sessions,
-the model, version and project mix next to the numbers.
+`rust-script .claude/transcripts/harness_report.rs --sessions <file> [--breaches <file>] [--quality <file>]...
+[--context <file>]` joins the outputs of these scripts into one markdown table per axis (efficiency, quality, rules,
+skills, fixed context), a row per group of consecutive revisions with enough sessions (`--min-sessions`, 10), the
+model, version and project mix next to the numbers (`--anonymous` keeps only the count of projects).
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

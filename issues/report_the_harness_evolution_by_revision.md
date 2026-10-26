@@ -55,7 +55,7 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
 2. [x] Report, efficiency axis: `harness_report.rs` reads the inputs, groups the revisions, prints the efficiency
    table with the confounders; verified by `test_harness_report.rs` on fixture TSV files; makes true REP-3 to REP-5,
    REP-8.
-3. [ ] Report, other axes: quality, rules, skills, fixed context tables; verified by the same test; makes true
+3. [x] Report, other axes: quality, rules, skills, fixed context tables; verified by the same test; makes true
    REP-6, REP-7 (spec `accepted`).
 4. [ ] Skill `evaluate-harness`: runs the scripts (a quality summary per repository) and reports the trend per axis;
    architecture, README, `audit-instructions` cross-reference; verified by `test_skills.rs`.
@@ -85,3 +85,10 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
 - Smoke run on the real transcripts: 77 sessions with a revision, 6 groups of 10 to 17 sessions and a last one `too few`.
 - Code review: 1 finding, not fixed here: the other inputs are read but print no table yet, deliverable 3; a second
   review after the tracking was written: no findings.
+
+## Deliverable 3
+- done: `## Quality`, `## Rules`, `## Skills` (calls, hook refusals, unused skills) and `## Fixed context` tables,
+  each printed with its input; a `too few` group is one row per table; spec `accepted`; architecture, README.
+- red: the eight checks of the new tables failed (no table printed).
+- Smoke run on the real data: every table in under 0.1 s; the rules table is the longest (one row per rule and group).
+- Code review: no findings (noted: a group with no rule row of its revisions has no row in `## Rules`, as REP-6 says).

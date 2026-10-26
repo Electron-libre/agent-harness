@@ -105,20 +105,25 @@ fn mix(sessions: &[&Row], column: &str) -> String {
             *counts.entry(name).or_default() += 1;
         }
     }
+    sorted_pairs(counts)
+}
+
+/// `name=n, …`, most frequent first, then by name.
+fn sorted_pairs(counts: BTreeMap<&str, u64>) -> String {
     let mut pairs: Vec<_> = counts.into_iter().collect();
     pairs.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
     pairs.iter().map(|(name, n)| format!("{name}={n}")).collect::<Vec<_>>().join(", ")
 }
 
-/// A markdown table under `## <title>`: `group`, `sessions`, then `columns`; a group with too few sessions shows
-/// only its size.
+/// A markdown table under `## <title>`: `group`, `sessions`, then `columns`, one row or more per group; a group with
+/// too few sessions is one row showing only its size.
 fn table(title: &str, columns: &[&str], groups: &[Group], cells: impl Fn(&Group) -> Vec<Vec<String>>) {
     println!("## {title}\n");
     println!("| group | sessions | {} |", columns.join(" | "));
     println!("|{}", "---|".repeat(columns.len() + 2));
     for group in groups {
-        for row in cells(group) {
-            let row = if group.too_few { vec![TOO_FEW.to_string(); row.len()] } else { row };
+        let rows = if group.too_few { vec![vec![TOO_FEW.to_string(); columns.len()]] } else { cells(group) };
+        for row in rows {
             println!("| {} | {} | {} |", group.name, group.sessions.len(), row.join(" | "));
         }
     }
@@ -144,6 +149,99 @@ fn efficiency(groups: &[Group], anonymous: bool) {
             column("validations"),
             column("other_messages"),
         ]]
+    });
+}
+
+/// The `name=n;name=n` pairs of `column` summed over `sessions`, as `name=n, …`, most frequent first, then by name.
+fn summed_pairs(sessions: &[&Row], column: &str) -> String {
+    let mut counts: BTreeMap<&str, u64> = BTreeMap::new();
+    for row in sessions {
+        for (name, n) in value(row, column).split(';').filter_map(|p| p.split_once('=')) {
+            *counts.entry(name).or_default() += n.parse().unwrap_or(0);
+        }
+    }
+    sorted_pairs(counts)
+}
+
+/// The sum of a column over `rows`, `None` when one value is empty or not a number.
+fn sum(rows: &[&Row], column: &str) -> Option<u64> {
+    rows.iter().map(|r| value(r, column).parse::<u64>().ok()).sum()
+}
+
+/// `a / b` with two decimals, empty when a term is missing or `b` is 0.
+fn ratio(a: Option<u64>, b: Option<u64>) -> String {
+    match (a, b) {
+        (Some(a), Some(b)) if b > 0 => format!("{:.2}", a as f64 / b as f64),
+        _ => String::new(),
+    }
+}
+
+/// The rows of `inputs` whose `revision` belongs to `group`.
+fn of_group<'a>(inputs: &'a [Row], group: &Group) -> Vec<&'a Row> {
+    inputs.iter().filter(|r| group.revisions.contains(value(r, "revision"))).collect()
+}
+
+fn quality(groups: &[Group], files: &[Vec<Row>]) {
+    let summed = ["issues", "deliverables", "commits", "fixes_in_issue", "fixes_after", "reverts_after", "reviews", "review_findings", "sessions", "failed_checks", "validations", "other_messages"];
+    let mut columns: Vec<&str> = summed.iter().map(|c| if *c == "sessions" { "issue_sessions" } else { c }).collect();
+    columns.extend(["fixes_after_per_issue", "findings_per_review"]);
+    let rows: Vec<Row> = files.iter().flatten().cloned().collect();
+    table("Quality", &columns, groups, |g| {
+        let rows = of_group(&rows, g);
+        let total = |c: &str| sum(&rows, c);
+        let mut cells: Vec<String> = summed.iter().map(|c| total(c).map(|n| n.to_string()).unwrap_or_default()).collect();
+        cells.push(ratio(total("fixes_after"), total("issues")));
+        cells.push(ratio(total("review_findings"), total("reviews")));
+        vec![cells]
+    });
+}
+
+fn rules(groups: &[Group], breaches: &[Row]) {
+    let columns = ["rule", "applied", "breached", "breaches", "blocked", "breached_share"];
+    table("Rules", &columns, groups, |g| {
+        let mut by_rule: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
+        for row in of_group(breaches, g) {
+            by_rule.entry(value(row, "rule")).or_default().push(row);
+        }
+        by_rule
+            .into_iter()
+            .map(|(rule, rows)| {
+                let total = |c: &str| rows.iter().map(|r| number(r, c)).sum::<u64>();
+                let (applied, breached) = (total("applied"), total("breached"));
+                let share = if applied > 0 { format!("{}%", (breached * 200 + applied).div_euclid(applied * 2)) } else { String::new() };
+                vec![rule.to_string(), applied.to_string(), breached.to_string(), total("breaches").to_string(), total("blocked").to_string(), share]
+            })
+            .collect()
+    });
+}
+
+fn skills(groups: &[Group], context: Option<&[Row]>) {
+    let mut columns = vec!["calls", "hook_refusals"];
+    if context.is_some() {
+        columns.push("unused");
+    }
+    table("Skills", &columns, groups, |g| {
+        let mut cells = vec![summed_pairs(&g.sessions, "skills"), summed_pairs(&g.sessions, "hook_refusals")];
+        if let Some(context) = context {
+            let called: HashSet<&str> = g.sessions.iter().flat_map(|r| value(r, "skills").split(';')).filter_map(|p| p.split_once('=')).map(|(n, _)| n.rsplit(':').next().unwrap_or(n)).collect();
+            let shipped: std::collections::BTreeSet<&str> = of_group(context, g).iter().flat_map(|r| value(r, "skills").split(',')).filter(|s| !s.is_empty()).collect();
+            cells.push(shipped.into_iter().filter(|s| !called.contains(s)).collect::<Vec<_>>().join(", "));
+        }
+        vec![cells]
+    });
+}
+
+fn fixed_context(groups: &[Group], context: &[Row]) {
+    let bytes = ["claude_md_bytes", "agents_md_bytes", "skill_description_bytes"];
+    let mut columns = bytes.to_vec();
+    columns.push("total_bytes");
+    table("Fixed context", &columns, groups, |g| {
+        let rows: Vec<&Row> = of_group(context, g).into_iter().filter(|r| bytes.iter().all(|c| value(r, c).parse::<u64>().is_ok())).collect();
+        let n = rows.len() as u64;
+        let mean = |f: &dyn Fn(&Row) -> u64| if n == 0 { String::new() } else { (rows.iter().map(|r| f(r)).sum::<u64>() * 2 + n).div_euclid(n * 2).to_string() };
+        let mut cells: Vec<String> = bytes.iter().map(|c| mean(&|r: &Row| number(r, c))).collect();
+        cells.push(mean(&|r: &Row| bytes.iter().map(|c| number(r, c)).sum()));
+        vec![cells]
     });
 }
 
@@ -184,9 +282,19 @@ fn main() {
     };
     let options = options().unwrap_or_else(|e| fail(e));
     let sessions = options.sessions.as_deref().ok_or("--sessions is required".to_string()).and_then(|f| read(f, SESSIONS)).unwrap_or_else(|e| fail(e));
-    let _breaches = options.breaches.as_deref().map(|f| read(f, BREACHES)).transpose().unwrap_or_else(|e| fail(e));
-    let _quality: Vec<Vec<Row>> = options.quality.iter().map(|f| read(f, QUALITY)).collect::<Result<_, _>>().unwrap_or_else(|e| fail(e));
-    let _context = options.context.as_deref().map(|f| read(f, CONTEXT)).transpose().unwrap_or_else(|e| fail(e));
+    let breaches = options.breaches.as_deref().map(|f| read(f, BREACHES)).transpose().unwrap_or_else(|e| fail(e));
+    let quality_files: Vec<Vec<Row>> = options.quality.iter().map(|f| read(f, QUALITY)).collect::<Result<_, _>>().unwrap_or_else(|e| fail(e));
+    let context = options.context.as_deref().map(|f| read(f, CONTEXT)).transpose().unwrap_or_else(|e| fail(e));
     let groups = groups(&sessions, options.min_sessions);
     efficiency(&groups, options.anonymous);
+    if !quality_files.is_empty() {
+        quality(&groups, &quality_files);
+    }
+    if let Some(breaches) = &breaches {
+        rules(&groups, breaches);
+    }
+    skills(&groups, context.as_deref());
+    if let Some(context) = &context {
+        fixed_context(&groups, context);
+    }
 }

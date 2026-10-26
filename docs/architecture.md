@@ -189,7 +189,10 @@ one markdown table per axis. The revisions are taken in the order of their first
 consecutive revisions holding at least `--min-sessions` (10) sessions, since a `self:` revision often covers one issue;
 the last group, when short, shows only its size. Next to the numbers (medians per session, so one long session does
 not weigh as ten) stand the sample size and the mix of models, Claude Code versions and projects (`--anonymous` keeps
-only their count), the confounders a reader must weigh before reading a trend.
+only their count), the confounders a reader must weigh before reading a trend. The other tables come with their input: the quality
+signals summed over the revisions of a group and over the repositories given (`--quality` once per repository), the
+rules per group with the share of the sessions where they applied that broke them, the skill calls and hook refusals
+with the skills shipped and never called (`--context`), and the mean fixed context.
 
 ## Parallel issues
 
