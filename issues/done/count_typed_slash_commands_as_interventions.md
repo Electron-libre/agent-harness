@@ -81,7 +81,7 @@ Code review: 8 findings
 - measure not reproducible: fixed, method recorded.
 - `just check` recorded as not run: fixed (it had run and passed; `just test-harness` run too).
 - `close_issue.rs` leaves a blank line when it removes the last queue entry: out of this issue, filed as
-  `issues/keep_the_queue_tidy_when_its_last_issue_closes.md`.
+  `issues/done/keep_the_queue_tidy_when_its_last_issue_closes.md`.
 
 not verified: none
 decisions needed: none

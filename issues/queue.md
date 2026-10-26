@@ -3,5 +3,3 @@
 Open issues in the order to work on them: the first is the next one. Read by `just next-issue`;
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
-
-- [keep_the_queue_tidy_when_its_last_issue_closes](keep_the_queue_tidy_when_its_last_issue_closes.md) - only open issue: a cosmetic fix of `close_issue.rs`
