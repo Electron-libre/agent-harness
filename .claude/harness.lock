@@ -1,9 +1,9 @@
 # Written by `harness sync`: hashes of the managed files. Do not edit.
 144fa623e8219143f8a9d7165e44fc05472b78ea7dec884fc8d963a4f6b9ce1d+x  .claude/hooks/clippy_gate.rs
 f3da08683417a1f2964cabde5f76b1e5e0154db28ae253db4adbde990eb92640+x  .claude/hooks/format_rust.rs
-7ecee12f946d1c5323971c6733d75c5c788296bd1801352e7c23499f50318100  .claude/hooks/require_code_review.rs
+3b11cb7e7d2b02c718d15ba1aa4169396febeed7d36a412b9650097ad94fd4ca  .claude/hooks/require_code_review.rs
 55391f54534526926881d5176332a19af88d52a659b16e428072ff7d33cd3cd4+x  .claude/hooks/test_hooks.rs
-4820388747e951a86ac0b29e90337d847b7bef0614264d324ae7985c079d2011  .claude/hooks/test_require_code_review.rs
+9f7ab65a4f341f67b1d946989bda79b06ced318125b73875cb2ce1350256113a  .claude/hooks/test_require_code_review.rs
 e5bd42bb4faea6c1134d4a18087c19eb7896c84261638630b00b7c5a3eebabb7  .claude/skills/audit-instructions/SKILL.md
 ec3bb90e7f7ce48972c78c614f713ca3a3e780056387346e8f097595ddfab91c  .claude/skills/audit-instructions/audit_sources.rs
 1e27ed1965dd0a755f12948b637ce444b41504c67f12874dc338b2f6bb51995e  .claude/skills/audit-instructions/test_audit_sources.rs

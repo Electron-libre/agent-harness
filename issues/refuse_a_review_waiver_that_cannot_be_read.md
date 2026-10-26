@@ -35,6 +35,9 @@ cannot read should waive nothing, as one it cannot stamp already does.
 
 1. [x] An unreadable waiver waives nothing: no stamp, no removal, the review judges the commit and the refusal names
    the waiver to fix (REV-10).
+2. [x] Fixes of the `high` review: only an I/O error makes a waiver unreadable (non-UTF-8 content is content, a
+   waiver gone before the read is no waiver), a reviewed diff passes with an unreadable waiver, the waiver state is
+   one enum, the `Refusal` doc names a waiver the hook could not use (REV-10).
 
 ## Deliverable 1 summary
 * done: `refusal()` reads an unreadable waiver as unusable (`Refusal::broken_waiver`), neither stamped nor dropped; the
@@ -44,3 +47,14 @@ cannot read should waive nothing, as one it cannot stamp already does.
   and the commit let through).
 * Code review (`low`): no findings.
 * not verified: the case as root (the test skips it, root reads a `0200` file).
+
+## Deliverable 2 summary
+* done: `enum Waiver` (`Absent`, `Unreadable`, `Text`) read by `waiver()`; a read failing with `NotFound` is no
+  waiver, non-UTF-8 content is read lossily (not a stamp, so dropped); new checks for a reviewed diff with an
+  unreadable waiver and for a non-UTF-8 waiver.
+* checks: `just check` ok, `just test-harness` ok, `just check-harness` ok.
+* red: `FAIL - native drops a waiver whose content is not UTF-8 and is no stamp`.
+* `high` review findings not fixed: keeping an unreadable waiver once `HEAD` moved is untested (not a REV-10
+  obligation); the silent skip of the case as root is the pattern of the unstampable case.
+* Code review (`low`): no findings.
+* not verified: the `NotFound` race between the path lookup and the read (no deterministic test).

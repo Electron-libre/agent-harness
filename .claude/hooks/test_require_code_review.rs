@@ -205,9 +205,17 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
         let path = waiver.canonicalize().unwrap();
         out.push(("that refusal tells the agent to ask the user to fix the unreadable waiver, by its path", stderr.contains("could not be read") && stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
         out.push(("native leaves the unreadable waiver unstamped", fs::metadata(&waiver).map(|m| m.len() == 0).unwrap_or(false)));
+        review_done(hook, &current, "code-review");
+        out.push(("native lets through a reviewed diff whose waiver it cannot read", native_run(hook, &current, &[]).0 == 0));
+        // a file the review never saw, so the next cases judge an unreviewed diff again
+        fs::write(current.join("unseen.txt"), "x\n").unwrap();
     }
     fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
     fs::remove_file(&waiver).unwrap();
+    // content that is not UTF-8 is read, not unreadable: it is no stamp, so it is dropped like a stale one
+    fs::write(&waiver, [0xff, 0xfe]).unwrap();
+    let (code, stderr) = native_run(hook, &current, &[]);
+    out.push(("native drops a waiver whose content is not UTF-8 and is no stamp", code == 2 && !stderr.contains("could not be read") && !waiver.exists()));
     // a waiver that cannot be stamped is ignored: the review alone judges the commit, and the user is told to fix it
     fs::write(&waiver, "").unwrap();
     let mut readonly = fs::metadata(&waiver).unwrap().permissions();
@@ -227,6 +235,7 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::set_permissions(&waiver, readonly).unwrap();
     fs::remove_file(&waiver).unwrap();
     fs::remove_file(current.join("new.txt")).unwrap();
+    let _ = fs::remove_file(current.join("unseen.txt"));
     fs::write(current.join("a.txt"), "one\n").unwrap();
     out.push(("native lets through a repository with nothing to commit", native_run(hook, &current, &[]).0 == 0));
     let _ = fs::remove_dir_all(current.parent().unwrap());

@@ -275,11 +275,30 @@ fn record(cwd: &Path) -> std::io::Result<()> {
     std::fs::write(path, serde_json::json!({"head": snap.head, "hash": snap.hash, "files": snap.files}).to_string())
 }
 
-/// Why the commit must wait for a review, and the waiver the hook could not stamp, if any.
+/// Why the commit must wait for a review, and the waiver the hook could not use, if any.
 struct Refusal {
     why: &'static str,
     /// A waiver that waives nothing because the hook could not use it: its path and what failed (`read`, `stamped`).
     broken_waiver: Option<(PathBuf, &'static str)>,
+}
+
+/// The waiver of the repository as the hook finds it.
+enum Waiver {
+    Absent,
+    /// It exists but reading it failed: it is neither stamped nor dropped.
+    Unreadable(PathBuf),
+    /// Its content, trimmed: empty while unspent, then the `HEAD` it was stamped with.
+    Text(PathBuf, String),
+}
+
+/// The waiver of `cwd`; one gone before the read is absent, content that is not UTF-8 is content, not a read failure.
+fn waiver(cwd: &Path) -> Waiver {
+    let Some(path) = git_file(cwd, WAIVER) else { return Waiver::Absent };
+    match std::fs::read(&path) {
+        Ok(bytes) => Waiver::Text(path, String::from_utf8_lossy(&bytes).trim().to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Waiver::Absent,
+        Err(_) => Waiver::Unreadable(path),
+    }
 }
 
 /// Why the commit must wait for a review, or `None` when the review covers it.
@@ -289,33 +308,29 @@ fn refusal(cwd: &Path) -> Option<Refusal> {
     // the waiver is spent by a commit, not by a command that may not commit (`--dry-run`, a refusal of another hook
     // or of git): it is stamped with `HEAD` when it lets a commit through and dropped once `HEAD` moved
     let stamp = if snap.head.is_empty() { NO_HEAD } else { snap.head.as_str() };
-    let waiver = git_file(cwd, WAIVER).filter(|w| w.exists());
-    // `None` inside: the waiver cannot be read, so it is neither stamped nor dropped
-    let used = waiver.as_ref().map(|w| std::fs::read_to_string(w).ok().map(|t| t.trim().to_string()));
-    if let (Some(waiver), Some(Some(used))) = (&waiver, &used) {
+    let mut waiver = waiver(cwd);
+    if let Waiver::Text(path, used) = &waiver {
         if !used.is_empty() && used != stamp {
-            std::fs::remove_file(waiver).ok();
+            std::fs::remove_file(path).ok();
+            waiver = Waiver::Absent;
         }
     }
     if snap.files.is_empty() || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR)) {
         return None;
     }
     // fail closed: a waiver that cannot be read or stamped could never be spent, so the review alone judges the commit
-    let mut failed = None;
-    if let (Some(waiver), Some(used)) = (&waiver, &used) {
-        match used {
-            Some(used) if used == stamp => return None,
-            Some(used) if used.is_empty() => {
-                if std::fs::write(waiver, stamp).is_ok() {
-                    return None;
-                }
-                failed = Some("stamped");
+    let broken_waiver = match waiver {
+        Waiver::Absent => None,
+        Waiver::Unreadable(path) => Some((path, "read")),
+        Waiver::Text(_, used) if used == stamp => return None,
+        Waiver::Text(path, _) => {
+            if std::fs::write(&path, stamp).is_ok() {
+                return None;
             }
-            Some(_) => {}
-            None => failed = Some("read"),
+            Some((path, "stamped"))
         }
     }
-    let broken_waiver = waiver.zip(failed).map(|(w, f)| (w.canonicalize().unwrap_or(w), f));
+    .map(|(path, failed)| (path.canonicalize().unwrap_or(path), failed));
     let refused = |why| Some(Refusal { why, broken_waiver: broken_waiver.clone() });
     let Some(marker) = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else {
         return refused("no code review has run in this project");
