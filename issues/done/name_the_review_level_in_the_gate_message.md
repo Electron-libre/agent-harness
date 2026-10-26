@@ -34,3 +34,11 @@ give the same instruction as the skill.
      `FAIL - refuses a commit without any review`.
    * Code review: no findings.
    * not verified: none. decisions needed: none.
+
+## End-of-issue review (`high`, `aa9a58b..HEAD`)
+* Waiver-stamp refusal also says to run a review, which cannot clear it: outside this issue, filed as
+  `tell_the_agent_to_ask_the_user_when_the_waiver_cannot_be_stamped`.
+* `low` hard-coded in the hook, duplicating step 4.5: the decision of this issue; the test pins it so a drift fails.
+* REV-10 does not name the level the test now pins: amendment folded into the waiver issue above (user agreed).
+* "/code-review low with the Skill tool" may be split badly by an agent: same wording as step 4.5, not changed.
+* Approach says no test pins the text: true when written; the Tracking records the change.

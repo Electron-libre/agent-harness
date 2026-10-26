@@ -131,7 +131,7 @@ and cleaner.
 | the checks read only `SKILL.md`, not `details.md` | fixed: every markdown file of a skill is checked |
 | `red:` says "step 2" and nothing for a deliverable without test | fixed: step 4.2, `none` without test |
 | the inlined report rules can drift from `AGENTS.md` | not fixed: decision (b) of step 1 |
-| the gate's refusal names no level | outside the deliverables: `issues/name_the_review_level_in_the_gate_message.md` |
+| the gate's refusal names no level | outside the deliverables: `issues/done/name_the_review_level_in_the_gate_message.md` |
 | the linked-worktree closing written three times | fixed: the Rules line only points to "Parallel agents" |
 
 | check | result |
