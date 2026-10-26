@@ -26,3 +26,26 @@ nothing on success and little on failure, and run the Stop hook only when there 
 # Hints
 * The gate must still let go when `stop_hook_active` is set, to avoid an endless loop.
 * A truncated clippy output must keep the file and line of each error kept.
+
+# Specs
+* `specs/clippy-gate.md` (CLG)
+
+# Tracking
+1. [x] Clippy gate: short format, at most 40 diagnostics, stamp of the last passing run (CLG-1 to CLG-5).
+2. [ ] Quiet recipes: `test-harness` (`files/harness.just`), `check`, `clippy`, `test` (`justfile`) print nothing on success, only the failures otherwise.
+3. [ ] Docs: the cheapest model setup and the measures before/after in `docs/architecture.md`.
+
+## Decisions
+* Mode: autonomous.
+* Base commit: 57303d89ed439426d29d25a8e8e8614482d131dc.
+* Measures before (this repository): `just check` 86 lines / 5611 bytes, `just test-harness` 267 lines / 12706 bytes on success; a failing clippy gate with 3 errors 35 lines / 1854 bytes (the short format: 3 lines).
+* The gate uses `--message-format=short` (one line per diagnostic, with the file, line and help) rather than cutting the human output.
+* `test-harness` is quieted in the recipe, which hides the output of a passing script and shows only its non-`ok` lines when it fails; the test scripts are unchanged.
+* A failing run writes no stamp: the next end of turn runs clippy again even when nothing changed.
+
+## Deliverable 1
+* done: the clippy gate reports one short line per diagnostic (at most 40, then a count), skips clippy while the Rust state of its last passing run is unchanged; spec `specs/clippy-gate.md` accepted.
+* checks: `just check` ok, `just test-harness` ok, specs traced (CLG-1 to CLG-5), docs `docs/architecture.md`.
+* red: `FAIL - gate reports the file, line and message`, `... at most 40 diagnostics`, `... skips clippy while the Rust state is unchanged` (and 3 more).
+* Code review (low): the stamp ignores `Cargo.toml`, `clippy.toml` and `[lints]`; not fixed, a non-goal of `specs/clippy-gate.md` (the next `.rs` edit or `just check` catches it).
+* not verified: the gate in a live Claude Code session.

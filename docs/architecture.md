@@ -39,6 +39,12 @@ No hook guards the attribution: the seeded settings turn it off at the source (`
 "sessionUrl": false}`), `commit_check.rs` rejects a credit line in a message (run by `skill:commit-message` and by CI
 through `just check-commits`), and `harness check` warns of settings that leave it on.
 
+The Stop hook `clippy_gate.rs` blocks the end of a turn while `cargo clippy` reports a problem in a project with a
+changed `.rs` file (spec [`specs/clippy-gate.md`](../specs/clippy-gate.md)). What it prints is billed to the agent at
+each turn, so it sends one line per diagnostic (`--message-format=short`: file, line, column, message), at most 40,
+and runs clippy only when the Rust state changed since the last passing run: that run writes a hash of `HEAD`, the
+diff of the tracked `.rs` files and the untracked ones to `claude-clippy-pass` in the git directory of the worktree.
+
 `require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
 declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on
 `PreToolUse` `Bash` (a third mode, `native`, is run by git, see below):

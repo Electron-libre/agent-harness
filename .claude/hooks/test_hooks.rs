@@ -13,9 +13,14 @@ struct Outcome {
 }
 
 fn run_hook(script: &Path, project: &Path, stdin: &str) -> Outcome {
+    run_hook_with(script, project, stdin, &[])
+}
+
+fn run_hook_with(script: &Path, project: &Path, stdin: &str, env: &[(&str, String)]) -> Outcome {
     let mut child = Command::new("rust-script")
         .arg(script)
         .env("CLAUDE_PROJECT_DIR", project)
+        .envs(env.iter().map(|(k, v)| (k, v)))
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -44,6 +49,92 @@ fn sh(project: &Path, program: &str, args: &[&str]) {
 fn commit_all(project: &Path, msg: &str) {
     sh(project, "git", &["add", "-A"]);
     sh(project, "git", &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", msg]);
+}
+
+// spec: CLG-1, CLG-2, CLG-3, CLG-4, CLG-5
+/// The clippy gate in one Cargo project, in order: the stamp of a passing run decides the runs that follow.
+fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> {
+    let main_rs = project.join("src/main.rs");
+    let mut checks = Vec::new();
+    // A fake `cargo` first on the PATH: it counts its runs and fails with the diagnostics of `fake_out`.
+    let fake_bin = project.join("fake-bin");
+    fs::create_dir_all(&fake_bin).unwrap();
+    let fake_out = project.join("fake-out.txt");
+    let fake_log = project.join("fake-log.txt");
+    let fake_cargo = fake_bin.join("cargo");
+    fs::write(
+        &fake_cargo,
+        format!("#!/bin/sh\necho run >> '{}'\ncat '{}' >&2\nexit 101\n", fake_log.display(), fake_out.display()),
+    )
+    .unwrap();
+    sh(project, "chmod", &["+x", fake_cargo.to_str().unwrap()]);
+    let fake_env = [("PATH", format!("{}:{}", fake_bin.display(), std::env::var("PATH").unwrap_or_default()))];
+    let fake_runs = || fs::read_to_string(&fake_log).map(|l| l.lines().count()).unwrap_or(0);
+    fs::write(project.join(".gitignore"), "/target\n/fake-*\n").unwrap();
+    commit_all(project, "ignore");
+
+    // rust-script builds the hook with cargo: build it with the real one before the fake shadows it.
+    run_hook(gate, project, "{\"stop_hook_active\":true}");
+    checks.push(("gate passes with no Rust change", run_hook_with(gate, project, "{}", &fake_env).code == 0));
+    checks.push(("gate runs no clippy with no Rust change", fake_runs() == 0));
+
+    fs::write(&main_rs, "fn main() {\n    let unused = 1;\n}\n").unwrap();
+    let out = run_hook(gate, project, "{}");
+    checks.push(("gate blocks on a clippy warning", out.code == 2));
+    checks.push((
+        "gate reports the file, line and message",
+        out.stderr.contains("src/main.rs:2:9:") && out.stderr.contains("unused"),
+    ));
+    checks.push((
+        "gate reports no build progress",
+        !out.stderr.contains("Checking")
+            && !out.stderr.contains("Compiling")
+            && !out.stderr.contains("could not compile"),
+    ));
+
+    checks.push((
+        "gate lets go when stop_hook_active",
+        run_hook_with(gate, project, "{\"stop_hook_active\":true}", &fake_env).code == 0 && fake_runs() == 0,
+    ));
+
+    let many: String = (1..=45).map(|i| format!("src/main.rs:{i}:1: error: problem {i}\n")).collect();
+    fs::write(&fake_out, format!("    Checking hooktest v0.1.0\n{many}error: could not compile `hooktest`\n")).unwrap();
+    let out = run_hook_with(gate, project, "{}", &fake_env);
+    let reported = out.stderr.lines().filter(|l| l.starts_with("src/main.rs:")).count();
+    checks.push(("gate reports at most 40 diagnostics", out.code == 2 && reported == 40));
+    checks.push(("gate says how many it left out", out.stderr.contains("5 more")));
+
+    let before = fake_runs();
+    run_hook_with(gate, project, "{}", &fake_env);
+    checks.push(("gate runs clippy again after a failure with nothing changed", fake_runs() == before + 1));
+
+    fs::write(&main_rs, "fn main() {}\n// edited\n").unwrap();
+    checks.push(("gate passes once fixed", run_hook(gate, project, "{}").code == 0));
+    let before = fake_runs();
+    fs::write(project.join("README.md"), "edited\n").unwrap();
+    checks.push((
+        "gate skips clippy while the Rust state is unchanged",
+        run_hook_with(gate, project, "{}", &fake_env).code == 0 && fake_runs() == before,
+    ));
+
+    fs::write(&main_rs, "fn main() {}\n// edited again\n").unwrap();
+    checks.push(("gate runs clippy again after a .rs edit", run_hook_with(gate, project, "{}", &fake_env).code == 2));
+    fs::write(&main_rs, "fn main() {}\n// edited\n").unwrap();
+    checks.push((
+        "gate skips again once back to the passing state",
+        run_hook_with(gate, project, "{}", &fake_env).code == 0,
+    ));
+    fs::write(project.join("src/extra.rs"), "").unwrap();
+    checks.push((
+        "gate runs clippy again for a new untracked .rs file",
+        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+    ));
+    fs::remove_file(project.join("src/extra.rs")).unwrap();
+    sh(project, "git", &["add", "README.md"]);
+    sh(project, "git", &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "readme"]);
+    checks.push(("gate runs clippy again after HEAD moved", run_hook_with(gate, project, "{}", &fake_env).code == 2));
+
+    checks
 }
 
 fn main() {
@@ -82,24 +173,9 @@ fn main() {
     fs::write(&main_rs, "fn main() {}\n").unwrap();
     commit_all(&project, "clean");
 
-    // clippy gate: no Rust change -> pass
-    check("gate passes with no Rust change", run_hook(&gate, &project, "{}").code == 0);
-
-    // clippy gate: warning -> exit 2 with the output on stderr
-    fs::write(&main_rs, "fn main() {\n    let unused = 1;\n}\n").unwrap();
-    let out = run_hook(&gate, &project, "{}");
-    check("gate blocks on a clippy warning", out.code == 2);
-    check("gate reports the warning to the agent", out.stderr.contains("unused"));
-
-    // clippy gate: no infinite loop when the agent already retried
-    check(
-        "gate lets go when stop_hook_active",
-        run_hook(&gate, &project, "{\"stop_hook_active\":true}").code == 0,
-    );
-
-    // clippy gate: fixed code -> pass
-    fs::write(&main_rs, "fn main() {}\n").unwrap();
-    check("gate passes once fixed", run_hook(&gate, &project, "{}").code == 0);
+    for (name, ok) in clippy_gate_checks(&gate, &project) {
+        check(name, ok);
+    }
 
     let _ = fs::remove_dir_all(&project);
     std::process::exit(i32::from(failed));
