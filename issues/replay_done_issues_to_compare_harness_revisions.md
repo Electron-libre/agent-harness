@@ -23,7 +23,7 @@ trends, not causes. For a major harness change, compare two revisions on the sam
 # Resources
 * `docs/adr/0002-rev-pins-the-resolved-commit.md`, `docs/adr/0003-one-worktree-per-issue.md`
 * `files/.claude/skills/issue-workflow/SKILL.md` (autonomous mode, validation stop)
-* `issues/report_the_harness_evolution_by_revision.md`
+* `issues/done/report_the_harness_evolution_by_revision.md`
 
 # Hints
 * Costly: each run is a full agent session; keep the set small and run it only around a major change.
