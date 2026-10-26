@@ -550,8 +550,13 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
 
     if !options.dry_run {
         write_lock(root, &new_lock)?;
-        report.warnings = settings::warnings(root, new_lock.contains_key(gate::REVIEW_HOOK));
     }
+    // judged on the project as the sync leaves it, or would under `--dry-run`
+    let done = |path: &str, outcome| report.outcome(path) == Some(outcome);
+    let present = |path: &str| {
+        done(path, Outcome::Added) || (root.join(path).is_file() && !done(path, Outcome::Removed))
+    };
+    report.warnings = settings::warnings(root, new_lock.contains_key(gate::REVIEW_HOOK), &present);
     Ok(report)
 }
 
@@ -664,7 +669,7 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
         .collect();
     Ok(Checked {
         problems,
-        warnings: settings::warnings(root, gated),
+        warnings: settings::warnings(root, gated, &|path| root.join(path).is_file()),
     })
 }
 

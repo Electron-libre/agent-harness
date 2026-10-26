@@ -648,7 +648,10 @@ fn the_seeded_settings_give_check_nothing_to_warn_of() {
             .unwrap();
         }
     }
-    assert_eq!(settings::warnings(root.path(), true), Vec::<String>::new());
+    assert_eq!(
+        settings::warnings(root.path(), true, &|path| root.path().join(path).is_file()),
+        Vec::<String>::new()
+    );
 }
 
 const GONE: &str = "warning: .claude/settings.json runs the missing hook .claude/hooks/gone.rs";
@@ -695,4 +698,29 @@ fn update_reports_the_warnings_of_its_sync_once() {
     .unwrap();
     assert!(done.applied);
     assert_eq!(done.sync.warnings, vec![GONE.to_string()]);
+}
+
+// spec: SYN-27
+#[test]
+fn a_dry_run_warns_of_the_settings_as_the_sync_would_leave_them() {
+    let dry = SyncOptions {
+        force: false,
+        dry_run: true,
+    };
+    let (source, root) = setup();
+    put(source.path(), "files/.claude/hooks/gone.rs", "// a hook");
+    put(root.path(), ".claude/settings.json", &running_gone());
+    // the sync would add the hook the settings run: nothing to warn of, though it is not there yet
+    let report = sync(root.path(), &dry).unwrap();
+    assert!(report.warnings.is_empty(), "{:?}", report.warnings);
+    assert!(get(root.path(), ".claude/hooks/gone.rs").is_none());
+
+    run(&root);
+    fs::remove_file(source.path().join("files/.claude/hooks/gone.rs")).unwrap();
+    let lock = get(root.path(), LOCK);
+    // the sync would remove it: warned of, though it is still there
+    let report = sync(root.path(), &dry).unwrap();
+    assert_eq!(report.warnings, vec![GONE.to_string()]);
+    assert!(get(root.path(), ".claude/hooks/gone.rs").is_some());
+    assert_eq!(get(root.path(), LOCK), lock);
 }

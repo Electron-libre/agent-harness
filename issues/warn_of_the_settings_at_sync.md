@@ -32,7 +32,7 @@ the sync that deletes a hook the source dropped (SYN-5): from then on the settin
 
 1. [x] `Report` carries the settings warnings, filled by `sync_from` after a real sync and printed to stderr by `sync`
    and `update` (once) (SYN-27, real sync).
-2. [ ] Under `--dry-run`, the warnings are judged on the state the sync would leave: hooks it would remove are
+2. [x] Under `--dry-run`, the warnings are judged on the state the sync would leave: hooks it would remove are
    missing, hooks it would add are present (SYN-27, dry run); spec `accepted`.
 
 ## Decisions
@@ -48,5 +48,13 @@ the sync that deletes a hook the source dropped (SYN-5): from then on the settin
   `sync` and for `update`); README, `docs/architecture.md` (and the stale `gate.rs` path of `DENY_RULES`) updated.
 * checks: `just check` ok, `just test-harness` ok, specs ok (SYN-27 traced, spec `draft` until deliverable 2).
 * code review: no findings.
-* not verified: the exit code of the binary on a warning is not tested end to end (`print_changes` returns
-  `conflicts() == 0`, unchanged).
+* not verified: the exit code of the binary on a warning (smoke-tested in deliverable 2: exit 0).
+
+## Deliverable 2
+
+* done: `settings::warnings` takes what the project has once synced; `sync_from` counts a hook it adds as present and
+  one it removes as missing, dry run or not; `specs/sync.md` `accepted`; `docs/architecture.md` says so.
+* checks: `just check` ok, `just test-harness` ok, specs ok.
+* code review: no findings.
+* smoke test of the binary: `sync`, `sync --dry-run` print the missing hook warning on stderr and exit 0.
+* not verified: nothing.

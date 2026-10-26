@@ -1,6 +1,6 @@
 ---
 id: SYN
-status: draft
+status: accepted
 adrs: [0002, 0004, 0005]
 ---
 
@@ -54,7 +54,7 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-24, SYN-25, SYN-26) Given a `.claude/settings.json` that cannot be read or is not valid JSON, then `check` prints one warning saying so instead of one per rule, hook or attribution, whether or not the review hook is managed.
 - (SYN-25) Given a hook command that names no file under `.claude/hooks/` (a `just` recipe, a tool on the `PATH`), then it is not reported.
 - (SYN-26) Given an `attribution` whose `commit` is empty but whose `pr` is unset, then the warning is printed: Claude Code adds its default text to the pull requests.
-- (SYN-27) Given a source that dropped a hook the settings run, when `sync --dry-run` runs, then it warns that the settings would run the missing hook, though the file is still there.
+- (SYN-27) Given a source that dropped a hook the settings run, when `sync --dry-run` runs, then it warns that the settings run the missing hook, though the file is still there.
 - (SYN-27) Given an `update` that applies, then the warnings of its sync come out once, not once for the dry run that precedes it and once for the sync.
 - (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
 

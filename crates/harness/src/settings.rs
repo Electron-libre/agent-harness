@@ -21,9 +21,9 @@ const HOOKS: &str = ".claude/hooks/";
 const PROJECT_PREFIXES: [&str; 4] = ["", "./", "$CLAUDE_PROJECT_DIR/", "${CLAUDE_PROJECT_DIR}/"];
 
 /// The warnings on the project's settings, none when it has none: the deny rules they lack when `gated` (the project
-/// has the review hook), the hooks they run that the project lacks, and an attribution left on. One warning saying
-/// why when they cannot be read or parsed.
-pub fn warnings(root: &Path, gated: bool) -> Vec<String> {
+/// has the review hook), the hooks they run that the project lacks (`present` says whether it has a path relative to
+/// its root), and an attribution left on. One warning saying why when they cannot be read or parsed.
+pub fn warnings(root: &Path, gated: bool, present: &dyn Fn(&str) -> bool) -> Vec<String> {
     let settings = match fs::read_to_string(root.join(SETTINGS)) {
         Err(e) if e.kind() == ErrorKind::NotFound => return Vec::new(),
         Err(e) => return vec![format!("warning: {SETTINGS} cannot be read: {e}")],
@@ -37,7 +37,7 @@ pub fn warnings(root: &Path, gated: bool) -> Vec<String> {
     } else {
         Vec::new()
     };
-    warnings.extend(missing_hooks(root, &settings));
+    warnings.extend(missing_hooks(&settings, present));
     if !attribution_off(&settings) {
         warnings.push(format!(
             "warning: {SETTINGS} does not turn off the attribution"
@@ -63,7 +63,7 @@ fn missing_deny_rules(settings: &Value) -> Vec<String> {
 
 /// One warning per file under the project's `HOOKS` that a hook command names and the project lacks, in the order of
 /// the settings (SYN-25). A path under another directory, a directory or a glob is not looked at.
-fn missing_hooks(root: &Path, settings: &Value) -> Vec<String> {
+fn missing_hooks(settings: &Value, present: &dyn Fn(&str) -> bool) -> Vec<String> {
     let commands = settings["hooks"]
         .as_object()
         .into_iter()
@@ -85,7 +85,7 @@ fn missing_hooks(root: &Path, settings: &Value) -> Vec<String> {
             .take_while(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
             .collect();
         let path = format!("{HOOKS}{name}");
-        if !name.is_empty() && !root.join(&path).is_file() && !missing.contains(&path) {
+        if !name.is_empty() && !present(&path) && !missing.contains(&path) {
             missing.push(path);
         }
     }

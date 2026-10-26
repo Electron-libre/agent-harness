@@ -28,8 +28,9 @@ The hooks are managed (`files/.claude/hooks/`) but their declaration lives in `.
 seeded once, so a new hook reaches a project that already adopted the harness only when the declaration is added
 to its file by hand. `harness check` compares the project with its lock and warns of what the settings lack or run in
 vain: a deny rule of the review waiver, a hook under `.claude/hooks/` the project no longer has (a hook the source
-dropped), an attribution left on. `harness sync` and `harness update` print the same warnings once the files are
-written, so the sync that deletes a hook the settings still run says so at once. It does not look for a hook nobody declared, so the hygiene test of the settings
+dropped), an attribution left on. `harness sync` and `harness update` print the same warnings, judged on the project as
+the sync leaves it (or would, under `--dry-run`), so the sync that deletes a hook the settings still run says so at
+once. It does not look for a hook nobody declared, so the hygiene test of the settings
 (`test_settings.rs`, run by `just test-harness` and by CI) fails for a hook script nobody declared, and its message
 gives the event, the matcher (the `Declare:` line of the hook's header) and the command to add. An agent that
 updates the harness runs `just test-harness` afterwards and is told what to add.
