@@ -34,6 +34,7 @@ nothing on success and little on failure, and run the Stop hook only when there 
 1. [x] Clippy gate: short format, at most 40 diagnostics, stamp of the last passing run (CLG-1 to CLG-5).
 2. [x] Quiet recipes: `test-harness` (`files/harness.just`), `check`, `clippy`, `test` (`justfile`) print nothing on success, only the failures otherwise.
 3. [x] Docs: the cheapest model setup and the measures before/after in `docs/architecture.md`.
+4. [x] Fixes of the `high` review: the stamp hashes the content of the changed `.rs` files (no commit yet, non-ASCII names, diff settings), errors with no location kept and build progress dropped, `.claude` scripts and projects without `Cargo.toml` ignored (CLG-1, CLG-2, CLG-4 amended), `HashSet` dedup, `test_recipes.rs` with a fake `rust-script`.
 
 ## Decisions
 * Mode: autonomous.
@@ -64,3 +65,10 @@ nothing on success and little on failure, and run the Stop hook only when there 
 * red: none.
 * Code review (low): it looked at the commits of deliverable 1 again and repeated the `Cargo.toml` / `clippy.toml` stamp finding; not fixed, a non-goal of `specs/clippy-gate.md`.
 * not verified: the Claude Code names cited (`/model opusplan`, `CLAUDE_CODE_SUBAGENT_MODEL`) against the current Claude Code docs.
+
+## Deliverable 4
+* done: the findings 1 to 7 and 9 of the `high` review fixed, after the user validated the amendments of CLG-1, CLG-2 and CLG-4; finding 8 (`tempfile::tempdir()` in `test_recipes.rs`) not fixed: the `rust-script` tests of `files/` use `temp_dir()` and the pid, with no cargo dependency.
+* checks: `just check` ok, `just test-harness` ok, specs traced, docs `docs/architecture.md`.
+* red: `FAIL - gate reports the errors that have no location`, `... no build progress without any located diagnostic`, `... after an edit of a non-ASCII file`, `... after an edit of a staged file with no commit`.
+* Code review (low): no findings.
+* not verified: the gate in a live Claude Code session.

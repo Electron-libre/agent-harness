@@ -40,10 +40,12 @@ No hook guards the attribution: the seeded settings turn it off at the source (`
 through `just check-commits`), and `harness check` warns of settings that leave it on.
 
 The Stop hook `clippy_gate.rs` blocks the end of a turn while `cargo clippy` reports a problem in a project with a
-changed `.rs` file (spec [`specs/clippy-gate.md`](../specs/clippy-gate.md)). What it prints is billed to the agent at
-each turn, so it sends one line per diagnostic (`--message-format=short`: file, line, column, message), at most 40,
-and runs clippy only when the Rust state changed since the last passing run: that run writes a hash of `HEAD`, the
-diff of the tracked `.rs` files and the untracked ones to `claude-clippy-pass` in the git directory of the worktree.
+`Cargo.toml` and a changed `.rs` file outside the `.claude` directories, whose scripts are not crate code (spec
+[`specs/clippy-gate.md`](../specs/clippy-gate.md)). What it prints is billed to the agent at each turn, so it sends one
+line per diagnostic (`--message-format=short`: file, line, column, message) and per error with no location, at most
+40, never the build progress, and runs clippy only when the Rust state changed since the last passing run: that run
+writes a hash of `HEAD` and of the path and content of each changed `.rs` file to `claude-clippy-pass` in the git
+directory of the worktree.
 For the same reason `just test-harness` prints nothing when every test script passes, and only the lines of the
 failing script that are not `ok` otherwise (`test_recipes.rs` proves it); the seeded `justfile` asks the same of the
 project's `check`.
