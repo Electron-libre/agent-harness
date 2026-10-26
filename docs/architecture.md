@@ -86,8 +86,9 @@ recomputes the snapshot and exits 2, telling the agent to run the review, when t
 the last commit, or the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with
 nothing to commit and a diff under `issues/` only are let through. Documentation is reviewed like code. A waiver is
 stamped with `HEAD` when it lets a commit through and removed at the first run after `HEAD` moved, so a command that
-does not commit leaves it usable. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot
-is the one `record` took.
+does not commit leaves it usable; a waiver that cannot be stamped refuses the commit and tells the agent to ask the
+user to fix it, since no review would clear it. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored
+so the snapshot is the one `record` took.
 
 A native hook does not run under `--no-verify` or `-n`, nor once `core.hooksPath` points elsewhere, so `check` refuses
 a commit that carries `--no-verify` (or an abbreviation) or `-n` (alone or in a bundle such as `-anm`), and any command

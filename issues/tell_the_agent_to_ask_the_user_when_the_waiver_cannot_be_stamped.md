@@ -26,3 +26,23 @@ while the commit stays refused. That refusal should tell the agent to ask the us
 * `files/.claude/hooks/require_code_review.rs` (`refusal()`, `refuse()`)
 * `files/.claude/hooks/test_require_code_review.rs`
 * `specs/review-gate.md`, `docs/adr/0005-the-gates-catch-mistakes-not-bypasses.md`
+
+# Tracking
+
+1. [x] REV-10 amended; the refusal of a waiver that cannot be stamped tells the agent to ask the user (test with a
+   read-only empty waiver).
+
+## Decisions
+
+* Mode: autonomous.
+* Base commit: 5b53329960740759631c0700c9cff8eb8261691b.
+* One deliverable; `refusal()` returns the instruction with the reason, `refuse_skipped_hook` unchanged.
+
+## Summary of deliverable 1
+
+* done: `refusal()` returns the instruction with the reason; a waiver that cannot be stamped tells the agent to ask the
+  user to fix the waiver file and its directory permissions; REV-10 amended; `docs/architecture.md` says so.
+* checks: `just check` ok, `just test-harness` ok, `just check-harness` ok, code review `low`: no findings.
+* red: `FAIL - that refusal tells the agent to ask the user, not to run a review`.
+* not verified: none.
+* decisions needed: none.

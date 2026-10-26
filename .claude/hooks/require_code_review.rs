@@ -275,8 +275,11 @@ fn record(cwd: &Path) -> std::io::Result<()> {
     std::fs::write(path, serde_json::json!({"head": snap.head, "hash": snap.hash, "files": snap.files}).to_string())
 }
 
-/// Why the commit must wait for a review, or `None` when the review covers it.
-fn refusal(cwd: &Path) -> Option<&'static str> {
+/// What a refusal tells the agent to do when a review clears it.
+const RUN_REVIEW: &str = "Run /code-review low on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.";
+
+/// Why the commit must wait and what the agent must do about it, or `None` when the review covers it.
+fn refusal(cwd: &Path) -> Option<(&'static str, &'static str)> {
     let snap = snapshot(cwd);
     let path = marker_path(cwd)?;
     // the waiver is spent by a commit, not by a command that may not commit (`--dry-run`, a refusal of another hook
@@ -299,16 +302,20 @@ fn refusal(cwd: &Path) -> Option<&'static str> {
         if used.is_empty() {
             // fail closed: a waiver that cannot be stamped could never be spent
             if std::fs::write(waiver, stamp).is_err() {
-                return Some("the waiver could not be stamped");
+                // no review clears it: only the user can make the waiver writable
+                return Some((
+                    "the waiver could not be stamped",
+                    "Ask the user to fix the waiver file and the permissions of its directory, then commit.",
+                ));
             }
             return None;
         }
     }
     let Some(marker) = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else {
-        return Some("no code review has run in this project");
+        return Some(("no code review has run in this project", RUN_REVIEW));
     };
     if marker["head"].as_str() != Some(snap.head.as_str()) {
-        return Some("the last code review predates the last commit");
+        return Some(("the last code review predates the last commit", RUN_REVIEW));
     }
     if marker["hash"].as_str() == Some(snap.hash.as_str()) {
         return None;
@@ -318,13 +325,13 @@ fn refusal(cwd: &Path) -> Option<&'static str> {
     if snap.files.iter().all(|f| reviewed.contains(&f.as_str())) {
         return None;
     }
-    Some("the diff holds files the last code review never saw")
+    Some(("the diff holds files the last code review never saw", RUN_REVIEW))
 }
 
-/// Tells the agent the commit waits for a review and exits 2 (the one message of `check` and `native`).
-fn refuse(why: &str) -> ! {
+/// Tells the agent why the commit waits and what to do, and exits 2 (the one message of `check` and `native`).
+fn refuse(why: &str, todo: &str) -> ! {
     eprintln!("Refused: {why}.");
-    eprintln!("Run /code-review low on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
+    eprintln!("{todo}");
     std::process::exit(2);
 }
 
@@ -349,8 +356,8 @@ fn main() {
                 std::env::set_var(name, here.join(value));
             }
         }
-        if let Some(why) = refusal(&toplevel(&here)) {
-            refuse(why);
+        if let Some((why, todo)) = refusal(&toplevel(&here)) {
+            refuse(why, todo);
         }
         return;
     }

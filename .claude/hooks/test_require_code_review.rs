@@ -195,6 +195,18 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::write(&waiver, "").unwrap();
     out.push(("native honours the waiver", native_run(hook, &current, &[]).0 == 0));
     fs::remove_file(&waiver).unwrap();
+    // no review clears a waiver that cannot be stamped: only the user can fix it
+    fs::write(&waiver, "").unwrap();
+    let mut readonly = fs::metadata(&waiver).unwrap().permissions();
+    readonly.set_readonly(true);
+    fs::set_permissions(&waiver, readonly.clone()).unwrap();
+    let (code, stderr) = native_run(hook, &current, &[]);
+    out.push(("native refuses a waiver it cannot stamp", code == 2));
+    out.push(("that refusal tells the agent to ask the user, not to run a review", stderr.contains("Ask the user to fix the waiver") && !stderr.contains("/code-review")));
+    #[allow(clippy::permissions_set_readonly_false)]
+    readonly.set_readonly(false);
+    fs::set_permissions(&waiver, readonly).unwrap();
+    fs::remove_file(&waiver).unwrap();
     fs::remove_file(current.join("new.txt")).unwrap();
     fs::write(current.join("a.txt"), "one\n").unwrap();
     out.push(("native lets through a repository with nothing to commit", native_run(hook, &current, &[]).0 == 0));
