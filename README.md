@@ -15,4 +15,12 @@ harness check                      # fails if a managed file was modified or del
                                    # and when Claude Code keeps the transcripts less than a year
 ```
 
+The harness is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes
+them after 30 days by default, for every project at once: keep them a year in your user settings
+(`~/.claude/settings.json`, or `settings.json` in `CLAUDE_CONFIG_DIR`), which `harness` never writes:
+
+```json
+{ "cleanupPeriodDays": 365 }
+```
+
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

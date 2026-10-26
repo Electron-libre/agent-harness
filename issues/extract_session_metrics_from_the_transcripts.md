@@ -26,6 +26,9 @@ evaluation issues read; it measures, it does not judge.
 3. Ignore unknown line types and missing fields, and count what was skipped, so a format change shows instead of
    silently skewing the numbers.
 4. Output text only (TSV or JSON), no message text, so the rows can be archived or committed as aggregates.
+5. Archive the rows of each session outside the repositories, so the history no longer depends on the retention of
+   the transcripts (moved here from `keep_the_session_transcripts_for_the_evaluation`, which warns of a short
+   retention, SYN-28).
 
 # Specs
 * A new `specs/evaluation.md` (id to pick) for the extracted fields, the revision join and the tolerance to unknown

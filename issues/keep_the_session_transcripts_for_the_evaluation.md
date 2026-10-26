@@ -48,7 +48,7 @@ archiving compact extracts (moved to `extract_session_metrics_from_the_transcrip
 1. [x] Retention warning: `check`, `sync` and `update` warn when the user settings keep the transcripts less than
    365 days or a project settings file lowers it; verified by unit tests on fixture settings in a tempdir; makes true
    SYN-28.
-2. [ ] Docs: `README.md` says the evaluation needs a longer retention and which user setting to raise; the archive
+2. [x] Docs: `README.md` says the evaluation needs a longer retention and which user setting to raise; the archive
    point moves to `issues/extract_session_metrics_from_the_transcripts.md`; verified by `just check`.
 
 ## Decisions
@@ -67,4 +67,13 @@ archiving compact extracts (moved to `extract_session_metrics_from_the_transcrip
 * code review: no findings.
 * smoke test: `harness check` silent with the user settings at 365; with `CLAUDE_CONFIG_DIR=/tmp/nowhere` it warns
   and exits 0; with `CI=1` it is silent.
+* not verified: nothing.
+
+## Deliverable 2
+
+* done: README says why and how to keep the transcripts a year; the archive point is now point 5 of
+  `issues/extract_session_metrics_from_the_transcripts.md`.
+* red: none (docs only).
+* checks: `just check` ok.
+* code review: no findings.
 * not verified: nothing.
