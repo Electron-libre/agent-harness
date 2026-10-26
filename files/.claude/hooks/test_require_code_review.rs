@@ -195,6 +195,19 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::write(&waiver, "").unwrap();
     out.push(("native honours the waiver", native_run(hook, &current, &[]).0 == 0));
     fs::remove_file(&waiver).unwrap();
+    // a waiver that cannot be read is ignored too: it is neither stamped nor dropped, and the user is told to fix it
+    fs::write(&waiver, "").unwrap();
+    fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o200)).unwrap();
+    // root reads a write-only file: the case cannot be built then
+    if fs::File::open(&waiver).is_err() {
+        let (code, stderr) = native_run(hook, &current, &[]);
+        out.push(("native refuses an unreviewed diff whose waiver it cannot read", code == 2 && stderr.contains("/code-review low")));
+        let path = waiver.canonicalize().unwrap();
+        out.push(("that refusal tells the agent to ask the user to fix the unreadable waiver, by its path", stderr.contains("could not be read") && stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
+        out.push(("native leaves the unreadable waiver unstamped", fs::metadata(&waiver).map(|m| m.len() == 0).unwrap_or(false)));
+    }
+    fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
+    fs::remove_file(&waiver).unwrap();
     // a waiver that cannot be stamped is ignored: the review alone judges the commit, and the user is told to fix it
     fs::write(&waiver, "").unwrap();
     let mut readonly = fs::metadata(&waiver).unwrap().permissions();

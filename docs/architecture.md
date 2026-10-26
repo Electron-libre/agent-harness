@@ -86,7 +86,7 @@ recomputes the snapshot and exits 2, telling the agent to run the review, when t
 the last commit, or the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with
 nothing to commit and a diff under `issues/` only are let through. Documentation is reviewed like code. A waiver is
 stamped with `HEAD` when it lets a commit through and removed at the first run after `HEAD` moved, so a command that
-does not commit leaves it usable; a waiver that cannot be stamped waives nothing, and a refusal tells the agent to ask
+does not commit leaves it usable; a waiver that cannot be read or stamped waives nothing, and a refusal tells the agent to ask
 the user to fix it. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is the one
 `record` took.
 
