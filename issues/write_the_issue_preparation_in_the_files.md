@@ -47,6 +47,7 @@ Plan: validated
 1. [x] Rewrite steps 0 to 3 of `issue-workflow` (preparation in the files, one stop with link, summary and numbered
    questions), renumber the steps and update the references (`create-issue`, `check_issue.rs`, `details.md`,
    `write-spec`, `docs/architecture.md`); verified by `just check`, `just test-harness`, `just check-harness`.
+2. [x] Fixes of the `high` review of the whole issue.
 
 ## Decisions
 - Mode: autonomous.
@@ -64,3 +65,12 @@ Plan: validated
   the `Plan: proposed` and `1 a, 2 c` passages, so these two were never seen red).
 - not verified: the new flow on a real issue (it is prose read by the agent).
 - Code review (low): resume branch sent an issue with no `# Tracking` to step 3; fixed (no section: start at step 1).
+
+## Summary of deliverable 2 (fixes of the `high` review)
+- done: resume with a missing spec keeps `# Tracking`; base commit set at validation; spec and ADR drafts committed
+  with the first deliverable; the stop names a means that differs and the requirement ids; an answer that changes the
+  plan shows it again; `Plan: validated` is a required passage; `write-spec` caller exception dropped (redundant);
+  `docs/architecture.md` no longer advises `opusplan` (plan mode cannot write the issue).
+- not fixed: the queue still lists the issue; closing it is the user's call.
+- red: none (prose; the new passage was present before the test).
+- Code review (low): dropping the `write-spec` exception could bring back its stop; `issue-workflow` now says to skip it.

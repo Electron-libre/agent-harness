@@ -22,7 +22,7 @@ Read the issue file. No `# Tracking` section: start at step 1. If `# Tracking` s
 validated: redo the stop of step 2. Otherwise (`Plan: validated`, or no marker: planned before it existed) show where it stands in two `next` / `left` lines (the next unchecked
 deliverable with the recorded mode, the deliverables left by name) and continue at step 3 in the mode recorded there (none recorded:
 validation at each deliverable), unless the issue changes a capability whose spec is missing, still `draft` with no validated
-requirements, or not named in its `# Specs` section: then write the spec (step 1) and validate it (step 2) first.
+requirements, or not named in its `# Specs` section: then write the spec as step 1 says, keeping `# Tracking` as it is, and validate it (step 2) first.
 
 ## 1. Prepare in the files (no stop)
 
@@ -31,8 +31,8 @@ the console only shows the link and the questions.
 
 - Read the issue, plus the resources it names (docs, `git log`, the `roadmap` documents of `.claude/harness.toml`, memory).
 - **Spec**, when the issue changes what a capability does (skip it for docs, harness, pure refactor, a measure): run
-  `skill:write-spec` up to its format check (requirements with stable ids, `deterministic`, left `draft`); its validation
-  stop is the one of step 2. The tests of step 3 come from these requirements, not the other way round.
+  `skill:write-spec` up to its format check (requirements with stable ids, `deterministic`, left `draft`); don't do its
+  validation stop: step 2 replaces it. The tests of step 3 come from these requirements, not the other way round.
 - **Write `# Tracking`** at the end of the issue:
 
   ```markdown
@@ -48,24 +48,27 @@ the console only shows the link and the questions.
 
   ## Decisions
   - Mode: autonomous
-  - Base commit: <`git rev-parse HEAD`>
+  - Base commit: <`git rev-parse HEAD`, set at validation>
   ```
 
   Small deliverables, each independently testable and committable, ordered by value and dependency. An issue that
-  fits one deliverable has a one-line plan. A decision of architecture also gets its ADR draft in `docs/adr/` now.
+  fits one deliverable has a one-line plan. A decision of architecture also gets its ADR draft in `docs/adr/` now. The spec and ADR drafts are
+  committed with the first deliverable.
 
 ## 2. Validate (STOP)
 
 Show, and nothing else:
 
-- The links to the files written in step 1 (the issue, the spec, the ADR), and the issue summed up in two or three lines.
+- The links to the files written in step 1 (the issue, the spec, the ADR), and the issue summed up in two or three lines;
+  one more line when the means differs from the issue's, and the ids of the requirements written.
 - The questions you can't answer from the repo, if any, as a table `# | question | options | why | impact`: questions
   numbered `1`, `2`…, options lettered `a`, `b`… with the recommended one marked, so the user answers `1 a, 2 c` (a bare
   `ok` takes every recommendation). Don't ask what has a conventional default. The details stay in the files.
 - One line: the mode of step 3, **autonomous (default)** or a validation at each deliverable.
 
-**Wait for the user.** Apply their answers and corrections to the files (the answers go to `## Decisions`), then set
-`Plan: validated`. The spec file is the record of the requirements; `## Decisions` doesn't copy them.
+**Wait for the user.** Apply their answers and corrections to the files (the answers go to `## Decisions`). When an
+answer changes the plan itself (deliverables, their order) rather than a detail, show the new plan lines and stop
+again. Then set `Plan: validated` and the base commit. The spec file is the record of the requirements; `## Decisions` doesn't copy them.
 
 ## 3. For each deliverable, in order
 

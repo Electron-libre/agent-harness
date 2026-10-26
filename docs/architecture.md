@@ -145,8 +145,8 @@ Everything a check prints is read by the agent and billed as tokens, every turn 
 The model is the other lever, and the shared settings deliberately do not choose it: it depends on the user's plan
 and the project. The setup that costs least for `issue-workflow` is a strong model where judgment matters (steps 1
 and 2: preparation in the files, single validation stop; the final `high` review) and a cheaper one for the mechanical part (step 3: test,
-code, docs, the `low` review, the commit). In Claude Code, `/model opusplan` does this split by plan mode (plan
-in plan mode with Opus, act with Sonnet); otherwise switch with `/model` after the plan is validated. Forked
+code, docs, the `low` review, the commit). Switch with `/model` after the plan is validated; `/model opusplan`
+does not fit, since plan mode is read-only and step 1 writes the issue. Forked
 skills and sub-agents follow the session model unless the user sets `CLAUDE_CODE_SUBAGENT_MODEL` in their own
 settings.
 

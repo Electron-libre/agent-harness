@@ -20,6 +20,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ("issue-workflow", "autonomous (default)", "plan validation asks autonomous or per-deliverable validation"),
     ("issue-workflow", "recorded first in `## Decisions`", "mode recorded in the issue so it survives a /clear"),
     ("issue-workflow", "Plan: proposed", "the plan is written in the issue before its validation"),
+    ("issue-workflow", "set `Plan: validated`", "the validation is recorded so a resume skips the stop"),
     ("issue-workflow", "`1 a, 2 c`", "questions answered by number and option letter"),
 ];
 
