@@ -23,4 +23,7 @@ them after 30 days by default, for every project at once: keep them a year in yo
 { "cleanupPeriodDays": 365 }
 ```
 
+`rust-script .claude/transcripts/session_metrics.rs` prints one row of numbers per session (cost, user
+interventions, project, issue, model, version), with no message text.
+
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

@@ -116,11 +116,24 @@ another tool is out of reach.
 ## The instruction audit
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory
-and instruction files under `~/.claude/projects`, through `audit_sources.rs`. It only proposes skills and hooks;
+and instruction files under `~/.claude/projects`, through `audit_sources.rs` (which shares the transcript reading of
+the evaluation, below). It only proposes skills and hooks;
 the report holds private content, so it stays in the conversation (or a file outside the repository) and each
 validated proposal becomes an issue in generic wording. It is a skill rather than a `harness` subcommand
 because telling a repeated procedure from a rule needs judgment, and a skill keeps the shared files free of
 project specifics.
+
+## The evaluation from the transcripts
+
+`.claude/transcripts/session_metrics.rs` prints one tab-separated row of numbers per session of every project
+(spec [`specs/evaluation.md`](../specs/evaluation.md)): tokens by kind, turns, tool calls, hook refusals, skill calls,
+typed messages split into plain validations and the rest, tagged with the project, the issue branches, the models and
+the Claude Code versions. An assistant message is repeated on one line per content block with the same usage, so it
+counts once per `message.id`; the sub-agent transcripts count with their session. The format moves between versions,
+so an unreadable line, an unknown type or a missing field is counted in its own column rather than skewing the others.
+No text of a message is printed. The transcript reading (projects, sessions, sub-agents, the typed-message filter)
+lives once in `transcripts.rs`, which `audit_sources.rs` includes too
+([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)).
 
 ## Parallel issues
 

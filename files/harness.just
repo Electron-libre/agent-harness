@@ -4,7 +4,7 @@
 # only the lines of the failing script that are not `ok` otherwise.
 test-harness:
     #!/usr/bin/env sh
-    for t in .claude/hooks/test_*.rs .claude/skills/test_skills.rs .claude/skills/*/test_*.rs .claude/specs/test_*.rs .claude/test_*.rs; do
+    for t in .claude/hooks/test_*.rs .claude/skills/test_skills.rs .claude/skills/*/test_*.rs .claude/specs/test_*.rs .claude/transcripts/test_*.rs .claude/test_*.rs; do
         [ -e "$t" ] || continue
         out=$(rust-script "$t" 2>&1) || { printf '%s\n' "$out" | grep -v '^ok '; echo "FAILED: $t"; exit 1; }
     done
