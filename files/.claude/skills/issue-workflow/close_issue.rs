@@ -156,7 +156,6 @@ fn main() {
     let tracked = Command::new("git")
         .args(["ls-files", "--error-unmatch", "--"])
         .arg(issue)
-        .current_dir(dir)
         .output()
         .is_ok_and(|o| o.status.success());
     let moved = if tracked {

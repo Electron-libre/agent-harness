@@ -68,11 +68,17 @@ fn main() {
         failed |= !ok;
     };
     let (ok, _) = run(&script, &tmp, "issues/tracked.md");
-    check("tracked issue is moved", ok && tmp.join("issues/done/tracked.md").is_file() && !tmp.join("issues/tracked.md").exists());
+    let index = |path: &str| {
+        let out = Command::new("git").args(["ls-files", "--", path]).current_dir(&tmp).output().unwrap();
+        !out.stdout.is_empty()
+    };
+    let staged = index("issues/done/tracked.md") && !index("issues/tracked.md");
+    check("tracked issue is moved with git mv", ok && staged && tmp.join("issues/done/tracked.md").is_file() && !tmp.join("issues/tracked.md").exists());
     let plan = std::fs::read_to_string(tmp.join("PLAN.md")).unwrap();
     check("references are pointed at done/", plan == "see issues/done/tracked.md and my_issues/tracked.md, docs/issues/tracked.md, issues/done/tracked.md.bak2 (`issues/done/tracked.md`) issues/tracked_two.md issues/done/untracked.md");
     let (ok, _) = run(&script, &tmp, "issues/untracked.md");
-    check("untracked issue is moved", ok && tmp.join("issues/done/untracked.md").is_file());
+    let outside_index = !index("issues/done/untracked.md");
+    check("untracked issue is moved and left out of the index", ok && outside_index && tmp.join("issues/done/untracked.md").is_file());
     std::fs::write(tmp.join("issues/done/README.md"), "x").unwrap();
     std::fs::write(tmp.join("NOTES.md"), "issues/untracked.md issues/README.md issues/other.md").unwrap();
     std::fs::write(tmp.join("issues/other.md"), "x").unwrap();
