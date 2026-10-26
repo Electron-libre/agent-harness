@@ -24,7 +24,8 @@ then do step 2 first. Otherwise start at step 1.
 - Show, short, only what the issue does not already say: `goal`, `out of scope`, `questions` (plus the means when you
   propose a different one than the issue's).
 - Ask the questions you can't answer from the repo. Don't ask what has a conventional default.
-- **Stop and wait for the user to validate the understanding.**
+- **Stop and wait for the user to validate the understanding.** When the issue changes no capability (step 2
+  skipped) and fits one deliverable, show the plan of step 3 in the same message: one stop validates both.
 
 ## 2. Spec (STOP, when the issue changes what a capability does)
 

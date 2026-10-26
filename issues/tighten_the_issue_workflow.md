@@ -43,7 +43,7 @@ and cleaner.
 
 1. [x] Step 4 tightened: review scoped to the deliverable and its level named (4.5), refactor step, `red:` line in
    the 4.6 summary.
-2. [ ] Steps 1 and 3 may be one stop for an issue that changes no capability and fits one deliverable.
+2. [x] Steps 1 and 3 may be one stop for an issue that changes no capability and fits one deliverable.
 3. [ ] Slimmer skill: "Parallel agents" and the waiver details move to `issue-workflow/details.md`; the four report
    rules are inlined in `issue-workflow` only.
 4. [ ] End-of-issue `high` review on `main..HEAD`, fixes of the findings on deliverables 1 to 3.
@@ -77,4 +77,21 @@ and cleaner.
 - red: n/a, text change, no test.
 - Code review: no findings.
 - not verified: an agent following the new steps on a real issue.
+- decisions needed: none.
+
+### 2. Steps 1 and 3 in one stop
+
+- done: step 1 shows the plan of step 3 in the same message when the issue changes no capability and fits one
+  deliverable; one stop validates both. Also commits the `harness.lock` left by the sync of deliverable 1.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `just test-harness`, `just check-harness` | pass |
+| docs | none to change |
+| code review | `low`, see below |
+
+- red: n/a, text change, no test.
+- Code review: no findings.
+- not verified: an agent following the merged stop on a real issue.
 - decisions needed: none.
