@@ -173,11 +173,15 @@ fn main() {
     // Drop the issue from the queue so `next_issue.rs` never offers a closed one.
     let queue = dir.join("queue.md");
     if let Ok(text) = std::fs::read_to_string(&queue) {
-        let kept: Vec<&str> = text
+        let mut kept: Vec<&str> = text
             .lines()
             .filter(|l| !l.trim().starts_with(&format!("- [{stem}](")))
             .collect();
         if kept.len() != text.lines().count() {
+            // Closing the last entry would leave the blank line under the header: end with one newline.
+            while kept.last().is_some_and(|l| l.trim().is_empty()) {
+                kept.pop();
+            }
             std::fs::write(&queue, kept.join("\n") + "\n").expect("queue is writable");
             println!("removed {stem} from {}", queue.display());
         }

@@ -88,6 +88,19 @@ fn main() {
     let (ok, out) = run(&script, &tmp, "issues/tracked.md");
     check("existing target is not overwritten", !ok && out.contains("already exists"));
 
+    let header = "# Issue queue\n\nIntro.\n";
+    std::fs::write(tmp.join("issues/queue.md"), format!("{header}\n- [a](a.md) - why\n- [b](b.md) - why\n- [c](c.md) - why\n")).unwrap();
+    for f in ["a.md", "b.md", "c.md"] {
+        std::fs::write(tmp.join("issues").join(f), "x").unwrap();
+    }
+    let (ok, _) = run(&script, &tmp, "issues/b.md");
+    let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
+    check("closing a middle entry keeps the others", ok && queue == format!("{header}\n- [a](a.md) - why\n- [c](c.md) - why\n"));
+    run(&script, &tmp, "issues/a.md");
+    let (ok, _) = run(&script, &tmp, "issues/c.md");
+    let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
+    check("closing the last entry leaves the header ending with one newline", ok && queue == header);
+
     for (name, ok) in refuses_a_linked_worktree(&script) {
         check(name, ok);
     }

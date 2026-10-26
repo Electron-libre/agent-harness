@@ -21,3 +21,38 @@ exactly one newline whatever entry is removed.
 
 # Hints
 * Change `files/`, then `just sync`; `just test-harness` runs the script tests.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+After `close_issue.rs` drops a queue line, the queue must end with exactly one `\n`, also when the dropped line was
+the last entry (the blank line under the header is trimmed). Out of scope: any other queue edit, a spec (the queue
+rewrite is no requirement of `specs/parallel-issues.md`; this is a cosmetic fix of a harness script).
+
+## Plan
+1. [x] Trim the queue on close: drop the trailing blank kept lines before writing them back with one `\n`; verified
+   by a new check in `test_close_issue.rs` (closing the only entry leaves the header ending with one newline, closing
+   a middle entry keeps the others).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 48eeb1bddb7669e1167fe38b441dc7f2f0044a18
+
+## Deliverable 1
+
+- done: `close_issue.rs` drops the trailing blank lines of the queue before writing it back with one `\n`.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| specs | no spec concerned |
+| docs | no change needed |
+| code review | `/code-review low` run |
+
+- red: `FAIL - closing the last entry leaves the header ending with one newline`
+- Code review: no findings
+- not verified: none
+- decisions needed: none
