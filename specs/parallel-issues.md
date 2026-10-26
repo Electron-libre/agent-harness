@@ -23,7 +23,7 @@ deliberate step run from the main branch.
 - **PAR-10** (deterministic) `finish-issue <stem> --force` must remove the worktree and delete the branch even when the branch is not detected as merged (its content is not all on the main branch), and must still refuse a worktree with uncommitted changes; without `--force`, work that is not on the main branch must never be deleted.
 - **PAR-11** (deterministic) `finish-issue`, with or without `--force`, must fail, removing nothing, when its working directory is the worktree to remove or inside it, with a message that names the main worktree to run it from.
 - **PAR-7** (deterministic) `finish-issue` must refuse a worktree with uncommitted changes, and must not remove a worktree other than the one named after the issue stem.
-- **PAR-8** (deterministic) `close-issue` must refuse to run in a worktree other than the main one, so that the queue is edited at merge time on the main branch and never on an issue branch.
+- **PAR-8** (deterministic) `close-issue` must refuse to close an issue whose `issues/` directory is in a worktree other than the main one, whatever directory it runs from, and `close-issue --relink` must refuse to run in such a worktree, so that the queue is edited at merge time on the main branch and never on an issue branch.
 - **PAR-9** (deterministic) The hooks that use the git directory (the code review gate and its marker and waiver) must resolve it per worktree, so a review recorded in one worktree is not seen by another.
 
 ## Scenarios
@@ -38,6 +38,7 @@ deliberate step run from the main branch.
 - (PAR-6) Given a squashed branch whose content was later changed on the main branch, when `finish-issue` runs, then it counts as not merged (the safe side).
 - (PAR-11) Given the shell in a subdirectory of the issue worktree, when `finish-issue` runs, then it fails and the worktree and the branch are kept.
 - (PAR-3) Given a branch `foo` with no worktree and no commit off the main branch, when `next-issue` runs, then `foo` is not taken and is reported as `Stale:`.
+- (PAR-8) Given the shell in the main worktree, when `close-issue ../repo-foo/issues/foo.md` names the issue of the linked worktree `repo-foo`, then it fails and the issue and the queue of `repo-foo` are untouched.
 
 ## Non-goals
 

@@ -3,7 +3,8 @@
 //! Uses `git mv` when the file is tracked, a plain rename otherwise. Refuses to overwrite.
 //! Then rewrites every `issues/foo.md` mentioned in the other text files of the repo to
 //! `issues/done/foo.md`, so no document keeps pointing at the old path.
-//! Refuses to run in a linked git worktree: the queue is edited at merge time, on the main worktree.
+//! Refuses an issue of a linked git worktree, whatever the caller's directory: the queue is edited at merge
+//! time, on the main worktree.
 //! Usage: `just close-issue issues/foo.md`; `just close-issue --relink` fixes the references to
 //! every issue already in `issues/done/` (run it once to repair old dangling paths).
 //! ```cargo
@@ -96,10 +97,10 @@ fn repo_root(dir: &Path) -> Option<std::path::PathBuf> {
     out.status.success().then(|| std::path::PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()))
 }
 
-/// `Some(message)` when the current directory is in a git worktree other than the main one.
-fn linked_worktree() -> Option<String> {
-    let top = repo_root(Path::new("."))?;
-    let out = Command::new("git").args(["worktree", "list", "--porcelain"]).output().ok()?;
+/// `Some(message)` when `dir` is in a git worktree other than the main one.
+fn linked_worktree(dir: &Path) -> Option<String> {
+    let top = repo_root(dir)?;
+    let out = Command::new("git").args(["worktree", "list", "--porcelain"]).current_dir(dir).output().ok()?;
     let list = String::from_utf8_lossy(&out.stdout);
     if list.split("\n\n").next()?.lines().any(|l| l == "bare") {
         return None;
@@ -109,16 +110,21 @@ fn linked_worktree() -> Option<String> {
     (!same).then(|| format!("{} is a linked worktree: close the issue from the main worktree {main}, after merging its branch", top.display()))
 }
 
+/// Exit with an error when `dir` is in a linked worktree (PAR-8).
+fn refuse_linked_worktree(dir: &Path) {
+    if let Some(message) = linked_worktree(dir) {
+        eprintln!("{message}");
+        std::process::exit(1);
+    }
+}
+
 fn main() {
     let Some(arg) = std::env::args().nth(1) else {
         eprintln!("usage: close_issue.rs issues/<name>.md | --relink");
         std::process::exit(2);
     };
-    if let Some(message) = linked_worktree() {
-        eprintln!("{message}");
-        std::process::exit(1);
-    }
     if arg == "--relink" {
+        refuse_linked_worktree(Path::new("."));
         let stems: HashSet<String> = std::fs::read_dir("issues/done")
             .into_iter()
             .flatten()
@@ -146,6 +152,7 @@ fn main() {
         eprintln!("{arg} is not an issue file directly under an `issues/` directory");
         std::process::exit(1);
     }
+    refuse_linked_worktree(dir);
     let done = dir.join("done");
     let target = done.join(name);
     if target.exists() {

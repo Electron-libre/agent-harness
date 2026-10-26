@@ -38,10 +38,13 @@ fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
     let (in_linked, out) = run(script, &linked, "issues/foo.md");
     let untouched = linked.join("issues/foo.md").is_file() && std::fs::read_to_string(linked.join("issues/queue.md")).unwrap().contains("[foo]");
     let (relink, _) = run(script, &linked, "--relink");
+    let (by_path, by_path_out) = run(script, &main, "../repo-foo/issues/foo.md");
+    let untouched_by_path = linked.join("issues/foo.md").is_file() && std::fs::read_to_string(linked.join("issues/queue.md")).unwrap().contains("[foo]");
     let (in_main, _) = run(script, &main, "issues/foo.md");
     let out = vec![
         ("a linked worktree is refused, naming the main one", !in_linked && out.contains("linked worktree") && untouched),
         ("--relink is refused there too", !relink),
+        ("the linked worktree's issue is refused by path from the main one", !by_path && by_path_out.contains("linked worktree") && untouched_by_path),
         ("the main worktree closes the issue", in_main && main.join("issues/done/foo.md").is_file()),
         ("a queue with no header is left empty", std::fs::read_to_string(main.join("issues/queue.md")).unwrap().is_empty()),
     ];

@@ -25,3 +25,27 @@ directory.
 
 # Hints
 * Change `files/`, then `just sync`; `just test-harness` runs the script tests.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The PAR-8 guard of `close_issue.rs` must check the worktree holding the issue's `issues/` directory, not the caller's
+directory; `--relink` keeps checking `.`. Out of scope: any other change to what a close edits.
+
+## Plan
+1. [x] Guard on the issue's worktree: `linked_worktree(dir)` runs `git` in the given directory, `main` validates the
+   issue path before the guard; verified by a by-path case in `refuses_a_linked_worktree` of `test_close_issue.rs`;
+   makes true PAR-8 (amended).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 6b2825e320a9d07ff2af9157f0ebc284c221ac98
+
+## Deliverable 1
+- done: the PAR-8 guard runs `git` in the issue's `issues/` directory (`.` for `--relink`), after the path is validated.
+- checks: `just check` ok, `just test-harness` ok, specs ok (PAR-8 amended), docs ok (architecture, details.md).
+- red: `FAIL - the linked worktree's issue is refused by path from the main one`
+- Code review: no findings
+- not verified: none.
