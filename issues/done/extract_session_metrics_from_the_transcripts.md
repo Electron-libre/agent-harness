@@ -107,6 +107,6 @@ not a `harness` subcommand.
   exact refusal prefix and `.rs` file names (EVA-5); stop answers no longer match `4k` (EVA-4); transcripts read
   line by line, a non UTF-8 line counted unreadable; `tempfile` in the test.
 - Not fixed: one set of git calls per session (194 sessions in 2.7 s, not worth a cache).
-- Out of the requirements: typed slash commands, now `issues/count_typed_slash_commands_as_interventions.md`
+- Out of the requirements: typed slash commands, now `issues/done/count_typed_slash_commands_as_interventions.md`
   (5 occurrences over all the transcripts).
 - red: the eight checks of the findings failed (counts, projects, revisions, archive, stamp).
