@@ -37,7 +37,7 @@ evaluation issues read; it measures, it does not judge.
 # Resources
 * `files/.claude/skills/audit-instructions/audit_sources.rs`, `files/.claude/skills/audit-instructions/SKILL.md`
 * `docs/adr/0002-rev-pins-the-resolved-commit.md`, `docs/adr/0003-one-worktree-per-issue.md`
-* `issues/keep_the_session_transcripts_for_the_evaluation.md`
+* `issues/done/keep_the_session_transcripts_for_the_evaluation.md`
 
 # Hints
 * Sub-agent sessions (`isSidechain`, per session sub-directories) belong to their parent session; count them
