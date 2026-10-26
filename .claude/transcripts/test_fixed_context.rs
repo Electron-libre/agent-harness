@@ -1,0 +1,137 @@
+#!/usr/bin/env rust-script
+//! Behavior test for `fixed_context.rs` on fixture transcripts and repositories: one row per project and revision,
+//! the commit the revision came in force with, the bytes read from its tree, the skills it ships.
+//! Usage: `just test-harness`.
+//! ```cargo
+//! [dependencies]
+//! serde_json = "1"
+//! sha2 = "0.10"
+//! tempfile = "3"
+//! ```
+
+use serde_json::json;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+const COLUMNS: &str = "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
+
+fn sh(dir: &Path, args: &[&str]) {
+    let ok = Command::new("git").args(args).current_dir(dir).output().is_ok_and(|o| o.status.success());
+    assert!(ok, "git {args:?} failed in {}", dir.display());
+}
+
+/// Writes `files` (path, content; an empty content removes the file) and commits them in `repo` at `date`; returns
+/// the abbreviated hash.
+fn commit_at(repo: &Path, date: &str, files: &[(&str, &str)]) -> String {
+    for (path, body) in files {
+        let file = repo.join(path);
+        if body.is_empty() {
+            let _ = std::fs::remove_file(&file);
+            continue;
+        }
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, body).unwrap();
+    }
+    sh(repo, &["add", "-A", "--force"]);
+    let out = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "chore: fixture"])
+        .env("GIT_AUTHOR_DATE", date)
+        .env("GIT_COMMITTER_DATE", date)
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "commit failed: {}", String::from_utf8_lossy(&out.stderr));
+    let head = Command::new("git").args(["log", "-1", "--format=%h"]).current_dir(repo).output().unwrap();
+    String::from_utf8_lossy(&head.stdout).trim().to_string()
+}
+
+fn new_repo(dir: &Path) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    sh(dir, &["init", "-q", "-b", "main"]);
+    dir.to_path_buf()
+}
+
+/// A one-line session transcript in `cwd` at `ts`.
+fn session(projects: &Path, project: &str, id: &str, cwd: &Path, ts: &str) {
+    let dir = projects.join(project);
+    std::fs::create_dir_all(&dir).unwrap();
+    let line = json!({"type": "user", "cwd": cwd, "timestamp": ts, "gitBranch": "main", "sessionId": id, "message": {"role": "user", "content": "SECRET ok"}});
+    std::fs::write(dir.join(format!("{id}.jsonl")), format!("{line}\n")).unwrap();
+}
+
+fn skill(name: &str, description: &str) -> String {
+    format!("---\nname: {name}\ndescription: {description}\n---\n\n# SECRET body not counted\n")
+}
+
+fn run(dir: &Path, projects: &Path) -> (bool, String) {
+    let out = Command::new("rust-script").arg(dir.join("fixed_context.rs")).arg(projects).output().expect("rust-script must be installed");
+    (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+// spec: REP-1, REP-2
+fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let projects = tmp.join("projects");
+    let toml = |rev: &str| format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"\n");
+    let pinned = new_repo(&tmp.join("pinned"));
+    commit_at(&pinned, "2025-12-01T00:00:00Z", &[("README.md", "x")]);
+    let c1 = commit_at(&pinned, "2026-01-01T00:00:00Z", &[(".claude/harness.toml", &toml("r1")), ("AGENTS.md", "aaaa"), ("CLAUDE.md", "cc"), (".claude/skills/one/SKILL.md", &skill("one", "d1d1"))]);
+    let c2 = commit_at(&pinned, "2026-01-05T00:00:00Z", &[(".claude/harness.toml", &toml("r2")), ("AGENTS.md", "aaaaaaaaaa"), ("CLAUDE.md", ""), (".claude/skills/two/SKILL.md", &skill("two", "\"d2\"")), (".claude/skills/three/SKILL.md", "---\nname: t\nmetadata:\n  name: SECRETNESTED\ndescription: >\n  ab\n  cd\n---\n")]);
+    commit_at(&pinned, "2026-01-06T00:00:00Z", &[("AGENTS.md", "aaaaaaaaaaaaaaaaaaaa")]);
+    session(&projects, "-pinned-b", "s3", &pinned, "2026-01-08T00:00:00.000Z");
+    session(&projects, "-pinned-a", "s2", &pinned, "2026-01-07T00:00:00.000Z");
+    session(&projects, "-pinned-a", "s1", &pinned, "2026-01-02T00:00:00.000Z");
+    let harness = new_repo(&tmp.join("harness"));
+    commit_at(&harness, "2026-01-01T00:00:00Z", &[(".claude/harness.toml", "[harness]\nsource = \".\"\n"), ("files/AGENTS.md", "f")]);
+    let own = commit_at(&harness, "2026-01-03T00:00:00Z", &[("files/AGENTS.md", "ff"), ("AGENTS.md", "ff")]);
+    commit_at(&harness, "2026-01-04T00:00:00Z", &[("AGENTS.md", "fff")]);
+    session(&projects, "-harness", "h1", &harness, "2026-01-05T00:00:00.000Z");
+    let bare = new_repo(&tmp.join("bare"));
+    commit_at(&bare, "2026-01-01T00:00:00Z", &[("README.md", "x")]);
+    session(&projects, "-bare", "b1", &bare, "2026-01-02T00:00:00.000Z");
+
+    let (ok, out) = run(dir, &projects);
+    let full = |c: &str| {
+        let o = Command::new("git").args(["rev-parse", c]).current_dir(&harness).output().unwrap();
+        String::from_utf8_lossy(&o.stdout).trim().to_string()
+    };
+    let expected = [
+        COLUMNS.to_string(),
+        format!("harness\tself:{}\t{own}\t0\t2\t0\t", full(&own)),
+        format!("pinned\tr1\t{c1}\t2\t4\t7\tone"),
+        format!("pinned\tr2\t{c2}\t0\t10\t18\tone,three,two"),
+    ];
+    let lines: Vec<&str> = out.lines().collect();
+    if lines != expected {
+        println!("got:\n{out}expected:\n{}", expected.join("\n"));
+    }
+    vec![
+        ("one row per project and revision, sorted, no row for an empty revision", ok && lines.first() == Some(&COLUMNS) && lines.len() == 4 && !out.contains("bare")),
+        ("the bytes and skills come from the commit the revision came in force with", lines == expected),
+        ("no text of a message nor of a skill body", !out.contains("SECRET")),
+    ]
+}
+
+// spec: REP-8
+fn stamp_checks(dir: &Path) -> Vec<(&'static str, bool)> {
+    use sha2::Digest;
+    let script = std::fs::read_to_string(dir.join("fixed_context.rs")).unwrap_or_default();
+    let stamp = format!("// transcripts.rs sha256: {:x}", sha2::Sha256::digest(std::fs::read(dir.join("transcripts.rs")).unwrap_or_default()));
+    if !script.contains(&stamp) {
+        println!("fixed_context.rs: write the line `{stamp}` so rust-script rebuilds it with the current transcripts.rs");
+    }
+    vec![("fixed_context.rs carries the SHA-256 of the current transcripts.rs", script.contains(&stamp))]
+}
+
+fn main() {
+    let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let checks: Vec<_> = row_checks(&dir, temp.path()).into_iter().chain(stamp_checks(&dir)).collect();
+    let mut failed = false;
+    for (name, ok) in checks {
+        println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
+        failed |= !ok;
+    }
+    if failed {
+        std::process::exit(1);
+    }
+}

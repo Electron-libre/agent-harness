@@ -24,6 +24,9 @@ costs in every session, and which skills and hooks earn their place.
    history outlives the transcripts: to decide.
 4. Report to the user as `AGENTS.md` section "Reports to the user" says (a table per axis, the trend only).
 
+# Specs
+* `specs/harness-report.md` (REP), new.
+
 # Resources
 * `issues/done/extract_session_metrics_from_the_transcripts.md`, `issues/done/detect_rule_breaches_in_the_transcripts.md`,
   `issues/done/measure_the_delivered_quality_from_the_git_history.md`
@@ -34,3 +37,42 @@ costs in every session, and which skills and hooks earn their place.
 # Hints
 * Numbers become targets once shown: report trends, never pass/fail thresholds on agent behaviour.
 * The report must hold nothing specific to one consumer when it lands in a shared file.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+On demand, one markdown table per axis (efficiency, quality, rules, skills, fixed context), one row per group of
+consecutive revisions holding enough sessions, with model, version and project mix and the sample size. Out of scope:
+verdicts, causes (the replay issue), false positives of refusals and misplaced skill calls (judgment). Means: two
+managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs of the three extractors) and a skill
+`evaluate-harness` that runs them.
+
+## Plan
+1. [x] Fixed context: `fixed_context.rs`, bytes of `CLAUDE.md`, `AGENTS.md` and skill descriptions per project and
+   revision; verified by `test_fixed_context.rs` on fixture transcripts and repositories; makes true REP-1, REP-2.
+2. [ ] Report, efficiency axis: `harness_report.rs` reads the inputs, groups the revisions, prints the efficiency
+   table with the confounders; verified by `test_harness_report.rs` on fixture TSV files; makes true REP-3 to REP-5,
+   REP-8.
+3. [ ] Report, other axes: quality, rules, skills, fixed context tables; verified by the same test; makes true
+   REP-6, REP-7 (spec `accepted`).
+4. [ ] Skill `evaluate-harness`: runs the scripts (a quality summary per repository) and reports the trend per axis;
+   architecture, README, `audit-instructions` cross-reference; verified by `test_skills.rs`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: ed19f9330c6ddf19e59703666509ed4a9afb138c
+- Unit of comparison: groups of consecutive revisions closed at `--min-sessions` sessions (default 10).
+- No committed snapshot: the session archive (EVA-11) and the git history suffice; `--anonymous` allows one later.
+- False positives of the refusals and misplaced skill calls: out of scope (judgment).
+- Skill name: `evaluate-harness`.
+
+## Deliverable 1
+- done: `fixed_context.rs` (bytes of `CLAUDE.md`, `AGENTS.md`, skill `name` and `description` per project and
+  revision, from the commit the revision came in force with; the skills shipped), architecture, README; REP-5 now
+  counts the models and versions by session (the rows give no turns per model).
+- red: the script did not exist, every check failed.
+- Smoke run on the real transcripts: 44 rows in 3 s; the skill descriptions cost 1.9 to 3.1 kB per revision.
+- Code review: 2 findings, both fixed: a description over several lines (`>` block) counted 1 byte, a nested `name:`
+  counted (REP-2 amended, fixture extended).

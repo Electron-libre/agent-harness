@@ -34,5 +34,7 @@ apart from what a gate blocked, and counts them per rule and harness revision.
 deliverables, the fixes inside it, the fixes and reverts of its files in the 30 days after its close, its
 reviews and their findings, and the failed checks and typed messages of the sessions that made it; `--summary` sums
 them per harness revision.
+`rust-script .claude/transcripts/fixed_context.rs` prints, per project and harness revision, the bytes of `CLAUDE.md`,
+`AGENTS.md` and the skill descriptions that every session pays, and the skills the revision ships.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).
