@@ -38,3 +38,44 @@ rules are broken often enough to deserve a hook or a rewording. Only the breache
   both apart.
 * The `files:` skill calls may be a harness defect (skills under `files/` being discovered) rather than an agent
   mistake: check before counting them.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+List each breach of a rule a program can see in the transcripts, `breach` apart from `blocked` by a gate, and count
+them per rule and harness revision over the sessions where the rule applied (BRE-1 to BRE-12). Out of scope: the
+rules that need judgment, one worktree per issue (parallel work only), the `files:` skill calls (a Claude Code
+offer, not an agent mistake). Means: a managed script next to `session_metrics.rs`; a new `specs/rule-breaches.md`
+rather than new requirements in the accepted `specs/evaluation.md`.
+
+## Plan
+1. [x] Shared resolution and transcript detectors: project, revision and "file committed at start" move to
+   `transcripts.rs`; `rule_breaches.rs` with the rows, `--summary` and the rules `no-verify`, `review-before-commit`,
+   `review-waiver`, `managed-copy`, `validation-stop`; verified by `test_rule_breaches.rs` on fixture transcripts and
+   repositories, `test_session_metrics.rs` unchanged; makes true BRE-1 to BRE-8, BRE-11, BRE-12.
+2. [ ] Commit rules: commits of the project joined to the sessions by date; verified by fixture repositories;
+   makes true BRE-9.
+3. [ ] Language rule: stop-word count per assistant text block; verified by fixture transcripts; makes true BRE-10
+   (spec `accepted`).
+4. [ ] Feed `audit-instructions`: its skill runs `rule_breaches.rs --summary` and proposes a hook for a rule often
+   broken; verified by `test_skills.rs`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: fa37c2219324ad93f51b61fad92b76bf424092c8
+- Commit messages: read from the git history of the project, joined to the session by date (a hand commit during a session counts as the agent's).
+- Language: stop-word count, French and English only, blocks of 20 words or more.
+
+## Deliverable 1
+- done: `transcripts.rs` now holds the session place (cwd, branches, start, end), the repository, project, revision
+  and the file committed at a date; `rule_breaches.rs` with the rows, `--summary` and five rules; architecture, README.
+- red: the script did not exist, every check failed.
+- Spec changes found on the real transcripts: only a refusal of a `git commit` call counts (the old text hook
+  refused a python edit script, and the commit after it was covered); only `Plan: proposed` written under `issues/`
+  arms the validation stop (a test fixture holding the text did); Bash writes are a non-goal.
+- Smoke run on the real transcripts: 3 s, no `breach` left; 21 review refusals and 14 waiver refusals `blocked`.
+- Code review: a review refusal suggesting to "ask the user to waive the review" was filed as a waiver refusal and
+  disarmed the bypass check; fixed (the waiver refusal is matched on `Refused: only the user waives`, BRE-5, BRE-6,
+  fixture extended).

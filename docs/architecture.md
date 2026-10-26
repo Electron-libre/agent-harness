@@ -135,10 +135,21 @@ counts once per `message.id`; the sub-agent transcripts count with their session
 so an unreadable line, an unknown type or a missing field is counted in its own column rather than skewing the others.
 No text of a message is printed, so `--archive <file>` can merge the rows into a file outside the repositories
 (a session replaced by its new row, a session whose transcript is gone kept): the history then outlives the retention
-of the transcripts. The transcript reading (projects, sessions, sub-agents, the typed-message filter)
-lives once in `transcripts.rs`, which `audit_sources.rs` includes too
-([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)); each including script carries the SHA-256 of the
-module, since `rust-script` would otherwise keep running the build of the old one.
+of the transcripts. The transcript reading (projects, sessions, sub-agents, the typed-message filter, and the
+project and harness revision a session resolves to) lives once in `transcripts.rs`, which `audit_sources.rs` and
+`rule_breaches.rs` include too ([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)); each including
+script carries the SHA-256 of the module, since `rust-script` would otherwise keep running the build of the old one.
+
+`.claude/transcripts/rule_breaches.rs` lists where the agent broke a rule a program can check (spec
+[`specs/rule-breaches.md`](../specs/rule-breaches.md)): one row per finding, `breach` when the act went through,
+`blocked` when a hook or a permission rule refused it, located by transcript line. The rules are read from the tool
+calls and their results: `--no-verify`, a commit after a review refusal with no review nor user message in between
+(the bypass of [ADR 0005](adr/0005-the-gates-catch-mistakes-not-bypasses.md)), the review waiver, an edit of a path of
+the project's `harness.lock`, and an edit outside `issues/`, `specs/` and `docs/adr/` between a proposed plan and the
+user's answer. The shell words of a command exclude its quoted strings and here-documents, so a commit message that
+names `--no-verify` is not a use of it. A session whose project had no harness then is skipped. `--summary` counts the
+findings per rule and revision over the sessions where the rule applied, so a rule that rarely applies does not read
+as respected.
 
 ## Parallel issues
 

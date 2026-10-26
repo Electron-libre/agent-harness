@@ -1,0 +1,45 @@
+---
+id: BRE
+status: draft
+adrs: [0003, 0005, 0006]
+---
+
+# Breaches of the harness rules in the session transcripts
+
+## Intent
+
+`.claude/transcripts/rule_breaches.rs` reads the Claude Code transcripts of every project and lists where the agent
+broke a rule the harness states (`AGENTS.md`, the skills, the ADRs), apart from where a gate refused it, then counts
+them per rule and per harness revision over the sessions where the rule applied, so `audit-instructions` can tell a
+rule broken often (a hook candidate) from a rule that rarely applies. Only the breaches a program can see are in
+scope.
+
+## Requirements
+
+- **BRE-1** (deterministic) `rule_breaches.rs [projects_dir]` must print a header line then one tab-separated row per finding, with the columns `session`, `project`, `revision`, `rule`, `kind`, `location`, `detail`; `kind` is `breach` when the act went through and `blocked` when a hook or a permission rule refused it; `location` is `<transcript file name>:<line>` (1-based, the file name of a sub-agent transcript being `subagents/<name>`), empty for a finding read from git.
+- **BRE-2** (deterministic) `project` and `revision` must be resolved as in `session_metrics.rs` (EVA-7, EVA-8), through the shared module `transcripts.rs`, so both scripts give a session the same project and revision; no rule applies to a session whose `revision` is empty (the project had no harness then).
+- **BRE-3** (deterministic) With `--summary`, the script must print instead a header then one row per rule and revision, with the columns `rule`, `revision`, `applied` (sessions where the rule applied, as each requirement below defines), `breached` (those with at least one `breach`), `breaches` and `blocked` (counts of findings), sorted by rule then revision.
+- **BRE-4** (deterministic) Rule `no-verify`: a `Bash` call whose command holds the words `git` and `commit` or `push` and the token `--no-verify` must be a finding (`blocked` when its result is an error). It applies to the sessions with a `Bash` call holding `git` and `commit` or `push`.
+- **BRE-5** (deterministic) Rule `review-before-commit`: an error result of a `Bash` call holding `git` and `commit` whose text holds `Refused:` and `code review` but not `Refused: only the user waives` must be a `blocked` finding (a refusal of another command is a mistake of the gate, not of the agent); a `Bash` call holding `git` and `commit` whose result is not an error, after such a refusal with neither a `Skill` call whose skill name ends with `code-review` nor a typed message (the filter of `transcripts.rs`) in between, must be a `breach` (the bypass of ADR 0005). It applies to the sessions with a `Bash` call holding `git` and `commit`.
+- **BRE-6** (deterministic) Rule `review-waiver`: a `Bash` call whose command runs the recipe `waive-review` (the words `just` and `waive-review`), an `Edit` or `Write` of a path whose file name is `claude-review-waived`, or an error tool result holding `Refused: only the user waives` must be a finding (`blocked` when the result is an error). It applies to the sessions with a `Bash` call holding `git` and `commit`.
+- **BRE-7** (deterministic) Rule `managed-copy`: an `Edit`, `Write` or `NotebookEdit` call whose `file_path`, made relative to the work tree of the session's first `cwd`, is listed in the `.claude/harness.lock` committed on the default branch of the project at the session's `start` must be a finding with that relative path as `detail` (`blocked` when its result is an error). It applies to the sessions with at least one such call in a project whose lock could be read.
+- **BRE-8** (deterministic) Rule `validation-stop`: once an `Edit` or `Write` call of the session's own transcript puts the text `Plan: proposed` in a file under `issues/`, each `Edit`, `Write` or `NotebookEdit` call before the next typed message whose path lies in the work tree but not under `issues/`, `specs/` or `docs/adr/` must be a `breach` with that path as `detail`. It applies to the sessions that wrote `Plan: proposed`.
+- **BRE-9** (deterministic) Rules `commit-attribution` and `commit-format`: each non-merge commit of any ref of the project's repository whose committer date lies between the `start` and the end of a session of that project must be checked once, against the latest-starting such session (a commit in no session was the user's and is skipped); a message with a line holding `co-authored-by:`, `noreply@anthropic.com`, or `generated with` and `claude` (case-insensitive) is a `commit-attribution` breach, and a subject that is not `<type>(<scope>): <description>` or `<type>: <description>` with a type of `AGENTS.md`, a scope among `docs`, `harness` and the `commit_scopes` of the `.claude/harness.toml` committed then, at most 72 characters, a description not starting with a capital letter nor ending with `.` is a `commit-format` breach; `detail` is the abbreviated hash. Both apply to the sessions with at least one checked commit.
+- **BRE-10** (deterministic) Rule `user-language`: when the `.claude/harness.toml` committed at the session's `start` names a `user_language` of `French` or `English`, each assistant text block of the session's own transcript that holds at least 20 words once fenced code and inline code are removed, and holds more stop words of the other language than of that one (from the two lists of the script), must be a `breach`. It applies to the sessions with at least one such block.
+- **BRE-11** (deterministic) The output must hold no text of a message, of a tool input or of a tool result: only identifiers, rule names, counts, paths and commit hashes.
+- **BRE-12** (deterministic) `rule_breaches.rs` must carry the `// transcripts.rs sha256: <hex>` line of EVA-13, checked by `just test-harness`.
+
+## Scenarios
+
+- (BRE-5) Given a refused commit, then a `/code-review` call, then a commit that passes, when the session is read, then there is one `blocked` finding and no `breach`.
+- (BRE-5) Given a refused commit, then a commit that passes with nothing in between, when the session is read, then there is one `blocked` finding and one `breach`.
+- (BRE-8) Given a session that writes `Plan: proposed` in an issue, then edits `src/main.rs`, then reads a typed `ok`, then edits `src/lib.rs`, when the session is read, then only `src/main.rs` is a breach.
+- (BRE-3) Given a rule that applied in ten sessions of a revision and was broken in one, when the summary is printed, then its row reads `applied` 10 and `breached` 1.
+
+## Non-goals
+
+- The rules that need judgment (the shape of the reports to the user): a later LLM judge.
+- One worktree per issue (ADR 0003): it is required only for agents working in parallel, which one transcript cannot show.
+- The `files:<skill>` calls of the harness repository: Claude Code offers the skills under `files/` as directory-scoped skills and tells the agent to prefer them there; they are the same text as the synced copies, so calling them is no breach.
+- A write made through `Bash` (a heredoc, `sed -i`): only the `Edit`, `Write` and `NotebookEdit` calls are read for the file rules.
+- A command that breaks a rule only by a construction nobody would write by mistake (ADR 0005), such as `-n` for `--no-verify` or a shell variable holding the flag.

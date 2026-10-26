@@ -7,9 +7,11 @@
 //! ```cargo
 //! [dependencies]
 //! serde_json = "1"
+//! chrono = "0.4"
+//! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: b30dc7325385743c5d4a5a6b7ba0ace159ee209332256005dab8beb364d6634f
+// transcripts.rs sha256: 9107c69c3dc3b74218133c7637511f56e5c62072439efc3568203b8b79886d31
 #[path = "../../transcripts/transcripts.rs"]
 mod transcripts;
 
