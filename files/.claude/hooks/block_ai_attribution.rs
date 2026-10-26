@@ -33,7 +33,7 @@ fn skip_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) {
 }
 
 /// Whether the command creates a commit or writes a pull request description. The subcommand is the first word
-/// after `git` or `gh` once their global options are skipped (the idea of `commit_dirs` in `require_code_review.rs`):
+/// after `git` or `gh` once their global options are skipped (the idea of `commit_skips_hooks` in `require_code_review.rs`):
 /// every flag, and the value of the options of `GIT_VALUE_OPTIONS` and `GH_VALUE_OPTIONS` given as a separate word.
 /// An unknown option that takes a value would hide the subcommand: add it to the list.
 fn writes_message(command: &str) -> bool {

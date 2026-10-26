@@ -61,7 +61,7 @@ then do step 2 first. Otherwise start at step 1.
    `just test-harness`, then **invoke `/code-review` on the diff with the Skill tool** and wait for its
    findings; reread the docs you changed. Fix what the review finds, or say why a finding is not fixed.
    Re-run `just check` after the fixes. Step 6 cannot start before the review has run.
-   The hook `require_code_review.rs` enforces it: `git commit` is refused (exit 2) while the diff holds a file
+   The native `pre-commit` hook (`require_code_review.rs native`) enforces it: `git commit` fails while the diff holds a file
    the last review never saw, so write the tracking and the summary of steps 6 and 7 in the issue **before**
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
    waive the review, with `just waive-review` (it creates the waiver of the current worktree, also in a linked

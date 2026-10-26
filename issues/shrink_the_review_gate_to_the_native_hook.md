@@ -52,7 +52,7 @@ down to what the native hook cannot do, so the gate stops growing.
 # Tracking
 
 1. [x] Deny rules in the seeded settings (REV-19), skill step 4.5 updated.
-2. [ ] Cut the Claude hook to `record` and REV-12; withdraw REV-1 to REV-8, REV-13, REV-14, REV-16, REV-18; rewrite REV-9; ADR 0005 accepted; measure.
+2. [x] Cut the Claude hook to `record` and REV-12; withdraw REV-1 to REV-8, REV-13, REV-14, REV-16, REV-18; rewrite REV-9; ADR 0005 accepted; measure.
 3. [ ] `harness check` warns on a missing deny rule (SYN-24); specs accepted then implemented.
 
 ## Decisions
@@ -95,4 +95,38 @@ REV-9 parity with `check`: deliverable 2. ADR 0004 body kept as written (an ADR 
 0005). A `touch` of the waiver is not refused once deliverable 2 lands: accepted non-goal (ADR 0005).
 
 not verified: that Claude Code refuses `just waive-review` with the new rules (needs a live session).
+decisions needed: none.
+
+## Deliverable 2
+
+done: `check` keeps only the refusal of `--no-verify`, `-n` and `core.hooksPath` (REV-12) and no longer judges the
+review; the repository parser, the `cd` reader and the waiver detection are gone with their tests; the review
+semantics (marker, fixes, `issues/`, waiver, first commit, linked worktree, recipe) are now tested through `native`;
+`docs/architecture.md`, skill step 4.5 and the comment of `block_ai_attribution.rs` follow.
+
+Measure (before -> after): hook 878 -> 385 lines (46.6 -> 19.2 KB), its tests 999 -> 560 lines (55.5 -> 28.2 KB),
+`files/` 272 -> 218 KB; `check` on `git status` about 3 ms before and after (cached binary): the gain is in code and
+review cost, not latency.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| lint | pass |
+| specs | pass |
+| docs | updated |
+| code review | 8 findings |
+
+Code review:
+- a quoted `--work-tree="my dir"`, a segment where `git` is first an argument, a continued line: fixed (regressions of
+  the cut or cheap to cover), with three REV-12 cases.
+- `GIT_VALUE_OPTIONS` said to match `block_ai_attribution.rs` but did not: fixed, same 7 options now.
+- REV-12 test built two repositories for a text-only check: fixed, a plain directory.
+- `native` introduced twice in `docs/architecture.md`: fixed.
+- `--no-verify` after a `$(…)` message or a quoted `|`: not fixed, the line was already split there before the cut;
+  a variant the hook does not read is a non-goal (ADR 0005).
+- no gate without the native hook (`core.hooksPath`, not synced): not fixed, decided at step 1 (`sync` and `check`
+  report it).
+
+not verified: none.
 decisions needed: none.

@@ -52,7 +52,8 @@ files: a message built by `$(cat file)` or a shell variable is out of reach. Its
 message that discusses the rule passes.
 
 `require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
-declared twice, one mode per event: `record` on `PostToolUse` `Skill`, `check` on `PreToolUse` `Bash`:
+declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on
+`PreToolUse` `Bash` (a third mode, `native`, is run by git, see below):
 
 ```json
 "PostToolUse": [
@@ -64,28 +65,16 @@ declared twice, one mode per event: `record` on `PostToolUse` `Skill`, `check` o
 When the `code-review` skill ends (it runs forked, so the hook fires at the end of the review), `record` writes
 the marker `claude-code-review.json` in the git directory, never a file of the work tree: the `HEAD`, a hash of
 the working tree against `HEAD` (tracked changes and untracked files, what an add of everything followed by a
-commit commits) and the files it covers. At a commit (`git -C dir` is followed), `check` recomputes the snapshot
-and exits 2, telling the agent to run the review, when the marker is missing, was made before the last commit, or
-the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with nothing to commit,
-a diff under `issues/` only and a directory outside a repository are let through. Documentation is reviewed like
-code. The user waives the review of the next commit with `just waive-review` (it creates the file at the path `git rev-parse --git-path` gives, right in a linked worktree too); the hook stamps the file
-with `HEAD` when it lets a commit through and removes it at the first check after `HEAD` moved, so a command that does
-not commit (`--dry-run`, a refusal by another hook) leaves it usable. The `permissions.deny` rules of the seeded
+commit commits) and the files it covers. The hook sees the review text in the `Skill` response but does not parse it.
+
+The gates catch the mistakes of a cooperative agent, not deliberate bypasses
+([ADR 0005](adr/0005-the-gates-catch-mistakes-not-bypasses.md)): the review is judged by the native hook below, on the
+repository git resolved, and `check` reads the text of a command only for what would skip that hook. The user waives
+the review of the next commit with `just waive-review` (it creates `claude-review-waived` at the path
+`git rev-parse --git-path` gives, right in a linked worktree too). The `permissions.deny` rules of the seeded
 `.claude/settings.json` (`Bash(just waive-review)`, `Bash(just waive-review *)`, `Edit(//**/claude-review-waived)`)
 make Claude Code refuse the agent the recipe and an edit of the file; they match the command the agent usually writes,
-not a `touch` or a script (ADR 0005). The hook sees the review
-text in the `Skill` response but does not parse it.
-
-The commit is judged on the repository it targets (spec [`specs/review-gate.md`](../specs/review-gate.md)): the work
-tree of `--work-tree`, else the parent of the innermost `.git` of `--git-dir` (the directory itself without one), else
-the directory the `-C` options lead to, which accumulate as in `git`. With `--git-dir` alone the directory the command
-runs in is checked too, since `git` commits its files into that git directory. `GIT_DIR` and `GIT_WORK_TREE` count as
-the two options (which win over them) when the line sets them before `git`, after `env`, or with `export`, until an
-`unset` or an `env -u` (the fish `set -x NAME value` and `set -e NAME` count the same); a line that gives one a value
-the text does not show (`$X`, `${X}`, `$(…)`, `(cmd)`, backticks) is refused, and so is a `-C`, `--git-dir` or
-`--work-tree` whose value is one of those. The hook reads the text of the command only: a variable exported by an
-earlier command of the session (an `export` in one call, a plain `git commit` in the next) is not seen, so the gate
-cannot cover that case.
+not a `touch` or a script.
 
 A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` installs
 ([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md), `crates/harness/src/gate.rs`;
@@ -103,9 +92,13 @@ repository, a directory outside any repository and a source without the review h
 `core.hooksPath` is set, git reads its hooks elsewhere, often a versioned directory: `sync` then installs nothing,
 reports `skipped (…)` with the line to add to the user's own `pre-commit`, and still succeeds.
 Git runs the hook in the repository that really receives the commit, with `GIT_DIR` and the work tree already
-resolved, so `native` reads no event and no command: it takes the same marker, snapshot, exemptions and waiver as
-`check` from that repository. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is
-the same.
+resolved, so `native` reads no event and no command (spec [`specs/review-gate.md`](../specs/review-gate.md)). It
+recomputes the snapshot and exits 2, telling the agent to run the review, when the marker is missing, was made before
+the last commit, or the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with
+nothing to commit and a diff under `issues/` only are let through. Documentation is reviewed like code. A waiver is
+stamped with `HEAD` when it lets a commit through and removed at the first run after `HEAD` moved, so a command that
+does not commit leaves it usable. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot
+is the one `record` took.
 
 A native hook does not run under `--no-verify` or `-n`, nor once `core.hooksPath` points elsewhere, so `check` refuses
 a commit that carries `--no-verify` (or an abbreviation) or `-n` (alone or in a bundle such as `-anm`), and any command
