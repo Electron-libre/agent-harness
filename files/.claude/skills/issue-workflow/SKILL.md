@@ -52,13 +52,16 @@ then do step 2 first. Otherwise start at step 1.
    deliverable that traces the last untraced requirement sets the spec `accepted`. Follow the test
    conventions of the project (the `test_conventions` note of `.claude/harness.toml` says where they are written). For non-Rust
    deliverables (hooks, skills, scripts) write the script test in Rust (`rust-script`, no bash) and run it with `just test-harness`.
-3. **Implement** until the test passes. The clippy gate hook keeps the code warning-free; fix what it reports.
+3. **Implement** until the test passes, then **refactor** under the green tests: remove duplication, rename, simplify,
+   no new behaviour. The clippy gate hook keeps the code warning-free; fix what it reports.
 4. **Docs**: run `skill:update-docs` (it covers the specs). If the change is an architectural decision, also write an ADR in
    `docs/adr/` (template and numbering in `docs/adr/README.md`) and update the
    diagrams in the `architecture` document of `.claude/harness.toml` when the flow changed.
 5. **Review (mandatory, never skipped)**: run `just check` (fmt, clippy, tests, specs) and
-   `just test-harness`, then **invoke `/code-review` on the diff with the Skill tool** and wait for its
-   findings; reread the docs you changed. Fix what the review finds, or say why a finding is not fixed.
+   `just test-harness`, then **invoke `/code-review low` on the diff with the Skill tool** (always name the level)
+   and wait for its findings; reread the docs you changed. Fix the findings on the deliverable's own change, or say
+   why one is not fixed; a finding outside the requirements of the deliverable becomes an issue
+   (`skill:create-issue`), not a fix in this deliverable.
    Re-run `just check` after the fixes. Step 6 cannot start before the review has run.
    The native `pre-commit` hook (`require_code_review.rs native`) enforces it: `git commit` fails while the diff holds a file
    the last review never saw, so write the tracking and the summary of steps 6 and 7 in the issue **before**
@@ -67,7 +70,7 @@ then do step 2 first. Otherwise start at step 1.
    worktree, where the waiver is per worktree); never create that file nor run that recipe yourself. Deny rules of
    `.claude/settings.json` refuse the recipe and an edit of the file; naming them (commit message, `grep`) is fine.
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
-   review), then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
+   review), one line `red:` with the failure message the test of step 2 gave before the code, then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
    clean), then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
    not invoke the review, go back to step 5 instead of presenting the deliverable. Wait for the user's validation.
    Don't commit before it. In autonomous mode, write this summary in the issue and go on.
@@ -78,6 +81,8 @@ then do step 2 first. Otherwise start at step 1.
    just the message.
 
 Then move to the next deliverable (autonomous mode: chain into it). Don't chain into it without saying so if the user asked to stop.
+After the last deliverable, invoke `/code-review high` once on the whole diff of the issue (its commits since the
+plan) and fix its findings as in step 5, in one more commit.
 
 ## Autonomous mode
 
@@ -87,9 +92,9 @@ recorded first in `## Decisions` of the issue's `# Tracking`, so it survives a `
 can switch it at any time.
 
 - **Lifted**: step 4.6 stops and the wait before step 4.8. Write the 4.6 summary (`done`, `check | result`,
-  `Code review:`, `not verified`, `decisions needed`) in the issue instead, then commit locally and chain into the next
+  `red:`, `Code review:`, `not verified`, `decisions needed`) in the issue instead, then commit locally and chain into the next
   deliverable.
-- **Never lifted**: the review of step 4.5 and its checks, the stops of steps 1 to 3, the Rules on push, deletion and
+- **Never lifted**: the review of step 4.5 and its checks, the `high` review of the whole issue, the stops of steps 1 to 3, the Rules on push, deletion and
   history rewriting (no push).
 - **Stops the chain**: a blocking question, a decision the summary needs from the user, a review finding you can't
   settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the

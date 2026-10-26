@@ -38,3 +38,43 @@ and cleaner.
 * `specs/agent-reports.md` and the wording checks of `test_skills.rs` are gone
   (`drop_redundant_guards_and_prose_tests`); `REQUIRED_PASSAGES` still pins the autonomous mode.
 * Keep the validation stops that the autonomous mode never lifts.
+
+# Tracking
+
+1. [x] Step 4 tightened: review scoped to the deliverable and its level named (4.5), refactor step, `red:` line in
+   the 4.6 summary.
+2. [ ] Steps 1 and 3 may be one stop for an issue that changes no capability and fits one deliverable.
+3. [ ] Slimmer skill: "Parallel agents" and the waiver details move to `issue-workflow/details.md`; the four report
+   rules are inlined in `issue-workflow` only.
+4. [ ] End-of-issue `high` review on `main..HEAD`, fixes of the findings on deliverables 1 to 3.
+
+## Decisions
+
+- Mode: autonomous.
+- No spec: the issue changes the text of a shared skill, no capability.
+- Review level: `low` per deliverable, `high` once at the end of the issue on `main..HEAD`.
+- Report rules: inlined in `issue-workflow` only; the six other skills keep citing `AGENTS.md`.
+- Refactor step: a cleanup by hand under green tests, no `/simplify`.
+- The moved passages go to a shared file of the skill (`details.md`), not to `docs/architecture.md`, which consumers
+  do not get.
+
+## Summaries
+
+### 1. Step 4 tightened
+
+- done: 4.3 implements then refactors under green tests (kept in step 3, so the step numbers that other text cites
+  stay); 4.5 names the level (`low`) and turns findings outside the deliverable into issues; 4.6 and the autonomous
+  summary show a `red:` line; a `high` review of the whole issue closes it, never lifted by the autonomous mode.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| lint, specs | pass |
+| docs | none to change (the skill is the doc) |
+| code review | `low`, see below |
+
+- red: n/a, text change, no test.
+- Code review: no findings.
+- not verified: an agent following the new steps on a real issue.
+- decisions needed: none.
