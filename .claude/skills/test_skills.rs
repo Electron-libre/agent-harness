@@ -16,6 +16,7 @@ const BUILT_IN_ROOT_DOCS: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 
 /// Passages a skill must keep, as (skill, passage, why).
 const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
+    ("audit-instructions", "rule_breaches.rs --summary", "the rules broken often feed the audit as hook candidates"),
     ("issue-workflow", "## Autonomous mode", "section defining the autonomous mode"),
     ("issue-workflow", "autonomous (default)", "plan validation asks autonomous or per-deliverable validation"),
     ("issue-workflow", "recorded first in `## Decisions`", "mode recorded in the issue so it survives a /clear"),

@@ -17,11 +17,16 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    read, project by project, `rust-script .claude/skills/audit-instructions/audit_sources.rs --messages`
    (pipe it through `grep -P '^<project>\t'`), the instruction files and the memory files listed. The output
    holds private content: keep it in the conversation, never in a file of the repository.
+   Also run `rust-script .claude/transcripts/rule_breaches.rs --summary`: per rule of the harness and revision,
+   the sessions where it applied, those where the agent broke it and the refusals of a gate (no message text).
 2. **Detect** candidates:
    - a procedure the user re-explained or re-triggered in several sessions or projects (same steps, same
      wording or intent);
    - a correction given more than once ("no, not like that", "I already told you");
    - a rule phrased "never" / "always" / "jamais" / "toujours", in an instruction file, a memory file or a message.
+   - a rule the agent broke in a noticeable share of the sessions where it applied (`breached` over `applied`),
+     and still breaks in the latest revisions: a hook candidate, or a rewording when a hook cannot see it; a rule
+     only `blocked` is a gate doing its job.
    Plain validations ("ok", "yes", "continue") are not candidates. Skip what an existing skill in
    `.claude/skills/` or hook in `.claude/hooks/` already covers (say so if it fails to).
 3. **Classify** each candidate:

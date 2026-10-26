@@ -117,7 +117,8 @@ another tool is out of reach.
 
 `audit-instructions` is the one skill that reads outside the repository: the user's session transcripts, memory
 and instruction files under `~/.claude/projects`, through `audit_sources.rs` (which shares the transcript reading of
-the evaluation, below). It only proposes skills and hooks;
+the evaluation, below), and the summary of `rule_breaches.rs`, whose rules broken often are hook candidates. It only
+proposes skills and hooks;
 the report holds private content, so it stays in the conversation (or a file outside the repository) and each
 validated proposal becomes an issue in generic wording. It is a skill rather than a `harness` subcommand
 because telling a repeated procedure from a rule needs judgment, and a skill keeps the shared files free of

@@ -59,7 +59,7 @@ rather than new requirements in the accepted `specs/evaluation.md`.
    makes true BRE-9.
 3. [x] Language rule: stop-word count per assistant text block; verified by fixture transcripts; makes true BRE-10
    (spec `accepted`).
-4. [ ] Feed `audit-instructions`: its skill runs `rule_breaches.rs --summary` and proposes a hook for a rule often
+4. [x] Feed `audit-instructions`: its skill runs `rule_breaches.rs --summary` and proposes a hook for a rule often
    broken; verified by `test_skills.rs`.
 
 ## Decisions
@@ -94,4 +94,10 @@ rather than new requirements in the accepted `specs/evaluation.md`.
   sub-agents skipped; spec `accepted`; architecture, README.
 - red: no language finding, the two language checks failed.
 - Smoke run: 74 sessions where it applied, 3 with English answers to a French user (8 blocks, read: true breaches).
+- Code review: no findings.
+
+## Deliverable 4
+- done: `audit-instructions` runs `rule_breaches.rs --summary` at collection and proposes a hook (or a rewording)
+  for a rule broken in a noticeable share of the sessions where it applied; architecture.
+- red: `audit-instructions: missing 'rule_breaches.rs --summary'` in `test_skills.rs`.
 - Code review: no findings.
