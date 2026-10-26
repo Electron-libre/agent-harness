@@ -96,7 +96,8 @@ pub fn result_text(block: &Value) -> String {
     }
 }
 
-fn push_distinct(list: &mut Vec<String>, value: Option<&str>) {
+/// Appends `value` to `list` unless it is empty or already there.
+pub fn push_distinct(list: &mut Vec<String>, value: Option<&str>) {
     if let Some(v) = value.filter(|v| !v.is_empty() && !list.iter().any(|k| k == v)) {
         list.push(v.to_string());
     }

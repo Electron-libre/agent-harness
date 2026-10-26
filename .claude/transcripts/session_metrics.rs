@@ -12,14 +12,14 @@
 //! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: 9107c69c3dc3b74218133c7637511f56e5c62072439efc3568203b8b79886d31
+// transcripts.rs sha256: 43f1f8aa151510a0d6379dc792ae8f924a95ea63e2ec2aa38f031eb1948d7562
 #[path = "transcripts.rs"]
 mod transcripts;
 
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use transcripts::{for_each_line, project_name, projects, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
+use transcripts::{for_each_line, project_name, projects, push_distinct, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
 
 const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
@@ -55,12 +55,6 @@ struct Session {
     unreadable: u64,
     unknown: u64,
     missing: u64,
-}
-
-fn push_distinct(list: &mut Vec<String>, value: Option<&str>) {
-    if let Some(v) = value.filter(|v| !v.is_empty() && !list.iter().any(|k| k == v)) {
-        list.push(v.to_string());
-    }
 }
 
 /// A plain validation, or the answers to the questions of a stop (`1 a, 2 c`; one answer needs its space, so a

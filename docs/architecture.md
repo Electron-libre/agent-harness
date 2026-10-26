@@ -144,14 +144,17 @@ script carries the SHA-256 of the module, since `rust-script` would otherwise ke
 `.claude/transcripts/rule_breaches.rs` lists where the agent broke a rule a program can check (spec
 [`specs/rule-breaches.md`](../specs/rule-breaches.md)): one row per finding, `breach` when the act went through,
 `blocked` when a hook or a permission rule refused it, located by transcript line. The rules are read from the tool
-calls and their results: `--no-verify`, a commit after a review refusal with no review nor user message in between
+calls and their results: `--no-verify`, a commit after a review refusal with no review nor user turn (a typed
+message, slash command or `!` command) in between
 (the bypass of [ADR 0005](adr/0005-the-gates-catch-mistakes-not-bypasses.md)), the review waiver, an edit of a path of
-the project's `harness.lock`, and an edit outside `issues/`, `specs/` and `docs/adr/` between a proposed plan and the
+the project's `harness.lock` (paths made relative to the work tree of the `cwd` of each call, so an issue worktree
+entered mid-session counts), and an edit outside `issues/`, `specs/` and `docs/adr/` between a proposed plan and the
 user's answer. The shell words of a command exclude its quoted strings and here-documents, so a commit message that
 names `--no-verify` is not a use of it. The commit messages (attribution trailer, Conventional Commits with the
-`commit_scopes` committed then) are read from the git history of the project instead, since a commit command rarely
-shows its message: a non-merge commit of any ref counts with the latest-starting session of the project whose span
-holds its committer date, and a commit in no session was the user's. The conversation language is judged per text
+`commit_scopes` of the commit itself, as `just check-commit` read them) are read from the git history of the project
+instead, since a commit command rarely shows its message: a non-merge commit of a local branch counts with the
+latest-starting session of the project whose span holds its author date, and a commit in no session was the user's
+(a commit the agent rebased keeps the date the user wrote it; stashes and notes are on no branch). The conversation language is judged per text
 block of the agent of 20 words or more once the code is removed, by counting the frequent words of French and English:
 a block with more words of the other language than of the `user_language` committed then is a breach. A session whose
 project had no harness then is skipped. `--summary` counts the

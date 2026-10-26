@@ -61,6 +61,9 @@ rather than new requirements in the accepted `specs/evaluation.md`.
    (spec `accepted`).
 4. [x] Feed `audit-instructions`: its skill runs `rule_breaches.rs --summary` and proposes a hook for a rule often
    broken; verified by `test_skills.rs`.
+5. [x] Fixes of the `high` review: stashes, notes and rebased commits, slash commands as user turns, a worktree
+   entered mid-session, `<<` inside quotes, scopes of the commit itself, shared `push_distinct`; verified by
+   `test_rule_breaches.rs`; amends BRE-4, BRE-5, BRE-7, BRE-8, BRE-9.
 
 ## Decisions
 - Mode: autonomous
@@ -100,4 +103,17 @@ rather than new requirements in the accepted `specs/evaluation.md`.
 - done: `audit-instructions` runs `rule_breaches.rs --summary` at collection and proposes a hook (or a rewording)
   for a rule broken in a noticeable share of the sessions where it applied; architecture.
 - red: `audit-instructions: missing 'rule_breaches.rs --summary'` in `test_skills.rs`.
+- Code review: no findings.
+
+## Deliverable 5 (fixes of the `high` review)
+- Fixed: commits read from the local branches by author date (a stash was a format breach, a rebased user commit
+  the agent's); a slash command or `!` command typed by the user is a user turn (a typed `/code-review` gave a false
+  bypass); paths relative to the work tree of each call's `cwd`; `<<` opens a here-document only outside quotes;
+  scopes from the `harness.toml` of the commit; `push_distinct` shared; no double tokenizing nor prefix stripping.
+- Not fixed: the git calls are not cached (4 s over every transcript); the commit rules are not shared with
+  `commit_check.rs`, which is a script with its own `main` and checks the work tree config: BRE-9 keeps the subject
+  and attribution rules; `chrono` and `toml` for `audit_sources.rs`, built once, rather than a second module and
+  stamp.
+- red: the g, h, stash, rebased and branch scope checks failed (extra findings, missed findings, wrong counts).
+- Smoke run: same findings as before (2 `commit-format`, 8 `user-language`).
 - Code review: no findings.

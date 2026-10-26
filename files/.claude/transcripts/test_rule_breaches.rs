@@ -171,6 +171,22 @@ fn fixture(tmp: &Path) -> (PathBuf, Vec<String>) {
     d.run("t1", "Bash", bash("git commit --no-verify -m x"), None);
     d.write(&proj.join("d.jsonl"));
 
+    let mut g = Transcript::new(&repo, "2026-02-03T10:00:00.000Z");
+    g.call("t1", "Bash", bash("git commit -m x"));
+    let refused3 = g.result("t1", true, "Refused: no code review has run in this project.");
+    g.typed("<command-name>/code-review</command-name>\n<command-args>low</command-args>");
+    g.run("t2", "Bash", bash("git commit -m x"), None);
+    g.write(&proj.join("g.jsonl"));
+
+    let linked = tmp.join("proj-foo");
+    sh(&repo, &["worktree", "add", "-q", "-b", "foo", linked.to_str().unwrap()]);
+    let mut h = Transcript::new(&repo, "2026-02-04T10:00:00.000Z");
+    h.typed("start the issue");
+    h.cwd = linked.display().to_string();
+    let switched = h.run("t1", "Edit", edit(&linked.join(".claude/hooks/x.rs")), None);
+    let quoted = h.run("t2", "Bash", bash("echo \"a << b\"\ngit commit --no-verify -m x"), None);
+    h.write(&proj.join("h.jsonl"));
+
     let mut e = Transcript::new(&repo, "2026-03-02T10:00:00.000Z");
     let late = e.run("t1", "Bash", bash("git -C x commit --no-verify"), None);
     e.write(&proj.join("e.jsonl"));
@@ -189,6 +205,9 @@ fn fixture(tmp: &Path) -> (PathBuf, Vec<String>) {
         row("a", "r1", "validation-stop", "breach", at(early), "src/main.rs"),
         row("a", "r1", "no-verify", "breach", format!("subagents/agent-x.jsonl:{pushed}"), ""),
         row("e", "r2", "no-verify", "breach", format!("e.jsonl:{late}"), ""),
+        row("g", "r1", "review-before-commit", "blocked", format!("g.jsonl:{refused3}"), ""),
+        row("h", "r1", "managed-copy", "breach", format!("h.jsonl:{switched}"), ".claude/hooks/x.rs"),
+        row("h", "r1", "no-verify", "breach", format!("h.jsonl:{quoted}"), ""),
     ];
     (projects, expected)
 }
@@ -227,12 +246,12 @@ fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let (ok, out) = run(dir, &projects, true);
     let expected = [
         SUMMARY,
-        "managed-copy\tr1\t2\t1\t1\t0",
-        "no-verify\tr1\t2\t1\t1\t1",
+        "managed-copy\tr1\t3\t2\t2\t0",
+        "no-verify\tr1\t4\t2\t2\t1",
         "no-verify\tr2\t1\t1\t1\t0",
-        "review-before-commit\tr1\t2\t1\t1\t2",
+        "review-before-commit\tr1\t4\t1\t1\t3",
         "review-before-commit\tr2\t1\t0\t0\t0",
-        "review-waiver\tr1\t2\t1\t1\t2",
+        "review-waiver\tr1\t4\t1\t1\t2",
         "review-waiver\tr2\t1\t0\t0\t0",
         "validation-stop\tr1\t1\t1\t1\t0",
     ];
@@ -271,7 +290,29 @@ fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let capital = commit_at(&repo, "2026-02-01T11:30:00Z", "Feat: Big.", &[("a", "6")]);
     sh(&repo, &["checkout", "-q", "-b", "other", "HEAD~3"]);
     let generated = commit_at(&repo, "2026-02-01T10:20:00Z", "chore(harness): w\n\nGenerated with [Claude Code]", &[("b", "1")]);
+    let with_cli = toml.replace("[\"sync\"]", "[\"sync\", \"cli\"]");
+    commit_at(&repo, "2026-02-01T10:21:00Z", "chore(sync): add the cli scope", &[(".claude/harness.toml", &with_cli)]);
+    commit_at(&repo, "2026-02-01T10:22:00Z", "feat(cli): add x", &[("b", "2")]);
     sh(&repo, &["checkout", "-q", "main"]);
+    std::fs::write(repo.join("a"), "stashed").unwrap();
+    let stash = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "stash", "-q"])
+        .env("GIT_AUTHOR_DATE", "2026-02-01T10:40:00Z")
+        .env("GIT_COMMITTER_DATE", "2026-02-01T10:40:00Z")
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    assert!(stash.status.success(), "stash failed");
+    std::fs::write(repo.join("c"), "1").unwrap();
+    sh(&repo, &["add", "c"]);
+    let rebased = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "Mine, rebased."])
+        .env("GIT_AUTHOR_DATE", "2026-01-15T10:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2026-02-01T10:41:00Z")
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    assert!(rebased.status.success(), "rebased commit failed");
     let merge = Command::new("git")
         .args(["-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "Merge branch other.", "other"])
         .env("GIT_AUTHOR_DATE", "2026-02-01T11:40:00Z")
@@ -306,7 +347,7 @@ fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     }
     vec![
         ("the commit rules succeed".to_string(), ok),
-        ("each commit of a session is checked once, against the latest-starting session; merges and the user's commits are skipped".to_string(), sorted(rows) == sorted(expected)),
+        ("each commit of a session is checked once, against the latest-starting session; merges, stashes and the user's commits are skipped; a scope added on the branch counts".to_string(), sorted(rows) == sorted(expected)),
         ("the commit rules apply to the sessions with a checked commit".to_string(), summary == want_summary),
     ]
 }

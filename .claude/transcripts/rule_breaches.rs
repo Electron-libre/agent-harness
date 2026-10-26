@@ -13,7 +13,7 @@
 //! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: 9107c69c3dc3b74218133c7637511f56e5c62072439efc3568203b8b79886d31
+// transcripts.rs sha256: 43f1f8aa151510a0d6379dc792ae8f924a95ea63e2ec2aa38f031eb1948d7562
 #[path = "transcripts.rs"]
 mod transcripts;
 
@@ -36,25 +36,34 @@ struct Call {
     name: String,
     input: Value,
     location: String,
+    /// The `cwd` of its line, where its paths are relative to.
+    cwd: String,
+    /// The words of a `Bash` command; empty for another tool.
+    words: Vec<String>,
     /// Whether its result was an error; `None` when no result was read.
     error: Option<bool>,
 }
 
 impl Call {
-    /// The words of a `Bash` command; empty for another tool.
-    fn words(&self) -> Vec<String> {
-        if self.name == "Bash" { shell_words(self.input["command"].as_str().unwrap_or_default()) } else { Vec::new() }
+    fn has(&self, word: &str) -> bool {
+        self.words.iter().any(|w| w == word)
     }
 
     /// Whether it is a `Bash` call running `git commit`.
     fn commits(&self) -> bool {
-        let words = self.words();
-        words.iter().any(|w| w == "git") && words.iter().any(|w| w == "commit")
+        self.has("git") && self.has("commit")
     }
+}
+
+/// A command the user typed: a slash command or a `!` shell command, which `typed_text` reads as injected text.
+fn user_command(line: &Value) -> bool {
+    let own = line["type"] == "user" && line["isMeta"].as_bool() != Some(true) && line["isSidechain"].as_bool() != Some(true);
+    own && line["message"]["content"].as_str().is_some_and(|t| t.contains("<command-name>/") || t.trim_start().starts_with("<bash-input>"))
 }
 
 enum Event {
     Call(usize),
+    /// A message or a command the user typed.
     Typed,
     /// An error tool result, with the call it answers when known.
     Error { location: String, text: String, call: Option<usize> },
@@ -86,11 +95,14 @@ impl Transcript {
                     for block in blocks.iter().filter(|b| b["type"] == "tool_use") {
                         ids.insert(block["id"].as_str().unwrap_or_default().to_string(), t.calls.len());
                         t.events.push(Event::Call(t.calls.len()));
-                        t.calls.push(Call { name: block["name"].as_str().unwrap_or_default().to_string(), input: block["input"].clone(), location: location.clone(), error: None });
+                        let name = block["name"].as_str().unwrap_or_default().to_string();
+                        let words = if name == "Bash" { shell_words(block["input"]["command"].as_str().unwrap_or_default()) } else { Vec::new() };
+                        let cwd = line["cwd"].as_str().unwrap_or_default().to_string();
+                        t.calls.push(Call { name, input: block["input"].clone(), location: location.clone(), cwd, words, error: None });
                     }
                 }
                 Some("user") => {
-                    if main && typed_text(line).is_some() {
+                    if main && (typed_text(line).is_some() || user_command(line)) {
                         t.events.push(Event::Typed);
                     }
                     for block in blocks.iter().filter(|b| b["type"] == "tool_result") {
@@ -117,30 +129,33 @@ impl Transcript {
 /// The words of a shell command that the shell itself reads: quoted strings and here-document bodies (commit
 /// messages, mostly) are dropped, so a message that names `--no-verify` is not a use of it.
 fn shell_words(command: &str) -> Vec<String> {
-    let mut code = String::new();
-    let mut terminator: Option<String> = None;
-    for line in command.lines() {
-        if let Some(end) = &terminator {
-            if line.trim() == end {
-                terminator = None;
-            }
-            continue;
-        }
-        code.push_str(line);
-        code.push('\n');
-        if let Some((_, rest)) = line.split_once("<<") {
-            let word: String = rest.trim_start_matches('-').trim_start().chars().filter(|c| !matches!(c, '\'' | '"')).take_while(|c| c.is_alphanumeric() || *c == '_').collect();
-            terminator = (!word.is_empty()).then_some(word);
-        }
-    }
     let (mut words, mut word, mut quote) = (Vec::new(), String::new(), None);
-    for c in code.chars() {
-        match quote {
-            Some(q) if c == q => quote = None,
-            Some(_) => {}
-            None if c == '\'' || c == '"' => quote = Some(c),
-            None if c.is_whitespace() || ";&|()<>`".contains(c) => words.extend((!word.is_empty()).then(|| std::mem::take(&mut word))),
-            None => word.push(c),
+    let mut lines = command.split('\n');
+    while let Some(line) = lines.next() {
+        // the terminator of a here-document opened on this line, outside quotes; its body is the next lines
+        let mut terminator: Option<String> = None;
+        let mut chars = line.chars().peekable();
+        while let Some(c) = chars.next() {
+            match quote {
+                Some(q) if c == q => quote = None,
+                Some(_) => {}
+                None if c == '\'' || c == '"' => quote = Some(c),
+                None if c == '<' && chars.peek() == Some(&'<') => {
+                    chars.next();
+                    let rest: String = chars.clone().collect();
+                    let name: String = rest.trim_start_matches('-').trim_start().chars().filter(|c| !matches!(c, '\'' | '"')).take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                    terminator = terminator.or(name.starts_with(|c: char| c.is_alphabetic() || c == '_').then_some(name));
+                    words.extend((!word.is_empty()).then(|| std::mem::take(&mut word)));
+                }
+                None if c.is_whitespace() || ";&|()<>`".contains(c) => words.extend((!word.is_empty()).then(|| std::mem::take(&mut word))),
+                None => word.push(c),
+            }
+        }
+        if quote.is_none() {
+            words.extend((!word.is_empty()).then(|| std::mem::take(&mut word)));
+        }
+        if let Some(end) = terminator.filter(|_| quote.is_none()) {
+            lines.by_ref().find(|l| l.trim() == end);
         }
     }
     words.extend((!word.is_empty()).then_some(word));
@@ -154,10 +169,10 @@ struct Finding {
     detail: String,
 }
 
-/// What a session is checked against: its work tree, to make paths relative, the managed paths and the stop words
-/// of the conversation language then, with those of the other language.
+/// What a session is checked against: the work tree of each `cwd` of its calls, to make paths relative, the managed
+/// paths and the stop words of the conversation language then, with those of the other language.
 struct Context {
-    worktree: PathBuf,
+    worktrees: HashMap<String, PathBuf>,
     managed: Option<HashSet<String>>,
     language: Option<(&'static [&'static str], &'static [&'static str])>,
 }
@@ -200,9 +215,15 @@ fn prose_words(text: &str) -> Vec<String> {
 const MIN_WORDS: usize = 20;
 
 impl Context {
-    fn relative(&self, path: &str) -> Option<String> {
-        Path::new(path).strip_prefix(&self.worktree).ok().map(|p| p.to_string_lossy().into_owned())
+    /// `path` relative to the work tree of `cwd`; `None` outside it.
+    fn relative(&self, cwd: &str, path: &str) -> Option<String> {
+        Path::new(path).strip_prefix(self.worktrees.get(cwd)?).ok().map(|p| p.to_string_lossy().into_owned())
     }
+}
+
+/// The work tree holding `cwd`: its git top level, else `cwd` itself (a removed worktree).
+fn worktree(cwd: &str) -> PathBuf {
+    git(Path::new(cwd), &["rev-parse", "--show-toplevel"]).map(PathBuf::from).unwrap_or_else(|| PathBuf::from(cwd))
 }
 
 #[derive(Default)]
@@ -234,8 +255,7 @@ impl Verdict {
                     let before = self.findings.len();
                     match call.name.as_str() {
                         "Bash" => {
-                            let words = call.words();
-                            let has = |w: &str| words.iter().any(|x| x == w);
+                            let has = |w: &str| call.has(w);
                             if has("git") && (has("commit") || has("push")) {
                                 self.applied.insert("no-verify");
                                 if has("--no-verify") {
@@ -263,7 +283,7 @@ impl Verdict {
                             if Path::new(path).file_name().is_some_and(|n| n == "claude-review-waived") {
                                 self.add("review-waiver", blocked, &call.location, String::new());
                             }
-                            let relative = context.relative(path);
+                            let relative = context.relative(&call.cwd, path);
                             if let Some(managed) = &context.managed {
                                 self.applied.insert("managed-copy");
                                 if let Some(rel) = relative.as_ref().filter(|r| managed.contains(*r)) {
@@ -271,11 +291,11 @@ impl Verdict {
                                 }
                             }
                             if main {
-                                if let Some(rel) = relative.filter(|r| plan_proposed && !PLAN_DIRS.iter().any(|d| r.starts_with(d))) {
-                                    self.add("validation-stop", false, &call.location, rel);
+                                if let Some(rel) = relative.as_ref().filter(|r| plan_proposed && !PLAN_DIRS.iter().any(|d| r.starts_with(d))) {
+                                    self.add("validation-stop", false, &call.location, rel.clone());
                                 }
                                 let text = [&call.input["new_string"], &call.input["content"]].into_iter().filter_map(Value::as_str).collect::<String>();
-                                let issue = context.relative(path).is_some_and(|r| r.starts_with("issues/"));
+                                let issue = relative.is_some_and(|r| r.starts_with("issues/"));
                                 if issue && text.contains("Plan: proposed") {
                                     plan_proposed = true;
                                     self.applied.insert("validation-stop");
@@ -344,9 +364,9 @@ fn conventional(subject: &str, scopes: &[String]) -> bool {
         && !description.ends_with('.')
 }
 
-/// The `commit_scopes` of the `.claude/harness.toml` committed in `repo` at `at`.
-fn commit_scopes(repo: &Path, at: &str) -> Vec<String> {
-    let config = committed_config(repo, at);
+/// The `commit_scopes` of the `.claude/harness.toml` of `commit` in `repo`, the one `just check-commit` read.
+fn commit_scopes(repo: &Path, commit: &str) -> Vec<String> {
+    let config = git(repo, &["show", &format!("{commit}:.claude/harness.toml")]).and_then(|t| t.parse::<toml::Table>().ok());
     let list = config.as_ref().and_then(|c| c.get("project")).and_then(|p| p.get("commit_scopes")).and_then(toml::Value::as_array);
     list.map(|l| l.iter().filter_map(toml::Value::as_str).map(str::to_string).collect()).unwrap_or_default()
 }
@@ -362,13 +382,14 @@ struct Record {
     verdict: Verdict,
 }
 
-/// Checks the non-merge commits of every ref of `repo` against the messages rules, each against the latest-starting
-/// session of `records` (all of that repository) whose span holds its committer date; the others were the user's.
+/// Checks the non-merge commits of the local branches of `repo` against the messages rules, each against the
+/// latest-starting session of `records` (all of that repository) whose span holds its author date: a commit the
+/// agent rebased keeps the date the user wrote it, and stashes and notes are on no branch.
 fn check_commits(repo: &Path, records: &mut [&mut Record]) {
-    let Some(log) = git(repo, &["log", "--all", "--no-merges", "--format=%h%x1f%cI%x1f%B%x1e"]) else { return };
+    let Some(log) = git(repo, &["log", "--branches", "--no-merges", "--format=%h%x1f%H%x1f%aI%x1f%B%x1e"]) else { return };
     for entry in log.split('\x1e') {
-        let mut fields = entry.trim_start_matches('\n').splitn(3, '\x1f');
-        let (Some(hash), Some(date), Some(message)) = (fields.next(), fields.next(), fields.next()) else { continue };
+        let mut fields = entry.trim_start_matches('\n').splitn(4, '\x1f');
+        let (Some(hash), Some(full), Some(date), Some(message)) = (fields.next(), fields.next(), fields.next(), fields.next()) else { continue };
         let Ok(at) = DateTime::parse_from_rfc3339(date) else { continue };
         let Some(record) = records.iter_mut().filter(|r| r.start <= at && at <= r.end).max_by_key(|r| r.start) else { continue };
         let verdict = &mut record.verdict;
@@ -376,7 +397,7 @@ fn check_commits(repo: &Path, records: &mut [&mut Record]) {
         if attributed(message) {
             verdict.add("commit-attribution", false, "", hash.to_string());
         }
-        if !conventional(message.lines().next().unwrap_or_default(), &commit_scopes(repo, date)) {
+        if !conventional(message.lines().next().unwrap_or_default(), &commit_scopes(repo, full)) {
             verdict.add("commit-format", false, "", hash.to_string());
         }
     }
@@ -420,10 +441,10 @@ fn main() {
             if revision.is_empty() {
                 continue;
             }
-            let worktree = git(Path::new(&cwd), &["rev-parse", "--show-toplevel"]).map(PathBuf::from).unwrap_or_else(|| PathBuf::from(&cwd));
+            let worktrees = transcripts.iter().flat_map(|(t, _)| &t.calls).map(|c| c.cwd.clone()).collect::<BTreeSet<_>>().into_iter().map(|c| (c.clone(), worktree(&c))).collect();
             let config = committed_config(&repo, &start_text);
             let language = config.as_ref().and_then(|c| c.get("project")).and_then(|p| p.get("user_language")).and_then(toml::Value::as_str).and_then(stop_words);
-            let context = Context { worktree, managed: managed_paths(&repo, &start_text), language };
+            let context = Context { worktrees, managed: managed_paths(&repo, &start_text), language };
             let mut verdict = Verdict::default();
             for (t, main) in &transcripts {
                 verdict.check(t, &context, *main);
