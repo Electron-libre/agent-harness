@@ -1,7 +1,8 @@
 #!/usr/bin/env rust-script
 //! Structural check of the project skills: frontmatter is valid, `name` matches the directory,
 //! and every skill (`skill:<name>`), repo doc (`` `AGENTS.md` ``, `` `docs/….md` ``) or section of `AGENTS.md`
-//! (`` `AGENTS.md` section "<heading>" ``) a skill references actually exists.
+//! (`` `AGENTS.md` section "<heading>" ``) a skill references actually exists, as does every file of its own
+//! directory it links (`[x](details.md)`).
 //! Usage: `just test-harness` (or `rust-script .claude/skills/test_skills.rs`).
 //! ```cargo
 //! [dependencies]
@@ -94,6 +95,13 @@ fn main() {
         for path in text.split('`').skip(1).step_by(2).filter(|s| is_doc_path(s, &root_docs)) {
             if !root.join(path).exists() {
                 failures.push(format!("{name}: references missing file '{path}'"));
+            }
+        }
+        // relative markdown links outside code spans, resolved in the skill's directory
+        let prose = text.split('`').step_by(2).collect::<Vec<_>>().join(" ");
+        for target in prose.split("](").skip(1).filter_map(|t| t.split(')').next()) {
+            if !target.contains("://") && !target.starts_with('#') && !entry.path().join(target).exists() {
+                failures.push(format!("{name}: links the missing file '{target}'"));
             }
         }
         // `AGENTS.md` section "<heading>" references, wherever the text wraps

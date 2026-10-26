@@ -9,7 +9,12 @@ The user hands over an issue file in `issues/`. Talk to the user in the `user_la
 commits stay in English). Never skip a validation stop: they are what makes the autonomy safe. The only ones the user can lift are those of
 step 4.6 and 4.8, through the Autonomous mode.
 
-Show the user your results as `AGENTS.md` section "Reports to the user" says.
+Reports to the user (stops, summaries, final report) are read at a glance:
+
+- Facts go in a table or a checklist, one fact per line; prose only for a decision the user must take.
+- No narration of the steps: show the result, not the path.
+- Don't repeat what the diff, the issue, a spec or the validated plan already shows.
+- Keep what a stop must show; shorten the form, not the content.
 
 ## 0. Resume or start
 
@@ -67,9 +72,7 @@ then do step 2 first. Otherwise start at step 1.
    The native `pre-commit` hook (`require_code_review.rs native`) enforces it: `git commit` fails while the diff holds a file
    the last review never saw, so write the tracking and the summary of steps 6 and 7 in the issue **before**
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
-   waive the review, with `just waive-review` (it creates the waiver of the current worktree, also in a linked
-   worktree, where the waiver is per worktree); never create that file nor run that recipe yourself. Deny rules of
-   `.claude/settings.json` refuse the recipe and an edit of the file; naming them (commit message, `grep`) is fine.
+   waive the review: never do it yourself ([details.md](details.md), "Review waiver").
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
    review), one line `red:` with the failure message the test of step 2 gave before the code, then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
    clean), then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
@@ -103,16 +106,9 @@ can switch it at any time.
 
 ## Parallel agents
 
-Two agents can work two issues at once, each in its own git worktree. From the main worktree run
-`just start-issue issues/<name>.md`: it creates `../<repo>-<name>` on a branch `<name>`; open the agent there.
-The issue must be committed on the main branch first. While the branch or worktree exists, `just next-issue` skips the issue.
-When the issue is done, merge it from the main worktree (rebase the branch onto the main branch, then
-fast-forward), run `just close-issue issues/<name>.md` there, commit the move, then `just finish-issue <name>`:
-run it from the main worktree (it refuses inside the worktree to remove, `--force` or not): it removes the worktree and the branch only once merged (fast-forward, rebase or squash of any number of commits are detected, the last by comparing trees) and clean.
-When the work is not on the main branch, `finish-issue` refuses: after the user agreed, run `just finish-issue <name> --force`, which deletes the branch even though
-its work is not on the main branch. `close-issue` refuses in a linked worktree, so
-the queue is never edited on an issue branch; in that worktree, report the issue as done and leave the closing
-to the merge.
+Two agents can work two issues at once, each in its own git worktree: read [details.md](details.md) before
+`just start-issue`, the merge or `just finish-issue`. In a linked worktree, report the issue as done and leave the
+closing to the merge.
 
 ## Rules
 

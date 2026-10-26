@@ -44,7 +44,7 @@ and cleaner.
 1. [x] Step 4 tightened: review scoped to the deliverable and its level named (4.5), refactor step, `red:` line in
    the 4.6 summary.
 2. [x] Steps 1 and 3 may be one stop for an issue that changes no capability and fits one deliverable.
-3. [ ] Slimmer skill: "Parallel agents" and the waiver details move to `issue-workflow/details.md`; the four report
+3. [x] Slimmer skill: "Parallel agents" and the waiver details move to `issue-workflow/details.md`; the four report
    rules are inlined in `issue-workflow` only.
 4. [ ] End-of-issue `high` review on `main..HEAD`, fixes of the findings on deliverables 1 to 3.
 
@@ -94,4 +94,24 @@ and cleaner.
 - red: n/a, text change, no test.
 - Code review: no findings.
 - not verified: an agent following the merged stop on a real issue.
+- decisions needed: none.
+
+### 3. Slimmer skill
+
+- done: the waiver details and the parallel-agents procedure move to `issue-workflow/details.md`, linked from
+  `SKILL.md`; the four report rules are inlined in `issue-workflow`; `test_skills.rs` checks that the relative
+  markdown links of a skill (outside code spans) name an existing file of its directory.
+- size: `SKILL.md` 10 778 B before this deliverable (10 046 B before the issue) → 9 898 B, and no more read of
+  `AGENTS.md` for the report rules; `details.md` 1 671 B, read only for a waiver or a worktree.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `just test-harness`, `just check-harness` | pass |
+| docs | none to change (no doc lists the skill's files or the checks of `test_skills.rs`) |
+| code review | `low`, see below |
+
+- red: `FAIL - issue-workflow: links the missing file 'details.md'`
+- Code review: no findings.
+- not verified: that an agent opens `details.md` when a worktree or a waiver comes up.
 - decisions needed: none.
