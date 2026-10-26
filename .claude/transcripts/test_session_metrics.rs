@@ -152,12 +152,83 @@ fn shared_reader_checks(dir: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+/// Commits `files` (path, content) in `repo` at `date` (committer and author); returns the commit hash.
+fn commit_at(repo: &Path, date: &str, files: &[(&str, &str)]) -> String {
+    for (path, body) in files {
+        let file = repo.join(path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, body).unwrap();
+    }
+    sh(repo, &["add", "-A", "--force"]);
+    let out = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", date])
+        .env("GIT_AUTHOR_DATE", date)
+        .env("GIT_COMMITTER_DATE", date)
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "commit failed in {}: {}{}", repo.display(), String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    let head = Command::new("git").args(["rev-parse", "HEAD"]).current_dir(repo).output().unwrap();
+    String::from_utf8_lossy(&head.stdout).trim().to_string()
+}
+
+fn new_repo(dir: &Path) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    sh(dir, &["init", "-q", "-b", "main"]);
+    dir.to_path_buf()
+}
+
+// spec: EVA-8
+fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let tmp = tmp.join("revision");
+    let pinned = new_repo(&tmp.join("pinned"));
+    let toml = |rev: &str| format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"  # v1\n");
+    commit_at(&pinned, "2026-01-01T10:00:00Z", &[(".claude/harness.toml", &toml("aaa"))]);
+    commit_at(&pinned, "2026-01-01T12:00:00Z", &[(".claude/harness.toml", &toml("bbb"))]);
+    let worktree = tmp.join("pinned-branch");
+    sh(&pinned, &["worktree", "add", "-q", "-b", "branch", worktree.to_str().unwrap()]);
+    commit_at(&worktree, "2026-01-01T12:30:00Z", &[(".claude/harness.toml", &toml("ccc"))]);
+    let own = new_repo(&tmp.join("own"));
+    commit_at(&own, "2026-01-01T10:00:00Z", &[(".claude/harness.toml", "[harness]\nsource = \".\"\n"), ("files/a", "1")]);
+    let files_commit = commit_at(&own, "2026-01-01T11:00:00Z", &[("files/a", "2")]);
+    commit_at(&own, "2026-01-01T11:10:00Z", &[("other", "x")]);
+    let unpinned = new_repo(&tmp.join("unpinned"));
+    commit_at(&unpinned, "2026-01-01T10:00:00Z", &[(".claude/harness.toml", "[harness]\nsource = \"https://example.org/harness\"\n")]);
+    let projects = tmp.join("projects");
+    let sessions: [(&str, &Path, &str); 7] = [
+        ("before", &pinned, "2026-01-01T09:00:00.000Z"),
+        ("first", &pinned, "2026-01-01T11:00:00.000Z"),
+        ("second", &pinned, "2026-01-01T13:00:00.000Z"),
+        ("on_branch", &worktree, "2026-01-01T13:00:00.000Z"),
+        ("own", &own, "2026-01-01T11:30:00.000Z"),
+        ("unpinned", &unpinned, "2026-01-01T11:00:00.000Z"),
+        ("gone", Path::new("/nonexistent/gone"), "2026-01-01T11:00:00.000Z"),
+    ];
+    for (id, cwd, ts) in sessions {
+        let proj = projects.join(format!("-{id}"));
+        std::fs::create_dir_all(&proj).unwrap();
+        std::fs::write(proj.join(format!("{id}.jsonl")), typed(cwd, ts, "ok")).unwrap();
+    }
+    let out = Command::new("rust-script").arg(dir.join("session_metrics.rs")).arg(&projects).output().expect("rust-script must be installed");
+    let rows = rows(&String::from_utf8_lossy(&out.stdout)).unwrap_or_default();
+    let rev = |id: &str| rows.get(id).and_then(|r| r.get("revision")).cloned().unwrap_or_else(|| "<none>".into());
+    vec![
+        ("no revision before the first pin", rev("before").is_empty()),
+        ("the pin in force at the start of the session", rev("first") == "aaa"),
+        ("a later pin applies to a later session", rev("second") == "bbb"),
+        ("a linked worktree reads the pin of the default branch", rev("on_branch") == "bbb"),
+        ("the harness repository itself gives its last commit touching files/", rev("own") == format!("self:{files_commit}")),
+        ("a harness.toml with no rev is unpinned", rev("unpinned") == "unpinned"),
+        ("an unreadable project gives an empty revision", rev("gone").is_empty()),
+    ]
+}
+
 fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let tmp = std::env::temp_dir().join(format!("session_metrics_test_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).unwrap();
-    let checks: Vec<_> = row_checks(&dir, &tmp).into_iter().chain(shared_reader_checks(&dir)).collect();
+    let checks: Vec<_> = row_checks(&dir, &tmp).into_iter().chain(revision_checks(&dir, &tmp)).chain(shared_reader_checks(&dir)).collect();
     let _ = std::fs::remove_dir_all(&tmp);
     let mut failed = false;
     for (name, ok) in checks {

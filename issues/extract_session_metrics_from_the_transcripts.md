@@ -60,7 +60,7 @@ not a `harness` subcommand.
    `audit_sources.rs`) and `session_metrics.rs` with every column but `revision`; verified by
    `test_session_metrics.rs` and `test_audit_sources.rs` on fixture transcripts; makes true EVA-1 to EVA-7, EVA-9,
    EVA-10, EVA-12.
-2. [ ] Harness revision: the join of `start` with the history of `.claude/harness.toml` on the default branch;
+2. [x] Harness revision: the join of `start` with the history of `.claude/harness.toml` on the default branch;
    verified by fixture git repositories (pinned, self, unpinned, unreadable); makes true EVA-8.
 3. [ ] Archive: `--archive <file>` merges the rows; verified by a fixture archive; makes true EVA-11 (spec
    `accepted`).
@@ -83,3 +83,10 @@ not a `harness` subcommand.
   the metadata lines (`ai-title`, `atis-latch`, `last-prompt`, `mode`, `cost-state`, `api-request-blob`) never carry
   one (22800 false "missing" otherwise).
 - Smoke run on the real transcripts: 194 sessions in under a second, 0 unreadable, 0 unknown, 0 missing.
+
+## Deliverable 2
+- done: `revision` column (`git log --before` on `origin/HEAD`, else `main`, else `master`, then `git show` of
+  `.claude/harness.toml`, read with `toml`); architecture.
+- red: the five revision checks with a readable pin failed (empty column).
+- Smoke run: 24 pinned sessions, 48 `self:`, 122 empty (projects without a `harness.toml` yet at the session).
+- Test note: the fixture repositories force-add, since a global gitignore may ignore `.claude/`.

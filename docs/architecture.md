@@ -128,7 +128,9 @@ project specifics.
 `.claude/transcripts/session_metrics.rs` prints one tab-separated row of numbers per session of every project
 (spec [`specs/evaluation.md`](../specs/evaluation.md)): tokens by kind, turns, tool calls, hook refusals, skill calls,
 typed messages split into plain validations and the rest, tagged with the project, the issue branches, the models and
-the Claude Code versions. An assistant message is repeated on one line per content block with the same usage, so it
+the Claude Code versions, and the harness revision in force: the transcripts do not record it, so it is the `rev` of
+the `.claude/harness.toml` committed on the default branch of the project at the start of the session (`self:<commit>`
+for this repository, the last commit touching `files/`). An assistant message is repeated on one line per content block with the same usage, so it
 counts once per `message.id`; the sub-agent transcripts count with their session. The format moves between versions,
 so an unreadable line, an unknown type or a missing field is counted in its own column rather than skewing the others.
 No text of a message is printed. The transcript reading (projects, sessions, sub-agents, the typed-message filter)

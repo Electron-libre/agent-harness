@@ -1,12 +1,14 @@
 #!/usr/bin/env rust-script
 //! Print one tab-separated row of numbers per session of the Claude Code transcripts (`specs/evaluation.md`): cost,
 //! user interventions, and what may explain a difference (project, issue, harness revision, model, version). The
-//! sub-agent transcripts count with their session. No text of a message is printed, so the rows can be archived.
+//! sub-agent transcripts count with their session; the harness revision comes from the git history of the
+//! project's `.claude/harness.toml`. No text of a message is printed, so the rows can be archived.
 //! Usage: `rust-script session_metrics.rs [projects_dir]` (default `~/.claude/projects`).
 //! ```cargo
 //! [dependencies]
 //! serde_json = "1"
 //! chrono = "0.4"
+//! toml = "0.8"
 //! ```
 
 #[path = "transcripts.rs"]
@@ -15,7 +17,7 @@ mod transcripts;
 use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use transcripts::{projects, projects_root, read_lines, sessions, subagents, typed_text};
 
@@ -215,13 +217,40 @@ impl Session {
     }
 }
 
-/// The name of the repository holding `cwd` (a linked worktree counts with its main repository), else the last
-/// component of `cwd`.
-fn project_name(cwd: &str) -> String {
-    let out = Command::new("git").args(["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"]).output();
-    let common = out.ok().filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-    let repo = common.as_deref().and_then(|c| Path::new(c).parent()).and_then(Path::file_name);
-    repo.or_else(|| Path::new(cwd).file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+fn git(dir: &Path, args: &[&str]) -> Option<String> {
+    let out = Command::new("git").arg("-C").arg(dir).args(args).output().ok().filter(|o| o.status.success())?;
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// The main worktree of the repository holding `cwd` (a linked worktree counts with its main repository).
+fn repository(cwd: &str) -> Option<PathBuf> {
+    let common = git(Path::new(cwd), &["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
+    Path::new(&common).parent().map(Path::to_path_buf)
+}
+
+/// The project of a session: the name of its repository, else the last component of `cwd`.
+fn project_name(cwd: &str, repo: Option<&Path>) -> String {
+    repo.and_then(Path::file_name).or_else(|| Path::new(cwd).file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// The harness revision in force in `repo` at `start` (ADR 0002): the `rev` of the `.claude/harness.toml` committed
+/// on the default branch then; `self:<commit>` for the harness repository itself (`source = "."`, no `rev`), the
+/// last commit touching `files/`; `unpinned` with no `rev`; empty when it cannot be read.
+fn revision(repo: &Path, start: &str) -> String {
+    let branch = ["origin/HEAD", "main", "master"].into_iter().find(|b| git(repo, &["rev-parse", "--verify", "-q", &format!("{b}^{{commit}}")]).is_some());
+    let Some(branch) = branch else { return String::new() };
+    let before = format!("--before={start}");
+    let last = |path: &str| git(repo, &["log", "-1", "--format=%H", &before, branch, "--", path]).filter(|c| !c.is_empty());
+    let Some(commit) = last(".claude/harness.toml") else { return String::new() };
+    let Some(text) = git(repo, &["show", &format!("{commit}:.claude/harness.toml")]) else { return String::new() };
+    let Ok(config) = text.parse::<toml::Table>() else { return String::new() };
+    let harness = config.get("harness");
+    let field = |key: &str| harness.and_then(|h| h.get(key)).and_then(toml::Value::as_str);
+    match (field("rev"), field("source")) {
+        (Some(rev), _) => rev.to_string(),
+        (None, Some(".")) => last("files").map(|c| format!("self:{c}")).unwrap_or_default(),
+        (None, _) => "unpinned".to_string(),
+    }
 }
 
 fn main() {
@@ -237,7 +266,7 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let mut names: HashMap<String, String> = HashMap::new();
+    let mut repositories: HashMap<String, Option<PathBuf>> = HashMap::new();
     println!("{HEADER}");
     for project in projects(&root) {
         for path in sessions(&project) {
@@ -248,8 +277,10 @@ fn main() {
             }
             let id = path.file_stem().unwrap().to_string_lossy().into_owned();
             let cwd = session.cwd.clone().unwrap_or_default();
-            let name = names.entry(cwd.clone()).or_insert_with(|| if cwd.is_empty() { String::new() } else { project_name(&cwd) });
-            println!("{}", session.row(&id, name, ""));
+            let repo = repositories.entry(cwd.clone()).or_insert_with(|| if cwd.is_empty() { None } else { repository(&cwd) });
+            let start = session.start.as_ref().map(|(_, text)| text.as_str()).unwrap_or_default();
+            let revision = repo.as_deref().filter(|_| !start.is_empty()).map(|r| revision(r, start)).unwrap_or_default();
+            println!("{}", session.row(&id, &project_name(&cwd, repo.as_deref()), &revision));
         }
     }
 }
