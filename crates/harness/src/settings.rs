@@ -19,7 +19,7 @@ const SETTINGS: &str = ".claude/settings.json";
 /// The settings of the project kept out of git, relative to its root.
 const LOCAL_SETTINGS: &str = ".claude/settings.local.json";
 /// The days Claude Code keeps the transcripts when `cleanupPeriodDays` is unset.
-const DEFAULT_RETENTION: &str = "30";
+const DEFAULT_RETENTION: f64 = 30.0;
 /// The days of transcripts the evaluation of the harness needs to span several revisions.
 const MIN_RETENTION: f64 = 365.0;
 /// Where the hooks the settings run live, relative to the root of the project.
@@ -112,26 +112,33 @@ fn attribution_off(settings: &Value) -> bool {
 }
 
 /// The retention warnings (SYN-28): the user settings at `user` keep the transcripts less than `MIN_RETENTION` days
-/// (unreadable or unset: the default), and each settings file of the project that sets a lower number. Claude Code sweeps
-/// the transcripts of every project with the value of the session that runs the sweep.
-pub fn retention(root: &Path, user: &Path) -> Vec<String> {
+/// (unset: the default), or cannot be read or located, and each settings file of the project that sets a lower number.
+/// Claude Code sweeps the transcripts of every project with the value of the session that runs the sweep.
+pub fn retention(root: &Path, user: Option<&Path>) -> Vec<String> {
     let mut warnings = Vec::new();
-    let days = read_json(user).and_then(|settings| retention_days(&settings));
-    if days
-        .as_ref()
-        .is_none_or(|d| d.as_f64().is_some_and(|d| d < MIN_RETENTION))
-    {
-        let days = days.map_or_else(|| DEFAULT_RETENTION.to_string(), |d| d.to_string());
-        warnings.push(format!(
-            "warning: the transcripts are deleted after {days} days (cleanupPeriodDays); set it to at least {MIN_RETENTION} in {}",
+    match user.map(|user| (user, read_json(user))) {
+        None => warnings.push(
+            "warning: the user settings cannot be located (set HOME or CLAUDE_CONFIG_DIR); the retention of the transcripts is not checked"
+                .to_string(),
+        ),
+        Some((user, Err(()))) => warnings.push(format!(
+            "warning: {} cannot be read or is not valid JSON; Claude Code pauses the cleanup of the transcripts until it is fixed",
             user.display()
-        ));
+        )),
+        Some((user, Ok(settings))) => {
+            let days = settings.as_ref().and_then(retention_days).unwrap_or(DEFAULT_RETENTION);
+            if days < MIN_RETENTION {
+                warnings.push(format!(
+                    "warning: the transcripts are deleted after {days} days (cleanupPeriodDays); set it to at least {MIN_RETENTION} in {}",
+                    user.display()
+                ));
+            }
+        }
     }
     for rel in [SETTINGS, LOCAL_SETTINGS] {
-        if let Some(days) =
-            read_json(&root.join(rel)).and_then(|settings| retention_days(&settings))
-        {
-            if days.as_f64().is_some_and(|d| d < MIN_RETENTION) {
+        let settings = read_json(&root.join(rel)).ok().flatten();
+        if let Some(days) = settings.as_ref().and_then(retention_days) {
+            if days < MIN_RETENTION {
                 warnings.push(format!(
                     "warning: {rel} sets cleanupPeriodDays to {days} days, below {MIN_RETENTION}"
                 ));
@@ -141,12 +148,16 @@ pub fn retention(root: &Path, user: &Path) -> Vec<String> {
     warnings
 }
 
-/// The file at `path` parsed as JSON, `None` when it cannot be read or parsed.
-fn read_json(path: &Path) -> Option<Value> {
-    serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
+/// The file at `path` parsed as JSON: `None` when there is no such file, an error when it cannot be read or parsed.
+fn read_json(path: &Path) -> Result<Option<Value>, ()> {
+    match fs::read_to_string(path) {
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(()),
+        Ok(text) => serde_json::from_str(&text).map(Some).map_err(|_| ()),
+    }
 }
 
 /// `cleanupPeriodDays` when it is a number.
-fn retention_days(settings: &Value) -> Option<Value> {
-    Some(settings["cleanupPeriodDays"].clone()).filter(Value::is_number)
+fn retention_days(settings: &Value) -> Option<f64> {
+    settings["cleanupPeriodDays"].as_f64()
 }

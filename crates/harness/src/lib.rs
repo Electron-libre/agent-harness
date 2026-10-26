@@ -662,24 +662,23 @@ pub fn retention_warnings(root: &Path) -> Vec<String> {
         std::env::var_os("CLAUDE_CONFIG_DIR"),
         std::env::var_os("HOME"),
     );
-    retention_with(root, in_ci(), &user)
+    retention_with(root, in_ci(), user.as_deref())
 }
 
-fn retention_with(root: &Path, ci: bool, user: &Path) -> Vec<String> {
+fn retention_with(root: &Path, ci: bool, user: Option<&Path>) -> Vec<String> {
     if ci {
         return Vec::new();
     }
     settings::retention(root, user)
 }
 
-/// The user settings of Claude Code: `settings.json` in `config_dir` (`CLAUDE_CONFIG_DIR`), or else in `~/.claude`.
-fn user_settings(config_dir: Option<OsString>, home: Option<OsString>) -> PathBuf {
-    let dir = config_dir
-        .filter(|d| !d.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| home.map(|h| PathBuf::from(h).join(".claude")))
-        .unwrap_or_else(|| PathBuf::from("~/.claude"));
-    dir.join("settings.json")
+/// The user settings of Claude Code: `settings.json` in `config_dir` (`CLAUDE_CONFIG_DIR`), or else in `~/.claude`;
+/// `None` when neither is set.
+fn user_settings(config_dir: Option<OsString>, home: Option<OsString>) -> Option<PathBuf> {
+    let set = |var: Option<OsString>| var.filter(|v| !v.is_empty()).map(PathBuf::from);
+    set(config_dir)
+        .or_else(|| set(home).map(|h| h.join(".claude")))
+        .map(|dir| dir.join("settings.json"))
 }
 
 fn check_with(root: &Path, ci: bool) -> Result<Checked> {

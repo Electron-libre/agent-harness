@@ -30,11 +30,10 @@ fn warns_when_the_user_settings_keep_the_transcripts_less_than_a_year() {
         (Some("{}"), "30"),
         (Some(r#"{"cleanupPeriodDays": "long"}"#), "30"),
         (Some(r#"{"cleanupPeriodDays": 90}"#), "90"),
-        (Some("{,}"), "30"),
     ] {
         let (root, _home, user) = project_and_user(text);
         assert_eq!(
-            retention_with(root.path(), false, &user),
+            retention_with(root.path(), false, Some(&user)),
             vec![user_warning(days, &user)],
             "{text:?}"
         );
@@ -45,10 +44,33 @@ fn warns_when_the_user_settings_keep_the_transcripts_less_than_a_year() {
     ] {
         let (root, _home, user) = project_and_user(Some(text));
         assert!(
-            retention_with(root.path(), false, &user).is_empty(),
+            retention_with(root.path(), false, Some(&user)).is_empty(),
             "{text}"
         );
     }
+}
+
+// spec: SYN-28
+#[test]
+fn says_when_the_user_settings_cannot_be_parsed_rather_than_guess_the_retention() {
+    let (root, _home, user) = project_and_user(Some("{,}"));
+    assert_eq!(
+        retention_with(root.path(), false, Some(&user)),
+        vec![format!(
+            "warning: {} cannot be read or is not valid JSON; Claude Code pauses the cleanup of the transcripts until it is fixed",
+            user.display()
+        )]
+    );
+}
+
+// spec: SYN-28
+#[test]
+fn says_when_the_user_settings_cannot_be_located() {
+    let root = tempdir().unwrap();
+    assert_eq!(
+        retention_with(root.path(), false, None),
+        vec!["warning: the user settings cannot be located (set HOME or CLAUDE_CONFIG_DIR); the retention of the transcripts is not checked".to_string()]
+    );
 }
 
 // spec: SYN-28
@@ -66,7 +88,7 @@ fn warns_of_each_project_settings_file_that_lowers_the_retention() {
         r#"{"cleanupPeriodDays": 7}"#,
     );
     assert_eq!(
-        retention_with(root.path(), false, &user),
+        retention_with(root.path(), false, Some(&user)),
         vec![
             "warning: .claude/settings.json sets cleanupPeriodDays to 30 days, below 365"
                 .to_string(),
@@ -81,7 +103,7 @@ fn warns_of_each_project_settings_file_that_lowers_the_retention() {
         r#"{"cleanupPeriodDays": 400}"#,
     );
     put(root.path(), ".claude/settings.local.json", "{,}");
-    assert!(retention_with(root.path(), false, &user).is_empty());
+    assert!(retention_with(root.path(), false, Some(&user)).is_empty());
 }
 
 // spec: SYN-28
@@ -93,7 +115,7 @@ fn says_nothing_of_the_retention_under_ci() {
         ".claude/settings.json",
         r#"{"cleanupPeriodDays": 30}"#,
     );
-    assert!(retention_with(root.path(), true, &user).is_empty());
+    assert!(retention_with(root.path(), true, Some(&user)).is_empty());
 }
 
 // spec: SYN-28
@@ -101,14 +123,12 @@ fn says_nothing_of_the_retention_under_ci() {
 fn the_user_settings_are_in_the_config_dir_or_else_in_the_home() {
     assert_eq!(
         user_settings(Some("/cfg".into()), Some("/home/u".into())),
-        PathBuf::from("/cfg/settings.json")
+        Some(PathBuf::from("/cfg/settings.json"))
     );
     assert_eq!(
         user_settings(None, Some("/home/u".into())),
-        PathBuf::from("/home/u/.claude/settings.json")
+        Some(PathBuf::from("/home/u/.claude/settings.json"))
     );
-    assert_eq!(
-        user_settings(Some("".into()), None),
-        PathBuf::from("~/.claude/settings.json")
-    );
+    assert_eq!(user_settings(Some("".into()), Some("".into())), None);
+    assert_eq!(user_settings(None, None), None);
 }

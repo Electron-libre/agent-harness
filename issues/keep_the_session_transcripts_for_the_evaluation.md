@@ -77,3 +77,16 @@ archiving compact extracts (moved to `extract_session_metrics_from_the_transcrip
 * checks: `just check` ok.
 * code review: no findings.
 * not verified: nothing.
+
+## Deliverable 3 (fixes of the high review)
+
+* done: unreadable or invalid user settings get their own warning instead of a false 30 days; no `HOME` nor
+  `CLAUDE_CONFIG_DIR` gives a "cannot be located" warning instead of a relative `~` path; a test of the binary proves
+  the warning comes out once after `check` and `sync`, never after `init`; the days are an `f64` throughout.
+* not fixed: folding the retention into `Report.warnings` / `Checked.warnings` (the library `check` and `sync` read
+  the project only, so their tests do not depend on the user's settings; the test of the binary covers `main`);
+  reading `.claude/settings.json` twice (two error policies on purpose: SYN-24 to SYN-26 already report a broken file).
+* red: type errors on `retention_with(.., Option<&Path>)` and `user_settings(..) -> Option<PathBuf>` before the code.
+* checks: `just check` ok, `just test-harness` ok.
+* code review: no findings.
+* not verified: nothing.

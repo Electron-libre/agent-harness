@@ -58,7 +58,8 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-27) Given a source that dropped a hook the settings run, when `sync --dry-run` runs, then it warns that the settings run the missing hook, though the file is still there.
 - (SYN-27) Given an `update` that applies, then the warnings of its sync come out once, not once for the dry run that precedes it and once for the sync.
 - (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
-- (SYN-28) Given user settings that cannot be read or are not valid JSON, then the retention warning is printed as if `cleanupPeriodDays` were missing: Claude Code then pauses its sweep, but the value in force is unknown.
+- (SYN-28) Given user settings that exist but cannot be read or are not valid JSON, then the warning is `warning: <user settings> cannot be read or is not valid JSON; Claude Code pauses the cleanup of the transcripts until it is fixed`, not the retention one: the value in force is unknown.
+- (SYN-28) Given neither `CLAUDE_CONFIG_DIR` nor `HOME` set (or both empty), then the warning is `warning: the user settings cannot be located (set HOME or CLAUDE_CONFIG_DIR); the retention of the transcripts is not checked`.
 
 ## Non-goals
 
