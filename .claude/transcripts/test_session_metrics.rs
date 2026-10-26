@@ -223,12 +223,43 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+// spec: EVA-11
+fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let tmp = tmp.join("archive");
+    let projects = tmp.join("projects/-p");
+    std::fs::create_dir_all(&projects).unwrap();
+    let cwd = Path::new("/nonexistent/p");
+    std::fs::write(projects.join("b.jsonl"), [typed(cwd, "2026-01-02T00:00:00.000Z", "ok"), typed(cwd, "2026-01-02T00:00:01.000Z", "ok")].concat()).unwrap();
+    std::fs::write(projects.join("c.jsonl"), typed(cwd, "2026-01-01T12:00:00.000Z", "ok")).unwrap();
+    let archive = tmp.join("state/deep/sessions.tsv");
+    let run = || Command::new("rust-script").arg(dir.join("session_metrics.rs")).arg(tmp.join("projects")).arg("--archive").arg(&archive).output().expect("rust-script must be installed");
+    let first = run();
+    let created = std::fs::read_to_string(&archive).unwrap_or_default();
+    let old_row = |id: &str, start: &str| format!("{id}\tp\t\t\t\t\t{start}\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n");
+    std::fs::create_dir_all(archive.parent().unwrap()).unwrap();
+    std::fs::write(&archive, format!("{COLUMNS}\n{}{}", old_row("b", "2026-01-02T00:00:00.000Z"), old_row("a", "2026-01-01T00:00:00.000Z"))).unwrap();
+    let merged = run();
+    let text = std::fs::read_to_string(&archive).unwrap_or_default();
+    let ids: Vec<&str> = text.lines().skip(1).map(|l| l.split('\t').next().unwrap_or_default()).collect();
+    let b_validations = rows(&text).and_then(|r| r.get("b").and_then(|b| b.get("validations")).cloned()).unwrap_or_default();
+    let foreign = "session\tsomething_else\na\tx\n";
+    std::fs::write(&archive, foreign).unwrap();
+    let refused = run();
+    vec![
+        ("the archive and its missing parent directories are created", first.status.success() && created.lines().count() == 3),
+        ("the rows are still printed with --archive", String::from_utf8_lossy(&merged.stdout).lines().count() == 3),
+        ("one header, sessions kept, replaced or added, sorted by start", merged.status.success() && text.starts_with(COLUMNS) && ids == ["a", "c", "b"]),
+        ("an archived session is replaced by its new row", b_validations == "2"),
+        ("an archive with another header is refused and left unchanged", !refused.status.success() && std::fs::read_to_string(&archive).unwrap_or_default() == foreign),
+    ]
+}
+
 fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let tmp = std::env::temp_dir().join(format!("session_metrics_test_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).unwrap();
-    let checks: Vec<_> = row_checks(&dir, &tmp).into_iter().chain(revision_checks(&dir, &tmp)).chain(shared_reader_checks(&dir)).collect();
+    let checks: Vec<_> = row_checks(&dir, &tmp).into_iter().chain(revision_checks(&dir, &tmp)).chain(archive_checks(&dir, &tmp)).chain(shared_reader_checks(&dir)).collect();
     let _ = std::fs::remove_dir_all(&tmp);
     let mut failed = false;
     for (name, ok) in checks {

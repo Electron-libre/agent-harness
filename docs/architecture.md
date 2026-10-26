@@ -133,7 +133,9 @@ the `.claude/harness.toml` committed on the default branch of the project at the
 for this repository, the last commit touching `files/`). An assistant message is repeated on one line per content block with the same usage, so it
 counts once per `message.id`; the sub-agent transcripts count with their session. The format moves between versions,
 so an unreadable line, an unknown type or a missing field is counted in its own column rather than skewing the others.
-No text of a message is printed. The transcript reading (projects, sessions, sub-agents, the typed-message filter)
+No text of a message is printed, so `--archive <file>` can merge the rows into a file outside the repositories
+(a session replaced by its new row, a session whose transcript is gone kept): the history then outlives the retention
+of the transcripts. The transcript reading (projects, sessions, sub-agents, the typed-message filter)
 lives once in `transcripts.rs`, which `audit_sources.rs` includes too
 ([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)).
 

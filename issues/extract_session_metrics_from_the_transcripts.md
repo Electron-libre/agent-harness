@@ -62,7 +62,7 @@ not a `harness` subcommand.
    EVA-10, EVA-12.
 2. [x] Harness revision: the join of `start` with the history of `.claude/harness.toml` on the default branch;
    verified by fixture git repositories (pinned, self, unpinned, unreadable); makes true EVA-8.
-3. [ ] Archive: `--archive <file>` merges the rows; verified by a fixture archive; makes true EVA-11 (spec
+3. [x] Archive: `--archive <file>` merges the rows; verified by a fixture archive; makes true EVA-11 (spec
    `accepted`).
 
 ## Decisions
@@ -90,3 +90,8 @@ not a `harness` subcommand.
 - red: the five revision checks with a readable pin failed (empty column).
 - Smoke run: 24 pinned sessions, 48 `self:`, 122 empty (projects without a `harness.toml` yet at the session).
 - Test note: the fixture repositories force-add, since a global gitignore may ignore `.claude/`.
+
+## Deliverable 3
+- done: `--archive <file>` merges the rows (written through a `.partial` file then renamed); an archive with other
+  columns is refused and left as is (added to EVA-11); spec `accepted`; architecture and README.
+- red: `unknown option --archive`, the four merge checks failed.

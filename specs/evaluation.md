@@ -1,6 +1,6 @@
 ---
 id: EVA
-status: draft
+status: accepted
 adrs: [0002, 0006]
 ---
 
@@ -25,7 +25,7 @@ measures; it does not judge.
 - **EVA-8** (deterministic) `revision` must be the `rev` value of the `.claude/harness.toml` committed on the default branch of the project at the session's `start` (the last commit touching that file at or before it); `self:<commit>` when that file names `source = "."` with no `rev` (the harness repository itself: the last commit touching `files/` at or before `start`); `unpinned` when the file exists then with no `rev`; empty when the project, the file or the history cannot be read.
 - **EVA-9** (deterministic) A line that is not valid JSON must count in `unreadable_lines`, a line whose `type` is not in the known list of the script in `unknown_lines`, and an assistant line with no `message.id` or no `message.usage`, or a line of the conversation (`user`, `assistant`, `attachment`, `system`) with no `timestamp`, in `missing_fields` (the metadata lines, such as `ai-title`, carry none); none of them must stop the script or change the other columns.
 - **EVA-10** (deterministic) The output must hold no text of a message, of a tool input or of a tool result: only identifiers, names, counts and timestamps.
-- **EVA-11** (deterministic) With `--archive <file>`, the script must also merge its rows into that file: a session already archived is replaced by its new row, a session absent from the transcripts is kept, and the file stays one header then rows sorted by `start`; the parent directory is created when missing.
+- **EVA-11** (deterministic) With `--archive <file>`, the script must also merge its rows into that file: a session already archived is replaced by its new row, a session absent from the transcripts is kept, and the file stays one header then rows sorted by `start`; the parent directory is created when missing. An archive whose header is not the script's must be left unchanged, with an error and a non-zero exit, since its columns would not line up.
 - **EVA-12** (deterministic) `audit_sources.rs` and `session_metrics.rs` must read the transcripts through the same module (`.claude/transcripts/transcripts.rs`): the typed-message filter and the listing of projects and sessions are written once.
 
 ## Scenarios

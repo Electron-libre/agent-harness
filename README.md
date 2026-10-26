@@ -24,6 +24,7 @@ them after 30 days by default, for every project at once: keep them a year in yo
 ```
 
 `rust-script .claude/transcripts/session_metrics.rs` prints one row of numbers per session (cost, user
-interventions, project, issue, model, version), with no message text.
+interventions, project, issue, harness revision, model, version), with no message text; `--archive <file>` also merges
+them into a file kept outside the repositories, so the history outlives the transcripts.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

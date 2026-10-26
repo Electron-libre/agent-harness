@@ -3,7 +3,8 @@
 //! user interventions, and what may explain a difference (project, issue, harness revision, model, version). The
 //! sub-agent transcripts count with their session; the harness revision comes from the git history of the
 //! project's `.claude/harness.toml`. No text of a message is printed, so the rows can be archived.
-//! Usage: `rust-script session_metrics.rs [projects_dir]` (default `~/.claude/projects`).
+//! With `--archive <file>`, also merge the rows into that file, so the history outlives the transcripts.
+//! Usage: `rust-script session_metrics.rs [projects_dir] [--archive <file>]` (default `~/.claude/projects`).
 //! ```cargo
 //! [dependencies]
 //! serde_json = "1"
@@ -253,13 +254,53 @@ fn revision(repo: &Path, start: &str) -> String {
     }
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if let Some(flag) = args.iter().find(|a| a.starts_with('-')) {
-        eprintln!("unknown option {flag}\nusage: session_metrics.rs [projects_dir]");
-        std::process::exit(2);
+/// Merges `rows` into the archive at `path`: a session already there is replaced, one absent from `rows` is kept, and
+/// the file stays one header then rows sorted by start. An archive with another header is left unchanged.
+fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
+    let existing = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
+    };
+    let mut lines = existing.lines();
+    if lines.next().is_some_and(|header| header != HEADER) {
+        return Err(format!("{} has other columns than this script: archive elsewhere", path.display()));
     }
-    let root = match projects_root(args.first()) {
+    let session = |row: &str| row.split('\t').next().unwrap_or_default().to_string();
+    let start = |row: &str| row.split('\t').nth(6).unwrap_or_default().to_string();
+    let mut merged: BTreeMap<String, String> = lines.filter(|l| !l.is_empty()).map(|l| (session(l), l.to_string())).collect();
+    merged.extend(rows.iter().map(|r| (session(r), r.clone())));
+    let mut merged: Vec<String> = merged.into_values().collect();
+    merged.sort_by_key(|r| start(r));
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent).map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+    }
+    let partial = path.with_extension("tsv.partial");
+    let text = std::iter::once(HEADER.to_string()).chain(merged).map(|l| l + "\n").collect::<String>();
+    std::fs::write(&partial, text).and_then(|()| std::fs::rename(&partial, path)).map_err(|e| format!("cannot write {}: {e}", path.display()))
+}
+
+fn main() {
+    const USAGE: &str = "usage: session_metrics.rs [projects_dir] [--archive <file>]";
+    let mut args = std::env::args().skip(1);
+    let (mut dir, mut archive_path) = (None, None);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--archive" => match args.next() {
+                Some(file) => archive_path = Some(PathBuf::from(file)),
+                None => {
+                    eprintln!("--archive needs a file\n{USAGE}");
+                    std::process::exit(2);
+                }
+            },
+            flag if flag.starts_with('-') => {
+                eprintln!("unknown option {flag}\n{USAGE}");
+                std::process::exit(2);
+            }
+            _ => dir = Some(arg),
+        }
+    }
+    let root = match projects_root(dir.as_ref()) {
         Ok(root) => root,
         Err(e) => {
             eprintln!("{e}");
@@ -267,7 +308,7 @@ fn main() {
         }
     };
     let mut repositories: HashMap<String, Option<PathBuf>> = HashMap::new();
-    println!("{HEADER}");
+    let mut rows = Vec::new();
     for project in projects(&root) {
         for path in sessions(&project) {
             let mut session = Session::default();
@@ -280,7 +321,15 @@ fn main() {
             let repo = repositories.entry(cwd.clone()).or_insert_with(|| if cwd.is_empty() { None } else { repository(&cwd) });
             let start = session.start.as_ref().map(|(_, text)| text.as_str()).unwrap_or_default();
             let revision = repo.as_deref().filter(|_| !start.is_empty()).map(|r| revision(r, start)).unwrap_or_default();
-            println!("{}", session.row(&id, &project_name(&cwd, repo.as_deref()), &revision));
+            rows.push(session.row(&id, &project_name(&cwd, repo.as_deref()), &revision));
         }
+    }
+    println!("{HEADER}");
+    for row in &rows {
+        println!("{row}");
+    }
+    if let Err(e) = archive_path.map_or(Ok(()), |path| archive(&path, &rows)) {
+        eprintln!("{e}");
+        std::process::exit(1);
     }
 }
