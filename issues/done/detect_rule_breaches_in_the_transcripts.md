@@ -43,6 +43,8 @@ rules are broken often enough to deserve a hook or a rewording. Only the breache
 
 Plan: validated
 
+Status: done (2026-10-26)
+
 ## Understanding
 List each breach of a rule a program can see in the transcripts, `breach` apart from `blocked` by a gate, and count
 them per rule and harness revision over the sessions where the rule applied (BRE-1 to BRE-12). Out of scope: the
