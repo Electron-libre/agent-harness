@@ -465,3 +465,23 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     run(&root);
     assert!(check_with(root.path(), false).unwrap().is_empty());
 }
+
+// spec: REV-19
+#[test]
+fn the_seeded_settings_deny_the_waiver_to_the_agent() {
+    let seed = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../seed/.claude/settings.json");
+    let settings: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(seed).unwrap()).unwrap();
+    let deny: Vec<&str> = settings["permissions"]["deny"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| r.as_str())
+        .collect();
+    for rule in gate::DENY_RULES {
+        assert!(
+            deny.contains(&rule),
+            "the seeded settings lack the deny rule {rule}: {deny:?}"
+        );
+    }
+}

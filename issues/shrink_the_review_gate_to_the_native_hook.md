@@ -48,3 +48,51 @@ down to what the native hook cannot do, so the gate stops growing.
   deny rule.
 * The hook refuses Bash commands that write the waiver file or run its recipe while it still exists: edit with the
   file tools.
+
+# Tracking
+
+1. [x] Deny rules in the seeded settings (REV-19), skill step 4.5 updated.
+2. [ ] Cut the Claude hook to `record` and REV-12; withdraw REV-1 to REV-8, REV-13, REV-14, REV-16, REV-18; rewrite REV-9; ADR 0005 accepted; measure.
+3. [ ] `harness check` warns on a missing deny rule (SYN-24); specs accepted then implemented.
+
+## Decisions
+
+- Mode: autonomous.
+- Existing consumers learn of the deny rules from a non-blocking warning of `harness check` (SYN-24).
+- A repository without the native hook has no review gate: accepted, `harness check` already reports it (SYN-23).
+- The user runs `just waive-review` from their own terminal; whether a deny rule applies to a `!` command was not checked.
+- SYN-24 goes into `specs/sync.md` with its test in deliverable 3, so that spec stays `implemented` (a `draft` spec is not enforced).
+- Baseline: hook 878 lines, its tests 999 lines (55 KB), `files/` 272 KB; `check` on `git status` about 3 ms (cached binary).
+
+## Deliverable 1
+
+done: deny rules in `seed/.claude/settings.json` and in this repository's settings, `DENY_RULES` in `gate.rs` checked by
+a REV-19 test, REV spec amended (withdrawals, REV-9 rewritten, REV-19), ADR 0005 accepted and ADR 0004 marked as partly
+superseded, skill step 4.5 and `docs/architecture.md` describe the deny rules.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| lint | pass |
+| specs | pass |
+| docs | updated |
+| code review | 9 findings |
+
+Code review:
+- `specs/sync.md` set back to `draft` turns its enforcement off: fixed, SYN-24 moves to deliverable 3 with its test.
+- architecture, withdrawn requirements and REV-9 describe the hook before deliverable 2 removes its text rules: not
+  fixed, deliverable 2 follows in the same run and makes them true.
+- this repository's own settings are not checked: deliverable 3 (`harness check` warning) covers it.
+- `serde_json` as a runtime dependency: fixed, moved to dev-dependencies until deliverable 3.
+- `DENY_RULES` with `expect(dead_code)`: kept, deliverable 3 reads it and drops the attribute.
+- "step 4.5" in the tracking: no change, the skill names it so (step 4, item 5).
+- ADR 0004 not pointing to 0005: fixed; ADR 0005 accepted (threat model validated at step 1).
+
+Second review (the ADRs were new to the diff): `core.hooksPath` is reported by `sync`, not `check`: fixed in the
+spec and ADR 0005. Architecture paragraph on the target repository, ADR 0004 body, stale `// spec:` of withdrawn ids,
+REV-9 parity with `check`: deliverable 2. ADR 0004 body kept as written (an ADR is a record; its status points to
+0005). A `touch` of the waiver is not refused once deliverable 2 lands: accepted non-goal (ADR 0005).
+
+not verified: that Claude Code refuses `just waive-review` with the new rules (needs a live session).
+decisions needed: none.

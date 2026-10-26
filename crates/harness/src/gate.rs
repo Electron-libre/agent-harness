@@ -16,6 +16,16 @@ use std::os::unix::fs::symlink;
 
 /// The review hook of the project, relative to its root: the gate exists only where this managed file does.
 pub const REVIEW_HOOK: &str = ".claude/hooks/require_code_review.rs";
+/// The `permissions.deny` rules of `.claude/settings.json` that keep the review waiver from the agent (REV-19).
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "read by `check` once SYN-24 is delivered")
+)]
+pub const DENY_RULES: [&str; 3] = [
+    "Bash(just waive-review)",
+    "Bash(just waive-review *)",
+    "Edit(//**/claude-review-waived)",
+];
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
 /// The line that tells the installed hook from one of the user.

@@ -65,8 +65,8 @@ then do step 2 first. Otherwise start at step 1.
    the last review never saw, so write the tracking and the summary of steps 6 and 7 in the issue **before**
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
    waive the review, with `just waive-review` (it creates the waiver of the current worktree, also in a linked
-   worktree, where the waiver is per worktree); never create that file nor run that recipe yourself. You can
-   still name them (commit message, `grep`): the hook only refuses a command that writes the file or runs the recipe.
+   worktree, where the waiver is per worktree); never create that file nor run that recipe yourself. Deny rules of
+   `.claude/settings.json` refuse the recipe and an edit of the file; naming them (commit message, `grep`) is fine.
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
    review), then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
    clean), then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did

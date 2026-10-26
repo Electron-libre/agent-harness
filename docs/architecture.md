@@ -70,8 +70,10 @@ the diff holds a file the review never saw. A fix to a file the review saw passe
 a diff under `issues/` only and a directory outside a repository are let through. Documentation is reviewed like
 code. The user waives the review of the next commit with `just waive-review` (it creates the file at the path `git rev-parse --git-path` gives, right in a linked worktree too); the hook stamps the file
 with `HEAD` when it lets a commit through and removes it at the first check after `HEAD` moved, so a command that does
-not commit (`--dry-run`, a refusal by another hook) leaves it usable, and refuses a Bash command that runs that recipe or writes the
-file (redirection, `touch`, `tee`, `dd`, `truncate`, `cp`, `mv`, `ln`, `install`, `rsync`, `curl`, `sed -i`), not one that only names it (`grep`, a commit message, a shell or an interpreter whose text the hook cannot read). That deters the agent from creating one but does not stop a write made by another tool. The hook sees the review
+not commit (`--dry-run`, a refusal by another hook) leaves it usable. The `permissions.deny` rules of the seeded
+`.claude/settings.json` (`Bash(just waive-review)`, `Bash(just waive-review *)`, `Edit(//**/claude-review-waived)`)
+make Claude Code refuse the agent the recipe and an edit of the file; they match the command the agent usually writes,
+not a `touch` or a script (ADR 0005). The hook sees the review
 text in the `Skill` response but does not parse it.
 
 The commit is judged on the repository it targets (spec [`specs/review-gate.md`](../specs/review-gate.md)): the work

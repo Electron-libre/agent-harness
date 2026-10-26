@@ -1,6 +1,6 @@
 # 0004. The review gate moves from the command to the repository
 
-Status: Accepted
+Status: Accepted, partly superseded by 0005 (the Claude hook no longer reads the command for the repository)
 Date: 2026-10-25
 
 ## Context
