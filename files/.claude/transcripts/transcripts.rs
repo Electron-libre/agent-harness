@@ -96,6 +96,25 @@ pub fn result_text(block: &Value) -> String {
     }
 }
 
+/// The typed messages that only validate a stop, compared trimmed, lower-cased, trailing `.` and `!` removed.
+const VALIDATIONS: &[&str] = &["ok", "okay", "yes", "y", "oui", "go", "continue", "lgtm", "vas-y", "c'est bon"];
+
+/// A plain validation, or the answers to the questions of a stop (`1 a, 2 c`; one answer needs its space, so a
+/// reply such as `4k` is not one).
+pub fn is_validation(text: &str) -> bool {
+    let t = text.trim().to_lowercase();
+    let t = t.trim_end_matches(['.', '!']).trim();
+    let answer = |item: &str| {
+        let item = item.trim();
+        let Some(letter) = item.chars().last().filter(|c| ('a'..='h').contains(c)) else { return false };
+        let number = item[..item.len() - letter.len_utf8()].trim_end();
+        !number.is_empty() && number.chars().all(|c| c.is_ascii_digit())
+    };
+    let items: Vec<&str> = t.split(',').collect();
+    let answers = items.iter().all(|i| answer(i)) && (items.len() > 1 || t.contains(' '));
+    VALIDATIONS.contains(&t) || answers
+}
+
 /// Appends `value` to `list` unless it is empty or already there.
 pub fn push_distinct(list: &mut Vec<String>, value: Option<&str>) {
     if let Some(v) = value.filter(|v| !v.is_empty() && !list.iter().any(|k| k == v)) {

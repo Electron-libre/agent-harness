@@ -2,8 +2,10 @@
 //! Measure what happened to the work of each done issue of a repository (`specs/delivered-quality.md`): one
 //! tab-separated row per file of `issues/done/`, with the commits of the issue, the fixes inside it, and the fixes
 //! and reverts of its files on the default branch after its close. Signals, not verdicts: a fix after a feature may
-//! come from a new need. No text of a commit or an issue is printed.
-//! Usage: `rust-script delivered_quality.rs [repo] [--window-days <n>]` (default the current directory and 30 days).
+//! come from a new need. The sessions that made its commits give the failed checks and the typed messages of its
+//! span. No text of a commit, an issue or a message is printed.
+//! Usage: `rust-script delivered_quality.rs [repo] [--projects <dir>] [--window-days <n>]` (default the current
+//! directory, `~/.claude/projects` and 30 days).
 //! ```cargo
 //! [dependencies]
 //! serde_json = "1"
@@ -11,14 +13,15 @@
 //! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: 26c36654f5330907f806aa94578bfc0c84c1ce0f54962ec8b259759e75ce8a4d
+// transcripts.rs sha256: f7ba8cb58a3d105f7d88ef5445e1cb61658b6a70b9682d95966e9b88c327c03d
 #[path = "transcripts.rs"]
 mod transcripts;
 
 use chrono::{DateTime, Duration, FixedOffset};
-use std::collections::BTreeSet;
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
-use transcripts::{default_branch, git, revision, sorted_entries};
+use transcripts::{default_branch, for_each_line, git, is_validation, projects, projects_root, repository, revision, sessions, sorted_entries, subagents, typed_text, Place};
 
 const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
 
@@ -138,13 +141,100 @@ fn reverts(commit: &Commit, files: &BTreeSet<&str>, own: &[&Commit]) -> bool {
     cited || typed && commit.paths.iter().any(|p| files.contains(p.as_str()))
 }
 
+/// What a session tells of the issue it worked on, at a timestamp.
+enum Event {
+    Validation,
+    Other,
+    FailedCheck,
+}
+
+/// A session of the repository: its span, sub-agents included, and the events of its own transcript.
+struct Session {
+    start: DateTime<FixedOffset>,
+    end: DateTime<FixedOffset>,
+    events: Vec<(DateTime<FixedOffset>, Event)>,
+}
+
+/// A check of the project: `just` followed by a word starting with `check` or `test` (QUA-8).
+fn is_check(command: &str) -> bool {
+    let words: Vec<&str> = command.split(|c: char| c.is_whitespace() || ";&|()".contains(c)).filter(|w| !w.is_empty()).collect();
+    words.windows(2).any(|w| w[0] == "just" && (w[1].starts_with("check") || w[1].starts_with("test")))
+}
+
+/// The sessions of the projects directory `root` whose repository is `repo` (QUA-7); `None` when `root` cannot be read.
+fn read_sessions(root: &Path, repo: &Path) -> Option<Vec<Session>> {
+    std::fs::read_dir(root).ok()?;
+    let repo = std::fs::canonicalize(repo).ok();
+    let mut found = Vec::new();
+    for path in projects(root).iter().flat_map(|p| sessions(p)) {
+        let mut place = Place::default();
+        let mut events = Vec::new();
+        let mut checks: HashMap<String, bool> = HashMap::new();
+        let read = for_each_line(&path, |line| {
+            place.observe(line, true);
+            let Some(at) = line["timestamp"].as_str().and_then(|t| DateTime::parse_from_rfc3339(t).ok()) else { return };
+            if let Some(text) = typed_text(line) {
+                events.push((at, if is_validation(&text) { Event::Validation } else { Event::Other }));
+            }
+            for block in line["message"]["content"].as_array().map(Vec::as_slice).unwrap_or_default() {
+                let id = block["id"].as_str().or(block["tool_use_id"].as_str()).unwrap_or_default().to_string();
+                if block["type"] == "tool_use" && block["name"] == "Bash" {
+                    checks.insert(id, is_check(block["input"]["command"].as_str().unwrap_or_default()));
+                } else if block["type"] == "tool_result" && block["is_error"] == Value::Bool(true) && checks.get(&id) == Some(&true) {
+                    events.push((at, Event::FailedCheck));
+                }
+            }
+        });
+        if let Err(e) = read {
+            eprintln!("cannot read {}: {e}", path.display());
+        }
+        for sub in subagents(&path) {
+            let _ = for_each_line(&sub, |line| {
+                place.observe(line, false);
+            });
+        }
+        let (Some(cwd), Some((start, _)), Some(end)) = (place.cwd.clone(), place.start.clone(), place.end) else { continue };
+        if repo.is_some() && repository(&cwd, &place.issues) == repo {
+            found.push(Session { start, end, events });
+        }
+    }
+    Some(found)
+}
+
+/// The transcript columns of an issue (QUA-7, QUA-8): its sessions, then the failed checks, validations and other
+/// typed messages of their spans that belong to it.
+fn session_cells(log: &[Commit], own: &[usize], sessions: &[Session]) -> [usize; 4] {
+    let mut by_session: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for &i in own {
+        let at = log[i].date;
+        if let Some((k, _)) = sessions.iter().enumerate().filter(|(_, s)| s.start <= at && at <= s.end).max_by_key(|(_, s)| s.start) {
+            by_session.entry(k).or_default().push(i);
+        }
+    }
+    let mut cells = [by_session.len(), 0, 0, 0];
+    for (k, commits) in &by_session {
+        let session = &sessions[*k];
+        let (first, last) = (log[commits[0]].date, log[commits[commits.len() - 1]].date);
+        let after = log.iter().enumerate().filter(|(i, c)| !own.contains(i) && c.date >= session.start && c.date < first).map(|(_, c)| c.date).max();
+        let inside = |at: &DateTime<FixedOffset>| after.map_or(*at >= session.start, |a| *at > a) && *at <= last;
+        for (_, event) in session.events.iter().filter(|(at, _)| inside(at)) {
+            cells[match event {
+                Event::FailedCheck => 1,
+                Event::Validation => 2,
+                Event::Other => 3,
+            }] += 1;
+        }
+    }
+    cells
+}
+
 struct Row {
     issue: String,
     closed: DateTime<FixedOffset>,
     cells: Vec<String>,
 }
 
-fn issue_row(repo: &Path, log: &[Commit], path: &Path, window: Duration) -> Option<Row> {
+fn issue_row(repo: &Path, log: &[Commit], sessions: Option<&[Session]>, path: &Path, window: Duration) -> Option<Row> {
     let stem = path.file_stem()?.to_string_lossy().into_owned();
     let own = issue_commits(repo, log, &stem);
     let (&first, &close) = (own.first()?, own.last()?);
@@ -161,7 +251,8 @@ fn issue_row(repo: &Path, log: &[Commit], path: &Path, window: Duration) -> Opti
     let reverts_after = later.iter().filter(|c| reverts(c, &files, &mine)).count();
     let fixes_in = mine.iter().filter(|c| matches!(c.kind(), "fix" | "revert")).count();
     let (review_count, findings) = reviews(&text);
-    let cells = vec![
+    let transcript = sessions.map(|s| session_cells(log, &own, s));
+    let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
         log[close].date.to_rfc3339(),
         deliverables(&text).to_string(),
@@ -171,11 +262,8 @@ fn issue_row(repo: &Path, log: &[Commit], path: &Path, window: Duration) -> Opti
         reverts_after.to_string(),
         review_count.to_string(),
         findings.map(|n| n.to_string()).unwrap_or_default(),
-        String::new(),
-        String::new(),
-        String::new(),
-        String::new(),
     ];
+    cells.extend((0..4).map(|k| transcript.map(|t| t[k].to_string()).unwrap_or_default()));
     Some(Row { issue: stem, closed: log[close].date, cells })
 }
 
@@ -183,6 +271,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut repo = PathBuf::from(".");
     let mut window_days = 30;
+    let mut projects_dir = None;
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
@@ -193,6 +282,7 @@ fn main() {
                     std::process::exit(2);
                 }
             },
+            "--projects" => projects_dir = rest.next().cloned(),
             other if other.starts_with("--") => {
                 eprintln!("unknown option {other}");
                 std::process::exit(2);
@@ -201,10 +291,11 @@ fn main() {
         }
     }
     let log = commits(&repo);
+    let sessions = projects_root(projects_dir.as_ref()).ok().and_then(|root| read_sessions(&root, &repo));
     let mut rows: Vec<Row> = sorted_entries(&repo.join("issues/done"))
         .iter()
         .filter(|p| p.extension().is_some_and(|e| e == "md"))
-        .filter_map(|p| issue_row(&repo, &log, p, Duration::days(window_days)))
+        .filter_map(|p| issue_row(&repo, &log, sessions.as_deref(), p, Duration::days(window_days)))
         .collect();
     rows.sort_by(|a, b| a.closed.cmp(&b.closed).then_with(|| a.issue.cmp(&b.issue)));
     println!("{HEADER}");

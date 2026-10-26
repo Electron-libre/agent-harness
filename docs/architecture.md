@@ -168,8 +168,12 @@ commits of an issue are those of the default branch touching its file, from the 
 citation. Its files (issue files, `docs/` and `harness.lock` left out) give the `fix` and `revert` commits of the
 next `--window-days` (30) after the close; its plan lines give the deliverables, and its `Code review` lines of `# Tracking` the reviews and their
 findings (the count opens the line, `issue-workflow` step 3.6; a line with no count leaves the sum empty); the revision is the one in force just
-before its first commit, so an issue that changes the harness is measured with the harness it was made with. These
-are signals, not verdicts: a later fix may come from a new need.
+before its first commit, so an issue that changes the harness is measured with the harness it was made with. The
+sessions of an issue are those of the projects directory that made its commits (the latest-starting session of the
+repository whose span holds the commit date, as for the commit rules above); within each, from the last commit of
+other work to the last commit of the issue, the failed `just check…`/`just test…` runs and the typed messages, split
+as `session_metrics.rs` splits them (`is_validation`, now in `transcripts.rs`). These are signals, not verdicts: a
+later fix may come from a new need.
 
 ## Parallel issues
 

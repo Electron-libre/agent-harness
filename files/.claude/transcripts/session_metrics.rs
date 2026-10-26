@@ -12,14 +12,14 @@
 //! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: 26c36654f5330907f806aa94578bfc0c84c1ce0f54962ec8b259759e75ce8a4d
+// transcripts.rs sha256: f7ba8cb58a3d105f7d88ef5445e1cb61658b6a70b9682d95966e9b88c327c03d
 #[path = "transcripts.rs"]
 mod transcripts;
 
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use transcripts::{for_each_line, project_name, projects, push_distinct, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
+use transcripts::{for_each_line, is_validation, project_name, projects, push_distinct, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
 
 const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
@@ -28,9 +28,6 @@ const KNOWN_TYPES: &[&str] = &[
     "user", "assistant", "attachment", "system", "summary", "ai-title", "custom-title", "last-prompt", "queue-operation", "api-request",
     "api-request-blob", "api-request-shape", "atis-latch", "mode", "cost-state", "file-history-snapshot",
 ];
-
-/// The typed messages that only validate a stop, compared trimmed, lower-cased, trailing `.` and `!` removed.
-const VALIDATIONS: &[&str] = &["ok", "okay", "yes", "y", "oui", "go", "continue", "lgtm", "vas-y", "c'est bon"];
 
 /// The lines of the conversation: the only ones that must carry a `timestamp`.
 const CONVERSATION_TYPES: &[&str] = &["user", "assistant", "attachment", "system"];
@@ -55,22 +52,6 @@ struct Session {
     unreadable: u64,
     unknown: u64,
     missing: u64,
-}
-
-/// A plain validation, or the answers to the questions of a stop (`1 a, 2 c`; one answer needs its space, so a
-/// reply such as `4k` is not one).
-fn is_validation(text: &str) -> bool {
-    let t = text.trim().to_lowercase();
-    let t = t.trim_end_matches(['.', '!']).trim();
-    let answer = |item: &str| {
-        let item = item.trim();
-        let Some(letter) = item.chars().last().filter(|c| ('a'..='h').contains(c)) else { return false };
-        let number = item[..item.len() - letter.len_utf8()].trim_end();
-        !number.is_empty() && number.chars().all(|c| c.is_ascii_digit())
-    };
-    let items: Vec<&str> = t.split(',').collect();
-    let answers = items.iter().all(|i| answer(i)) && (items.len() > 1 || t.contains(' '));
-    VALIDATIONS.contains(&t) || answers
 }
 
 /// A refusal of a hook: `PreToolUse:<tool> hook error:`, the tool name holding no space.

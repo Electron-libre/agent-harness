@@ -1,9 +1,11 @@
 #!/usr/bin/env rust-script
 //! Behavior test for `delivered_quality.rs` on a fixture repository: the commits of each done issue, the fixes and
-//! reverts of its files after the close, its deliverables and revision, no text of a commit or an issue.
+//! reverts of its files after the close, its deliverables, revision and reviews, the failed checks and typed messages
+//! of its sessions, no text of a commit, an issue or a message.
 //! Usage: `just test-harness`.
 //! ```cargo
 //! [dependencies]
+//! serde_json = "1"
 //! sha2 = "0.10"
 //! tempfile = "3"
 //! ```
@@ -88,8 +90,15 @@ fn fixture(tmp: &Path) -> PathBuf {
     repo
 }
 
+/// Runs the script on `repo`; with no `--projects` in `args`, on a projects directory that does not exist, so the
+/// real transcripts are never read.
 fn run(dir: &Path, repo: &Path, args: &[&str]) -> (bool, String) {
-    let out = Command::new("rust-script").arg(dir.join("delivered_quality.rs")).arg(repo).args(args).output().expect("rust-script must be installed");
+    let mut cmd = Command::new("rust-script");
+    cmd.arg(dir.join("delivered_quality.rs")).arg(repo).args(args);
+    if !args.contains(&"--projects") {
+        cmd.arg("--projects").arg(repo.join("no-projects"));
+    }
+    let out = cmd.output().expect("rust-script must be installed");
     if !out.status.success() {
         println!("{}", String::from_utf8_lossy(&out.stderr));
     }
@@ -152,6 +161,63 @@ fn review_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+/// A transcript line of `kind` in `cwd` at `ts`, with `fields` merged in.
+fn line(kind: &str, cwd: &Path, ts: &str, fields: serde_json::Value) -> String {
+    let mut line = serde_json::json!({"type": kind, "cwd": cwd, "timestamp": ts, "sessionId": "x", "gitBranch": "main"});
+    line.as_object_mut().unwrap().extend(fields.as_object().unwrap().clone());
+    format!("{line}\n")
+}
+
+fn typed(cwd: &Path, ts: &str, text: &str) -> String {
+    line("user", cwd, ts, serde_json::json!({"message": {"role": "user", "content": text}}))
+}
+
+/// A `Bash` call at `ts` and its result a second later, an error when `error`.
+fn bash(cwd: &Path, ts: &str, id: &str, command: &str, error: bool) -> String {
+    let call = line("assistant", cwd, &format!("{ts}:00Z"), serde_json::json!({"message": {"id": id, "content": [{"type": "tool_use", "id": id, "name": "Bash", "input": {"command": command}}]}}));
+    let result = line("user", cwd, &format!("{ts}:01Z"), serde_json::json!({"message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": id, "is_error": error, "content": "SECRET output"}]}}));
+    call + &result
+}
+
+fn write(path: &Path, lines: &[String]) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, lines.concat()).unwrap();
+}
+
+// spec: QUA-7, QUA-8
+fn session_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("sessions");
+    let repo = fixture(&tmp);
+    let projects = tmp.join("projects");
+    // S0 starts earlier and holds the first commit of alpha, but S1, starting later, holds it too and wins.
+    write(&projects.join("-proj/s0.jsonl"), &[typed(&repo, "2026-01-02T20:00:00Z", "SECRET early"), bash(&repo, "2026-01-03T10:00", "s0a", "just check", true)]);
+    write(&projects.join("-proj/s1.jsonl"), &[
+        typed(&repo, "2026-01-02T23:00:00Z", "SECRET do alpha"),
+        bash(&repo, "2026-01-03T01:00", "a1", "just check", true),
+        bash(&repo, "2026-01-03T02:00", "a2", "just test-harness", false),
+        bash(&repo, "2026-01-03T03:00", "a3", "cargo check", true),
+        bash(&repo, "2026-01-03T03:30", "a4", "echo just a check", true),
+        bash(&repo, "2026-01-04T05:00", "a5", "cd x && just check-harness", true),
+        typed(&repo, "2026-01-04T08:00:00Z", "ok"),
+        bash(&repo, "2026-01-04T09:00", "a6", "just check", true),
+        typed(&repo, "2026-01-05T00:30:00Z", "1 a, 2 b"),
+        typed(&repo, "2026-01-05T01:00:00Z", "SECRET after"),
+    ]);
+    write(&projects.join("-proj/s1/subagents/agent-1.jsonl"), &[bash(&repo, "2026-01-03T04:00", "b1", "just check", true)]);
+    let (ok, out) = run(dir, &repo, &["--projects", projects.to_str().unwrap()]);
+    let r = rows(&out);
+    let (_, none) = run(dir, &repo, &[]);
+    let n = rows(&none);
+    vec![
+        ("the script reads the transcripts".to_string(), ok),
+        ("the sessions of an issue are the latest-starting ones holding its commits".to_string(), has(&r, "alpha", "sessions", "1") && has(&r, "beta", "sessions", "1")),
+        ("the failed just checks of its span are counted, not other commands nor sub-agents".to_string(), has(&r, "alpha", "failed_checks", "3") && has(&r, "beta", "failed_checks", "1")),
+        ("the typed messages of its span are split into validations and the rest".to_string(), has(&r, "alpha", "validations", "1") && has(&r, "alpha", "other_messages", "1") && has(&r, "beta", "validations", "1") && has(&r, "beta", "other_messages", "0")),
+        ("the transcript columns are empty when the projects cannot be read".to_string(), ["sessions", "failed_checks", "validations", "other_messages"].iter().all(|c| has(&n, "alpha", c, ""))),
+        ("no text of a message is printed".to_string(), !out.contains("SECRET")),
+    ]
+}
+
 // spec: QUA-10
 fn stamp_checks(dir: &Path) -> Vec<(String, bool)> {
     use sha2::Digest;
@@ -170,7 +236,7 @@ fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let temp = tempfile::tempdir().unwrap();
     let tmp = temp.path().to_path_buf();
-    let checks: Vec<_> = git_checks(&dir, &tmp).into_iter().chain(review_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
+    let checks: Vec<_> = git_checks(&dir, &tmp).into_iter().chain(review_checks(&dir, &tmp)).chain(session_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
     let mut failed = false;
     for (name, ok) in checks {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });

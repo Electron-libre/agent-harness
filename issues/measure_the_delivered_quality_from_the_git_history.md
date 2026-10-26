@@ -50,7 +50,7 @@ rather than new EVA requirements, as `rule-breaches.md` did.
    QUA-5, QUA-10.
 2. [x] Review findings read from the done issue file, and `issue-workflow` step 3.6 records the count first
    (`Code review: <n> findings`); verified by fixture issue files and `test_skills.rs`; makes true QUA-6.
-3. [ ] Transcript signals: sessions, failed checks, typed messages per issue; verified by fixture transcripts with
+3. [x] Transcript signals: sessions, failed checks, typed messages per issue; verified by fixture transcripts with
    commits in their span; makes true QUA-7, QUA-8.
 4. [ ] `--summary` per revision, docs (architecture, README, report issue resources); verified by the test; makes
    true QUA-9 (spec `accepted`).
@@ -81,3 +81,12 @@ rather than new EVA requirements, as `rule-breaches.md` did.
 - Smoke run: 27 of 39 issues record a review, 22 with a count.
 - Code review: 1 finding, fixed: a line summed every count it held (`3 findings, 1 finding dismissed` read as 4);
   only the first count of a line is read now (QUA-6 amended).
+
+## Deliverable 3
+- done: `--projects`, the sessions of each issue, its failed checks and typed messages (QUA-7, QUA-8);
+  `is_validation` moved from `session_metrics.rs` to `transcripts.rs` (scripts restamped); architecture and README.
+- red: `unknown option --projects`, the six transcript checks failed.
+- Smoke run on the real transcripts: 0.6 s; the recent issues have 1 session each, 0 to 1 failed check, 1 to 7
+  other typed messages.
+- Code review: no findings (two questions checked: the log is read oldest first, `--reverse`; a repository that
+  cannot be resolved has no commits, so no row shows its zeros).

@@ -31,6 +31,7 @@ see (no `--no-verify`, a review before each commit, no edit of a managed copy, t
 the commit message format and no AI attribution, the conversation language),
 apart from what a gate blocked, and counts them per rule and harness revision.
 `rust-script .claude/transcripts/delivered_quality.rs [repo]` prints one row per done issue: its commits and
-deliverables, the fixes inside it, and the fixes and reverts of its files in the 30 days after its close.
+deliverables, the fixes inside it, the fixes and reverts of its files in the 30 days after its close, its
+reviews and their findings, and the failed checks and typed messages of the sessions that made it.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).
