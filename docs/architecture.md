@@ -44,6 +44,9 @@ changed `.rs` file (spec [`specs/clippy-gate.md`](../specs/clippy-gate.md)). Wha
 each turn, so it sends one line per diagnostic (`--message-format=short`: file, line, column, message), at most 40,
 and runs clippy only when the Rust state changed since the last passing run: that run writes a hash of `HEAD`, the
 diff of the tracked `.rs` files and the untracked ones to `claude-clippy-pass` in the git directory of the worktree.
+For the same reason `just test-harness` prints nothing when every test script passes, and only the lines of the
+failing script that are not `ok` otherwise (`test_recipes.rs` proves it); the seeded `justfile` asks the same of the
+project's `check`.
 
 `require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
 declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on

@@ -4,5 +4,6 @@ import 'harness.just'
 default:
     @just --list
 
-# Format, lint and test the project, then check the specs. Replace the first three with the project's own.
+# Format, lint and test the project, then check the specs. Replace the first three with the project's own, quiet on
+# success: the agent reads all of their output.
 check: check-specs

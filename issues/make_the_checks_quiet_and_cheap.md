@@ -32,7 +32,7 @@ nothing on success and little on failure, and run the Stop hook only when there 
 
 # Tracking
 1. [x] Clippy gate: short format, at most 40 diagnostics, stamp of the last passing run (CLG-1 to CLG-5).
-2. [ ] Quiet recipes: `test-harness` (`files/harness.just`), `check`, `clippy`, `test` (`justfile`) print nothing on success, only the failures otherwise.
+2. [x] Quiet recipes: `test-harness` (`files/harness.just`), `check`, `clippy`, `test` (`justfile`) print nothing on success, only the failures otherwise.
 3. [ ] Docs: the cheapest model setup and the measures before/after in `docs/architecture.md`.
 
 ## Decisions
@@ -49,3 +49,11 @@ nothing on success and little on failure, and run the Stop hook only when there 
 * red: `FAIL - gate reports the file, line and message`, `... at most 40 diagnostics`, `... skips clippy while the Rust state is unchanged` (and 3 more).
 * Code review (low): the stamp ignores `Cargo.toml`, `clippy.toml` and `[lints]`; not fixed, a non-goal of `specs/clippy-gate.md` (the next `.rs` edit or `just check` catches it).
 * not verified: the gate in a live Claude Code session.
+
+## Deliverable 2
+* done: `just test-harness` hides the output of a passing script and shows only the non-`ok` lines of a failing one with its name; `just check` (`fmt`, `clippy -q`, `test` shown only on failure, `check-specs`) prints nothing on success; the seeded `justfile` asks the project for quiet recipes.
+* measures after (this repository, success): `just check` 0 lines (86 before), `just test-harness` 0 lines (267 before); a failing unit test: 29 lines.
+* checks: `just check` ok, `just test-harness` ok (with the new `test_recipes.rs`), docs `docs/architecture.md`, `seed/justfile`.
+* red: `FAIL - test-harness passes and prints nothing when every script passes`, `... names the failing script`, `... hides the passing lines`.
+* Code review (low): no findings.
+* not verified: a consumer whose own `justfile` recipes stay verbose (project-owned, out of reach).

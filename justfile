@@ -5,19 +5,22 @@ set allow-duplicate-recipes
 default:
     @just --list
 
-# Format, lint (warning-free), test, then check the specs. Strict: this repository ships the managed tests, so
-# their citations must resolve to a spec here (consumers stay lenient).
+# Format, lint (warning-free), test, then check the specs; prints nothing on success, since the agent reads all of it.
+# Strict: this repository ships the managed tests, so their citations must resolve to a spec here (consumers stay
+# lenient).
 check: fmt clippy test
-    just check-specs --strict
+    @just check-specs --strict
 
 fmt:
-    cargo fmt --all
+    @cargo fmt --all
 
 clippy:
-    cargo clippy --workspace --all-targets -- -D warnings
+    @cargo clippy -q --workspace --all-targets -- -D warnings
 
+# The output of the tests, only when they fail.
 test:
-    cargo test --workspace
+    #!/usr/bin/env sh
+    out=$(cargo test -q --workspace 2>&1) || { printf '%s\n' "$out"; exit 1; }
 
 # Install the `harness` binary to ~/.cargo/bin.
 install:
