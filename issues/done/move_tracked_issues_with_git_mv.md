@@ -70,7 +70,7 @@ the rename is staged. Out of scope: a spec (no requirement of `specs/parallel-is
 | # | finding | done |
 |---|---|---|
 | 1 | the check follows the caller's directory, so an absolute path from elsewhere is plain-renamed | fixed (deliverable 2) |
-| 2 | the PAR-8 guard checks the caller's directory, bypassed by a path into a linked worktree | outside the requirements: `issues/refuse_closing_an_issue_of_a_linked_worktree_by_path.md` |
+| 2 | the PAR-8 guard checks the caller's directory, bypassed by a path into a linked worktree | outside the requirements: `issues/done/refuse_closing_an_issue_of_a_linked_worktree_by_path.md` |
 | 3 | a failed `git ls-files` silently falls back to a plain rename | fixed: the output names the move used |
 | 4 | no test with an absolute path from another directory | fixed (deliverable 2) |
 | 5 | plan line names a test and an `R ` assertion that do not exist | fixed: plan line 1 updated |
