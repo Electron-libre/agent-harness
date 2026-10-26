@@ -23,6 +23,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ("issue-workflow", "Plan: proposed", "the plan is written in the issue before its validation"),
     ("issue-workflow", "set `Plan: validated`", "the validation is recorded so a resume skips the stop"),
     ("issue-workflow", "`1 a, 2 c`", "questions answered by number and option letter"),
+    ("issue-workflow", "`Code review: <n> findings`", "the count of findings opens the line delivered_quality.rs reads"),
 ];
 
 /// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.

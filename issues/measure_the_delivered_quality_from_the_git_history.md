@@ -48,7 +48,7 @@ rather than new EVA requirements, as `rule-breaches.md` did.
 1. [x] Git signals: `delivered_quality.rs` with the issue commits, `deliverables`, `fixes_in_issue`, `fixes_after`,
    `reverts_after`, `revision`; verified by `test_delivered_quality.rs` on fixture repositories; makes true QUA-1 to
    QUA-5, QUA-10.
-2. [ ] Review findings read from the done issue file, and `issue-workflow` step 3.6 records the count first
+2. [x] Review findings read from the done issue file, and `issue-workflow` step 3.6 records the count first
    (`Code review: <n> findings`); verified by fixture issue files and `test_skills.rs`; makes true QUA-6.
 3. [ ] Transcript signals: sessions, failed checks, typed messages per issue; verified by fixture transcripts with
    commits in their span; makes true QUA-7, QUA-8.
@@ -73,3 +73,11 @@ rather than new EVA requirements, as `rule-breaches.md` did.
 - Code review: 4 findings, all fixed: a hash pasted into the doc comment of `transcripts.rs` (scripts restamped), a
   dead filter, a fix in the same second as the close missed (QUA-4 now reads "after it in the history"),
   `--projects` accepted but unused (left to deliverable 3).
+
+## Deliverable 2
+- done: `reviews` and `review_findings` read from the `# Tracking` section (QUA-6 now scoped to it); `issue-workflow`
+  step 3.6 asks for `Code review: <n> findings` first (passage required by `test_skills.rs`); architecture.
+- red: the review columns were empty; the skill lacked the passage.
+- Smoke run: 27 of 39 issues record a review, 22 with a count.
+- Code review: 1 finding, fixed: a line summed every count it held (`3 findings, 1 finding dismissed` read as 4);
+  only the first count of a line is read now (QUA-6 amended).

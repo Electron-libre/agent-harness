@@ -113,6 +113,20 @@ fn deliverables(text: &str) -> usize {
     if text.lines().any(|l| l.trim_end() == "## Plan") { section("## Plan") } else { section("# Tracking") }
 }
 
+/// The reviews recorded in the `# Tracking` section of an issue file and the sum of their findings (QUA-6): a line
+/// holding `Code review` is one review, its findings the `<n>` of its first `<n> finding(s)` (0 for `no findings`),
+/// since what follows may count the fixed ones; `None` for the sum when a line gives no count.
+fn reviews(text: &str) -> (usize, Option<usize>) {
+    let tracking = text.lines().skip_while(|l| l.trim_end() != "# Tracking").take_while(|l| l.trim_end() == "# Tracking" || !l.starts_with("# "));
+    let lines: Vec<String> = tracking.map(str::to_lowercase).filter(|l| l.contains("code review")).collect();
+    let counts = lines.iter().map(|line| {
+        let words: Vec<&str> = line.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()).collect();
+        words.windows(2).filter(|w| w[1] == "finding" || w[1] == "findings").find_map(|w| if w[0] == "no" { Some(0) } else { w[0].parse().ok() })
+    });
+    let sum = counts.collect::<Option<Vec<usize>>>().map(|c| c.iter().sum());
+    (lines.len(), sum)
+}
+
 /// Whether `commit` reverts the work of the issue (QUA-4): a `revert` type or a `Revert "` subject changing one of
 /// its `files`, or a `This reverts commit <hash>` citing one of its `own` commits.
 fn reverts(commit: &Commit, files: &BTreeSet<&str>, own: &[&Commit]) -> bool {
@@ -146,6 +160,7 @@ fn issue_row(repo: &Path, log: &[Commit], path: &Path, window: Duration) -> Opti
     let fixes_after = later.iter().filter(|c| c.kind() == "fix" && c.paths.iter().any(|p| files.contains(p.as_str()))).count();
     let reverts_after = later.iter().filter(|c| reverts(c, &files, &mine)).count();
     let fixes_in = mine.iter().filter(|c| matches!(c.kind(), "fix" | "revert")).count();
+    let (review_count, findings) = reviews(&text);
     let cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
         log[close].date.to_rfc3339(),
@@ -154,8 +169,8 @@ fn issue_row(repo: &Path, log: &[Commit], path: &Path, window: Duration) -> Opti
         fixes_in.to_string(),
         fixes_after.to_string(),
         reverts_after.to_string(),
-        String::new(),
-        String::new(),
+        review_count.to_string(),
+        findings.map(|n| n.to_string()).unwrap_or_default(),
         String::new(),
         String::new(),
         String::new(),
