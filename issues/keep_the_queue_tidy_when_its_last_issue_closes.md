@@ -35,6 +35,8 @@ rewrite is no requirement of `specs/parallel-issues.md`; this is a cosmetic fix 
 1. [x] Trim the queue on close: drop the trailing blank kept lines before writing them back with one `\n`; verified
    by a new check in `test_close_issue.rs` (closing the only entry leaves the header ending with one newline, closing
    a middle entry keeps the others).
+2. [x] Fixes of the `high` review: a queue with no header is left empty, not `\n`; verified by a new check in
+   `test_close_issue.rs`.
 
 ## Decisions
 - Mode: autonomous
@@ -53,6 +55,34 @@ rewrite is no requirement of `specs/parallel-issues.md`; this is a cosmetic fix 
 | code review | `/code-review low` run |
 
 - red: `FAIL - closing the last entry leaves the header ending with one newline`
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Review high (48eeb1b..3800b7c)
+
+| # | finding | done |
+|---|---|---|
+| 1 | trimming drops the blank line between the header and the list | kept: an emptied queue now equals `seed/issues/queue.md`, the goal |
+| 2 | a headerless queue becomes `\n` | fixed (deliverable 2) |
+| 3 | queues already emptied keep `\n\n` | not fixed: no entry to close, a one-time hand fix in the consumer |
+| 4 | CRLF turned into LF on rewrite | not fixed: pre-existing, every consumer is LF |
+| 5 | line match duplicates `next_issue.rs` `entry()` | not fixed: rust-scripts share no code, pre-existing |
+| 6 | second pass to detect a removal | not fixed: pre-existing, negligible |
+
+## Deliverable 2
+
+- done: closing the only entry of a headerless queue leaves it empty.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| specs | no spec concerned |
+| docs | no change needed |
+| code review | `/code-review low` run |
+
+- red: `FAIL - a queue with no header is left empty`
 - Code review: no findings
 - not verified: none
 - decisions needed: none

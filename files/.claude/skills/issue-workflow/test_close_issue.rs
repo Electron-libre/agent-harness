@@ -43,6 +43,7 @@ fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
         ("a linked worktree is refused, naming the main one", !in_linked && out.contains("linked worktree") && untouched),
         ("--relink is refused there too", !relink),
         ("the main worktree closes the issue", in_main && main.join("issues/done/foo.md").is_file()),
+        ("a queue with no header is left empty", std::fs::read_to_string(main.join("issues/queue.md")).unwrap().is_empty()),
     ];
     let _ = std::fs::remove_dir_all(&root);
     out

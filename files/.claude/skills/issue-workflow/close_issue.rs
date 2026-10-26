@@ -182,7 +182,8 @@ fn main() {
             while kept.last().is_some_and(|l| l.trim().is_empty()) {
                 kept.pop();
             }
-            std::fs::write(&queue, kept.join("\n") + "\n").expect("queue is writable");
+            let rewritten = if kept.is_empty() { String::new() } else { kept.join("\n") + "\n" };
+            std::fs::write(&queue, rewritten).expect("queue is writable");
             println!("removed {stem} from {}", queue.display());
         }
     }
