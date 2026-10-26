@@ -27,7 +27,8 @@ them after 30 days by default, for every project at once: keep them a year in yo
 interventions, project, issue, harness revision, model, version), with no message text; `--archive <file>` also merges
 them into a file kept outside the repositories, so the history outlives the transcripts.
 `rust-script .claude/transcripts/rule_breaches.rs [--summary]` lists the breaches of the harness rules a program can
-see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue),
+see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue,
+the commit message format and no AI attribution),
 apart from what a gate blocked, and counts them per rule and harness revision.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

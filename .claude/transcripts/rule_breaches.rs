@@ -2,7 +2,9 @@
 //! List where the agent broke a rule of the harness in the Claude Code transcripts (`specs/rule-breaches.md`): one
 //! tab-separated row per finding, `breach` when the act went through, `blocked` when a hook or a permission rule
 //! refused it. With `--summary`, count them per rule and harness revision over the sessions where the rule applied,
-//! so a rule broken often (a hook candidate) stands out from one that rarely applies. No text of a message is printed.
+//! so a rule broken often (a hook candidate) stands out from one that rarely applies. The commit messages are read
+//! from the git history of each project, a commit counting with the session whose span holds its date. No text of a
+//! message is printed.
 //! Usage: `rust-script rule_breaches.rs [projects_dir] [--summary]` (default `~/.claude/projects`).
 //! ```cargo
 //! [dependencies]
@@ -15,10 +17,11 @@
 #[path = "transcripts.rs"]
 mod transcripts;
 
+use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use transcripts::{committed_file, for_each_numbered_line, git, project_name, projects, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
+use transcripts::{committed_config, committed_file, for_each_numbered_line, git, project_name, projects, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
 
 const HEADER: &str = "session\tproject\trevision\trule\tkind\tlocation\tdetail";
 const SUMMARY_HEADER: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
@@ -261,6 +264,70 @@ fn managed_paths(repo: &Path, start: &str) -> Option<HashSet<String>> {
     Some(lock.lines().filter(|l| !l.starts_with('#')).filter_map(|l| l.split_whitespace().nth(1)).map(str::to_string).collect())
 }
 
+/// The commit types of `AGENTS.md`.
+const COMMIT_TYPES: &[&str] = &["feat", "fix", "refactor", "docs", "test", "perf", "build", "ci", "chore"];
+
+/// Whether a commit message carries an AI or tool attribution.
+fn attributed(message: &str) -> bool {
+    message.lines().map(str::to_lowercase).any(|l| l.contains("co-authored-by:") || l.contains("noreply@anthropic.com") || (l.contains("generated with") && l.contains("claude")))
+}
+
+/// Whether a subject follows `<type>(<scope>): <description>` (scope optional) with one of `scopes`.
+fn conventional(subject: &str, scopes: &[String]) -> bool {
+    let Some((head, description)) = subject.split_once(": ") else { return false };
+    let (kind, scope) = match head.split_once('(') {
+        Some((kind, rest)) => match rest.strip_suffix(')') {
+            Some(scope) => (kind, Some(scope)),
+            None => return false,
+        },
+        None => (head, None),
+    };
+    subject.chars().count() <= 72
+        && COMMIT_TYPES.contains(&kind)
+        && scope.is_none_or(|s| s == "docs" || s == "harness" || scopes.iter().any(|k| k == s))
+        && !description.is_empty()
+        && !description.starts_with(char::is_uppercase)
+        && !description.ends_with('.')
+}
+
+/// The `commit_scopes` of the `.claude/harness.toml` committed in `repo` at `at`.
+fn commit_scopes(repo: &Path, at: &str) -> Vec<String> {
+    let config = committed_config(repo, at);
+    let list = config.as_ref().and_then(|c| c.get("project")).and_then(|p| p.get("commit_scopes")).and_then(toml::Value::as_array);
+    list.map(|l| l.iter().filter_map(toml::Value::as_str).map(str::to_string).collect()).unwrap_or_default()
+}
+
+/// A session checked against the rules, with what places it.
+struct Record {
+    id: String,
+    project: String,
+    revision: String,
+    repo: PathBuf,
+    start: DateTime<FixedOffset>,
+    end: DateTime<FixedOffset>,
+    verdict: Verdict,
+}
+
+/// Checks the non-merge commits of every ref of `repo` against the messages rules, each against the latest-starting
+/// session of `records` (all of that repository) whose span holds its committer date; the others were the user's.
+fn check_commits(repo: &Path, records: &mut [&mut Record]) {
+    let Some(log) = git(repo, &["log", "--all", "--no-merges", "--format=%h%x1f%cI%x1f%B%x1e"]) else { return };
+    for entry in log.split('\x1e') {
+        let mut fields = entry.trim_start_matches('\n').splitn(3, '\x1f');
+        let (Some(hash), Some(date), Some(message)) = (fields.next(), fields.next(), fields.next()) else { continue };
+        let Ok(at) = DateTime::parse_from_rfc3339(date) else { continue };
+        let Some(record) = records.iter_mut().filter(|r| r.start <= at && at <= r.end).max_by_key(|r| r.start) else { continue };
+        let verdict = &mut record.verdict;
+        verdict.applied.extend(["commit-attribution", "commit-format"]);
+        if attributed(message) {
+            verdict.add("commit-attribution", false, "", hash.to_string());
+        }
+        if !conventional(message.lines().next().unwrap_or_default(), &commit_scopes(repo, date)) {
+            verdict.add("commit-format", false, "", hash.to_string());
+        }
+    }
+}
+
 fn main() {
     const USAGE: &str = "usage: rule_breaches.rs [projects_dir] [--summary]";
     let (mut dir, mut summary) = (None, false);
@@ -281,9 +348,7 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let mut rows = Vec::new();
-    // (rule, revision) -> [applied, breached, breaches, blocked]
-    let mut counts: BTreeMap<(&str, String), [u64; 4]> = BTreeMap::new();
+    let mut records = Vec::new();
     for project in projects(&root) {
         for path in sessions(&project) {
             let mut place = Place::default();
@@ -295,32 +360,43 @@ fn main() {
                 transcripts.push((Transcript::read(&sub, &name, false, &mut place), false));
             }
             let cwd = place.cwd.clone().unwrap_or_default();
-            let start = place.start_text();
-            let Some(repo) = repository(&cwd, &place.issues).filter(|_| !cwd.is_empty() && !start.is_empty()) else { continue };
-            let revision = revision(&repo, start);
+            let (Some((start, start_text)), Some(end)) = (place.start.clone(), place.end) else { continue };
+            let Some(repo) = repository(&cwd, &place.issues).filter(|_| !cwd.is_empty()) else { continue };
+            let revision = revision(&repo, &start_text);
             if revision.is_empty() {
                 continue;
             }
             let worktree = git(Path::new(&cwd), &["rev-parse", "--show-toplevel"]).map(PathBuf::from).unwrap_or_else(|| PathBuf::from(&cwd));
-            let context = Context { worktree, managed: managed_paths(&repo, start) };
+            let context = Context { worktree, managed: managed_paths(&repo, &start_text) };
             let mut verdict = Verdict::default();
             for (t, main) in &transcripts {
                 verdict.check(t, &context, *main);
             }
             let project = project_name(&cwd, Some(&repo));
-            for rule in &verdict.applied {
-                let entry = counts.entry((rule, revision.clone())).or_default();
-                let found: Vec<&Finding> = verdict.findings.iter().filter(|f| f.rule == *rule).collect();
-                let breaches = found.iter().filter(|f| !f.blocked).count() as u64;
-                entry[0] += 1;
-                entry[1] += u64::from(breaches > 0);
-                entry[2] += breaches;
-                entry[3] += found.len() as u64 - breaches;
-            }
-            for f in verdict.findings {
-                let kind = if f.blocked { "blocked" } else { "breach" };
-                rows.push(format!("{id}\t{project}\t{revision}\t{}\t{kind}\t{}\t{}", f.rule, f.location, f.detail));
-            }
+            records.push(Record { id, project, revision, repo, start, end, verdict });
+        }
+    }
+    let repos: BTreeSet<PathBuf> = records.iter().map(|r| r.repo.clone()).collect();
+    for repo in repos {
+        let mut of_repo: Vec<&mut Record> = records.iter_mut().filter(|r| r.repo == repo).collect();
+        check_commits(&repo, &mut of_repo);
+    }
+    let mut rows = Vec::new();
+    // (rule, revision) -> [applied, breached, breaches, blocked]
+    let mut counts: BTreeMap<(&str, String), [u64; 4]> = BTreeMap::new();
+    for Record { id, project, revision, verdict, .. } in records {
+        for rule in &verdict.applied {
+            let entry = counts.entry((rule, revision.clone())).or_default();
+            let found: Vec<&Finding> = verdict.findings.iter().filter(|f| f.rule == *rule).collect();
+            let breaches = found.iter().filter(|f| !f.blocked).count() as u64;
+            entry[0] += 1;
+            entry[1] += u64::from(breaches > 0);
+            entry[2] += breaches;
+            entry[3] += found.len() as u64 - breaches;
+        }
+        for f in verdict.findings {
+            let kind = if f.blocked { "blocked" } else { "breach" };
+            rows.push(format!("{id}\t{project}\t{revision}\t{}\t{kind}\t{}\t{}", f.rule, f.location, f.detail));
         }
     }
     if summary {

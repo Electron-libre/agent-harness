@@ -55,7 +55,7 @@ rather than new requirements in the accepted `specs/evaluation.md`.
    `transcripts.rs`; `rule_breaches.rs` with the rows, `--summary` and the rules `no-verify`, `review-before-commit`,
    `review-waiver`, `managed-copy`, `validation-stop`; verified by `test_rule_breaches.rs` on fixture transcripts and
    repositories, `test_session_metrics.rs` unchanged; makes true BRE-1 to BRE-8, BRE-11, BRE-12.
-2. [ ] Commit rules: commits of the project joined to the sessions by date; verified by fixture repositories;
+2. [x] Commit rules: commits of the project joined to the sessions by date; verified by fixture repositories;
    makes true BRE-9.
 3. [ ] Language rule: stop-word count per assistant text block; verified by fixture transcripts; makes true BRE-10
    (spec `accepted`).
@@ -79,3 +79,12 @@ rather than new requirements in the accepted `specs/evaluation.md`.
 - Code review: a review refusal suggesting to "ask the user to waive the review" was filed as a waiver refusal and
   disarmed the bypass check; fixed (the waiver refusal is matched on `Refused: only the user waives`, BRE-5, BRE-6,
   fixture extended).
+
+## Deliverable 2
+- done: `commit-attribution` and `commit-format` from `git log --all --no-merges` of each project, joined to the
+  latest-starting session whose span holds the committer date; scopes from the `harness.toml` committed then;
+  architecture, README.
+- red: no commit finding, the two commit checks failed.
+- Smoke run: 72 sessions with a checked commit, no attribution, two subjects over 72 characters (`4d9117f`,
+  `009c901`, which `just check-commit` rejects too).
+- Code review: no findings.

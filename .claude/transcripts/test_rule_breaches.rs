@@ -21,8 +21,8 @@ fn sh(dir: &Path, args: &[&str]) {
     assert!(ok, "git {args:?} failed in {}", dir.display());
 }
 
-/// Commits `files` (path, content) in `repo` at `date`, with `message`.
-fn commit_at(repo: &Path, date: &str, message: &str, files: &[(&str, &str)]) {
+/// Commits `files` (path, content) in `repo` at `date`, with `message`; returns the abbreviated hash.
+fn commit_at(repo: &Path, date: &str, message: &str, files: &[(&str, &str)]) -> String {
     for (path, body) in files {
         let file = repo.join(path);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -37,6 +37,8 @@ fn commit_at(repo: &Path, date: &str, message: &str, files: &[(&str, &str)]) {
         .output()
         .unwrap();
     assert!(out.status.success(), "commit failed: {}", String::from_utf8_lossy(&out.stderr));
+    let head = Command::new("git").args(["log", "-1", "--format=%h"]).current_dir(repo).output().unwrap();
+    String::from_utf8_lossy(&head.stdout).trim().to_string()
 }
 
 fn new_repo(dir: &Path) -> PathBuf {
@@ -251,11 +253,65 @@ fn stamp_checks(dir: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+// spec: BRE-9
+fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("commits");
+    let repo = new_repo(&tmp.join("cm"));
+    let toml = "[harness]\nsource = \"https://example.org/harness\"\nrev = \"r1\"\n\n[project]\ncommit_scopes = [\"sync\"]\n";
+    commit_at(&repo, "2026-01-01T00:00:00Z", "chore: sync", &[(".claude/harness.toml", toml)]);
+    commit_at(&repo, "2026-02-01T09:00:00Z", "Not mine.", &[("a", "1")]);
+    commit_at(&repo, "2026-02-01T10:15:00Z", "feat(sync): add x", &[("a", "2")]);
+    let long = commit_at(&repo, "2026-02-01T10:25:00Z", &format!("feat: {}", "a".repeat(70)), &[("a", "3")]);
+    let scope = commit_at(&repo, "2026-02-01T10:45:00Z", "fix(nope): y", &[("a", "4")]);
+    let trailer = commit_at(&repo, "2026-02-01T10:50:00Z", "docs: z\n\nCo-Authored-By: Claude <noreply@anthropic.com>", &[("a", "5")]);
+    let capital = commit_at(&repo, "2026-02-01T11:30:00Z", "Feat: Big.", &[("a", "6")]);
+    sh(&repo, &["checkout", "-q", "-b", "other", "HEAD~3"]);
+    let generated = commit_at(&repo, "2026-02-01T10:20:00Z", "chore(harness): w\n\nGenerated with [Claude Code]", &[("b", "1")]);
+    sh(&repo, &["checkout", "-q", "main"]);
+    let merge = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "Merge branch other.", "other"])
+        .env("GIT_AUTHOR_DATE", "2026-02-01T11:40:00Z")
+        .env("GIT_COMMITTER_DATE", "2026-02-01T11:40:00Z")
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    assert!(merge.status.success(), "merge failed");
+    let projects = tmp.join("projects");
+    for (id, start, end) in [("s1", "2026-02-01T10:00:00.000Z", "2026-02-01T11:00:00.000Z"), ("s2", "2026-02-01T10:30:00.000Z", "2026-02-01T12:00:00.000Z")] {
+        let mut t = Transcript::new(&repo, start);
+        t.typed("SECRET start");
+        t.ts = end.to_string();
+        t.typed("ok");
+        t.write(&projects.join("-cm").join(format!("{id}.jsonl")));
+    }
+    let row = |s: &str, rule: &str, hash: &str| format!("{s}\tcm\tr1\t{rule}\tbreach\t\t{hash}");
+    let expected = vec![
+        row("s1", "commit-format", &long),
+        row("s1", "commit-attribution", &generated),
+        row("s2", "commit-format", &scope),
+        row("s2", "commit-attribution", &trailer),
+        row("s2", "commit-format", &capital),
+    ];
+    let (ok, out) = run(dir, &projects, false);
+    let rows: Vec<String> = out.lines().skip(1).map(str::to_string).collect();
+    let (_, summary) = run(dir, &projects, true);
+    let summary: Vec<&str> = summary.lines().collect();
+    let want_summary = [SUMMARY, "commit-attribution\tr1\t2\t2\t2\t0", "commit-format\tr1\t2\t2\t3\t0"];
+    if sorted(rows.clone()) != sorted(expected.clone()) || summary != want_summary {
+        println!("{out}{}", summary.join("\n"));
+    }
+    vec![
+        ("the commit rules succeed".to_string(), ok),
+        ("each commit of a session is checked once, against the latest-starting session; merges and the user's commits are skipped".to_string(), sorted(rows) == sorted(expected)),
+        ("the commit rules apply to the sessions with a checked commit".to_string(), summary == want_summary),
+    ]
+}
+
 fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let temp = tempfile::tempdir().unwrap();
     let tmp = temp.path().to_path_buf();
-    let checks: Vec<_> = finding_checks(&dir, &tmp).into_iter().chain(summary_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
+    let checks: Vec<_> = finding_checks(&dir, &tmp).into_iter().chain(summary_checks(&dir, &tmp)).chain(commit_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
     let mut failed = false;
     for (name, ok) in checks {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
