@@ -21,7 +21,7 @@ ae87714b3fc1afbc4c73f80e016f15a79191ee5232a051631b33e363c33931e4+x  .claude/skil
 a0e48ae02cc30dbc1afbb470d3082637a5af03e47b1cba7e0e1f0bf7d6e3b167+x  .claude/skills/issue-workflow/test_issue_worktree.rs
 b1a0b8f8f0533c10d465909e73ab93dcfa9a600afefd32a33a2ba51d6d9f1726  .claude/skills/issue-workflow/test_next_issue.rs
 72ad3c6cf9cfd9f5fa459b083143e5aceb9e8e9395035d22438ae73f86be270e  .claude/skills/prioritize-issues/SKILL.md
-a87b7faa8fb50473224d28d40da073b413591e1375e484902270ae8d1ebf3c78+x  .claude/skills/test_skills.rs
+86ba09e77e30a60cade437ccaf4df9ab20ababe10a3c53c4c103366ac0f025dc+x  .claude/skills/test_skills.rs
 fb2d21c5484dbad2bd0639f2a326a6385731bee3a4143fb8778807e1169d5e14  .claude/skills/update-docs/SKILL.md
 29eed70a14b2257df2a89b1f737c77fe6b86001dd307e643ff2b2e0eaf1136f3  .claude/skills/write-spec/SKILL.md
 996911f1e1f8327e30136ee12f0ab1eb595cd54f27fd24b8fea2cf255aa34f89  .claude/specs/check_specs.rs

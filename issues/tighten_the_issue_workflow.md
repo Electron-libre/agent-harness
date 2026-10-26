@@ -30,10 +30,11 @@ and cleaner.
 
 # Resources
 * `files/.claude/skills/issue-workflow/SKILL.md`, `files/AGENTS.md` (section "Reports to the user")
-* `files/.claude/skills/test_skills.rs` (checks wording of the skills: some changes here will trip it)
+* `files/.claude/skills/test_skills.rs` (checks the passages of `REQUIRED_PASSAGES` and the sections of `AGENTS.md`
+  the skills cite)
 * `docs/architecture.md`
 
 # Hints
-* `test_skills.rs` and `specs/agent-reports.md` pin parts of the skill text; if
-  `drop_redundant_guards_and_prose_tests` lands first, they are gone.
+* `specs/agent-reports.md` and the wording checks of `test_skills.rs` are gone
+  (`drop_redundant_guards_and_prose_tests`); `REQUIRED_PASSAGES` still pins the autonomous mode.
 * Keep the validation stops that the autonomous mode never lifts.

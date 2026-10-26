@@ -41,7 +41,7 @@ maintenance on every change of the skills. Remove them so that what remains is a
 # Tracking
 1. [x] `harness check` warns of a missing hook and of an attribution left on (SYN-25, SYN-26, SYN-24 scenario).
 2. [x] Attribution off in the seeded settings; drop `block_ai_attribution.rs` and its test.
-3. [ ] Delete `specs/agent-reports.md` and the RPT checks of `test_skills.rs`.
+3. [x] Delete `specs/agent-reports.md` and the RPT checks of `test_skills.rs`.
 4. [ ] Drop the `quality` kind; merge `implemented` into `accepted` (still accepted, with a warning).
 
 ## Decisions
@@ -112,3 +112,37 @@ Code review:
 not verified: a real consumer synced after this change (its settings edited by hand per the warnings).
 decisions needed: —
 follow-up (asked at the end): whether `sync` should also print the settings warnings (would amend SYN-25, SYN-26).
+
+## Deliverable 3
+* done: `specs/agent-reports.md` deleted; `test_skills.rs` keeps its structural checks (front matter, cited skills
+  and docs, required passages of `issue-workflow`) and drops the five RPT wording checks; `CLAUDE.md` points to the
+  `AGENTS.md` section instead of the spec.
+
+| check | result |
+|---|---|
+| tests | `just check`, `just test-harness` pass |
+| lint | clippy clean |
+| specs | `just check-specs --strict` clean, no RPT citation left |
+| docs | `CLAUDE.md` |
+| code review | see below |
+
+Code review:
+* nothing checked any more that the `AGENTS.md` section the skills cite exists: fixed, `test_skills.rs` checks that
+  every `` `AGENTS.md` section "<heading>" `` a skill cites is a heading of `AGENTS.md` (a structural check, proved
+  failing on a renamed heading).
+* `issues/tighten_the_issue_workflow.md` still described the spec and the wording checks: fixed.
+* the summary lacked its review section: this section.
+* `CLAUDE.md` names the section instead of the spec: kept, it is the pointer the index needs.
+
+not verified: —
+decisions needed: —
+
+Second review (on the fixes):
+* the spec is deleted although its ids were stable: kept, deletion was the decision taken at step 1; the done issue
+  that cites RPT stays as history.
+* a `#` line inside a fenced block of `AGENTS.md` counted as a heading: fixed, the headings are collected once,
+  outside fences.
+* a citation wrapped over two lines escaped the check: fixed, whitespace is collapsed first.
+* nothing requires a skill to cite the section any more: kept, that was RPT-2, dropped with the spec.
+* a missing `AGENTS.md` gave one misleading failure per citation: fixed, the section check is skipped then (the
+  missing file is reported by the reference check).

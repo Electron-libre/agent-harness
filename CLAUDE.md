@@ -19,7 +19,7 @@ The shared agent harness (skills, hooks, scripts, recipes, CI) of the user's pro
 - Parallel agents: one git worktree per issue (`just start-issue`, `just finish-issue`), see
   `docs/architecture.md`.
 - `AGENTS.md`: commit message format (Conventional Commits, enforced by `just check-commit`) and the output rule for
-  the reports to the user (`specs/agent-reports.md`).
+  the reports to the user (section "Reports to the user").
 
 This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `harness.just`, `script/` and
 `specs/README.md` are copies of `files/`. After changing `files/`, run `just sync`; `just check-harness`
