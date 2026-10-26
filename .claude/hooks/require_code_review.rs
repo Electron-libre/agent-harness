@@ -324,7 +324,7 @@ fn refusal(cwd: &Path) -> Option<&'static str> {
 /// Tells the agent the commit waits for a review and exits 2 (the one message of `check` and `native`).
 fn refuse(why: &str) -> ! {
     eprintln!("Refused: {why}.");
-    eprintln!("Run /code-review on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
+    eprintln!("Run /code-review low on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
     std::process::exit(2);
 }
 

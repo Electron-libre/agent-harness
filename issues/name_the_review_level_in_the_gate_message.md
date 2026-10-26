@@ -19,3 +19,18 @@ give the same instruction as the skill.
 # Resources
 * `files/.claude/hooks/require_code_review.rs`
 * `files/.claude/skills/issue-workflow/SKILL.md` (step 4.5)
+
+# Tracking
+
+## Decisions
+* Mode: autonomous. Base commit: `aa9a58bfdae82ff34b4998081e91b60ae284dd09`.
+* No spec change: REV-10 already asks for a message telling the agent to run the review; the level is its wording.
+* The test pins `/code-review low` in the refusal (REV-10 check and the plain refusal check).
+
+1. [x] The refusal names the level `low`.
+   * done: `refuse()` says `/code-review low`; the two refusal checks of `test_require_code_review.rs` look for it.
+   * check | result: `just check` ok, `just test-harness` ok, specs ok, docs: nothing cites the message, code review: see below.
+   * red: `FAIL - native refuses an unreviewed repository with a message naming the review and its level`,
+     `FAIL - refuses a commit without any review`.
+   * Code review: no findings.
+   * not verified: none. decisions needed: none.

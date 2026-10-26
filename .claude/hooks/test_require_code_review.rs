@@ -181,7 +181,7 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let (current, other) = target_fixture(hook, "rev9");
     let (code, stderr) = native_run(hook, &other, &[]);
     let mut out = vec![
-        ("native refuses an unreviewed repository with a message naming the review", code != 0 && stderr.contains("code-review")),
+        ("native refuses an unreviewed repository with a message naming the review and its level", code != 0 && stderr.contains("/code-review low")),
         ("native lets through a reviewed repository", native_run(hook, &current, &[]).0 == 0),
     ];
     // git resolved the repository: the text of the command is not involved
@@ -461,7 +461,7 @@ fn main() {
 
     fs::write(project.join("a.txt"), "two\n").unwrap();
     let (code, stderr) = native_run(&hook, &project, &[]);
-    check("refuses a commit without any review", code == 2 && stderr.contains("code-review"));
+    check("refuses a commit without any review", code == 2 && stderr.contains("/code-review low"));
     check("check leaves the judgment of a commit to the native hook", commit_attempt(&hook, &project, "git commit -am x").0 == 0);
 
     review_done(&hook, &project, "simplify");
