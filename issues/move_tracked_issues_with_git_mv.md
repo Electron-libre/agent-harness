@@ -37,8 +37,10 @@ the rename is staged. Out of scope: a spec (no requirement of `specs/parallel-is
 
 ## Plan
 1. [x] Detect tracked issues from the caller's directory: run the `git ls-files` check without `current_dir(dir)`;
-   verified by `tracked issue is moved` in `test_close_issue.rs` also asserting a staged rename (`R `) and the
-   untracked case staying out of the index.
+   verified by `tracked issue is moved with git mv` in `test_close_issue.rs` (index read with `git ls-files`) and
+   the untracked case staying out of the index.
+2. [x] Fixes of the `high` review: run `git ls-files` and `git mv` in the issue's directory with paths relative to
+   it, and say which move was used; verified by `an absolute path from outside the repo is moved with git mv`.
 
 ## Decisions
 - Mode: autonomous
@@ -62,3 +64,31 @@ the rename is staged. Out of scope: a spec (no requirement of `specs/parallel-is
 - not verified: none
 - decisions needed: none
 - note: the fixture repo has no commit, so the test reads the index (`git ls-files`), not a `R ` status line.
+
+## Review high (3115a61..e2f0f7f)
+
+| # | finding | done |
+|---|---|---|
+| 1 | the check follows the caller's directory, so an absolute path from elsewhere is plain-renamed | fixed (deliverable 2) |
+| 2 | the PAR-8 guard checks the caller's directory, bypassed by a path into a linked worktree | outside the requirements: `issues/refuse_closing_an_issue_of_a_linked_worktree_by_path.md` |
+| 3 | a failed `git ls-files` silently falls back to a plain rename | fixed: the output names the move used |
+| 4 | no test with an absolute path from another directory | fixed (deliverable 2) |
+| 5 | plan line names a test and an `R ` assertion that do not exist | fixed: plan line 1 updated |
+
+## Deliverable 2
+
+- done: `close_issue.rs` runs `git ls-files` and `git mv` in the issue's directory and prints `(git mv)` or
+  `(plain rename, not tracked by git)`.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| specs | no spec concerned |
+| docs | no change needed |
+| code review | `/code-review low` run |
+
+- red: `FAIL - an absolute path from outside the repo is moved with git mv`
+- Code review: 1 finding: an empty `dir` would fail `git`; no change, `main` refuses any path whose parent is not `issues`
+- not verified: none
+- decisions needed: none

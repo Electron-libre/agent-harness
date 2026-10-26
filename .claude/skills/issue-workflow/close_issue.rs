@@ -153,13 +153,15 @@ fn main() {
         std::process::exit(1);
     }
     std::fs::create_dir_all(&done).expect("done dir is creatable");
+    // Run git in the issue's directory with paths relative to it, so the caller's directory does not matter.
     let tracked = Command::new("git")
         .args(["ls-files", "--error-unmatch", "--"])
-        .arg(issue)
+        .arg(name)
+        .current_dir(dir)
         .output()
         .is_ok_and(|o| o.status.success());
     let moved = if tracked {
-        Command::new("git").arg("mv").arg(issue).arg(&target).status().is_ok_and(|s| s.success())
+        Command::new("git").arg("mv").arg(name).arg(Path::new("done").join(name)).current_dir(dir).status().is_ok_and(|s| s.success())
     } else {
         std::fs::rename(issue, &target).is_ok()
     };
@@ -167,7 +169,8 @@ fn main() {
         eprintln!("could not move {arg}");
         std::process::exit(1);
     }
-    println!("moved {} -> {}", issue.display(), target.display());
+    let how = if tracked { "git mv" } else { "plain rename, not tracked by git" };
+    println!("moved {} -> {} ({how})", issue.display(), target.display());
     let stem = Path::new(name).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
     // Drop the issue from the queue so `next_issue.rs` never offers a closed one.
     let queue = dir.join("queue.md");

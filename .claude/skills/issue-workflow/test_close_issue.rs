@@ -94,6 +94,12 @@ fn main() {
     std::fs::write(tmp.join("issues/tracked.md"), "y").unwrap();
     let (ok, out) = run(&script, &tmp, "issues/tracked.md");
     check("existing target is not overwritten", !ok && out.contains("already exists"));
+    std::fs::write(tmp.join("issues/absolute.md"), "x").unwrap();
+    git(&["add", "issues/absolute.md"]);
+    let outside = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    let (ok, out) = run(&script, &outside, tmp.join("issues/absolute.md").to_str().unwrap());
+    let staged = index("issues/done/absolute.md") && !index("issues/absolute.md");
+    check("an absolute path from outside the repo is moved with git mv", ok && staged && out.contains("git mv"));
 
     let header = "# Issue queue\n\nIntro.\n";
     std::fs::write(tmp.join("issues/queue.md"), format!("{header}\n- [a](a.md) - why\n- [b](b.md) - why\n- [c](c.md) - why\n")).unwrap();
