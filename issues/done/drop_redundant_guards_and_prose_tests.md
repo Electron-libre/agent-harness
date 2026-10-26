@@ -130,7 +130,7 @@ Code review:
 * nothing checked any more that the `AGENTS.md` section the skills cite exists: fixed, `test_skills.rs` checks that
   every `` `AGENTS.md` section "<heading>" `` a skill cites is a heading of `AGENTS.md` (a structural check, proved
   failing on a renamed heading).
-* `issues/tighten_the_issue_workflow.md` still described the spec and the wording checks: fixed.
+* `issues/done/tighten_the_issue_workflow.md` still described the spec and the wording checks: fixed.
 * the summary lacked its review section: this section.
 * `CLAUDE.md` names the section instead of the spec: kept, it is the pointer the index needs.
 
