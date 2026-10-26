@@ -195,14 +195,20 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::write(&waiver, "").unwrap();
     out.push(("native honours the waiver", native_run(hook, &current, &[]).0 == 0));
     fs::remove_file(&waiver).unwrap();
-    // no review clears a waiver that cannot be stamped: only the user can fix it
+    // a waiver that cannot be stamped is ignored: the review alone judges the commit, and the user is told to fix it
     fs::write(&waiver, "").unwrap();
     let mut readonly = fs::metadata(&waiver).unwrap().permissions();
     readonly.set_readonly(true);
     fs::set_permissions(&waiver, readonly.clone()).unwrap();
-    let (code, stderr) = native_run(hook, &current, &[]);
-    out.push(("native refuses a waiver it cannot stamp", code == 2));
-    out.push(("that refusal tells the agent to ask the user, not to run a review", stderr.contains("Ask the user to fix the waiver") && !stderr.contains("/code-review")));
+    // root writes a read-only file: the case cannot be built then
+    if fs::OpenOptions::new().write(true).open(&waiver).is_err() {
+        let (code, stderr) = native_run(hook, &current, &[]);
+        out.push(("native refuses an unreviewed diff whose waiver it cannot stamp", code == 2 && stderr.contains("/code-review low")));
+        let path = waiver.canonicalize().unwrap();
+        out.push(("that refusal tells the agent to ask the user to fix the waiver, by its path", stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
+        review_done(hook, &current, "code-review");
+        out.push(("native lets through a reviewed diff whose waiver it cannot stamp", native_run(hook, &current, &[]).0 == 0));
+    }
     #[allow(clippy::permissions_set_readonly_false)]
     readonly.set_readonly(false);
     fs::set_permissions(&waiver, readonly).unwrap();

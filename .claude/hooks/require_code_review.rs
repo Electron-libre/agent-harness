@@ -275,11 +275,14 @@ fn record(cwd: &Path) -> std::io::Result<()> {
     std::fs::write(path, serde_json::json!({"head": snap.head, "hash": snap.hash, "files": snap.files}).to_string())
 }
 
-/// What a refusal tells the agent to do when a review clears it.
-const RUN_REVIEW: &str = "Run /code-review low on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.";
+/// Why the commit must wait for a review, and the waiver the hook could not stamp, if any.
+struct Refusal {
+    why: &'static str,
+    unstamped_waiver: Option<PathBuf>,
+}
 
-/// Why the commit must wait and what the agent must do about it, or `None` when the review covers it.
-fn refusal(cwd: &Path) -> Option<(&'static str, &'static str)> {
+/// Why the commit must wait for a review, or `None` when the review covers it.
+fn refusal(cwd: &Path) -> Option<Refusal> {
     let snap = snapshot(cwd);
     let path = marker_path(cwd)?;
     // the waiver is spent by a commit, not by a command that may not commit (`--dry-run`, a refusal of another hook
@@ -295,27 +298,25 @@ fn refusal(cwd: &Path) -> Option<(&'static str, &'static str)> {
     if snap.files.is_empty() || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR)) {
         return None;
     }
+    let mut unstamped_waiver = None;
     if let (Some(waiver), Some(used)) = (&waiver, &used) {
         if used == stamp {
             return None;
         }
         if used.is_empty() {
-            // fail closed: a waiver that cannot be stamped could never be spent
-            if std::fs::write(waiver, stamp).is_err() {
-                // no review clears it: only the user can make the waiver writable
-                return Some((
-                    "the waiver could not be stamped",
-                    "Ask the user to fix the waiver file and the permissions of its directory, then commit.",
-                ));
+            // fail closed: a waiver that cannot be stamped could never be spent, so the review alone judges the commit
+            if std::fs::write(waiver, stamp).is_ok() {
+                return None;
             }
-            return None;
+            unstamped_waiver = Some(waiver.canonicalize().unwrap_or_else(|_| waiver.clone()));
         }
     }
+    let refused = |why| Some(Refusal { why, unstamped_waiver: unstamped_waiver.clone() });
     let Some(marker) = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else {
-        return Some(("no code review has run in this project", RUN_REVIEW));
+        return refused("no code review has run in this project");
     };
     if marker["head"].as_str() != Some(snap.head.as_str()) {
-        return Some(("the last code review predates the last commit", RUN_REVIEW));
+        return refused("the last code review predates the last commit");
     }
     if marker["hash"].as_str() == Some(snap.hash.as_str()) {
         return None;
@@ -325,13 +326,16 @@ fn refusal(cwd: &Path) -> Option<(&'static str, &'static str)> {
     if snap.files.iter().all(|f| reviewed.contains(&f.as_str())) {
         return None;
     }
-    Some(("the diff holds files the last code review never saw", RUN_REVIEW))
+    refused("the diff holds files the last code review never saw")
 }
 
-/// Tells the agent why the commit waits and what to do, and exits 2 (the one message of `check` and `native`).
-fn refuse(why: &str, todo: &str) -> ! {
-    eprintln!("Refused: {why}.");
-    eprintln!("{todo}");
+/// Tells the agent the commit waits for a review, and to have the user fix a waiver the hook could not stamp, then exits 2.
+fn refuse(refusal: Refusal) -> ! {
+    eprintln!("Refused: {}.", refusal.why);
+    eprintln!("Run /code-review low on the current diff with the Skill tool (issue-workflow, step 4.5), fix what it finds, then commit.");
+    if let Some(waiver) = refusal.unstamped_waiver {
+        eprintln!("The review waiver {} could not be stamped, so it waives nothing: ask the user to fix that file.", waiver.display());
+    }
     std::process::exit(2);
 }
 
@@ -356,8 +360,8 @@ fn main() {
                 std::env::set_var(name, here.join(value));
             }
         }
-        if let Some((why, todo)) = refusal(&toplevel(&here)) {
-            refuse(why, todo);
+        if let Some(refusal) = refusal(&toplevel(&here)) {
+            refuse(refusal);
         }
         return;
     }
