@@ -166,13 +166,15 @@ instead (spec [`specs/delivered-quality.md`](../specs/delivered-quality.md)): on
 commits of an issue are those of the default branch touching its file, from the first whose version holds
 `# Tracking` to the one that moves it to `issues/done/`, except the closes of other issues that only rewrite a
 citation. Its files (issue files, `docs/` and `harness.lock` left out) give the `fix` and `revert` commits of the
-next `--window-days` (30) after the close; its plan lines give the deliverables, and its `Code review` lines of `# Tracking` the reviews and their
-findings (the count opens the line, `issue-workflow` step 3.6; a line with no count leaves the sum empty); the revision is the one in force just
+next `--window-days` (30) after the close; its plan lines give the deliverables, and its `Code review` lines of `# Tracking` (not the rows of the `check | result`
+table) the reviews and their findings (the count opens the line, `issue-workflow` step 3.6; a line with no count leaves the sum empty); the revision is the one in force just
 before its first commit, so an issue that changes the harness is measured with the harness it was made with. The
 sessions of an issue are those of the projects directory that made its commits (the latest-starting session of the
-repository whose span holds the commit date, as for the commit rules above); within each, from the last commit of
-other work to the last commit of the issue, the failed `just check…`/`just test…` runs and the typed messages, split
-as `session_metrics.rs` splits them (`is_validation`, now in `transcripts.rs`). `--summary` sums the columns per harness revision (a sum over an empty value stays empty), the
+repository whose span holds the commit date, as for the commit rules above, a session on the issue's branch first, so
+a parallel session in another worktree does not take it); within each, from the last commit of other work (from its
+start on the issue's branch) to the last commit of the issue, the failed `just check…`/`just test…` runs and the typed messages, split
+as `session_metrics.rs` splits them (`is_validation`, now in `transcripts.rs`). `--summary` sums the columns per harness revision, in the order the revisions were used (a sum over an empty value
+stays empty), the
 input of the report by revision. These are signals, not verdicts: a later fix may come from a new need.
 
 ## Parallel issues

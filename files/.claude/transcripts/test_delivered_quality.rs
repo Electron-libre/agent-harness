@@ -51,7 +51,7 @@ fn toml(rev: &str) -> String {
     format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"\n")
 }
 
-const ALPHA: &str = "# SECRET alpha\n\nRun the code review.\n\n# Tracking\n\n## Plan\n1. [x] SECRET one\n2. [x] two\n   3. [ ] not a plan line\n\n## Decisions\n1. [x] not in the plan\n\n## Deliverable 1\n- Code review: 6 findings, 1 finding dismissed.\n- code review (low): 1 finding; second review: no findings\n- Code review: no findings.\n";
+const ALPHA: &str = "# SECRET alpha\n\nRun the code review.\n\n# Tracking\n\n## Plan\n1. [x] SECRET one\n2. [x] two\n   3. [ ] not a plan line\n\n## Decisions\n1. [x] not in the plan\n\n## Deliverable 1\n```sh\n# a comment, not a heading\n```\n| code review | low |\n- Code review: 6 findings, 1 finding dismissed.\n- code review (low): 1 finding; second review: no findings\n- Code review: no findings.\n";
 
 /// The fixture repository: `alpha` (three commits, one fix inside, fixes and reverts after), `beta` (closed in one
 /// commit that also rewrites a citation in `alpha`), `gamma` (done in the work tree only).
@@ -83,6 +83,7 @@ fn fixture(tmp: &Path) -> PathBuf {
     commit_at(&repo, "2026-01-12T00:00:00Z", "Revert \"feat(files): a\"", &[("src/a.rs", Some("d"))]);
     commit_at(&repo, "2026-01-13T00:00:00Z", "revert(files): a", &[("src/a.rs", Some("e"))]);
     commit_at(&repo, "2026-02-20T00:00:00Z", "fix(files): too late", &[("src/a.rs", Some("f"))]);
+    commit_at(&repo, "2026-01-04T23:00:00Z", "fix(files): rebased after the close", &[("src/a.rs", Some("h"))]);
     sh(&repo, &["checkout", "-q", "-b", "side"]);
     commit_at(&repo, "2026-01-09T00:00:00Z", "fix(files): on a side branch", &[("src/a.rs", Some("g"))]);
     sh(&repo, &["checkout", "-q", "main"]);
@@ -141,8 +142,9 @@ fn git_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         ("the commits run from the first with a Tracking to the close, another close excluded".to_string(), has(&r, "alpha", "commits", "3") && has(&r, "beta", "commits", "1")),
         ("the deliverables are the plan lines of the done file, under Tracking when no Plan".to_string(), has(&r, "alpha", "deliverables", "2") && has(&r, "beta", "deliverables", "2")),
         ("the fixes inside the issue are counted".to_string(), has(&r, "alpha", "fixes_in_issue", "1") && has(&r, "beta", "fixes_in_issue", "0")),
-        ("a later fix of its files counts, docs, lock, side branch and window excluded".to_string(), has(&r, "alpha", "fixes_after", "1") && has(&r, "beta", "fixes_after", "0")),
-        ("the window can be widened".to_string(), has(&w, "alpha", "fixes_after", "2")),
+        ("a later fix of its files counts, docs, lock, side branch and window excluded".to_string(), has(&r, "alpha", "fixes_after", "2") && has(&r, "beta", "fixes_after", "0")),
+        ("the window can be widened".to_string(), has(&w, "alpha", "fixes_after", "3")),
+        ("a negative window and a --projects with no value are refused".to_string(), !run(dir, &repo, &["--window-days", "-1"]).0 && !run(dir, &repo, &["--projects"]).0),
         ("reverts by type, by subject and by cited hash are counted".to_string(), has(&r, "alpha", "reverts_after", "3")),
         ("the revision is the one in force before the first commit of the issue".to_string(), has(&r, "alpha", "revision", "r1") && has(&r, "beta", "revision", "r2")),
         ("no text of a commit or an issue is printed".to_string(), !out.contains("SECRET")),
@@ -189,9 +191,11 @@ fn session_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let tmp = tmp.join("sessions");
     let repo = fixture(&tmp);
     let projects = tmp.join("projects");
-    // S0 starts earlier and holds the first commit of alpha, but S1, starting later, holds it too and wins.
+    // S0, on another branch, starts after S1 and holds the first commit of alpha too: S1, on alpha's branch, wins.
     write(&projects.join("-proj/s0.jsonl"), &[typed(&repo, "2026-01-02T20:00:00Z", "SECRET early"), bash(&repo, "2026-01-03T10:00", "s0a", "just check", true)]);
-    write(&projects.join("-proj/s1.jsonl"), &[
+    // S1 runs on the branch of alpha from before the issues were opened: all its span up to alpha's last commit counts.
+    let s1 = [
+        typed(&repo, "2026-01-01T23:00:00Z", "SECRET prepare alpha"),
         typed(&repo, "2026-01-02T23:00:00Z", "SECRET do alpha"),
         bash(&repo, "2026-01-03T01:00", "a1", "just check", true),
         bash(&repo, "2026-01-03T02:00", "a2", "just test-harness", false),
@@ -202,7 +206,8 @@ fn session_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         bash(&repo, "2026-01-04T09:00", "a6", "just check", true),
         typed(&repo, "2026-01-05T00:30:00Z", "1 a, 2 b"),
         typed(&repo, "2026-01-05T01:00:00Z", "SECRET after"),
-    ]);
+    ];
+    write(&projects.join("-proj/s1.jsonl"), &s1.map(|l| l.replace("\"gitBranch\":\"main\"", "\"gitBranch\":\"alpha\"")));
     write(&projects.join("-proj/s1/subagents/agent-1.jsonl"), &[bash(&repo, "2026-01-03T04:00", "b1", "just check", true)]);
     let (ok, out) = run(dir, &repo, &["--projects", projects.to_str().unwrap()]);
     let r = rows(&out);
@@ -210,9 +215,9 @@ fn session_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let n = rows(&none);
     vec![
         ("the script reads the transcripts".to_string(), ok),
-        ("the sessions of an issue are the latest-starting ones holding its commits".to_string(), has(&r, "alpha", "sessions", "1") && has(&r, "beta", "sessions", "1")),
+        ("the sessions of an issue are the latest-starting ones holding its commits, its branch first".to_string(), has(&r, "alpha", "sessions", "1") && has(&r, "beta", "sessions", "1")),
         ("the failed just checks of its span are counted, not other commands nor sub-agents".to_string(), has(&r, "alpha", "failed_checks", "3") && has(&r, "beta", "failed_checks", "1")),
-        ("the typed messages of its span are split into validations and the rest".to_string(), has(&r, "alpha", "validations", "1") && has(&r, "alpha", "other_messages", "1") && has(&r, "beta", "validations", "1") && has(&r, "beta", "other_messages", "0")),
+        ("the typed messages of its span are split into validations and the rest".to_string(), has(&r, "alpha", "validations", "1") && has(&r, "alpha", "other_messages", "2") && has(&r, "beta", "validations", "1") && has(&r, "beta", "other_messages", "0")),
         ("the transcript columns are empty when the projects cannot be read".to_string(), ["sessions", "failed_checks", "validations", "other_messages"].iter().all(|c| has(&n, "alpha", c, ""))),
         ("no text of a message is printed".to_string(), !out.contains("SECRET")),
     ]
@@ -226,17 +231,21 @@ fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     std::fs::remove_file(repo.join("issues/done/gamma.md")).unwrap();
     commit_at(&repo, "2026-02-01T00:00:00Z", "chore: unpin back", &[(".claude/harness.toml", Some(&toml("r2")))]);
     commit_at(&repo, "2026-02-02T00:00:00Z", "feat(files): gamma", &[("issues/done/gamma.md", Some("# gamma\n\n# Tracking\n\n1. [x] one\n- Code review: 2 findings\n")), ("src/g.rs", Some("g"))]);
+    // delta, in a revision named before the others, comes last: the revisions are in the order they were used.
+    commit_at(&repo, "2026-02-03T00:00:00Z", "chore: pin", &[(".claude/harness.toml", Some(&toml("a0")))]);
+    commit_at(&repo, "2026-02-04T00:00:00Z", "feat(files): delta", &[("issues/done/delta.md", Some("# delta\n\n# Tracking\n\n1. [x] one\n"))]);
     let (ok, out) = run(dir, &repo, &["--summary"]);
     let expected = [
         "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages",
-        "r1\t1\t2\t3\t1\t1\t3\t3\t7\t\t\t\t",
+        "r1\t1\t2\t3\t1\t2\t3\t3\t7\t\t\t\t",
         "r2\t2\t3\t2\t0\t0\t0\t3\t\t\t\t\t",
+        "a0\t1\t1\t1\t0\t0\t0\t0\t0\t\t\t\t",
     ];
     let lines: Vec<&str> = out.lines().collect();
     if lines != expected {
         println!("{out}");
     }
-    vec![("the summary sums the columns per revision, an empty value leaving its sum empty".to_string(), ok && lines == expected)]
+    vec![("the summary sums the columns per revision in the order they were used, an empty value leaving its sum empty".to_string(), ok && lines == expected)]
 }
 
 // spec: QUA-10

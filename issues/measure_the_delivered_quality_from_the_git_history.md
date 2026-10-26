@@ -37,6 +37,8 @@ happened to it afterwards: fixes, reverts, review findings, failed checks, rewor
 
 Plan: validated
 
+Status: done (2026-10-26)
+
 ## Understanding
 One TSV row of quality signals per done issue of a repository: fixes and reverts of its files after the close,
 fixes inside it, review findings from its file, failed checks and typed messages from its sessions. Out of scope:
@@ -54,6 +56,9 @@ rather than new EVA requirements, as `rule-breaches.md` did.
    commits in their span; makes true QUA-7, QUA-8.
 4. [x] `--summary` per revision, docs (architecture, README, report issue resources); verified by the test; makes
    true QUA-9 (spec `accepted`).
+5. [x] Fixes of the `high` review: review table rows, sessions of parallel issues, fixes rebased after the close,
+   reordered commits, cached repositories, fenced headings, quoted paths, summary in time order, argument checks,
+   one `git log` per issue; verified by `test_delivered_quality.rs`; makes true QUA-3, QUA-4, QUA-6 to QUA-9.
 
 ## Decisions
 - Mode: autonomous
@@ -96,4 +101,15 @@ rather than new EVA requirements, as `rule-breaches.md` did.
   `report_the_harness_evolution_by_revision`.
 - red: `unknown option --summary`; then the fixture added the work tree copy of `gamma` one commit early (test fixed).
 - Smoke run: 33 revisions over the 39 issues of this repository (one `self:` revision per issue or two).
+- Code review: no findings.
+
+## Deliverable 5 (fixes of the `high` review)
+- Fixed (10 findings): `check | result` table rows no longer count as reviews (QUA-6); a session on the issue's
+  branch is preferred and counts from its start (QUA-7, QUA-8); fixes rebased after the close count whatever their
+  author date (QUA-4); first and last commit dates by min and max; repositories cached by `cwd`; headings inside
+  fenced blocks end no section (QUA-3); `core.quotePath=false`; summary in the order the revisions were used
+  (QUA-9); `--window-days` from 0 to 3650 and `--projects` without a value refused (QUA-1); one `git log -G` per
+  issue instead of a `git show` per commit.
+- Not tested: the quoted paths and the reordered commits (one-line changes, no fixture cheap enough).
+- red: seven checks failed (table row, fenced comment, rebased fix, branch session, summary order, arguments).
 - Code review: no findings.

@@ -59,7 +59,7 @@ impl Commit {
 /// The non-merge commits of the default branch of `repo`, oldest first.
 fn commits(repo: &Path) -> Vec<Commit> {
     let Some(branch) = default_branch(repo) else { return Vec::new() };
-    let Some(log) = git(repo, &["log", "--no-merges", "--no-renames", "--reverse", "--name-status", "--format=%x1e%H%x1f%aI%x1f%B%x1f", branch]) else { return Vec::new() };
+    let Some(log) = git(repo, &["-c", "core.quotePath=false", "log", "--no-merges", "--no-renames", "--reverse", "--name-status", "--format=%x1e%H%x1f%aI%x1f%B%x1f", branch]) else { return Vec::new() };
     log.split('\x1e')
         .filter_map(|record| {
             let mut fields = record.splitn(4, '\x1f');
@@ -98,13 +98,26 @@ fn issue_commits(repo: &Path, log: &[Commit], stem: &str) -> Vec<usize> {
     let done = format!("issues/done/{stem}.md");
     let Some(close) = log.iter().rposition(|c| c.added.contains(&done)) else { return Vec::new() };
     let candidates: Vec<usize> = (0..=close).filter(|&i| log[i].touches(&open) || log[i].touches(&done)).collect();
-    let tracked = |i: usize| {
-        let show = |path: &str| git(repo, &["show", &format!("{}:{path}", log[i].hash)]);
-        show(&done).or_else(|| show(&open)).is_some_and(|text| text.lines().any(|l| l.trim_end() == "# Tracking"))
-    };
-    let start = candidates.iter().copied().find(|&i| tracked(i)).unwrap_or(close);
+    // The commits whose diff of the file adds or removes the heading: the oldest of them added it.
+    let branch = default_branch(repo).unwrap_or("HEAD");
+    let tracked = git(repo, &["-c", "core.quotePath=false", "log", "--no-renames", "--format=%H", "-G^# Tracking$", branch, "--", &open, &done]).unwrap_or_default();
+    let tracked: BTreeSet<&str> = tracked.lines().collect();
+    let start = candidates.iter().copied().find(|&i| tracked.contains(log[i].hash.as_str())).unwrap_or(close);
     let closes_another = |c: &Commit| c.added.iter().any(|p| p.starts_with("issues/done/") && *p != done);
     candidates.into_iter().filter(|&i| i >= start && (i == close || !closes_another(&log[i]))).collect()
+}
+
+/// The lines of `text` after the line `heading`, up to the next line that `ends` accepts outside a fenced code block.
+fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Vec<&'a str> {
+    let mut fenced = false;
+    text.lines()
+        .skip_while(|l| l.trim_end() != heading)
+        .skip(1)
+        .take_while(|l| {
+            fenced ^= l.starts_with("```");
+            fenced || !ends(l)
+        })
+        .collect()
 }
 
 /// The number of plan lines of an issue file (QUA-3): `<n>. [x]` or `<n>. [ ]` at the start of a line of `## Plan`,
@@ -114,16 +127,16 @@ fn deliverables(text: &str) -> usize {
         let rest = line.trim_start_matches(|c: char| c.is_ascii_digit());
         rest.len() < line.len() && (rest.starts_with(". [x]") || rest.starts_with(". [ ]"))
     };
-    let section = |heading: &str| text.lines().skip_while(|l| l.trim_end() != heading).skip(1).take_while(|l| !l.starts_with('#')).filter(is_item).count();
-    if text.lines().any(|l| l.trim_end() == "## Plan") { section("## Plan") } else { section("# Tracking") }
+    let heading = if text.lines().any(|l| l.trim_end() == "## Plan") { "## Plan" } else { "# Tracking" };
+    section(text, heading, |l| l.starts_with('#')).into_iter().filter(is_item).count()
 }
 
 /// The reviews recorded in the `# Tracking` section of an issue file and the sum of their findings (QUA-6): a line
-/// holding `Code review` is one review, its findings the `<n>` of its first `<n> finding(s)` (0 for `no findings`),
+/// holding `Code review` is one review, unless it is a row of the `check | result` table, its findings the `<n>` of its first `<n> finding(s)` (0 for `no findings`),
 /// since what follows may count the fixed ones; `None` for the sum when a line gives no count.
 fn reviews(text: &str) -> (usize, Option<usize>) {
-    let tracking = text.lines().skip_while(|l| l.trim_end() != "# Tracking").take_while(|l| l.trim_end() == "# Tracking" || !l.starts_with("# "));
-    let lines: Vec<String> = tracking.map(str::to_lowercase).filter(|l| l.contains("code review")).collect();
+    let tracking = section(text, "# Tracking", |l| l.starts_with("# "));
+    let lines: Vec<String> = tracking.iter().filter(|l| !l.trim_start().starts_with('|')).map(|l| l.to_lowercase()).filter(|l| l.contains("code review")).collect();
     let counts = lines.iter().map(|line| {
         let words: Vec<&str> = line.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()).collect();
         words.windows(2).filter(|w| w[1] == "finding" || w[1] == "findings").find_map(|w| if w[0] == "no" { Some(0) } else { w[0].parse().ok() })
@@ -150,8 +163,10 @@ enum Event {
     FailedCheck,
 }
 
-/// A session of the repository: its span, sub-agents included, and the events of its own transcript.
+/// A session of the repository: its span, sub-agents included, its branches other than the default ones, and the
+/// events of its own transcript.
 struct Session {
+    branches: Vec<String>,
     start: DateTime<FixedOffset>,
     end: DateTime<FixedOffset>,
     events: Vec<(DateTime<FixedOffset>, Event)>,
@@ -167,6 +182,7 @@ fn is_check(command: &str) -> bool {
 fn read_sessions(root: &Path, repo: &Path) -> Option<Vec<Session>> {
     std::fs::read_dir(root).ok()?;
     let repo = std::fs::canonicalize(repo).ok();
+    let mut repositories: HashMap<String, Option<PathBuf>> = HashMap::new();
     let mut found = Vec::new();
     for path in projects(root).iter().flat_map(|p| sessions(p)) {
         let mut place = Place::default();
@@ -196,8 +212,9 @@ fn read_sessions(root: &Path, repo: &Path) -> Option<Vec<Session>> {
             });
         }
         let (Some(cwd), Some((start, _)), Some(end)) = (place.cwd.clone(), place.start.clone(), place.end) else { continue };
-        if repo.is_some() && repository(&cwd, &place.issues) == repo {
-            found.push(Session { start, end, events });
+        let resolved = repositories.entry(cwd.clone()).or_insert_with(|| repository(&cwd, &place.issues));
+        if repo.is_some() && *resolved == repo {
+            found.push(Session { branches: place.issues, start, end, events });
         }
     }
     Some(found)
@@ -205,19 +222,23 @@ fn read_sessions(root: &Path, repo: &Path) -> Option<Vec<Session>> {
 
 /// The transcript columns of an issue (QUA-7, QUA-8): its sessions, then the failed checks, validations and other
 /// typed messages of their spans that belong to it.
-fn session_cells(log: &[Commit], own: &[usize], sessions: &[Session]) -> [usize; 4] {
-    let mut by_session: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+fn session_cells(log: &[Commit], own: &[usize], stem: &str, sessions: &[Session]) -> [usize; 4] {
+    let on_branch = |s: &Session| s.branches.iter().any(|b| b == stem);
+    let mut by_session: BTreeMap<usize, Vec<DateTime<FixedOffset>>> = BTreeMap::new();
     for &i in own {
         let at = log[i].date;
-        if let Some((k, _)) = sessions.iter().enumerate().filter(|(_, s)| s.start <= at && at <= s.end).max_by_key(|(_, s)| s.start) {
-            by_session.entry(k).or_default().push(i);
+        let holding: Vec<(usize, &Session)> = sessions.iter().enumerate().filter(|(_, s)| s.start <= at && at <= s.end).collect();
+        let preferred = holding.iter().filter(|(_, s)| on_branch(s)).max_by_key(|(_, s)| s.start);
+        if let Some((k, _)) = preferred.or_else(|| holding.iter().max_by_key(|(_, s)| s.start)) {
+            by_session.entry(*k).or_default().push(at);
         }
     }
     let mut cells = [by_session.len(), 0, 0, 0];
-    for (k, commits) in &by_session {
+    for (k, dates) in &by_session {
         let session = &sessions[*k];
-        let (first, last) = (log[commits[0]].date, log[commits[commits.len() - 1]].date);
-        let after = log.iter().enumerate().filter(|(i, c)| !own.contains(i) && c.date >= session.start && c.date < first).map(|(_, c)| c.date).max();
+        let (Some(&first), Some(&last)) = (dates.iter().min(), dates.iter().max()) else { continue };
+        let other_work = log.iter().enumerate().filter(|(i, c)| !own.contains(i) && c.date >= session.start && c.date < first).map(|(_, c)| c.date).max();
+        let after = other_work.filter(|_| !on_branch(session));
         let inside = |at: &DateTime<FixedOffset>| after.map_or(*at >= session.start, |a| *at > a) && *at <= last;
         for (_, event) in session.events.iter().filter(|(at, _)| inside(at)) {
             cells[match event {
@@ -232,6 +253,8 @@ fn session_cells(log: &[Commit], own: &[usize], sessions: &[Session]) -> [usize;
 
 struct Row {
     issue: String,
+    /// The author date of its oldest commit, which orders the revisions of the summary.
+    first: DateTime<FixedOffset>,
     closed: DateTime<FixedOffset>,
     cells: Vec<String>,
 }
@@ -248,12 +271,12 @@ fn issue_row(repo: &Path, log: &[Commit], sessions: Option<&[Session]>, path: &P
         .filter(|p| !UNRELATED_PREFIXES.iter().any(|d| p.starts_with(d)) && !UNRELATED_FILES.contains(p))
         .collect();
     let end = log[close].date + window;
-    let later: Vec<&Commit> = log[close + 1..].iter().filter(|c| c.date >= log[close].date && c.date <= end).collect();
+    let later: Vec<&Commit> = log[close + 1..].iter().filter(|c| c.date <= end).collect();
     let fixes_after = later.iter().filter(|c| c.kind() == "fix" && c.paths.iter().any(|p| files.contains(p.as_str()))).count();
     let reverts_after = later.iter().filter(|c| reverts(c, &files, &mine)).count();
     let fixes_in = mine.iter().filter(|c| matches!(c.kind(), "fix" | "revert")).count();
     let (review_count, findings) = reviews(&text);
-    let transcript = sessions.map(|s| session_cells(log, &own, s));
+    let transcript = sessions.map(|s| session_cells(log, &own, &stem, s));
     let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
         log[close].date.to_rfc3339(),
@@ -266,24 +289,27 @@ fn issue_row(repo: &Path, log: &[Commit], sessions: Option<&[Session]>, path: &P
         findings.map(|n| n.to_string()).unwrap_or_default(),
     ];
     cells.extend((0..4).map(|k| transcript.map(|t| t[k].to_string()).unwrap_or_default()));
-    Some(Row { issue: stem, closed: log[close].date, cells })
+    Some(Row { issue: stem, first: log[first].date, closed: log[close].date, cells })
 }
 
-/// The rows summed per revision (QUA-9): the count of issues, then the sum of each numeric column, empty when one of
-/// its values is.
+/// The rows summed per revision (QUA-9), in the order the revisions were first used: the count of issues, then the
+/// sum of each numeric column, empty when one of its values is.
 fn summary(rows: &[Row]) -> Vec<String> {
-    let mut by_revision: BTreeMap<&str, (usize, Vec<Option<u64>>)> = BTreeMap::new();
+    let mut by_revision: HashMap<&str, (DateTime<FixedOffset>, usize, Vec<Option<u64>>)> = HashMap::new();
     for row in rows {
         let values: Vec<Option<u64>> = row.cells[2..].iter().map(|v| v.parse().ok()).collect();
-        let (count, sums) = by_revision.entry(&row.cells[0]).or_insert_with(|| (0, vec![Some(0); values.len()]));
+        let (first, count, sums) = by_revision.entry(&row.cells[0]).or_insert_with(|| (row.first, 0, vec![Some(0); values.len()]));
+        *first = (*first).min(row.first);
         *count += 1;
         for (sum, value) in sums.iter_mut().zip(values) {
             *sum = sum.zip(value).map(|(a, b)| a + b);
         }
     }
-    by_revision
+    let mut ordered: Vec<_> = by_revision.into_iter().collect();
+    ordered.sort_by(|a, b| (a.1 .0, a.0).cmp(&(b.1 .0, b.0)));
+    ordered
         .into_iter()
-        .map(|(revision, (count, sums))| {
+        .map(|(revision, (_, count, sums))| {
             let sums: Vec<String> = sums.iter().map(|s| s.map(|n| n.to_string()).unwrap_or_default()).collect();
             format!("{revision}\t{count}\t{}", sums.join("\t"))
         })
@@ -299,14 +325,20 @@ fn main() {
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
-            "--window-days" => match rest.next().and_then(|n| n.parse().ok()) {
+            "--window-days" => match rest.next().and_then(|n| n.parse::<i64>().ok()).filter(|n| (0..=3650).contains(n)) {
                 Some(n) => window_days = n,
                 None => {
-                    eprintln!("--window-days needs a number of days");
+                    eprintln!("--window-days needs a whole number of days from 0 to 3650");
                     std::process::exit(2);
                 }
             },
-            "--projects" => projects_dir = rest.next().cloned(),
+            "--projects" => match rest.next() {
+                Some(dir) => projects_dir = Some(dir.clone()),
+                None => {
+                    eprintln!("--projects needs a directory");
+                    std::process::exit(2);
+                }
+            },
             "--summary" => summed = true,
             other if other.starts_with("--") => {
                 eprintln!("unknown option {other}");
