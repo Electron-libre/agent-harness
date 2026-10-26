@@ -50,7 +50,7 @@ For the same reason `just test-harness` prints nothing when every test script pa
 failing script that are not `ok` otherwise (`test_recipes.rs` proves it); the seeded `justfile` asks the same of the
 project's `check`.
 
-`require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
+`require_code_review.rs` makes the code review of `issue-workflow` (step 3.5) a precondition of the commit. It is
 declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on
 `PreToolUse` `Bash` (a third mode, `native`, is run by git, see below):
 
@@ -144,7 +144,7 @@ Everything a check prints is read by the agent and billed as tokens, every turn 
 
 The model is the other lever, and the shared settings deliberately do not choose it: it depends on the user's plan
 and the project. The setup that costs least for `issue-workflow` is a strong model where judgment matters (steps 1
-to 3: reformulation, spec, plan; the final `high` review) and a cheaper one for the mechanical part (step 4: test,
+and 2: preparation in the files, single validation stop; the final `high` review) and a cheaper one for the mechanical part (step 3: test,
 code, docs, the `low` review, the commit). In Claude Code, `/model opusplan` does this split by plan mode (plan
 in plan mode with Opus, act with Sonnet); otherwise switch with `/model` after the plan is validated. Forked
 skills and sub-agents follow the session model unless the user sets `CLAUDE_CODE_SUBAGENT_MODEL` in their own

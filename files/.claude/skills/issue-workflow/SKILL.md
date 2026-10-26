@@ -1,13 +1,13 @@
 ---
 name: issue-workflow
-description: Drive an issue file from `issues/` to done in validated deliverables (reformulate, plan, then per deliverable test, code, docs, review, human validation, issue update, commit). Use when the user hands over an issue file (e.g. `issues/foo.md`) or says to start, continue or resume an issue, so the process doesn't have to be re-explained in each prompt.
+description: Drive an issue file from `issues/` to done in validated deliverables (understanding, spec and plan written in the issue then validated in one stop, then per deliverable test, code, docs, review, human validation, issue update, commit). Use when the user hands over an issue file (e.g. `issues/foo.md`) or says to start, continue or resume an issue, so the process doesn't have to be re-explained in each prompt.
 ---
 
 # Work an issue
 
 The user hands over an issue file in `issues/`. Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and
 commits stay in English). Never skip a validation stop: they are what makes the autonomy safe. The only ones the user can lift are those of
-step 4.6 and 4.8, through the Autonomous mode.
+step 3.6 and 3.8, through the Autonomous mode.
 
 Reports to the user (stops, summaries, final report) are read at a glance:
 
@@ -18,40 +18,56 @@ Reports to the user (stops, summaries, final report) are read at a glance:
 
 ## 0. Resume or start
 
-Read the issue file. If it has a `# Tracking` section, the issue is already planned: show where it stands in two `next` / `left` lines (the next unchecked
-deliverable with the recorded mode, the deliverables left by name) and continue at step 4 in the mode recorded there (none recorded: validation at each deliverable), unless the issue
-changes a capability whose spec is missing, still `draft` with no validated requirements, or not named in its `# Specs` section:
-then do step 2 first. Otherwise start at step 1.
+Read the issue file. No `# Tracking` section: start at step 1. If `# Tracking` says `Plan: proposed`, the plan was never
+validated: redo the stop of step 2. Otherwise (`Plan: validated`, or no marker: planned before it existed) show where it stands in two `next` / `left` lines (the next unchecked
+deliverable with the recorded mode, the deliverables left by name) and continue at step 3 in the mode recorded there (none recorded:
+validation at each deliverable), unless the issue changes a capability whose spec is missing, still `draft` with no validated
+requirements, or not named in its `# Specs` section: then write the spec (step 1) and validate it (step 2) first.
 
-## 1. Reformulate and validate (STOP)
+## 1. Prepare in the files (no stop)
+
+The understanding, the spec and the plan are written in the files, not in the console: the files keep the history,
+the console only shows the link and the questions.
 
 - Read the issue, plus the resources it names (docs, `git log`, the `roadmap` documents of `.claude/harness.toml`, memory).
-- Show, short, only what the issue does not already say: `goal`, `out of scope`, `questions` (plus the means when you
-  propose a different one than the issue's).
-- Ask the questions you can't answer from the repo. Don't ask what has a conventional default.
-- **Stop and wait for the user to validate the understanding.** When the issue changes no capability (step 2
-  skipped) and fits one deliverable, show the plan of step 3 in the same message: one stop validates both.
+- **Spec**, when the issue changes what a capability does (skip it for docs, harness, pure refactor, a measure): run
+  `skill:write-spec` up to its format check (requirements with stable ids, `deterministic`, left `draft`); its validation
+  stop is the one of step 2. The tests of step 3 come from these requirements, not the other way round.
+- **Write `# Tracking`** at the end of the issue:
 
-## 2. Spec (STOP, when the issue changes what a capability does)
+  ```markdown
+  # Tracking
 
-- Skip it, and say so, for an issue that changes no behaviour (docs, harness, pure refactor, a measure).
-- Otherwise run `skill:write-spec`: read the spec of the capability in `specs/` and write or amend its
-  requirements (stable ids, `deterministic`), left `draft`. The tests of step 4 come from
-  these requirements, not the other way round.
-- **Stop and wait for the user to validate the requirements.** The spec file is the record of that decision;
-  the plan of step 3 names the requirements, no need to copy them into `## Decisions`.
+  Plan: proposed
 
-## 3. Plan the deliverables (STOP)
+  ## Understanding
+  <Three lines at most: the goal in your words, what is out of scope, the means if it differs from the issue's.>
 
-- Split the work into small deliverables, each independently testable and committable, ordered by value
-  and dependency; name the requirements (`ABC-n`) each one makes true. Give your recommended order and why.
-- For each: what it does, how it will be verified.
-- Ask in the same message how to run step 4: **autonomous (default)**, or a validation at each deliverable.
-- **Stop and wait for the user to validate the plan.** Then write it in the issue under `# Tracking`
-  (checklist `1. [ ] …`, plus a `## Decisions` list for the answers given, starting with the mode and the base
-  commit of the issue, `git rev-parse HEAD`).
+  ## Plan
+  1. [ ] <deliverable>: <what it does>; verified by <test or check>; makes true <ABC-n>.
 
-## 4. For each deliverable, in order
+  ## Decisions
+  - Mode: autonomous
+  - Base commit: <`git rev-parse HEAD`>
+  ```
+
+  Small deliverables, each independently testable and committable, ordered by value and dependency. An issue that
+  fits one deliverable has a one-line plan. A decision of architecture also gets its ADR draft in `docs/adr/` now.
+
+## 2. Validate (STOP)
+
+Show, and nothing else:
+
+- The links to the files written in step 1 (the issue, the spec, the ADR), and the issue summed up in two or three lines.
+- The questions you can't answer from the repo, if any, as a table `# | question | options | why | impact`: questions
+  numbered `1`, `2`…, options lettered `a`, `b`… with the recommended one marked, so the user answers `1 a, 2 c` (a bare
+  `ok` takes every recommendation). Don't ask what has a conventional default. The details stay in the files.
+- One line: the mode of step 3, **autonomous (default)** or a validation at each deliverable.
+
+**Wait for the user.** Apply their answers and corrections to the files (the answers go to `## Decisions`), then set
+`Plan: validated`. The spec file is the record of the requirements; `## Decisions` doesn't copy them.
+
+## 3. For each deliverable, in order
 
 1. **Gather**: read the code and docs it touches; ask about missing information (one batch of questions).
 2. **Test first**: write a behavior or end-to-end test that fails for the right reason. When the capability has a
@@ -61,7 +77,7 @@ then do step 2 first. Otherwise start at step 1.
    deliverables (hooks, skills, scripts) write the script test in Rust (`rust-script`, no bash) and run it with `just test-harness`.
 3. **Implement** until the test passes, then **refactor** under the green tests: remove duplication, rename, simplify,
    no new behaviour. The clippy gate hook keeps the code warning-free; fix what it reports.
-4. **Docs**: run `skill:update-docs` (it covers the specs). If the change is an architectural decision, also write an ADR in
+4. **Docs**: run `skill:update-docs` (it covers the specs). If the change is an architectural decision, also write or finish its ADR in
    `docs/adr/` (template and numbering in `docs/adr/README.md`) and update the
    diagrams in the `architecture` document of `.claude/harness.toml` when the flow changed.
 5. **Review (mandatory, never skipped)**: run `just check` (fmt, clippy, tests, specs) and
@@ -75,7 +91,7 @@ then do step 2 first. Otherwise start at step 1.
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
    waive the review: never do it yourself ([details.md](details.md), "Review waiver").
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
-   review), one line `red:` with the failure message the test of step 4.2 gave before the code (`none` for a deliverable
+   review), one line `red:` with the failure message the test of step 3.2 gave before the code (`none` for a deliverable
    with no test), then the line `Code review:` with the findings and what was done about each (`no findings` if it came back
    clean), then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
    not invoke the review, go back to step 5 instead of presenting the deliverable. Wait for the user's validation.
@@ -88,7 +104,7 @@ then do step 2 first. Otherwise start at step 1.
 
 Then move to the next deliverable (autonomous mode: chain into it). Don't chain into it without saying so if the user asked to stop.
 After the last deliverable, invoke `/code-review high` once on the whole issue (`<base>..HEAD`, the base commit
-recorded in `## Decisions`); its fixes are one more deliverable, steps 4.2 to 4.8 with their own `low` review (the
+recorded in `## Decisions`); its fixes are one more deliverable, steps 3.2 to 3.8 with their own `low` review (the
 commit gate only knows the files that review saw).
 
 ## Autonomous mode
@@ -98,10 +114,10 @@ The default once the plan is validated, unless the user asked for a validation a
 recorded first in `## Decisions` of the issue's `# Tracking`, so it survives a `/clear` or a resumed thread. The user
 can switch it at any time.
 
-- **Lifted**: step 4.6 stops and the wait before step 4.8. Write the 4.6 summary (`done`, `check | result`,
+- **Lifted**: step 3.6 stops and the wait before step 3.8. Write the 3.6 summary (`done`, `check | result`,
   `red:`, `Code review:`, `not verified`, `decisions needed`) in the issue instead, then commit locally and chain into the next
   deliverable.
-- **Never lifted**: the review of step 4.5 and its checks, the `high` review of the whole issue, the stops of steps 1 to 3, the Rules on push, deletion and
+- **Never lifted**: the review of step 3.5 and its checks, the `high` review of the whole issue, the stop of step 2, the Rules on push, deletion and
   history rewriting (no push).
 - **Stops the chain**: a blocking question, a decision the summary needs from the user, a review finding you can't
   settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the

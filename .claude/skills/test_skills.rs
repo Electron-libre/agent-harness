@@ -19,6 +19,8 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ("issue-workflow", "## Autonomous mode", "section defining the autonomous mode"),
     ("issue-workflow", "autonomous (default)", "plan validation asks autonomous or per-deliverable validation"),
     ("issue-workflow", "recorded first in `## Decisions`", "mode recorded in the issue so it survives a /clear"),
+    ("issue-workflow", "Plan: proposed", "the plan is written in the issue before its validation"),
+    ("issue-workflow", "`1 a, 2 c`", "questions answered by number and option letter"),
 ];
 
 /// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.

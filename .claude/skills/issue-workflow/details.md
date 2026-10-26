@@ -4,7 +4,7 @@ The rare cases of `SKILL.md`, read when one of them comes up.
 
 ## Review waiver
 
-Only the user can waive the review of step 4.5, with `just waive-review`: it creates the waiver of the current
+Only the user can waive the review of step 3.5, with `just waive-review`: it creates the waiver of the current
 worktree (also in a linked worktree, where the waiver is per worktree). Never create that file nor run that recipe
 yourself. Deny rules of `.claude/settings.json` refuse the recipe and an edit of the file; naming them (commit
 message, `grep`) is fine.

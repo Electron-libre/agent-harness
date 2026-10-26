@@ -29,7 +29,7 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
 3. **Validate the format**: run `just check-specs` and read the lines that name the spec you edited; there
    must be none, warnings included (other specs may have their own problems). A `draft` spec is not asked for tests yet.
 4. **Validate with the user (STOP)**: show the requirements and ask what is missing or too strong. The
-   spec stays `draft`.
+   spec stays `draft`. Called from `skill:issue-workflow`, skip this stop: its single validation stop covers the spec.
 5. **Trace**: write the tests from the requirements; each carries `// spec: ID` placed as `specs/README.md`
    says. When every requirement is traced, set `accepted`; `just check-specs` then enforces it.
 
