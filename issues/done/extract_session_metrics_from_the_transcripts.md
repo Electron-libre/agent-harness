@@ -49,6 +49,8 @@ evaluation issues read; it measures, it does not judge.
 
 Plan: validated
 
+Status: done (2026-10-26)
+
 ## Understanding
 One TSV row of numbers per session (EVA-1), sub-agents folded in, unknown lines counted, harness revision joined
 from the git history of `.claude/harness.toml`, rows merged into an archive outside the repositories. Out of scope:

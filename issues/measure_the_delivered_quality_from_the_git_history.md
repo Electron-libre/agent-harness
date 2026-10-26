@@ -27,7 +27,7 @@ happened to it afterwards: fixes, reverts, review findings, failed checks, rewor
 # Resources
 * `AGENTS.md` (commit format), `issues/done/`, `issues/queue.md`
 * `files/.claude/skills/issue-workflow/SKILL.md` (what `# Tracking` records)
-* `issues/extract_session_metrics_from_the_transcripts.md`
+* `issues/done/extract_session_metrics_from_the_transcripts.md`
 
 # Hints
 * A fix after a feature may come from a new need, not a defect: report it as a signal, not a verdict.

@@ -49,7 +49,7 @@ archiving compact extracts (moved to `extract_session_metrics_from_the_transcrip
    365 days or a project settings file lowers it; verified by unit tests on fixture settings in a tempdir; makes true
    SYN-28.
 2. [x] Docs: `README.md` says the evaluation needs a longer retention and which user setting to raise; the archive
-   point moves to `issues/extract_session_metrics_from_the_transcripts.md`; verified by `just check`.
+   point moves to `issues/done/extract_session_metrics_from_the_transcripts.md`; verified by `just check`.
 
 ## Decisions
 - Mode: autonomous
@@ -72,7 +72,7 @@ archiving compact extracts (moved to `extract_session_metrics_from_the_transcrip
 ## Deliverable 2
 
 * done: README says why and how to keep the transcripts a year; the archive point is now point 5 of
-  `issues/extract_session_metrics_from_the_transcripts.md`.
+  `issues/done/extract_session_metrics_from_the_transcripts.md`.
 * red: none (docs only).
 * checks: `just check` ok.
 * code review: no findings.

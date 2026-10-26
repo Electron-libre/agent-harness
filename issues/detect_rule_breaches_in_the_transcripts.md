@@ -31,7 +31,7 @@ rules are broken often enough to deserve a hook or a rewording. Only the breache
 * `files/AGENTS.md`, `CLAUDE.md`, `.claude/harness.toml`
 * `docs/adr/0005-the-gates-catch-mistakes-not-bypasses.md`, `docs/adr/0003-one-worktree-per-issue.md`
 * `files/.claude/hooks/require_code_review.rs` (its refusal messages)
-* `issues/extract_session_metrics_from_the_transcripts.md`
+* `issues/done/extract_session_metrics_from_the_transcripts.md`
 
 # Hints
 * A breach already blocked by a hook is not a breach of the agent's behaviour but a gate doing its job; report
