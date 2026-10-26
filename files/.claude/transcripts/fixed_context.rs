@@ -10,46 +10,48 @@
 //! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: f7ba8cb58a3d105f7d88ef5445e1cb61658b6a70b9682d95966e9b88c327c03d
+// transcripts.rs sha256: 88aa683cf117f2087cfff20243255bd66990027890ee1f3f654b6f73590b0e85
 #[path = "transcripts.rs"]
 mod transcripts;
 
 use chrono::{DateTime, FixedOffset};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
-use transcripts::{default_branch, for_each_line, git, project_name, projects, projects_root, repository, revision, sessions, subagents, Place};
+use transcripts::{default_branch, for_each_line, git, pinned_revision, project_name, projects, projects_root, repository, revision, sessions, subagents, Place};
 
 const HEADER: &str = "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
 
-/// The revision a commit's `.claude/harness.toml` pins, as EVA-8 names it; `None` for a `self:` revision, which is
-/// matched by its own commit.
-fn pinned(text: &str) -> Option<String> {
-    let config: toml::Table = text.parse().ok()?;
-    let field = |key: &str| config.get("harness").and_then(|h| h.get(key)).and_then(toml::Value::as_str);
-    match (field("rev"), field("source")) {
-        (Some(rev), _) => Some(rev.to_string()),
-        (None, Some(".")) => None,
-        (None, _) => Some("unpinned".to_string()),
-    }
+/// The commits of the first-parent history of the default branch touching `.claude/harness.toml`, oldest first,
+/// with the revision each pins (`None` for a `self:` revision, matched by its own commit).
+fn pins(repo: &Path) -> Vec<(String, Option<String>)> {
+    let Some(branch) = default_branch(repo) else { return Vec::new() };
+    let log = git(repo, &["log", "--first-parent", "--reverse", "--format=%H", branch, "--", ".claude/harness.toml"]).unwrap_or_default();
+    log.lines()
+        .filter_map(|c| {
+            let config: toml::Table = git(repo, &["show", &format!("{c}:.claude/harness.toml")])?.parse().ok()?;
+            Some((c.to_string(), pinned_revision(&config)))
+        })
+        .collect()
 }
 
-/// The oldest commit of the first-parent history of the default branch at which `revision` is in force (REP-2).
-fn in_force_commit(repo: &Path, revision: &str) -> Option<String> {
+/// The oldest commit at which `revision` is in force (REP-2), among the `pins` of its repository.
+fn in_force_commit(pins: &[(String, Option<String>)], revision: &str) -> Option<String> {
     if let Some(commit) = revision.strip_prefix("self:") {
         return Some(commit.to_string());
     }
-    let branch = default_branch(repo)?;
-    let log = git(repo, &["log", "--first-parent", "--reverse", "--format=%H", branch, "--", ".claude/harness.toml"])?;
-    log.lines().find(|c| git(repo, &["show", &format!("{c}:.claude/harness.toml")]).and_then(|t| pinned(&t)).is_some_and(|r| r == revision)).map(str::to_string)
+    pins.iter().find(|(_, r)| r.as_deref() == Some(revision)).map(|(c, _)| c.clone())
 }
 
-/// The size of `path` in the tree of `commit`, 0 when absent.
+/// The size of `path` in the tree of `commit`, a symbolic link counted as the file it points to; 0 when absent.
 fn size(repo: &Path, commit: &str, path: &str) -> u64 {
-    git(repo, &["cat-file", "-s", &format!("{commit}:{path}")]).and_then(|s| s.parse().ok()).unwrap_or(0)
+    let link = git(repo, &["ls-tree", commit, "--", path]).is_some_and(|entry| entry.starts_with("120000 "));
+    let target = if link { git(repo, &["show", &format!("{commit}:{path}")]).map(|t| Path::new(path).with_file_name(t).to_string_lossy().into_owned()) } else { Some(path.to_string()) };
+    target.and_then(|t| git(repo, &["cat-file", "-s", &format!("{commit}:{t}")])).and_then(|s| s.parse().ok()).unwrap_or(0)
 }
 
 /// The bytes of the top-level `name` and `description` values of a skill's front matter: surrounding quotes removed,
-/// a value over several lines (a `>` or `|` block, or indented continuation lines) counted with one byte per line break.
+/// a value over several lines (a `>` or `|` block, or continuation lines), blank lines included, counted with one byte
+/// per line break.
 fn description_bytes(skill: &str) -> u64 {
     let mut lines = skill.lines();
     if lines.next().map(str::trim) != Some("---") {
@@ -58,8 +60,8 @@ fn description_bytes(skill: &str) -> u64 {
     let mut values: Vec<Vec<&str>> = Vec::new();
     let mut counted = false;
     for line in lines.take_while(|l| l.trim() != "---") {
-        if line.starts_with(char::is_whitespace) {
-            if counted && !line.trim().is_empty() {
+        if line.trim().is_empty() || line.starts_with(char::is_whitespace) {
+            if counted {
                 values.last_mut().unwrap().push(line.trim());
             }
             continue;
@@ -68,19 +70,33 @@ fn description_bytes(skill: &str) -> u64 {
         counted = matches!(key, "name" | "description");
         if counted {
             let v = value.trim();
-            let block = v.starts_with(['>', '|']);
-            let unquoted = ['"', '\''].iter().find_map(|q| v.strip_prefix(*q).and_then(|s| s.strip_suffix(*q))).unwrap_or(v);
-            values.push(if block || unquoted.is_empty() { Vec::new() } else { vec![unquoted] });
+            values.push(if v.is_empty() || v.starts_with(['>', '|']) { Vec::new() } else { vec![v] });
         }
     }
-    values.iter().map(|parts| parts.iter().map(|p| p.len() as u64).sum::<u64>() + parts.len().saturating_sub(1) as u64).sum()
+    values
+        .iter_mut()
+        .map(|parts| {
+            while parts.last().is_some_and(|p| p.is_empty()) {
+                parts.pop();
+            }
+            let (first, last) = (parts.first().copied().unwrap_or_default(), parts.last().copied().unwrap_or_default());
+            let quoted = ['"', '\''].into_iter().any(|q| first.starts_with(q) && last.ends_with(q)) && (parts.len() > 1 || first.len() > 1);
+            if quoted {
+                let n = parts.len() - 1;
+                parts[0] = &parts[0][1..];
+                parts[n] = &parts[n][..parts[n].len() - 1];
+            }
+            parts.iter().map(|p| p.len() as u64).sum::<u64>() + parts.len().saturating_sub(1) as u64
+        })
+        .sum()
 }
 
 /// The columns after `revision` of a row: the commit and what its tree costs; empty when there is no such commit.
-fn context(repo: &Path, revision: &str) -> Vec<String> {
-    let Some(commit) = in_force_commit(repo, revision).and_then(|c| git(repo, &["rev-parse", "--short", &c])) else { return vec![String::new(); 5] };
-    let files = git(repo, &["ls-tree", "-r", "--name-only", &commit, "--", ".claude/skills"]).unwrap_or_default();
-    let skills: Vec<&str> = files.lines().filter_map(|p| p.strip_prefix(".claude/skills/")?.strip_suffix("/SKILL.md").filter(|d| !d.contains('/'))).collect();
+fn context(repo: &Path, pins: &[(String, Option<String>)], revision: &str) -> Vec<String> {
+    let Some(commit) = in_force_commit(pins, revision).and_then(|c| git(repo, &["rev-parse", "--short", &c])) else { return vec![String::new(); 5] };
+    let files = git(repo, &["-c", "core.quotePath=false", "ls-tree", "-r", "--name-only", &commit, "--", ".claude/skills"]).unwrap_or_default();
+    let mut skills: Vec<&str> = files.lines().filter_map(|p| p.strip_prefix(".claude/skills/")?.strip_suffix("/SKILL.md").filter(|d| !d.contains('/'))).collect();
+    skills.sort_unstable();
     let descriptions: u64 = skills.iter().filter_map(|s| git(repo, &["show", &format!("{commit}:.claude/skills/{s}/SKILL.md")])).map(|t| description_bytes(&t)).sum();
     let (claude, agents) = (size(repo, &commit, "CLAUDE.md"), size(repo, &commit, "AGENTS.md"));
     vec![commit, claude.to_string(), agents.to_string(), descriptions.to_string(), skills.join(",")]
@@ -125,8 +141,10 @@ fn main() {
     }
     let mut rows: Vec<_> = used.into_iter().collect();
     rows.sort_by(|((pa, _), (sa, _)), ((pb, _), (sb, _))| (pa, sa).cmp(&(pb, sb)));
+    let mut pinned: HashMap<PathBuf, Vec<(String, Option<String>)>> = HashMap::new();
     println!("{HEADER}");
     for ((project, rev), (_, repo)) in rows {
-        println!("{project}\t{rev}\t{}", context(&repo, &rev).join("\t"));
+        let pins = pinned.entry(repo.clone()).or_insert_with(|| pins(&repo));
+        println!("{project}\t{rev}\t{}", context(&repo, pins, &rev).join("\t"));
     }
 }

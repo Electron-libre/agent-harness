@@ -179,7 +179,8 @@ input of the report by revision. These are signals, not verdicts: a later fix ma
 
 `.claude/transcripts/fixed_context.rs` measures what a revision costs in every session before any work (spec
 [`specs/harness-report.md`](../specs/harness-report.md)): one row per project and revision used by a session, the bytes
-of `CLAUDE.md`, `AGENTS.md` and the `name` and `description` of each skill (what Claude Code loads at the start), read
+of `CLAUDE.md`, `AGENTS.md` (a symbolic link counted as its target) and the `name` and `description` of each skill
+(what Claude Code loads at the start), read
 from the tree of the oldest commit of the default branch where the revision is in force (the sync commit of a pin, the
 commit itself for `self:`), with the list of the skills it ships. The shared hooks print nothing in a session but their
 refusals, already counted.

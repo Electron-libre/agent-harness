@@ -205,16 +205,22 @@ pub fn committed_config(repo: &Path, at: &str) -> Option<toml::Table> {
     committed_file(repo, at, ".claude/harness.toml")?.parse().ok()
 }
 
-/// The harness revision in force in `repo` at `start` (ADR 0002): the `rev` of the `.claude/harness.toml` committed
-/// on the default branch then; `self:<commit>` for the harness repository itself (`source = "."`, no `rev`), the
-/// last commit touching `files/`; `unpinned` with no `rev`; empty when it cannot be read.
-pub fn revision(repo: &Path, start: &str) -> String {
-    let Some(config) = committed_config(repo, start) else { return String::new() };
+/// The revision a parsed `.claude/harness.toml` pins (ADR 0002): its `rev`, `unpinned` with no `rev`; `None` for the
+/// harness repository itself (`source = "."`, no `rev`), whose revision is a commit of its `files/`.
+pub fn pinned_revision(config: &toml::Table) -> Option<String> {
     let harness = config.get("harness");
     let field = |key: &str| harness.and_then(|h| h.get(key)).and_then(toml::Value::as_str);
     match (field("rev"), field("source")) {
-        (Some(rev), _) => rev.to_string(),
-        (None, Some(".")) => last_commit(repo, start, "files").map(|c| format!("self:{c}")).unwrap_or_default(),
-        (None, _) => "unpinned".to_string(),
+        (Some(rev), _) => Some(rev.to_string()),
+        (None, Some(".")) => None,
+        (None, _) => Some("unpinned".to_string()),
     }
+}
+
+/// The harness revision in force in `repo` at `start`: the `pinned_revision` of the `.claude/harness.toml` committed
+/// on the default branch then; `self:<commit>` for the harness repository itself, the last commit touching `files/`;
+/// empty when it cannot be read.
+pub fn revision(repo: &Path, start: &str) -> String {
+    let Some(config) = committed_config(repo, start) else { return String::new() };
+    pinned_revision(&config).unwrap_or_else(|| last_commit(repo, start, "files").map(|c| format!("self:{c}")).unwrap_or_default())
 }

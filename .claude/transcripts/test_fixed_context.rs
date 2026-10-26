@@ -82,7 +82,10 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     session(&projects, "-pinned-a", "s1", &pinned, "2026-01-02T00:00:00.000Z");
     let harness = new_repo(&tmp.join("harness"));
     commit_at(&harness, "2026-01-01T00:00:00Z", &[(".claude/harness.toml", "[harness]\nsource = \".\"\n"), ("files/AGENTS.md", "f")]);
-    let own = commit_at(&harness, "2026-01-03T00:00:00Z", &[("files/AGENTS.md", "ff"), ("AGENTS.md", "ff")]);
+    std::os::unix::fs::symlink("AGENTS.md", harness.join("CLAUDE.md")).unwrap();
+    let review = "---\nname: review\ndescription: |\n  a\n\n  b\n---\n";
+    let review_pr = "---\nname: review-pr\ndescription: \"x\n  y\"\n---\n";
+    let own = commit_at(&harness, "2026-01-03T00:00:00Z", &[("files/AGENTS.md", "ff"), ("AGENTS.md", "ff"), (".claude/skills/review/SKILL.md", review), (".claude/skills/review-pr/SKILL.md", review_pr)]);
     commit_at(&harness, "2026-01-04T00:00:00Z", &[("AGENTS.md", "fff")]);
     session(&projects, "-harness", "h1", &harness, "2026-01-05T00:00:00.000Z");
     let bare = new_repo(&tmp.join("bare"));
@@ -96,7 +99,7 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     };
     let expected = [
         COLUMNS.to_string(),
-        format!("harness\tself:{}\t{own}\t0\t2\t0\t", full(&own)),
+        format!("harness\tself:{}\t{own}\t2\t2\t22\treview,review-pr", full(&own)),
         format!("pinned\tr1\t{c1}\t2\t4\t7\tone"),
         format!("pinned\tr2\t{c2}\t0\t10\t18\tone,three,two"),
     ];

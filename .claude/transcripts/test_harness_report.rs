@@ -164,6 +164,10 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let rule_rows: Vec<String> = rules.map(|r| r.iter().skip(1).filter(|c| c[0] == first).map(|c| c[2..].join(" ")).collect()).unwrap_or_default();
     let few = |table: Option<&Vec<Vec<String>>>| table.is_some_and(|r| r.iter().filter(|c| c[0] == "r-c").count() == 1 && r.iter().any(|c| c[0] == "r-c" && c[1] == "4" && c[2..].iter().all(|v| v == "too few")));
     let too_few = [quality, rules, skills, fixed].into_iter().all(few);
+    let only_b = write(&tmp.join("breaches-b.tsv"), BREACHES, &["x-rule\tr-b\t4\t1\t1\t2".into()]);
+    let (_, small, _) = run(dir, &[arg("--sessions"), sessions.as_os_str(), arg("--min-sessions"), arg("2"), arg("--breaches"), only_b.as_os_str(), arg("--quality"), quality_a.as_os_str()]);
+    let small = tables(&small);
+    let no_rule = small.get("Rules").and_then(|r| r.iter().find(|c| c[0] == "self:1111111")).is_some_and(|c| c.len() == 8 && c[2..].iter().all(String::is_empty));
     let (_, bare, _) = run(dir, &[arg("--sessions"), sessions.as_os_str()]);
     let bare = tables(&bare);
     vec![
@@ -175,6 +179,8 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ("unused skills of the revisions, a prefixed call counting", cell(skills, first, "unused") == "audit, write-spec"),
         ("fixed context means over the rows with bytes, rounded half up", cell(fixed, first, "claude_md_bytes") == "151" && cell(fixed, first, "agents_md_bytes") == "300" && cell(fixed, first, "skill_description_bytes") == "400" && cell(fixed, first, "total_bytes") == "851"),
         ("a group with too few sessions is one row of `too few` in every table", too_few),
+        ("a group with no quality row has empty sums, not zeros", cell(small.get("Quality"), "r-c", "issues").is_empty() && cell(small.get("Quality"), "self:1111111", "issues") == "2"),
+        ("a group with no rule row keeps one row of empty cells", no_rule),
         ("a table whose input is not given is not printed", bare.contains_key("Skills") && !bare.contains_key("Quality") && !bare.contains_key("Rules") && !bare.contains_key("Fixed context")),
     ]
 }

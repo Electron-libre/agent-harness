@@ -42,6 +42,8 @@ costs in every session, and which skills and hooks earn their place.
 
 Plan: validated
 
+Status: done (2026-10-26)
+
 ## Understanding
 On demand, one markdown table per axis (efficiency, quality, rules, skills, fixed context), one row per group of
 consecutive revisions holding enough sessions, with model, version and project mix and the sample size. Out of scope:
@@ -59,6 +61,10 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
    REP-6, REP-7 (spec `accepted`).
 4. [x] Skill `evaluate-harness`: runs the scripts (a quality summary per repository) and reports the trend per axis;
    architecture, README, `audit-instructions` cross-reference; verified by `test_skills.rs`.
+5. [x] Fixes of the `high` review: symbolic links, sorted and unquoted skill names, multi-line values, one pass of
+   the pins per repository, the revision rule shared in `transcripts.rs`, empty sums and rule rows for a group with no
+   input, the archive caveat in the skill; verified by `test_fixed_context.rs` and `test_harness_report.rs`; amends
+   REP-2, REP-6.
 
 ## Decisions
 - Mode: autonomous
@@ -100,3 +106,15 @@ managed scripts (`fixed_context.rs`, `harness_report.rs` joining the TSV outputs
 - red: `evaluate-harness: skill missing` for the five passages of `test_skills.rs`.
 - Code review: 1 finding, fixed: the outputs went to bare relative names, so in the repository; every path now
   goes under the `mktemp -d` directory.
+
+## Deliverable 5 (fixes of the `high` review)
+- Fixed (9 of 10 findings): a symbolic `CLAUDE.md` counted as its target (REP-2); skills sorted, `core.quotePath=false`;
+  blank lines and quotes over several lines in a description; the pins of a repository read once; `pinned_revision`
+  shared by `revision` and `fixed_context.rs` (every including script restamped); a group with no quality row has
+  empty sums and a group with no rule row one empty row (REP-6); the quality rows borrowed, not cloned; the skill
+  warns that an archive older than the transcripts has no other axes.
+- Not fixed: two repositories with the same directory name share a row: the project is the name everywhere (EVA-7),
+  so the report could not tell them apart anyway.
+- red: the bytes of the link, the order of `review` and `review-pr`, the empty quality sums and the empty rule row
+  failed.
+- Code review: no findings.

@@ -163,8 +163,11 @@ fn summed_pairs(sessions: &[&Row], column: &str) -> String {
     sorted_pairs(counts)
 }
 
-/// The sum of a column over `rows`, `None` when one value is empty or not a number.
+/// The sum of a column over `rows`, `None` when there is no row or one value is empty or not a number.
 fn sum(rows: &[&Row], column: &str) -> Option<u64> {
+    if rows.is_empty() {
+        return None;
+    }
     rows.iter().map(|r| value(r, column).parse::<u64>().ok()).sum()
 }
 
@@ -177,17 +180,16 @@ fn ratio(a: Option<u64>, b: Option<u64>) -> String {
 }
 
 /// The rows of `inputs` whose `revision` belongs to `group`.
-fn of_group<'a>(inputs: &'a [Row], group: &Group) -> Vec<&'a Row> {
-    inputs.iter().filter(|r| group.revisions.contains(value(r, "revision"))).collect()
+fn of_group<'a>(inputs: impl IntoIterator<Item = &'a Row>, group: &Group) -> Vec<&'a Row> {
+    inputs.into_iter().filter(|r| group.revisions.contains(value(r, "revision"))).collect()
 }
 
 fn quality(groups: &[Group], files: &[Vec<Row>]) {
     let summed = ["issues", "deliverables", "commits", "fixes_in_issue", "fixes_after", "reverts_after", "reviews", "review_findings", "sessions", "failed_checks", "validations", "other_messages"];
     let mut columns: Vec<&str> = summed.iter().map(|c| if *c == "sessions" { "issue_sessions" } else { c }).collect();
     columns.extend(["fixes_after_per_issue", "findings_per_review"]);
-    let rows: Vec<Row> = files.iter().flatten().cloned().collect();
     table("Quality", &columns, groups, |g| {
-        let rows = of_group(&rows, g);
+        let rows = of_group(files.iter().flatten(), g);
         let total = |c: &str| sum(&rows, c);
         let mut cells: Vec<String> = summed.iter().map(|c| total(c).map(|n| n.to_string()).unwrap_or_default()).collect();
         cells.push(ratio(total("fixes_after"), total("issues")));
@@ -202,6 +204,9 @@ fn rules(groups: &[Group], breaches: &[Row]) {
         let mut by_rule: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
         for row in of_group(breaches, g) {
             by_rule.entry(value(row, "rule")).or_default().push(row);
+        }
+        if by_rule.is_empty() {
+            return vec![vec![String::new(); columns.len()]];
         }
         by_rule
             .into_iter()
