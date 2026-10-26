@@ -3,8 +3,9 @@
 //! tab-separated row per file of `issues/done/`, with the commits of the issue, the fixes inside it, and the fixes
 //! and reverts of its files on the default branch after its close. Signals, not verdicts: a fix after a feature may
 //! come from a new need. The sessions that made its commits give the failed checks and the typed messages of its
-//! span. No text of a commit, an issue or a message is printed.
-//! Usage: `rust-script delivered_quality.rs [repo] [--projects <dir>] [--window-days <n>]` (default the current
+//! span. With `--summary`, the columns are summed per harness revision. No text of a commit, an issue or a message
+//! is printed.
+//! Usage: `rust-script delivered_quality.rs [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the current
 //! directory, `~/.claude/projects` and 30 days).
 //! ```cargo
 //! [dependencies]
@@ -23,6 +24,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use transcripts::{default_branch, for_each_line, git, is_validation, projects, projects_root, repository, revision, sessions, sorted_entries, subagents, typed_text, Place};
 
+const SUMMARY_HEADER: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
 const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
 
 /// The paths whose later fixes say nothing of the issue's work: the issue files, the docs and the lock of the sync.
@@ -267,11 +269,33 @@ fn issue_row(repo: &Path, log: &[Commit], sessions: Option<&[Session]>, path: &P
     Some(Row { issue: stem, closed: log[close].date, cells })
 }
 
+/// The rows summed per revision (QUA-9): the count of issues, then the sum of each numeric column, empty when one of
+/// its values is.
+fn summary(rows: &[Row]) -> Vec<String> {
+    let mut by_revision: BTreeMap<&str, (usize, Vec<Option<u64>>)> = BTreeMap::new();
+    for row in rows {
+        let values: Vec<Option<u64>> = row.cells[2..].iter().map(|v| v.parse().ok()).collect();
+        let (count, sums) = by_revision.entry(&row.cells[0]).or_insert_with(|| (0, vec![Some(0); values.len()]));
+        *count += 1;
+        for (sum, value) in sums.iter_mut().zip(values) {
+            *sum = sum.zip(value).map(|(a, b)| a + b);
+        }
+    }
+    by_revision
+        .into_iter()
+        .map(|(revision, (count, sums))| {
+            let sums: Vec<String> = sums.iter().map(|s| s.map(|n| n.to_string()).unwrap_or_default()).collect();
+            format!("{revision}\t{count}\t{}", sums.join("\t"))
+        })
+        .collect()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut repo = PathBuf::from(".");
     let mut window_days = 30;
     let mut projects_dir = None;
+    let mut summed = false;
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
@@ -283,6 +307,7 @@ fn main() {
                 }
             },
             "--projects" => projects_dir = rest.next().cloned(),
+            "--summary" => summed = true,
             other if other.starts_with("--") => {
                 eprintln!("unknown option {other}");
                 std::process::exit(2);
@@ -298,6 +323,11 @@ fn main() {
         .filter_map(|p| issue_row(&repo, &log, sessions.as_deref(), p, Duration::days(window_days)))
         .collect();
     rows.sort_by(|a, b| a.closed.cmp(&b.closed).then_with(|| a.issue.cmp(&b.issue)));
+    if summed {
+        println!("{SUMMARY_HEADER}");
+        summary(&rows).iter().for_each(|line| println!("{line}"));
+        return;
+    }
     println!("{HEADER}");
     for row in rows {
         println!("{}\t{}", row.issue, row.cells.join("\t"));

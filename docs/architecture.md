@@ -172,8 +172,8 @@ before its first commit, so an issue that changes the harness is measured with t
 sessions of an issue are those of the projects directory that made its commits (the latest-starting session of the
 repository whose span holds the commit date, as for the commit rules above); within each, from the last commit of
 other work to the last commit of the issue, the failed `just check…`/`just test…` runs and the typed messages, split
-as `session_metrics.rs` splits them (`is_validation`, now in `transcripts.rs`). These are signals, not verdicts: a
-later fix may come from a new need.
+as `session_metrics.rs` splits them (`is_validation`, now in `transcripts.rs`). `--summary` sums the columns per harness revision (a sum over an empty value stays empty), the
+input of the report by revision. These are signals, not verdicts: a later fix may come from a new need.
 
 ## Parallel issues
 

@@ -27,6 +27,7 @@ costs in every session, and which skills and hooks earn their place.
 # Resources
 * `issues/done/extract_session_metrics_from_the_transcripts.md`, `issues/done/detect_rule_breaches_in_the_transcripts.md`,
   `issues/measure_the_delivered_quality_from_the_git_history.md`
+* `.claude/transcripts/delivered_quality.rs --summary` (quality signals per revision, `specs/delivered-quality.md`)
 * `files/.claude/skills/audit-instructions/SKILL.md` (sibling: it proposes rules, this one measures them)
 * `files/AGENTS.md`, section "Reports to the user"; `.claude/harness.toml` (`confidential`)
 

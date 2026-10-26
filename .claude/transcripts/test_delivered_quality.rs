@@ -218,6 +218,27 @@ fn session_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+// spec: QUA-9
+fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("summary");
+    let repo = fixture(&tmp);
+    // gamma, closed in the revision of beta, makes r2 a sum of two issues; its copy left in the work tree goes first.
+    std::fs::remove_file(repo.join("issues/done/gamma.md")).unwrap();
+    commit_at(&repo, "2026-02-01T00:00:00Z", "chore: unpin back", &[(".claude/harness.toml", Some(&toml("r2")))]);
+    commit_at(&repo, "2026-02-02T00:00:00Z", "feat(files): gamma", &[("issues/done/gamma.md", Some("# gamma\n\n# Tracking\n\n1. [x] one\n- Code review: 2 findings\n")), ("src/g.rs", Some("g"))]);
+    let (ok, out) = run(dir, &repo, &["--summary"]);
+    let expected = [
+        "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages",
+        "r1\t1\t2\t3\t1\t1\t3\t3\t7\t\t\t\t",
+        "r2\t2\t3\t2\t0\t0\t0\t3\t\t\t\t\t",
+    ];
+    let lines: Vec<&str> = out.lines().collect();
+    if lines != expected {
+        println!("{out}");
+    }
+    vec![("the summary sums the columns per revision, an empty value leaving its sum empty".to_string(), ok && lines == expected)]
+}
+
 // spec: QUA-10
 fn stamp_checks(dir: &Path) -> Vec<(String, bool)> {
     use sha2::Digest;
@@ -236,7 +257,7 @@ fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let temp = tempfile::tempdir().unwrap();
     let tmp = temp.path().to_path_buf();
-    let checks: Vec<_> = git_checks(&dir, &tmp).into_iter().chain(review_checks(&dir, &tmp)).chain(session_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
+    let checks: Vec<_> = git_checks(&dir, &tmp).into_iter().chain(review_checks(&dir, &tmp)).chain(session_checks(&dir, &tmp)).chain(summary_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
     let mut failed = false;
     for (name, ok) in checks {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });

@@ -52,7 +52,7 @@ rather than new EVA requirements, as `rule-breaches.md` did.
    (`Code review: <n> findings`); verified by fixture issue files and `test_skills.rs`; makes true QUA-6.
 3. [x] Transcript signals: sessions, failed checks, typed messages per issue; verified by fixture transcripts with
    commits in their span; makes true QUA-7, QUA-8.
-4. [ ] `--summary` per revision, docs (architecture, README, report issue resources); verified by the test; makes
+4. [x] `--summary` per revision, docs (architecture, README, report issue resources); verified by the test; makes
    true QUA-9 (spec `accepted`).
 
 ## Decisions
@@ -90,3 +90,10 @@ rather than new EVA requirements, as `rule-breaches.md` did.
   other typed messages.
 - Code review: no findings (two questions checked: the log is read oldest first, `--reverse`; a repository that
   cannot be resolved has no commits, so no row shows its zeros).
+
+## Deliverable 4
+- done: `--summary` per revision (QUA-9), spec `accepted`, architecture, README, resources of
+  `report_the_harness_evolution_by_revision`.
+- red: `unknown option --summary`; then the fixture added the work tree copy of `gamma` one commit early (test fixed).
+- Smoke run: 33 revisions over the 39 issues of this repository (one `self:` revision per issue or two).
+- Code review: no findings.
