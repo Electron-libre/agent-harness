@@ -30,7 +30,7 @@ then do step 2 first. Otherwise start at step 1.
 
 - Skip it, and say so, for an issue that changes no behaviour (docs, harness, pure refactor, a measure).
 - Otherwise run `skill:write-spec`: read the spec of the capability in `specs/` and write or amend its
-  requirements (stable ids, `deterministic` or `quality`), left `draft`. The tests of step 4 come from
+  requirements (stable ids, `deterministic`), left `draft`. The tests of step 4 come from
   these requirements, not the other way round.
 - **Stop and wait for the user to validate the requirements.** The spec file is the record of that decision;
   the plan of step 3 names the requirements, no need to copy them into `## Decisions`.
@@ -49,8 +49,7 @@ then do step 2 first. Otherwise start at step 1.
 1. **Gather**: read the code and docs it touches; ask about missing information (one batch of questions).
 2. **Test first**: write a behavior or end-to-end test that fails for the right reason. When the capability has a
    spec, the test proves a requirement and carries `// spec: ABC-n` (placement in `specs/README.md`); the
-   deliverable that traces the last untraced `deterministic` requirement sets the spec `accepted`, and the one
-   that makes the last requirement true sets it `implemented`. Follow the test
+   deliverable that traces the last untraced requirement sets the spec `accepted`. Follow the test
    conventions of the project (the `test_conventions` note of `.claude/harness.toml` says where they are written). For non-Rust
    deliverables (hooks, skills, scripts) write the script test in Rust (`rust-script`, no bash) and run it with `just test-harness`.
 3. **Implement** until the test passes. The clippy gate hook keeps the code warning-free; fix what it reports.

@@ -1,6 +1,6 @@
 ---
 id: SYN
-status: implemented
+status: accepted
 adrs: [0002, 0004, 0005]
 ---
 

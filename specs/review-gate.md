@@ -1,6 +1,6 @@
 ---
 id: REV
-status: implemented
+status: accepted
 adrs: [0004, 0005]
 ---
 

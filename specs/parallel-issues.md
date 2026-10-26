@@ -1,6 +1,6 @@
 ---
 id: PAR
-status: implemented
+status: accepted
 adrs: [0003]
 ---
 

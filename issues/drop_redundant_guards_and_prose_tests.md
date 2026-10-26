@@ -42,7 +42,7 @@ maintenance on every change of the skills. Remove them so that what remains is a
 1. [x] `harness check` warns of a missing hook and of an attribution left on (SYN-25, SYN-26, SYN-24 scenario).
 2. [x] Attribution off in the seeded settings; drop `block_ai_attribution.rs` and its test.
 3. [x] Delete `specs/agent-reports.md` and the RPT checks of `test_skills.rs`.
-4. [ ] Drop the `quality` kind; merge `implemented` into `accepted` (still accepted, with a warning).
+4. [x] Drop the `quality` kind; merge `implemented` into `accepted` (still accepted, with a warning).
 
 ## Decisions
 * Mode: autonomous.
@@ -146,3 +146,47 @@ Second review (on the fixes):
 * nothing requires a skill to cite the section any more: kept, that was RPT-2, dropped with the spec.
 * a missing `AGENTS.md` gave one misleading failure per citation: fixed, the section check is skipped then (the
   missing file is reported by the reference check).
+
+## Deliverable 4
+* done: the `quality` kind is gone from `check_specs.rs`, `specs/README.md`, `TEMPLATE.md`, `write-spec` and
+  `issue-workflow`; `implemented` is read as `accepted` with a warning on stderr; this repository's specs are
+  `accepted`.
+
+| check | result |
+|---|---|
+| tests | `just check`, `just test-harness` pass; new cases: quality and implemented read with a warning, implemented enforced like accepted |
+| lint | clippy clean |
+| specs | `just check-specs --strict` clean |
+| docs | `specs/README.md`, `TEMPLATE.md`, `write-spec`, `issue-workflow` |
+| code review | see below |
+
+Code review:
+* a consumer's `(quality)` requirement became a hard error with no migration: fixed, it is read untraced with a
+  warning (reword it for a test or withdraw it), like `implemented`; `specs/README.md` says so.
+* a withdrawn `(quality)` requirement failed on its kind: fixed, it passes without warning.
+* the README gave no migration for existing quality requirements: fixed with the first point.
+* `Requirement.kind` and the "is deterministic" message were dead: fixed, one `exempt` flag, message "no test
+  cites".
+* the warning assertion of the test sat far from its case and printed no stderr: fixed, `failed` is a `Cell`, the
+  assertion follows its case and a failing case prints its stderr.
+* the quality case still wrote a benchmark file: fixed.
+* the warnings go to stderr with no removal plan: kept, as the warnings of `harness check`; removing the shims is
+  left for when no consumer uses them.
+
+not verified: a consumer spec with `(quality)` (none of the local consumers has one).
+decisions needed: —
+
+Second review (on the fixes):
+* a `(quality)` requirement stays untraced for good, only warned of: kept, it is the deprecation path; the warning
+  says how to leave it.
+* the shim keeps a kind the issue said no spec uses: kept, only the local consumers were checked; it costs one
+  branch.
+* orphan `benchmark:` lines are not reported: not fixed, harmless text.
+* no status says the code meets the spec any more: the decision of step 1 (a failing test counts already).
+* the record said the quality kind was refused: fixed.
+* the print-and-flag logic was repeated: fixed, `case` and the two manual checks call `report`.
+* `write-spec` step 3 did not say whether warnings count: fixed, they do.
+* the withdrawn-quality case matched any "quality" on stderr: fixed, it matches the warning.
+
+Third review: `root` of `parse` said dead, not so (it finds `docs/adr`); the warnings not failing the check is the
+deprecation path, kept.
