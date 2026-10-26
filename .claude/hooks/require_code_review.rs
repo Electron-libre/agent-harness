@@ -120,8 +120,7 @@ fn snapshot(cwd: &Path) -> Snapshot {
 const SKIPPED_OPTIONS: [&str; 8] =
     ["--no-pager", "--paginate", "-p", "-P", "--no-optional-locks", "--bare", "--no-replace-objects", "--literal-pathspecs"];
 
-/// Global options of `git` that take the next word as value; the same list as `GIT_VALUE_OPTIONS` of
-/// `block_ai_attribution.rs` (a hook is a single file, keep the two in step).
+/// Global options of `git` that take the next word as value.
 const GIT_VALUE_OPTIONS: [&str; 7] = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"];
 
 /// Completes `first`, the start of a value, with the next words of `words` when it opens a quote it does not close.

@@ -626,3 +626,27 @@ fn check_warns_when_the_settings_leave_the_attribution_on() {
     );
     assert!(check_with(root.path(), false).unwrap().problems.is_empty());
 }
+
+// spec: SYN-25, SYN-26
+#[test]
+fn the_seeded_settings_give_check_nothing_to_warn_of() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = tempdir().unwrap();
+    fs::create_dir_all(root.path().join(".claude/hooks")).unwrap();
+    fs::copy(
+        repo.join("seed/.claude/settings.json"),
+        root.path().join(".claude/settings.json"),
+    )
+    .unwrap();
+    for entry in fs::read_dir(repo.join("files/.claude/hooks")).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_file() {
+            fs::copy(
+                entry.path(),
+                root.path().join(".claude/hooks").join(entry.file_name()),
+            )
+            .unwrap();
+        }
+    }
+    assert_eq!(settings::warnings(root.path(), true), Vec::<String>::new());
+}

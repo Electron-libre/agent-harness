@@ -40,7 +40,7 @@ maintenance on every change of the skills. Remove them so that what remains is a
 
 # Tracking
 1. [x] `harness check` warns of a missing hook and of an attribution left on (SYN-25, SYN-26, SYN-24 scenario).
-2. [ ] Attribution off in the seeded settings; drop `block_ai_attribution.rs` and its test.
+2. [x] Attribution off in the seeded settings; drop `block_ai_attribution.rs` and its test.
 3. [ ] Delete `specs/agent-reports.md` and the RPT checks of `test_skills.rs`.
 4. [ ] Drop the `quality` kind; merge `implemented` into `accepted` (still accepted, with a warning).
 
@@ -82,3 +82,33 @@ Code review:
 
 not verified: —
 decisions needed: —
+
+## Deliverable 2
+* done: the seeded settings and this repository's turn the attribution off at the source and no longer run
+  `block_ai_attribution.rs`; the hook and its test left `files/` (`just sync` removed the copies, SYN-5); a test
+  proves the seeded settings give `check` nothing to warn of.
+
+| check | result |
+|---|---|
+| tests | `just check`, `just test-harness` pass; `harness check` prints nothing here |
+| lint | clippy clean |
+| specs | no change |
+| docs | `docs/architecture.md`, comment of `require_code_review.rs` |
+| code review | see below |
+
+Code review:
+* `sync` deletes the hook but the seeded settings of a consumer keep running it, and only `check` says so: not
+  fixed, SYN-25 puts the warning in `check` as validated; a hook whose script is missing exits 1, a non-blocking
+  error in Claude Code, so the consumer sees noise until the line is removed. Follow-up: `sync` could print the
+  settings warnings too (follow-up below).
+* no hook scans the pull request bodies any more: accepted by the issue, `attribution.pr` is empty at the source and
+  the user's rules forbid a credit line.
+* commit messages are only checked by `skill:commit-message` and CI: accepted by the issue (Approach 1).
+* the new test read the hooks as UTF-8 and claimed "only managed hooks": fixed, it copies files only and is named
+  after what it asserts.
+* the new test carried no `// spec:`: fixed, it cites SYN-25 and SYN-26.
+* the summary pointed to a missing review section: this section.
+
+not verified: a real consumer synced after this change (its settings edited by hand per the warnings).
+decisions needed: —
+follow-up (asked at the end): whether `sync` should also print the settings warnings (would amend SYN-25, SYN-26).

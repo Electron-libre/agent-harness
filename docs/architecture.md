@@ -31,27 +31,11 @@ vain: a deny rule of the review waiver, a hook under `.claude/hooks/` the projec
 dropped), an attribution left on. It does not look for a hook nobody declared, so the hygiene test of the settings
 (`test_settings.rs`, run by `just test-harness` and by CI) fails for a hook script nobody declared, and its message
 gives the event, the matcher (the `Declare:` line of the hook's header) and the command to add. An agent that
-updates the harness runs `just test-harness` afterwards and is told what to add. The declaration of the attribution hook, under `hooks`
-in `.claude/settings.json`:
+updates the harness runs `just test-harness` afterwards and is told what to add.
 
-```json
-"PreToolUse": [
-  {
-    "matcher": "Bash",
-    "hooks": [
-      { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block_ai_attribution.rs" }
-    ]
-  }
-]
-```
-
-`block_ai_attribution.rs` refuses a `git commit` or `gh pr create|edit` whose message (inline, heredoc, `-F` or
-`--body-file`) credits the agent: a co-author trailer, a "Generated with" footer or a credit line ending with the
-vendor's no-reply address. It finds the subcommand after the global options (`git -C dir commit`,
-`gh -R owner/repo pr create`), so `git log --grep commit` is not scanned; an option that takes a value and is unknown to
-its lists hides the subcommand and the message is not scanned. It reads only the literal command and message
-files: a message built by `$(cat file)` or a shell variable is out of reach. Its patterns are narrower than those of `commit_check.rs` on purpose, so a
-message that discusses the rule passes.
+No hook guards the attribution: the seeded settings turn it off at the source (`"attribution": {"commit": "", "pr": "",
+"sessionUrl": false}`), `commit_check.rs` rejects a credit line in a message (run by `skill:commit-message` and by CI
+through `just check-commits`), and `harness check` warns of settings that leave it on.
 
 `require_code_review.rs` makes the code review of `issue-workflow` (step 4.5) a precondition of the commit. It is
 declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on
