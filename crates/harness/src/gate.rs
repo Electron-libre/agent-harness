@@ -1,4 +1,5 @@
-//! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-23).
+//! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-23), and
+//! the deny rules of the settings that keep the review waiver from the agent (SYN-24).
 //!
 //! The hook is a small `sh` script that starts the managed `require_code_review.rs native` of the project, then the
 //! `pre-commit` the user already had (moved to `pre-commit.user`, never overwritten).
@@ -17,15 +18,13 @@ use std::os::unix::fs::symlink;
 /// The review hook of the project, relative to its root: the gate exists only where this managed file does.
 pub const REVIEW_HOOK: &str = ".claude/hooks/require_code_review.rs";
 /// The `permissions.deny` rules of `.claude/settings.json` that keep the review waiver from the agent (REV-19).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read by `check` once SYN-24 is delivered")
-)]
 pub const DENY_RULES: [&str; 3] = [
     "Bash(just waive-review)",
     "Bash(just waive-review *)",
     "Edit(//**/claude-review-waived)",
 ];
+/// The settings of the project that hold `DENY_RULES`: seeded once, never rewritten by `sync`.
+const SETTINGS: &str = ".claude/settings.json";
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
 /// The line that tells the installed hook from one of the user.
@@ -225,4 +224,28 @@ impl Plan {
         fs::rename(&staged, &hook)?;
         Ok(())
     }
+}
+
+/// One warning per rule of `DENY_RULES` missing from the `permissions.deny` of the project's settings, when they exist
+/// (SYN-24); one warning saying why when they cannot be read or parsed.
+pub fn missing_deny_rules(root: &Path) -> Vec<String> {
+    let settings = match fs::read_to_string(root.join(SETTINGS)) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
+        Err(e) => return vec![format!("warning: {SETTINGS} cannot be read: {e}")],
+        Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
+            Err(e) => return vec![format!("warning: {SETTINGS} is not valid JSON: {e}")],
+            Ok(settings) => settings,
+        },
+    };
+    let deny: Vec<&str> = settings["permissions"]["deny"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| r.as_str())
+        .collect();
+    DENY_RULES
+        .iter()
+        .filter(|rule| !deny.contains(rule))
+        .map(|rule| format!("warning: {SETTINGS} lacks the deny rule {rule}"))
+        .collect()
 }

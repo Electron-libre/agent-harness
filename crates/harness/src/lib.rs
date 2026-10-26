@@ -617,13 +617,24 @@ fn update_in(
     })
 }
 
+/// What `check` found: `problems` make it fail, `warnings` do not.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Checked {
+    /// Managed files modified or deleted since the last sync, and the native review gate when the project should have
+    /// it and does not.
+    pub problems: Vec<String>,
+    /// The deny rules of the review waiver the project's settings lack (SYN-24).
+    pub warnings: Vec<String>,
+}
+
 /// Managed files modified or deleted since the last sync, one line each, and the native review gate when the project
 /// should have it and does not. Under CI (the `CI` environment variable is set) the gate is not looked at: a fresh
-/// clone has no git hooks, and nobody commits there.
+/// clone has no git hooks, and nobody commits there. When the project has the review hook among its managed files, it
+/// also warns of each deny rule of the review waiver its settings lack.
 ///
 /// # Errors
 /// When the project was never synced (no lock file) or the lock cannot be read.
-pub fn check(root: &Path) -> Result<Vec<String>> {
+pub fn check(root: &Path) -> Result<Checked> {
     check_with(root, in_ci())
 }
 
@@ -633,22 +644,28 @@ fn in_ci() -> bool {
         .is_ok_and(|v| !matches!(v.trim().to_lowercase().as_str(), "" | "0" | "false"))
 }
 
-fn check_with(root: &Path, ci: bool) -> Result<Vec<String>> {
+fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
         bail!("no {LOCK}: run `harness sync` first");
     };
-    Ok(lock
+    let gated = lock.contains_key(gate::REVIEW_HOOK);
+    let problems = lock
         .iter()
         .filter_map(|(rel, locked)| match fingerprint_of(&root.join(rel)) {
             None => Some(format!("missing: {rel}")),
             Some(print) if print != *locked => Some(format!("modified: {rel}")),
             Some(_) => None,
         })
-        .chain(gate::problem(
-            root,
-            !ci && lock.contains_key(gate::REVIEW_HOOK),
-        ))
-        .collect())
+        .chain(gate::problem(root, !ci && gated))
+        .collect();
+    Ok(Checked {
+        problems,
+        warnings: if gated {
+            gate::missing_deny_rules(root)
+        } else {
+            Vec::new()
+        },
+    })
 }
 
 #[cfg(test)]

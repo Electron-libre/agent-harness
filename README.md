@@ -9,7 +9,8 @@ cd my-project
 harness init ../agent-harness      # writes .claude/harness.toml (or a git URL with --rev)
 harness sync                       # managed files copied, project-owned ones seeded, git pre-commit review gate installed
 harness update [--rev <tag|branch|commit>] [--dry-run] [--force]  # git source: sync to it, then pin the commit in `rev`
-harness check                      # fails if a managed file was modified or deleted, or the git review gate is missing
+harness check                      # fails if a managed file was modified or deleted, or the git review gate is missing;
+                                   # warns of a deny rule of the review waiver missing from .claude/settings.json
 ```
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).

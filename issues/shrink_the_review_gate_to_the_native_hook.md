@@ -53,7 +53,7 @@ down to what the native hook cannot do, so the gate stops growing.
 
 1. [x] Deny rules in the seeded settings (REV-19), skill step 4.5 updated.
 2. [x] Cut the Claude hook to `record` and REV-12; withdraw REV-1 to REV-8, REV-13, REV-14, REV-16, REV-18; rewrite REV-9; ADR 0005 accepted; measure.
-3. [ ] `harness check` warns on a missing deny rule (SYN-24); specs accepted then implemented.
+3. [x] `harness check` warns on a missing deny rule (SYN-24); specs accepted then implemented.
 
 ## Decisions
 
@@ -127,6 +127,41 @@ Code review:
   a variant the hook does not read is a non-goal (ADR 0005).
 - no gate without the native hook (`core.hooksPath`, not synced): not fixed, decided at step 1 (`sync` and `check`
   report it).
+
+not verified: none.
+decisions needed: none.
+
+## Deliverable 3
+
+done: `harness check` prints `warning: .claude/settings.json lacks the deny rule <rule>` for each rule of `DENY_RULES`
+missing from a project that manages the review hook, without failing (SYN-24, `warnings` in `lib.rs`,
+`missing_deny_rules` in `gate.rs`); `serde_json` is a runtime dependency again; `specs/sync.md` gains SYN-24 and stays
+`implemented`, as does `specs/review-gate.md`; README and `docs/architecture.md` describe the warning.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| `just test-harness` | pass |
+| lint | pass |
+| specs | pass |
+| docs | updated |
+| code review | 9 findings |
+
+Code review:
+- an unreadable settings file was silent, an invalid one reported every rule missing: fixed, one warning saying why
+  (with a SYN-24 scenario and a test).
+- the lock read twice and the review hook test duplicated, a lost report when the second read failed, a dead
+  "never synced" branch: fixed, `check` returns `Checked { problems, warnings }` from one read of the lock.
+- warnings mixed with problems on stdout: fixed, warnings go to stderr.
+- the deliverable 3 summary pointed to a missing review section: fixed, this one.
+- an equivalent rule written otherwise (`Bash(just waive-review:*)`) still warns: not fixed, the warning names the exact
+  rule to add, and matching Claude Code's rule grammar is not worth its code.
+
+Second review (`tests.rs` was new to the diff): the `expected` flag of `missing_deny_rules` and the wording of the
+hooks paragraph of `docs/architecture.md`: fixed. Not fixed: no settings file gives no warning (`sync` seeds it again
+when missing); rules kept in the user's or the local settings, a `deny` of the wrong JSON type, an equivalent rule
+written otherwise and the warning under CI are edge cases a warning does not need to cover; `serde_json` at runtime is
+the price of reading the settings.
 
 not verified: none.
 decisions needed: none.

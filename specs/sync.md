@@ -1,7 +1,7 @@
 ---
 id: SYN
 status: implemented
-adrs: [0002, 0004]
+adrs: [0002, 0004, 0005]
 ---
 
 # Harness synchronisation
@@ -37,6 +37,7 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-21** (deterministic) For a linked worktree, or a project whose `.git` is a file, the gate must be installed in the `hooks` directory of the common git directory.
 - **SYN-22** (deterministic) When `core.hooksPath` is set for the project, `sync` must install nothing, report that the native gate is not installed and why, and succeed; a project that is not a git repository, or has no `.claude/hooks/require_code_review.rs`, gets no gate and no error.
 - **SYN-23** (deterministic) `check` must report `missing: native review gate` when the project is a git repository that has the review hook among its managed files (even deleted since), whose hooks directory lacks the managed gate and where `core.hooksPath` is unset, and `modified: native review gate` when it differs; it must not report it otherwise, nor when the `CI` environment variable is set (a fresh clone of a CI run has no git hooks and nobody commits there).
+- **SYN-24** (deterministic) `check` must print `warning: .claude/settings.json lacks the deny rule <rule>` for each rule of REV-19 (`specs/review-gate.md`) that the `permissions.deny` list of the project's `.claude/settings.json` lacks, when the project has the review hook among its managed files and that settings file exists; the warning goes to stderr and must not make `check` fail. Seeded once, the settings file is never rewritten by `sync`, so this is how an existing project learns of a rule added later.
 
 ## Scenarios
 
@@ -47,6 +48,7 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-12) Given a `rev` line with a trailing comment from an earlier update, when `update` runs, then the comment is replaced by the new requested name.
 - (SYN-17) Given an abbreviated hash or a name that does not resolve, the fetch by hash is not tried and the error stays "unknown revision".
 - (SYN-19) Given a user's `pre-commit` that runs a linter, when `sync` runs, then the linter runs after the gate, and a refusal of the gate stops the commit before it.
+- (SYN-24) Given a `.claude/settings.json` that cannot be read or is not valid JSON, then `check` prints one warning saying so instead of one per rule.
 - (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
 
 ## Non-goals

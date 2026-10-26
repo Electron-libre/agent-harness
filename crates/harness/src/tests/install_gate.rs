@@ -398,46 +398,46 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
 fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     let (_source, root) = gated();
     run(&root);
-    assert!(check_with(root.path(), false).unwrap().is_empty());
+    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
 
     let managed = get(root.path(), ".git/hooks/pre-commit").unwrap();
     fs::write(pre_commit(&root), format!("{managed}# edited\n")).unwrap();
     set_executable(&pre_commit(&root), true).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap(),
+        check_with(root.path(), false).unwrap().problems,
         vec!["modified: native review gate"]
     );
 
     fs::write(pre_commit(&root), managed.clone()).unwrap();
     set_executable(&pre_commit(&root), false).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap(),
+        check_with(root.path(), false).unwrap().problems,
         vec!["modified: native review gate"]
     );
 
     fs::remove_file(pre_commit(&root)).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap(),
+        check_with(root.path(), false).unwrap().problems,
         vec!["missing: native review gate"]
     );
 
     // a hook of the user without ours is a missing gate too
     user_hook(&root, 0);
     assert_eq!(
-        check_with(root.path(), false).unwrap(),
+        check_with(root.path(), false).unwrap().problems,
         vec!["missing: native review gate"]
     );
     fs::remove_file(pre_commit(&root)).unwrap();
 
     // a gate that cannot be installed is not a problem to report
     git_in(root.path(), &["config", "core.hooksPath", ".githooks"]);
-    assert!(check_with(root.path(), false).unwrap().is_empty());
+    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
     git_in(root.path(), &["config", "--unset", "core.hooksPath"]);
 
     // the review hook deleted since the sync is still a managed file: the gate is still expected
     fs::remove_file(root.path().join(HOOK)).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap(),
+        check_with(root.path(), false).unwrap().problems,
         vec![
             format!("missing: {HOOK}"),
             "missing: native review gate".to_string()
@@ -445,7 +445,7 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     );
     // a fresh clone of a CI run has no git hooks
     assert_eq!(
-        check_with(root.path(), true).unwrap(),
+        check_with(root.path(), true).unwrap().problems,
         vec![format!("missing: {HOOK}")]
     );
 
@@ -453,7 +453,7 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     let (_source, plain) = setup();
     git_in(plain.path(), &["init", "--quiet", "-b", "main"]);
     run(&plain);
-    assert!(check_with(plain.path(), false).unwrap().is_empty());
+    assert!(check_with(plain.path(), false).unwrap().problems.is_empty());
 
     // not a repository
     let (source, root) = setup();
@@ -463,7 +463,7 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
         "// the review hook",
     );
     run(&root);
-    assert!(check_with(root.path(), false).unwrap().is_empty());
+    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
 }
 
 // spec: REV-19
@@ -484,4 +484,59 @@ fn the_seeded_settings_deny_the_waiver_to_the_agent() {
             "the seeded settings lack the deny rule {rule}: {deny:?}"
         );
     }
+}
+
+// spec: SYN-24
+#[test]
+fn check_warns_of_each_deny_rule_the_settings_lack() {
+    let (_source, root) = gated();
+    run(&root);
+    let settings = ".claude/settings.json";
+    let warning = |rule: &str| format!("warning: {settings} lacks the deny rule {rule}");
+    // no settings file: nothing to warn about
+    assert!(check_with(root.path(), false).unwrap().warnings.is_empty());
+
+    put(
+        root.path(),
+        settings,
+        r#"{"permissions": {"allow": ["Bash(just waive-review)"]}}"#,
+    );
+    assert_eq!(
+        check_with(root.path(), false).unwrap().warnings,
+        gate::DENY_RULES
+            .iter()
+            .map(|r| warning(r))
+            .collect::<Vec<_>>()
+    );
+
+    put(
+        root.path(),
+        settings,
+        r#"{"permissions": {"deny": ["Bash(just waive-review)", "Bash(just waive-review *)"]}}"#,
+    );
+    assert_eq!(
+        check_with(root.path(), false).unwrap().warnings,
+        vec![warning("Edit(//**/claude-review-waived)")]
+    );
+    // a warning does not make `check` fail
+    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+
+    let all = serde_json::json!({"permissions": {"deny": gate::DENY_RULES}});
+    put(root.path(), settings, &all.to_string());
+    assert!(check_with(root.path(), false).unwrap().warnings.is_empty());
+
+    // settings that do not parse are said so, not reported as lacking every rule
+    put(root.path(), settings, "{,}");
+    let invalid = check_with(root.path(), false).unwrap().warnings;
+    assert!(
+        invalid.len() == 1
+            && invalid[0].starts_with(&format!("warning: {settings} is not valid JSON")),
+        "{invalid:?}"
+    );
+
+    // a source without the review hook: no rule expected
+    let (_source, plain) = setup();
+    run(&plain);
+    put(plain.path(), settings, "{}");
+    assert!(check_with(plain.path(), false).unwrap().warnings.is_empty());
 }

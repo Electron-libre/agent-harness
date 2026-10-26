@@ -46,7 +46,7 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set).
+    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn of a missing deny rule of the review waiver.
     Check,
 }
 
@@ -85,11 +85,14 @@ fn main() -> ExitCode {
             }
             clean
         }),
-        Command::Check => check(&cli.root).map(|problems| {
-            for problem in &problems {
+        Command::Check => check(&cli.root).map(|checked| {
+            for problem in &checked.problems {
                 println!("{problem}");
             }
-            problems.is_empty()
+            for warning in &checked.warnings {
+                eprintln!("{warning}");
+            }
+            checked.problems.is_empty()
         }),
     };
     match result {

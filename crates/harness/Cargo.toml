@@ -8,9 +8,9 @@ description = "Synchronise the shared agent harness (skills, hooks, scripts) int
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+serde_json = "1"
 sha2 = "0.10"
 toml = "0.8"
 
 [dev-dependencies]
-serde_json = "1"
 tempfile = "3"

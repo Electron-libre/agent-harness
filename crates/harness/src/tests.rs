@@ -172,12 +172,12 @@ fn dry_run_reports_and_writes_nothing() {
 fn check_lists_modified_and_deleted_managed_files_only() {
     let (_source, root) = setup();
     run(&root);
-    assert!(check(root.path()).unwrap().is_empty());
+    assert!(check(root.path()).unwrap().problems.is_empty());
     put(root.path(), "a.txt", "local");
     fs::remove_file(root.path().join("sub/b.txt")).unwrap();
     put(root.path(), "s.txt", "a seed may change freely");
     assert_eq!(
-        check(root.path()).unwrap(),
+        check(root.path()).unwrap().problems,
         ["modified: a.txt", "missing: sub/b.txt"]
     );
 }
@@ -265,10 +265,13 @@ mod unix {
         run(&root);
         assert_ne!(mode(root.path(), "sub/b.txt"), 0);
         assert_eq!(mode(root.path(), "a.txt"), 0);
-        assert!(check(root.path()).unwrap().is_empty());
+        assert!(check(root.path()).unwrap().problems.is_empty());
         let path = root.path().join("sub/b.txt");
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        assert_eq!(check(root.path()).unwrap(), ["modified: sub/b.txt"]);
+        assert_eq!(
+            check(root.path()).unwrap().problems,
+            ["modified: sub/b.txt"]
+        );
         assert_eq!(run(&root).outcome("sub/b.txt"), Some(Outcome::Conflict));
         let force = SyncOptions {
             force: true,
