@@ -20,6 +20,7 @@ pub const CONFIG: &str = ".claude/harness.toml";
 pub const LOCK: &str = ".claude/harness.lock";
 
 mod gate;
+mod settings;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SyncOptions {
@@ -623,14 +624,14 @@ pub struct Checked {
     /// Managed files modified or deleted since the last sync, and the native review gate when the project should have
     /// it and does not.
     pub problems: Vec<String>,
-    /// The deny rules of the review waiver the project's settings lack (SYN-24).
+    /// What the project's settings lack or run in vain (SYN-24 to SYN-26).
     pub warnings: Vec<String>,
 }
 
 /// Managed files modified or deleted since the last sync, one line each, and the native review gate when the project
 /// should have it and does not. Under CI (the `CI` environment variable is set) the gate is not looked at: a fresh
-/// clone has no git hooks, and nobody commits there. When the project has the review hook among its managed files, it
-/// also warns of each deny rule of the review waiver its settings lack.
+/// clone has no git hooks, and nobody commits there. It also warns of what the project's settings lack: the deny rules of
+/// the review waiver (when the review hook is among the managed files), the hooks they run, the attribution turned off.
 ///
 /// # Errors
 /// When the project was never synced (no lock file) or the lock cannot be read.
@@ -660,11 +661,7 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
         .collect();
     Ok(Checked {
         problems,
-        warnings: if gated {
-            gate::missing_deny_rules(root)
-        } else {
-            Vec::new()
-        },
+        warnings: settings::warnings(root, gated),
     })
 }
 

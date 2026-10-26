@@ -26,11 +26,12 @@ Everything that differs between projects is a value, not code. Scripts read list
 
 The hooks are managed (`files/.claude/hooks/`) but their declaration lives in `.claude/settings.json`, which is
 seeded once, so a new hook reaches a project that already adopted the harness only when the declaration is added
-to its file by hand. `harness check` compares the project with its lock and reads the settings for the deny rules of
-the review waiver only, not for the hooks they declare, so the hygiene test of the settings (`test_settings.rs`, run by
-`just test-harness` and by CI) fails for a hook script nobody declared, and its message gives the event, the matcher
-(the `Declare:` line of the hook's header) and the command to add. An agent that updates the harness runs
-`just test-harness` afterwards and is told what to add. The declaration of the attribution hook, under `hooks`
+to its file by hand. `harness check` compares the project with its lock and warns of what the settings lack or run in
+vain: a deny rule of the review waiver, a hook under `.claude/hooks/` the project no longer has (a hook the source
+dropped), an attribution left on. It does not look for a hook nobody declared, so the hygiene test of the settings
+(`test_settings.rs`, run by `just test-harness` and by CI) fails for a hook script nobody declared, and its message
+gives the event, the matcher (the `Declare:` line of the hook's header) and the command to add. An agent that
+updates the harness runs `just test-harness` afterwards and is told what to add. The declaration of the attribution hook, under `hooks`
 in `.claude/settings.json`:
 
 ```json

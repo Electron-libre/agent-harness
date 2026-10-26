@@ -38,6 +38,8 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-22** (deterministic) When `core.hooksPath` is set for the project, `sync` must install nothing, report that the native gate is not installed and why, and succeed; a project that is not a git repository, or has no `.claude/hooks/require_code_review.rs`, gets no gate and no error.
 - **SYN-23** (deterministic) `check` must report `missing: native review gate` when the project is a git repository that has the review hook among its managed files (even deleted since), whose hooks directory lacks the managed gate and where `core.hooksPath` is unset, and `modified: native review gate` when it differs; it must not report it otherwise, nor when the `CI` environment variable is set (a fresh clone of a CI run has no git hooks and nobody commits there).
 - **SYN-24** (deterministic) `check` must print `warning: .claude/settings.json lacks the deny rule <rule>` for each rule of REV-19 (`specs/review-gate.md`) that the `permissions.deny` list of the project's `.claude/settings.json` lacks, when the project has the review hook among its managed files and that settings file exists; the warning goes to stderr and must not make `check` fail. Seeded once, the settings file is never rewritten by `sync`, so this is how an existing project learns of a rule added later.
+- **SYN-25** (deterministic) `check` must print `warning: .claude/settings.json runs the missing hook <path>` for each hook command of the `hooks` table of the project's `.claude/settings.json` that names a file under `.claude/hooks/` the project does not have, when that settings file exists; the warning goes to stderr and must not make `check` fail. A hook the source dropped is deleted by `sync` (SYN-5), but the seeded settings keep running it.
+- **SYN-26** (deterministic) `check` must print `warning: .claude/settings.json does not turn off the attribution` when the project's `.claude/settings.json` exists and its `attribution` is neither `false` nor an object whose `commit` and `pr` are both empty strings; the warning goes to stderr and must not make `check` fail.
 
 ## Scenarios
 
@@ -48,7 +50,9 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-12) Given a `rev` line with a trailing comment from an earlier update, when `update` runs, then the comment is replaced by the new requested name.
 - (SYN-17) Given an abbreviated hash or a name that does not resolve, the fetch by hash is not tried and the error stays "unknown revision".
 - (SYN-19) Given a user's `pre-commit` that runs a linter, when `sync` runs, then the linter runs after the gate, and a refusal of the gate stops the commit before it.
-- (SYN-24) Given a `.claude/settings.json` that cannot be read or is not valid JSON, then `check` prints one warning saying so instead of one per rule.
+- (SYN-24, SYN-25, SYN-26) Given a `.claude/settings.json` that cannot be read or is not valid JSON, then `check` prints one warning saying so instead of one per rule, hook or attribution, whether or not the review hook is managed.
+- (SYN-25) Given a hook command that names no file under `.claude/hooks/` (a `just` recipe, a tool on the `PATH`), then it is not reported.
+- (SYN-26) Given an `attribution` whose `commit` is empty but whose `pr` is unset, then the warning is printed: Claude Code adds its default text to the pull requests.
 - (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
 
 ## Non-goals

@@ -37,3 +37,48 @@ maintenance on every change of the skills. Remove them so that what remains is a
 * `harness sync` must remove the dropped managed files from the consumers: check what it does with a file that left
   `files/`.
 * Consumer specs may already use `implemented`: the checker has to keep accepting it, or `sync` has to say so.
+
+# Tracking
+1. [x] `harness check` warns of a missing hook and of an attribution left on (SYN-25, SYN-26, SYN-24 scenario).
+2. [ ] Attribution off in the seeded settings; drop `block_ai_attribution.rs` and its test.
+3. [ ] Delete `specs/agent-reports.md` and the RPT checks of `test_skills.rs`.
+4. [ ] Drop the `quality` kind; merge `implemented` into `accepted` (still accepted, with a warning).
+
+## Decisions
+* Mode: autonomous.
+* Attribution: `"attribution": {"commit": "", "pr": "", "sessionUrl": false}` (the `false` form needs Claude Code
+  v2.1.281).
+* RPT: the spec is deleted, not withdrawn; RPT-7 was already moot (the native hook reads no report marker).
+* `implemented`: the checker keeps accepting it with a warning, so consumer specs do not break.
+* SYN-25 and SYN-26 apply to any existing `.claude/settings.json`; the unreadable-settings warning stays single and
+  no longer depends on the review hook being managed.
+
+## Deliverable 1
+* done: `check` warns of a hook the settings run and the project lacks, and of an attribution left on; the
+  settings warnings moved to `crates/harness/src/settings.rs`, read once, the unreadable-settings warning no longer
+  needs the review hook.
+
+| check | result |
+|---|---|
+| tests | `just check`, `just test-harness` pass |
+| lint | clippy clean |
+| specs | SYN-25, SYN-26 traced; `sync.md` back to `implemented` |
+| docs | README, `docs/architecture.md`, `main.rs` help |
+| code review | see below |
+
+Code review:
+* the attribution warning fires in this repo and every seeded project until deliverable 2: expected, deliverable 2
+  sets it in both settings.
+* a `.claude/hooks/` path outside the project (`~/.claude/hooks/x`) was reported: fixed, only a bare, `./` or
+  `$CLAUDE_PROJECT_DIR/` prefix counts.
+* a path followed by `)`, `>` and the like kept those characters: fixed, the file name stops at the first character
+  that is not alphanumeric, `_`, `-` or `.`.
+* a bare `.claude/hooks/` or a glob was reported: fixed, skipped.
+* `attribution: false` is said undocumented: not fixed, the Claude Code settings reference documents it (v2.1.281);
+  the deprecated `includeCoAuthoredBy: false` still gets the warning on purpose, SYN-26 asks for `attribution`.
+* one parse feeding the three checks behind a `gated` flag: not changed, a single read is what SYN-24's scenario asks
+  (one warning for unreadable settings).
+* a line over 120 characters in `docs/architecture.md`: fixed.
+
+not verified: —
+decisions needed: —

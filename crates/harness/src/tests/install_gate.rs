@@ -478,7 +478,7 @@ fn the_seeded_settings_deny_the_waiver_to_the_agent() {
         .flatten()
         .filter_map(|r| r.as_str())
         .collect();
-    for rule in gate::DENY_RULES {
+    for rule in settings::DENY_RULES {
         assert!(
             deny.contains(&rule),
             "the seeded settings lack the deny rule {rule}: {deny:?}"
@@ -493,6 +493,14 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     run(&root);
     let settings = ".claude/settings.json";
     let warning = |rule: &str| format!("warning: {settings} lacks the deny rule {rule}");
+    let deny_warnings = |root: &Path| -> Vec<String> {
+        check_with(root, false)
+            .unwrap()
+            .warnings
+            .into_iter()
+            .filter(|w| w.contains("lacks the deny rule"))
+            .collect()
+    };
     // no settings file: nothing to warn about
     assert!(check_with(root.path(), false).unwrap().warnings.is_empty());
 
@@ -502,8 +510,8 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
         r#"{"permissions": {"allow": ["Bash(just waive-review)"]}}"#,
     );
     assert_eq!(
-        check_with(root.path(), false).unwrap().warnings,
-        gate::DENY_RULES
+        deny_warnings(root.path()),
+        settings::DENY_RULES
             .iter()
             .map(|r| warning(r))
             .collect::<Vec<_>>()
@@ -515,15 +523,15 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
         r#"{"permissions": {"deny": ["Bash(just waive-review)", "Bash(just waive-review *)"]}}"#,
     );
     assert_eq!(
-        check_with(root.path(), false).unwrap().warnings,
+        deny_warnings(root.path()),
         vec![warning("Edit(//**/claude-review-waived)")]
     );
     // a warning does not make `check` fail
     assert!(check_with(root.path(), false).unwrap().problems.is_empty());
 
-    let all = serde_json::json!({"permissions": {"deny": gate::DENY_RULES}});
+    let all = serde_json::json!({"permissions": {"deny": settings::DENY_RULES}});
     put(root.path(), settings, &all.to_string());
-    assert!(check_with(root.path(), false).unwrap().warnings.is_empty());
+    assert!(deny_warnings(root.path()).is_empty());
 
     // settings that do not parse are said so, not reported as lacking every rule
     put(root.path(), settings, "{,}");
@@ -538,5 +546,83 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     let (_source, plain) = setup();
     run(&plain);
     put(plain.path(), settings, "{}");
-    assert!(check_with(plain.path(), false).unwrap().warnings.is_empty());
+    assert!(deny_warnings(plain.path()).is_empty());
+}
+
+// spec: SYN-24, SYN-25, SYN-26
+#[test]
+fn unparsable_settings_get_one_warning_without_the_review_hook() {
+    let (_source, plain) = setup();
+    run(&plain);
+    put(plain.path(), ".claude/settings.json", "{,}");
+    let warnings = check_with(plain.path(), false).unwrap().warnings;
+    assert!(
+        warnings.len() == 1 && warnings[0].contains("is not valid JSON"),
+        "{warnings:?}"
+    );
+}
+
+/// `settings` with the attribution turned off, so that only the hooks are warned of.
+fn quiet(hooks: &serde_json::Value) -> String {
+    serde_json::json!({"attribution": {"commit": "", "pr": ""}, "hooks": hooks}).to_string()
+}
+
+// spec: SYN-25
+#[test]
+fn check_warns_of_each_hook_the_settings_run_and_the_project_lacks() {
+    let (_source, root) = setup();
+    run(&root);
+    put(root.path(), ".claude/hooks/present.rs", "// here");
+    let hooks = serde_json::json!({
+        "PreToolUse": [{"matcher": "Bash", "hooks": [
+            {"type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/present.rs"},
+            {"type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gone.rs check"},
+        ]}],
+        "Stop": [{"hooks": [
+            {"type": "command", "command": "rust-script .claude/hooks/also_gone.rs", "timeout": 600},
+            {"type": "command", "command": "just lint"},
+            {"type": "command", "command": "bash ~/.claude/hooks/notify.sh; run-parts .claude/hooks/"},
+            {"type": "command", "command": "sh -c \"$(cat .claude/hooks/present.rs)\" >/dev/null"},
+            {"type": "command", "command": "rust-script ./.claude/hooks/gone.rs"},
+        ]}],
+    });
+    put(root.path(), ".claude/settings.json", &quiet(&hooks));
+    let checked = check_with(root.path(), false).unwrap();
+    assert_eq!(
+        checked.warnings,
+        vec![
+            "warning: .claude/settings.json runs the missing hook .claude/hooks/gone.rs"
+                .to_string(),
+            "warning: .claude/settings.json runs the missing hook .claude/hooks/also_gone.rs"
+                .to_string(),
+        ]
+    );
+    assert!(checked.problems.is_empty());
+}
+
+// spec: SYN-26
+#[test]
+fn check_warns_when_the_settings_leave_the_attribution_on() {
+    let (_source, root) = setup();
+    run(&root);
+    let warning = "warning: .claude/settings.json does not turn off the attribution".to_string();
+    let warnings = |text: &str| {
+        put(root.path(), ".claude/settings.json", text);
+        check_with(root.path(), false).unwrap().warnings
+    };
+    assert_eq!(warnings("{}"), vec![warning.clone()]);
+    assert_eq!(
+        warnings(r#"{"attribution": {"commit": ""}}"#),
+        vec![warning.clone()]
+    );
+    assert_eq!(
+        warnings(r#"{"attribution": {"commit": "", "pr": "Made by a bot"}}"#),
+        vec![warning.clone()]
+    );
+    assert_eq!(warnings(r#"{"attribution": true}"#), vec![warning]);
+    assert!(warnings(r#"{"attribution": false}"#).is_empty());
+    assert!(
+        warnings(r#"{"attribution": {"commit": "", "pr": "", "sessionUrl": false}}"#).is_empty()
+    );
+    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
 }

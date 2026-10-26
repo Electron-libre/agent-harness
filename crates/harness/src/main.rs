@@ -46,7 +46,7 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn of a missing deny rule of the review waiver.
+    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn when the settings lack a deny rule of the review waiver, run a missing hook or leave the attribution on.
     Check,
 }
 
