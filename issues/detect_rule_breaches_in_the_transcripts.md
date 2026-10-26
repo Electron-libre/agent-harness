@@ -57,7 +57,7 @@ rather than new requirements in the accepted `specs/evaluation.md`.
    repositories, `test_session_metrics.rs` unchanged; makes true BRE-1 to BRE-8, BRE-11, BRE-12.
 2. [x] Commit rules: commits of the project joined to the sessions by date; verified by fixture repositories;
    makes true BRE-9.
-3. [ ] Language rule: stop-word count per assistant text block; verified by fixture transcripts; makes true BRE-10
+3. [x] Language rule: stop-word count per assistant text block; verified by fixture transcripts; makes true BRE-10
    (spec `accepted`).
 4. [ ] Feed `audit-instructions`: its skill runs `rule_breaches.rs --summary` and proposes a hook for a rule often
    broken; verified by `test_skills.rs`.
@@ -87,4 +87,11 @@ rather than new requirements in the accepted `specs/evaluation.md`.
 - red: no commit finding, the two commit checks failed.
 - Smoke run: 72 sessions with a checked commit, no attribution, two subjects over 72 characters (`4d9117f`,
   `009c901`, which `just check-commit` rejects too).
+- Code review: no findings.
+
+## Deliverable 3
+- done: `user-language`, stop words of French and English per agent text block of 20 words or more, code removed,
+  sub-agents skipped; spec `accepted`; architecture, README.
+- red: no language finding, the two language checks failed.
+- Smoke run: 74 sessions where it applied, 3 with English answers to a French user (8 blocks, read: true breaches).
 - Code review: no findings.

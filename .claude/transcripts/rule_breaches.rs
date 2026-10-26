@@ -58,6 +58,8 @@ enum Event {
     Typed,
     /// An error tool result, with the call it answers when known.
     Error { location: String, text: String, call: Option<usize> },
+    /// A text block of the agent to the user (the session's own transcript only).
+    Text { location: String, text: String },
 }
 
 /// The events of one transcript file, in order.
@@ -77,6 +79,10 @@ impl Transcript {
             let blocks = line["message"]["content"].as_array().map(Vec::as_slice).unwrap_or_default();
             match line["type"].as_str() {
                 Some("assistant") => {
+                    if main {
+                        let texts = blocks.iter().filter(|b| b["type"] == "text").filter_map(|b| b["text"].as_str());
+                        t.events.extend(texts.map(|text| Event::Text { location: location.clone(), text: text.to_string() }));
+                    }
                     for block in blocks.iter().filter(|b| b["type"] == "tool_use") {
                         ids.insert(block["id"].as_str().unwrap_or_default().to_string(), t.calls.len());
                         t.events.push(Event::Call(t.calls.len()));
@@ -148,11 +154,50 @@ struct Finding {
     detail: String,
 }
 
-/// What a session is checked against: its work tree, to make paths relative, and the managed paths then.
+/// What a session is checked against: its work tree, to make paths relative, the managed paths and the stop words
+/// of the conversation language then, with those of the other language.
 struct Context {
     worktree: PathBuf,
     managed: Option<HashSet<String>>,
+    language: Option<(&'static [&'static str], &'static [&'static str])>,
 }
+
+/// Frequent words of one language only (`a`, `on`, `or`, `plus` are both French and English).
+const FRENCH_WORDS: &[&str] = &[
+    "le", "la", "les", "un", "une", "des", "du", "de", "et", "est", "que", "qui", "dans", "pour", "pas", "sur", "avec", "ce", "cette", "il", "elle",
+    "je", "tu", "nous", "vous", "au", "aux", "ou", "mais", "par", "sont", "fait", "sans", "comme", "se", "ne", "en", "donc", "puis",
+];
+const ENGLISH_WORDS: &[&str] = &[
+    "the", "an", "and", "is", "are", "that", "which", "in", "for", "not", "with", "this", "it", "i", "you", "we", "of", "to", "be", "by", "was",
+    "but", "as", "at", "from", "have", "has", "so", "then", "will", "can",
+];
+
+/// The stop words of `user_language` then those of the other language; `None` for a language with no list.
+fn stop_words(language: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
+    match language {
+        "French" => Some((FRENCH_WORDS, ENGLISH_WORDS)),
+        "English" => Some((ENGLISH_WORDS, FRENCH_WORDS)),
+        _ => None,
+    }
+}
+
+/// The lower-cased words of a text once fenced and inline code are removed.
+fn prose_words(text: &str) -> Vec<String> {
+    let mut prose = String::new();
+    let mut fenced = false;
+    for line in text.lines() {
+        if line.trim_start().starts_with("```") {
+            fenced = !fenced;
+        } else if !fenced {
+            prose.extend(line.split('`').step_by(2).flat_map(|part| [part, " "]));
+            prose.push('\n');
+        }
+    }
+    prose.split(|c: char| !c.is_alphabetic()).filter(|w| !w.is_empty()).map(str::to_lowercase).collect()
+}
+
+/// The fewest words a text block needs for its language to be judged.
+const MIN_WORDS: usize = 20;
 
 impl Context {
     fn relative(&self, path: &str) -> Option<String> {
@@ -240,6 +285,15 @@ impl Verdict {
                     }
                     if self.findings.len() > before {
                         flagged.insert(*i);
+                    }
+                }
+                Event::Text { location, text } => {
+                    let words = prose_words(text);
+                    let Some((own, other)) = context.language.filter(|_| words.len() >= MIN_WORDS) else { continue };
+                    self.applied.insert("user-language");
+                    let count = |list: &[&str]| words.iter().filter(|w| list.contains(&w.as_str())).count();
+                    if count(other) > count(own) {
+                        self.add("user-language", false, location, String::new());
                     }
                 }
                 Event::Error { location, text, call } => {
@@ -367,7 +421,9 @@ fn main() {
                 continue;
             }
             let worktree = git(Path::new(&cwd), &["rev-parse", "--show-toplevel"]).map(PathBuf::from).unwrap_or_else(|| PathBuf::from(&cwd));
-            let context = Context { worktree, managed: managed_paths(&repo, &start_text) };
+            let config = committed_config(&repo, &start_text);
+            let language = config.as_ref().and_then(|c| c.get("project")).and_then(|p| p.get("user_language")).and_then(toml::Value::as_str).and_then(stop_words);
+            let context = Context { worktree, managed: managed_paths(&repo, &start_text), language };
             let mut verdict = Verdict::default();
             for (t, main) in &transcripts {
                 verdict.check(t, &context, *main);

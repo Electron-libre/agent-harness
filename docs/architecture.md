@@ -150,8 +150,10 @@ user's answer. The shell words of a command exclude its quoted strings and here-
 names `--no-verify` is not a use of it. The commit messages (attribution trailer, Conventional Commits with the
 `commit_scopes` committed then) are read from the git history of the project instead, since a commit command rarely
 shows its message: a non-merge commit of any ref counts with the latest-starting session of the project whose span
-holds its committer date, and a commit in no session was the user's. A session whose project had no harness then is
-skipped. `--summary` counts the
+holds its committer date, and a commit in no session was the user's. The conversation language is judged per text
+block of the agent of 20 words or more once the code is removed, by counting the frequent words of French and English:
+a block with more words of the other language than of the `user_language` committed then is a breach. A session whose
+project had no harness then is skipped. `--summary` counts the
 findings per rule and revision over the sessions where the rule applied, so a rule that rarely applies does not read
 as respected.
 

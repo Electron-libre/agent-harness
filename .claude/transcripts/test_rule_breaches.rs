@@ -75,6 +75,10 @@ impl Transcript {
         self.push(json!({"type": "assistant", "message": {"id": format!("m{id}"), "content": [{"type": "tool_use", "id": id, "name": name, "input": input}]}}))
     }
 
+    fn text(&mut self, id: &str, text: &str) -> usize {
+        self.push(json!({"type": "assistant", "message": {"id": id, "content": [{"type": "text", "text": text}]}}))
+    }
+
     fn result(&mut self, id: &str, error: bool, text: &str) -> usize {
         self.push(json!({"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": id, "is_error": error, "content": text}]}}))
     }
@@ -307,11 +311,52 @@ fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+const FRENCH: &str = "Le livrable est fait : les tests passent et la revue ne trouve rien, donc je committe puis je passe au suivant dans la foulée.";
+const ENGLISH: &str = "The deliverable is done: the tests pass and the review finds nothing, so I commit it and move on to the next one with the plan.";
+
+// spec: BRE-10
+fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("language");
+    let projects = tmp.join("projects");
+    let mut expected = Vec::new();
+    for (name, language) in [("fr", Some("French")), ("de", Some("German")), ("none", None)] {
+        let repo = new_repo(&tmp.join(name));
+        let key = language.map(|l| format!("user_language = \"{l}\"\n")).unwrap_or_default();
+        commit_at(&repo, "2026-01-01T00:00:00Z", "chore: sync", &[(".claude/harness.toml", &format!("[harness]\nsource = \"x\"\nrev = \"r1\"\n\n[project]\n{key}"))]);
+        let mut t = Transcript::new(&repo, "2026-02-01T10:00:00.000Z");
+        t.typed("SECRET");
+        t.text("m1", FRENCH);
+        let english = t.text("m2", ENGLISH);
+        t.text("m3", "The tests pass, so I commit it and move on.");
+        t.text("m4", &format!("Voici le diff :\n```\n{ENGLISH}\n```\net `{ENGLISH}` fini."));
+        t.write(&projects.join(format!("-{name}/s.jsonl")));
+        let mut sub = Transcript::new(&repo, "2026-02-01T10:01:00.000Z");
+        sub.text("m5", ENGLISH);
+        sub.write(&projects.join(format!("-{name}/s/subagents/agent-y.jsonl")));
+        if name == "fr" {
+            expected.push(format!("s\tfr\tr1\tuser-language\tbreach\ts.jsonl:{english}\t"));
+        }
+    }
+    let (ok, out) = run(dir, &projects, false);
+    let rows: Vec<String> = out.lines().skip(1).map(str::to_string).collect();
+    let (_, summary) = run(dir, &projects, true);
+    let summary: Vec<&str> = summary.lines().collect();
+    let want_summary = [SUMMARY, "user-language\tr1\t1\t1\t1\t0"];
+    if rows != expected || summary != want_summary {
+        println!("{out}{}", summary.join("\n"));
+    }
+    vec![
+        ("the language rule succeeds".to_string(), ok && !out.contains("SECRET") && !out.contains("deliverable")),
+        ("a long block of the session in the other language is a breach; short, code and sub-agent blocks are not".to_string(), rows == expected),
+        ("the language rule applies only with a French or English user_language".to_string(), summary == want_summary),
+    ]
+}
+
 fn main() {
     let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
     let temp = tempfile::tempdir().unwrap();
     let tmp = temp.path().to_path_buf();
-    let checks: Vec<_> = finding_checks(&dir, &tmp).into_iter().chain(summary_checks(&dir, &tmp)).chain(commit_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
+    let checks: Vec<_> = finding_checks(&dir, &tmp).into_iter().chain(summary_checks(&dir, &tmp)).chain(commit_checks(&dir, &tmp)).chain(language_checks(&dir, &tmp)).chain(stamp_checks(&dir)).collect();
     let mut failed = false;
     for (name, ok) in checks {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });

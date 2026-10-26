@@ -28,7 +28,7 @@ interventions, project, issue, harness revision, model, version), with no messag
 them into a file kept outside the repositories, so the history outlives the transcripts.
 `rust-script .claude/transcripts/rule_breaches.rs [--summary]` lists the breaches of the harness rules a program can
 see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue,
-the commit message format and no AI attribution),
+the commit message format and no AI attribution, the conversation language),
 apart from what a gate blocked, and counts them per rule and harness revision.
 
 Design and decisions: [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/).
