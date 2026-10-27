@@ -51,6 +51,9 @@ keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 
    before `# Tracking`, and one with no `# Tracking` keeping 0; makes true QUA-12 (as amended). ~80 lines.
 3. [x] BRE-10 reads fences with the shared `fenced` of `tools/mod.rs`; verified by an English text block in a `~~~`
    fence of a French session giving no breach; makes true BRE-10. ~40 lines.
+4. [x] Fixes of the `high` review: `section` tells read, unread and absent in one pass, the start of an issue reads
+   one blob per commit with `git cat-file`, the mixed `## Plan` cases of `deliverables` are tested, the architecture
+   doc follows; makes true QUA-2, QUA-12.
 
 ## Decisions
 - Mode: autonomous
@@ -79,6 +82,19 @@ keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 
   and longer fences hide their words too; BRE-10 cites the fence rule of QUA-12.
 - red: BRE-10: `FAIL - a long block of the session in the other language is a breach; short, code and sub-agent
   blocks are not` (the English text of an indented `~~~` fence counted as prose).
+- Code review: no findings (low).
+- not verified: none.
+- decisions needed: none.
+
+## Deliverable 4
+- done: `Section` (read, unread, absent) from one fence-aware pass replaces `holds` and the hand-written fallback of
+  `deliverables`; the start of an issue reads only the version its commit wrote, with `git cat-file blob` (raw, no
+  textconv); `docs/architecture.md` says fences and empty unread columns. The rows of this repository are unchanged.
+- red: none (the new checks of the mixed `## Plan` cases guard the refactoring and passed before it).
+- High review (base..HEAD): 7 findings. Fixed: two `git show` per candidate, the double scan and duplicated fallback,
+  the stale architecture doc, the untested mixed `## Plan` cases, the throwaway `section` call, `git show` reading a
+  textconv. Not fixed: one unread issue empties the `--summary` sums of its revision, which is QUA-9 as written and
+  the choice 1 a made (an unread section is unknown, not 0).
 - Code review: no findings (low).
 - not verified: none.
 - decisions needed: none.

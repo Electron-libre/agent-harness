@@ -125,12 +125,12 @@ fn issue_commits(repo: &Path, log: &[Commit], stem: &str) -> Vec<usize> {
     let candidates: Vec<usize> = (0..=close)
         .filter(|&i| log[i].touches(&open) || log[i].touches(&done))
         .collect();
-    // The oldest version of the file holding the heading outside a fence (QUA-12) started the work.
+    // The oldest version of the file holding the heading outside a fence (QUA-12) started the work: the version the
+    // commit wrote, under `issues/done/` once it moved there.
     let tracked = |c: &Commit| {
-        [&open, &done].iter().any(|path| {
-            git(repo, &["show", &format!("{}:{path}", c.hash)])
-                .is_some_and(|text| section(&text, "# Tracking", |_| true).is_some())
-        })
+        let path = if c.touches(&done) { &done } else { &open };
+        git(repo, &["cat-file", "blob", &format!("{}:{path}", c.hash)])
+            .is_some_and(|text| matches!(section(&text, "# Tracking", |_| true), Section::Read(_)))
     };
     let start = candidates
         .iter()
@@ -148,13 +148,34 @@ fn issue_commits(repo: &Path, log: &[Commit], stem: &str) -> Vec<usize> {
         .collect()
 }
 
-/// The lines of `text` after the line `heading`, up to the next line that `ends` accepts, both outside a fenced code
-/// block (QUA-12); `None` when no such heading.
-fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Option<Vec<&'a str>> {
-    let mut lines = super::fenced(text.lines())
-        .skip_while(|&(line, fenced)| fenced || line.trim_end() != heading);
-    lines.next()?;
-    Some(
+/// A section of an issue file as QUA-12 reads it.
+enum Section<'a> {
+    /// The lines after its heading.
+    Read(Vec<&'a str>),
+    /// Its heading stands only inside a fenced code block.
+    Unread,
+    /// The file does not hold its heading.
+    Absent,
+}
+
+/// The lines of `text` after the line `heading` (trailing spaces ignored), up to the next line that `ends` accepts,
+/// both outside a fenced code block (QUA-12).
+fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Section<'a> {
+    let mut quoted = false;
+    let mut lines = super::fenced(text.lines()).skip_while(|&(line, fenced)| {
+        let found = line.trim_end() == heading;
+        quoted |= found && fenced;
+        fenced || !found
+    });
+    if lines.next().is_none() {
+        drop(lines);
+        return if quoted {
+            Section::Unread
+        } else {
+            Section::Absent
+        };
+    }
+    Section::Read(
         lines
             .take_while(|&(line, fenced)| fenced || !ends(line))
             .map(|(line, _)| line)
@@ -162,15 +183,13 @@ fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Opt
     )
 }
 
-/// Whether `text` holds the line `heading` (trailing spaces ignored), fenced or not.
-fn holds(text: &str, heading: &str) -> bool {
-    text.lines().any(|l| l.trim_end() == heading)
-}
-
-/// The section `heading` as QUA-12 reads it: empty when the file does not hold its heading, `None` when the heading
-/// stands only inside a fenced code block (unread).
+/// The section `heading`, empty when the file does not hold its heading; `None` when it is unread (QUA-12).
 fn readable<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Option<Vec<&'a str>> {
-    section(text, heading, ends).or_else(|| (!holds(text, heading)).then(Vec::new))
+    match section(text, heading, ends) {
+        Section::Read(lines) => Some(lines),
+        Section::Absent => Some(Vec::new()),
+        Section::Unread => None,
+    }
 }
 
 /// The number of plan lines of an issue file (QUA-3): `<n>. [x]` or `<n>. [ ]` at the start of a line of `## Plan`,
@@ -182,9 +201,14 @@ fn deliverables(text: &str) -> Option<usize> {
         rest.len() < line.len() && (rest.starts_with(". [x]") || rest.starts_with(". [ ]"))
     };
     let ends = |l: &str| l.starts_with('#');
-    let plan = section(text, "## Plan", ends)
-        .or_else(|| section(text, "# Tracking", ends))
-        .or_else(|| (!holds(text, "## Plan") && !holds(text, "# Tracking")).then(Vec::new))?;
+    let plan = match (
+        section(text, "## Plan", ends),
+        section(text, "# Tracking", ends),
+    ) {
+        (Section::Read(lines), _) | (_, Section::Read(lines)) => lines,
+        (Section::Absent, Section::Absent) => Vec::new(),
+        _ => return None,
+    };
     Some(plan.into_iter().filter(is_item).count())
 }
 

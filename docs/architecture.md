@@ -228,12 +228,13 @@ as respected.
 `harness run delivered-quality [repo]` measures the quality of the delivered work from the git history
 instead (spec [`specs/delivered-quality.md`](../specs/delivered-quality.md)): one row per file of `issues/done/`. The
 commits of an issue are those of the default branch touching its file, from the first whose version holds
-`# Tracking` to the one that moves it to `issues/done/`, except the closes of other issues that only rewrite a
+`# Tracking` outside a fenced code block to the one that moves it to `issues/done/`, except the closes of other issues that only rewrite a
 citation. Its files (issue files, `docs/` and `harness.lock` left out) give the `fix` and `revert` commits of the
 next `--window-days` (30) after the close; its plan lines give the deliverables, and its `Code review` lines of `# Tracking` (not the rows of the `check | result`
 table) the reviews and their findings (the count opens the line, `issue-workflow` step 3.6; a line with no count leaves the sum empty); the `// spec:` lines its commits add to its files, less those they remove (a moved test traces
 nothing), give the requirement ids it traced, and those missing from the id list that opens each `red:` item of
-`# Tracking` count as traced with no red run; the revision is the one in force just
+`# Tracking` count as traced with no red run (a section whose heading stands only inside a fence, such as one left
+open before it, is unread: its columns are empty, not 0); the revision is the one in force just
 before its first commit, so an issue that changes the harness is measured with the harness it was made with. The
 sessions of an issue are those of the projects directory that made its commits (the latest-starting session of the
 repository whose span holds the commit date, as for the commit rules above, a session on the issue's branch first, so

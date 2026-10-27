@@ -443,6 +443,9 @@ fn start_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
 /// An issue file whose Goal fence is left open before its Tracking, and one with no Tracking nor Plan.
 const THETA: &str = "# theta\n\n# Goal\n```md\n# Tracking\n\n## Plan\n1. [x] one\n- Code review: 2 findings\n- red: ABC-1: failed\n";
 const IOTA: &str = "# iota\n\n# Goal\nClosed with no plan.\n";
+/// Issue files whose Goal quotes `## Plan` in a fence, with an older-layout Tracking (`lambda`) or none (`mu`).
+const LAMBDA: &str = "# lambda\n\n# Goal\n```md\n## Plan\n1. [x] quoted\n```\n\n# Tracking\n\n1. [x] one\n2. [x] two\n";
+const MU: &str = "# mu\n\n# Goal\n```md\n## Plan\n1. [x] quoted\n```\n";
 
 // spec: QUA-12
 fn unread_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
@@ -468,7 +471,11 @@ fn unread_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         &repo,
         "2026-01-03T00:00:00Z",
         "docs: close iota",
-        &[("issues/done/iota.md", Some(IOTA))],
+        &[
+            ("issues/done/iota.md", Some(IOTA)),
+            ("issues/done/lambda.md", Some(LAMBDA)),
+            ("issues/done/mu.md", Some(MU)),
+        ],
     );
     let (_, out) = run(dir, &repo, &[]);
     let r = rows(&out);
@@ -496,6 +503,11 @@ fn unread_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
             ]
             .iter()
             .all(|c| has(&r, "iota", c, "0")),
+        ),
+        (
+            "a Plan quoted in a fence leaves the plan lines to the Tracking, or empty without one"
+                .to_string(),
+            has(&r, "lambda", "deliverables", "2") && has(&r, "mu", "deliverables", ""),
         ),
     ]
 }
