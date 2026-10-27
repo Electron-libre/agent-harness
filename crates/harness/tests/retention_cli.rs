@@ -209,6 +209,7 @@ fn says_nothing_of_the_retention_under_ci() {
         let mut cmd = home.command();
         cmd.args(args).arg("--root").arg(root.path()).env("CI", "1");
         let run = output(cmd, "");
+        assert_eq!(run.code, Some(0), "{args:?}: {run:?}");
         assert!(retention(&run).is_empty(), "{args:?}: {run:?}");
     }
 }

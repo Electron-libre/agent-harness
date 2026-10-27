@@ -7,15 +7,16 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{executable, output, put, script, Home, Run, CONFIG};
+use common::{executable, get, output, put, script, Home, Run, CONFIG};
 use tempfile::{tempdir, TempDir};
 
 const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
 const SOURCE: &str = "https://github.com/owner/repo.git";
 
-/// A fake tools binary (`harness tool <name> <code> ...`): prints its arguments, its working directory and stdin to
-/// stdout, a line to stderr, and exits with `<code>`.
-const TOOL: &str = "echo \"args: $*\"; pwd; cat; echo \"to stderr\" >&2; exit \"$3\"\n";
+/// A fake tools binary (`harness tool <name> <code> ...`): prints its arguments, its working directory, stdin and its
+/// own path to stdout, a line to stderr, and exits with `<code>`.
+const TOOL: &str =
+    "echo \"args: $*\"; pwd; cat; echo \"bin: $0\"; echo \"to stderr\" >&2; exit \"$3\"\n";
 
 /// The platform of the release assets: the Rust target triple, `musl` on Linux.
 fn target() -> String {
@@ -43,8 +44,8 @@ impl Launcher {
             &format!(
                 r#"out=""; url=""
 while [ $# -gt 0 ]; do case "$1" in --output) out="$2"; shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
-echo "$url" >> {home}/log
-file={home}/served/"${{url##*/}}"
+echo "$url" >> '{home}/log'
+file='{home}/served/'"${{url##*/}}"
 [ -f "$file" ] || exit 22
 if [ -n "$out" ]; then cat "$file" > "$out"; else cat "$file"; fi
 "#,
@@ -58,9 +59,9 @@ if [ -n "$out" ]; then cat "$file" > "$out"; else cat "$file"; fi
         self.home.program(
             "cargo",
             &format!(
-                r#"echo "$*" >> {home}/log
+                r#"echo "$*" >> '{home}/log'
 root=""; while [ $# -gt 0 ]; do case "$1" in --root) root="$2"; shift 2;; *) shift;; esac; done
-mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"; chmod +x "$root/bin/harness"
+mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"
 "#,
                 home = self.home.path().display()
             ),
@@ -135,6 +136,12 @@ fn pinned(source: &str) -> TempDir {
     root
 }
 
+/// The binary that ran: the `bin:` line `TOOL` prints.
+fn ran(run: &Run) -> PathBuf {
+    let line = run.stdout.lines().find_map(|l| l.strip_prefix("bin: "));
+    PathBuf::from(line.unwrap_or_else(|| panic!("no tool ran: {run:?}")))
+}
+
 fn sha256(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     format!("{:x}", Sha256::digest(bytes))
@@ -156,8 +163,9 @@ fn run_executes_the_cached_binary_of_the_pinned_commit_with_no_fetch() {
     assert_eq!(
         run.stdout,
         format!(
-            "args: tool my-tool 3 --flag\n{}\nthe input\n",
-            cwd.display()
+            "args: tool my-tool 3 --flag\n{}\nthe input\nbin: {}\n",
+            cwd.display(),
+            l.cached(COMMIT).display()
         )
     );
     assert_eq!(run.stderr, "to stderr\n");
@@ -179,25 +187,29 @@ fn a_working_directory_outside_any_project_falls_back_to_the_project_dir() {
     let run = l.run_in(elsewhere.path(), None, &["t", "0"], "");
     assert_eq!(run.code, Some(3), "{run:?}");
     assert!(run.stderr.contains("harness.toml"), "{run:?}");
+
+    // inside a project, its own pin wins over the project dir: the binary of the other pin is not there
+    let other = tempdir().unwrap();
+    put(
+        other.path(),
+        CONFIG,
+        &format!(
+            "[harness]\nsource = \"{SOURCE}\"\nrev = \"{}\"\n",
+            "f".repeat(40)
+        ),
+    );
+    let run = l.run_in(root.path(), Some(other.path()), &["t", "0"], "");
+    assert_eq!(run.code, Some(0), "{run:?}");
+    assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
 }
 
 // spec: BIN-2
 #[test]
 fn a_rev_that_is_no_hash_resolves_in_the_clone_sync_left_without_fetching() {
     let l = Launcher::new();
-    let origin = tempdir().unwrap();
-    l.home.git(origin.path(), &["init", "-q", "-b", "main"]);
-    put(origin.path(), "files/a.txt", "a");
-    l.home.git(origin.path(), &["add", "."]);
-    l.home.git(origin.path(), &["commit", "-q", "-m", "x"]);
-    let commit = l.home.git(origin.path(), &["rev-parse", "HEAD"]);
-    let root = tempdir().unwrap();
-    let url = format!("file://{}", origin.path().display());
-    put(
-        root.path(),
-        CONFIG,
-        &format!("[harness]\nsource = \"{url}\"\nrev = \"main\"\n"),
-    );
+    let (origin, root, commit) = git_source(&l.home);
+    let config = get(root.path(), CONFIG).unwrap();
+    put(root.path(), CONFIG, &format!("{config}rev = \"main\"\n"));
     l.home.ok(root.path(), &["sync"]);
     script(&l.cached(&commit), TOOL);
     // the source is gone: a fetch would fail
@@ -206,7 +218,7 @@ fn a_rev_that_is_no_hash_resolves_in_the_clone_sync_left_without_fetching() {
     let run = l.run(root.path());
 
     assert_eq!(run.code, Some(0), "{run:?}");
-    assert!(run.stdout.starts_with("args: tool t 0\n"), "{run:?}");
+    assert_eq!(ran(&run), l.cached(&commit), "{run:?}");
 }
 
 // spec: BIN-3, BIN-4
@@ -290,21 +302,26 @@ fn with_no_asset_the_binary_is_built_with_cargo_install() {
 // spec: BIN-11
 #[test]
 fn with_no_asset_nor_a_build_the_fetch_fails_naming_the_commit_the_platform_and_update() {
-    // the `cargo` of the home fails
     let l = Launcher::new();
     let root = pinned(SOURCE);
+    // the `cargo` of the home fails, then there is none
+    for missing in [false, true] {
+        if missing {
+            fs::remove_file(l.home.path().join("bin/cargo")).unwrap();
+        }
 
-    let run = l.run(root.path());
+        let run = l.run(root.path());
 
-    assert_eq!(run.code, Some(3), "{run:?}");
-    assert!(
-        run.stderr.contains(COMMIT)
-            && run.stderr.contains(&target())
-            && run.stderr.contains("harness update"),
-        "{run:?}"
-    );
-    assert!(!l.cached(COMMIT).exists());
-    assert!(l.leftovers().is_empty(), "{:?}", l.leftovers());
+        assert_eq!(run.code, Some(3), "{run:?}");
+        assert!(
+            run.stderr.contains(COMMIT)
+                && run.stderr.contains(&target())
+                && run.stderr.contains("harness update"),
+            "{run:?}"
+        );
+        assert!(!l.cached(COMMIT).exists());
+        assert!(l.leftovers().is_empty(), "{:?}", l.leftovers());
+    }
 }
 
 /// A project on a local source, and the path of the binary a successful build of it reports.
@@ -326,7 +343,7 @@ fn cargo_build(l: &Launcher, built: Option<&Path>) {
         Some(built) => {
             script(built, TOOL);
             format!(
-                "echo \"$*\" >> {log}\necho '{{\"reason\":\"compiler-artifact\",\"target\":{{\"name\":\"harness\"}},\"executable\":\"{exe}\"}}'\n",
+                "echo \"$*\" >> '{log}'\necho '{{\"reason\":\"compiler-artifact\",\"target\":{{\"name\":\"harness\"}},\"executable\":\"{exe}\"}}'\n",
                 log = l.home.path().join("log").display(),
                 exe = built.display()
             )
@@ -346,7 +363,7 @@ fn a_local_source_runs_the_crate_it_builds() {
     let run = l.run(root.path());
 
     assert_eq!(run.code, Some(0), "{run:?}");
-    assert!(run.stdout.starts_with("args: tool t 0\n"), "{run:?}");
+    assert_eq!(ran(&run), built, "the fresh build runs");
     let build = l.log();
     let manifest = fs::canonicalize(source.path()).unwrap().join("Cargo.toml");
     assert!(
@@ -369,7 +386,7 @@ fn a_local_source_that_does_not_build_runs_its_last_good_build() {
     let run = l.run(root.path());
 
     assert_eq!(run.code, Some(0), "{run:?}");
-    assert!(run.stdout.starts_with("args: tool t 0\n"), "{run:?}");
+    assert!(ran(&run).starts_with(l.home.cache()), "{run:?}");
     let warning: Vec<&str> = run
         .stderr
         .lines()
@@ -430,7 +447,7 @@ fn sync_and_update_warn_of_a_failed_prefetch_and_dry_runs_fetch_nothing() {
     let (_origin, root, commit) = git_source(&l.home);
     l.home.program(
         "cargo",
-        &format!("echo \"$*\" >> {}/log; exit 1\n", l.home.path().display()),
+        &format!("echo \"$*\" >> '{}/log'; exit 1\n", l.home.path().display()),
     );
 
     let dry = l.home.ok(root.path(), &["update", "--dry-run"]);

@@ -5,7 +5,7 @@
 mod common;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use common::{get, project, put, Home, CONFIG, LOCK};
 use tempfile::{tempdir, TempDir};
@@ -62,28 +62,14 @@ fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refus
     assert_eq!(get(home.path(), "log").unwrap(), "help run\nhelp newcmd\n");
 }
 
-/// The `PATH` of the binary without any `harness`: the home's own `bin`, the `harness` removed, and the directories of
-/// the caller's `PATH` that hold none.
-fn path_without_harness(home: &Home) -> std::ffi::OsString {
-    fs::remove_file(home.path().join("bin/harness")).unwrap();
-    let caller = std::env::var_os("PATH").unwrap_or_default();
-    let dirs = std::iter::once(home.path().join("bin")).chain(
-        std::env::split_paths(&caller).filter(|dir: &PathBuf| !dir.join("harness").exists()),
-    );
-    std::env::join_paths(dirs).unwrap()
-}
-
 // spec: BIN-15
 #[test]
 fn check_looks_at_nothing_without_a_harness_on_the_path() {
     let home = Home::new();
     let (_source, root) = project_with_hooks(&home);
-    let mut cmd = home.command();
-    cmd.env("PATH", path_without_harness(&home))
-        .args(["check", "--root"])
-        .arg(root.path());
+    fs::remove_file(home.path().join("bin/harness")).unwrap();
 
-    let run = common::output(cmd, "");
+    let run = home.harness(root.path(), &["check"]);
 
     assert_eq!(run.code, Some(0), "{run:?}");
     assert_eq!(run.stdout, "");

@@ -1,6 +1,7 @@
-//! Helpers of the tests that run the `harness` binary on temp dirs, offline. The cache, the user settings, a failing
-//! `curl` and `cargo` and a `harness` that knows every subcommand live in a temp home: the prefetch of the tools binary (BIN-13),
-//! the retention warning (SYN-28), the hooks `check` judges (BIN-15) and git never reach outside it. The fakes are
+//! Helpers of the tests that run the `harness` binary on temp dirs, offline. The cache, the user settings, the `PATH`
+//! (a failing `curl` and `cargo`, a `harness` that knows every subcommand, and a few programs of the system) live in a
+//! temp home: the prefetch of the tools binary (BIN-13), the retention warning (SYN-28), the hooks `check` judges
+//! (BIN-15) and git never reach outside it. The fakes are
 //! shell scripts: these tests run on Unix.
 #![allow(dead_code)]
 
@@ -14,6 +15,9 @@ use tempfile::{tempdir, TempDir};
 
 pub const CONFIG: &str = ".claude/harness.toml";
 pub const LOCK: &str = ".claude/harness.lock";
+
+/// The programs of the system the binary and the fakes run.
+const SYSTEM: [&str; 6] = ["git", "cat", "cp", "mkdir", "chmod", "pwd"];
 
 pub fn put(dir: &Path, rel: &str, text: &str) {
     let path = dir.join(rel);
@@ -62,6 +66,19 @@ impl Home {
             "config/settings.json",
             r#"{"cleanupPeriodDays": 365}"#,
         );
+        // the binary sees only these programs of the system, and the fakes of `bin`: a program a test removes from
+        // `bin` is missing, whatever the caller has installed
+        let sys = dir.path().join("sys");
+        fs::create_dir_all(&sys).unwrap();
+        let caller = std::env::var_os("PATH").unwrap_or_default();
+        for program in SYSTEM {
+            let found = std::env::split_paths(&caller)
+                .map(|d| d.join(program))
+                .find(|p| p.is_file())
+                .unwrap_or_else(|| panic!("{program} is not on the PATH"));
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(found, sys.join(program)).unwrap();
+        }
         let home = Self { dir };
         // no network: `curl` fails as on a missing asset, and the prefetch of a git source would build the tools
         // binary with `cargo install`: it fails at once here; the `harness` on the path knows every subcommand, so
@@ -87,14 +104,15 @@ impl Home {
         script(&self.dir.path().join("bin").join(program), body);
     }
 
+    /// The `PATH` of the binary: the fakes of `bin`, then the programs of `SYSTEM`.
+    pub fn path_var(&self) -> std::ffi::OsString {
+        std::env::join_paths([self.dir.path().join("bin"), self.dir.path().join("sys")]).unwrap()
+    }
+
     /// The binary, with this home: its cache, its user settings, its `PATH`, outside CI and any session.
     pub fn command(&self) -> Command {
-        let mut path = vec![self.dir.path().join("bin")];
-        path.extend(std::env::split_paths(
-            &std::env::var_os("PATH").unwrap_or_default(),
-        ));
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_harness"));
-        cmd.env("PATH", std::env::join_paths(path).unwrap())
+        cmd.env("PATH", self.path_var())
             .env("XDG_CACHE_HOME", self.cache())
             .env("CLAUDE_CONFIG_DIR", self.dir.path().join("config"))
             .env_remove("CI")

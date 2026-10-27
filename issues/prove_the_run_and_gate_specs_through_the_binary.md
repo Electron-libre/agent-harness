@@ -49,6 +49,9 @@ boundary); the gate and the settings warnings (`prove_the_gate_specs_through_the
 3. [x] Retention: `tests/retention_cli.rs` gains each warning (user settings in `CLAUDE_CONFIG_DIR` or `HOME`,
    unreadable, unlocatable, project files, `CI`); `src/tests/retention.rs` dropped; makes true SYN-28 (~250 lines).
 
+4. [x] Fixes of the `high` review: the proofs fail when the behaviour breaks, the test `PATH` holds no program of
+   the caller but a few system ones.
+
 ## Decisions
 - Mode: autonomous
 - Base commit: e3d066c911a67a66956d33d53c58e0fc98f4774f
@@ -84,5 +87,25 @@ boundary); the gate and the settings warnings (`prove_the_gate_specs_through_the
   set fails 2 proofs.
 - Code review: 1 findings; the removal of `config/settings.json` assumes it exists: it does, `Home::new` writes
   it, and the test passes.
+- not verified: none
+- decisions needed: none
+
+## Deliverable 4 (fixes of the `high` review)
+- done: 8 of the 10 findings fixed: the test home's `PATH` is its fakes plus links to `git`, `cat`, `cp`, `mkdir`,
+  `chmod`, `pwd` (a removed fake is a missing program, whatever the caller installed; `path_without_harness` gone);
+  BIN-11 also runs with no `cargo`; the fake `cargo install` no longer sets the executable bit, so BIN-3 and BIN-5
+  prove the launcher does; `TOOL` prints its path, so BIN-6 asserts the fresh build ran, BIN-12 the cached one, and
+  BIN-1 that the nearest project wins over `CLAUDE_PROJECT_DIR`; the `CI` proof asserts exit 0; the paths in the
+  fakes are quoted; the BIN-2 test reuses `git_source`.
+- not fixed: (6) `retention_cli.rs` is Unix-only: the test home's fakes are `sh` scripts and Windows is a non-goal of
+  the hooks (`specs/tool-binaries.md`); (9) `target()` and `sha256` are not taken from the crate on purpose: a
+  boundary test states the asset name and digest the spec promises, not the code's; the third copy of the git-source
+  fixture (`launcher_cli.rs`, tag and two commits) has another shape and stays.
+- red: none (the fixes harden the proofs); mutations checked: no `set_executable` in `Staging::install` fails BIN-3,
+  BIN-5, BIN-13; the fallback before the nearest project fails BIN-1; running the last good build after a good build
+  fails BIN-6.
+- Code review: 1 findings; the fake `cargo install` no longer sets the executable bit: intended, the launcher
+  must set it (BIN-3, BIN-5).
+- Status: every deliverable done; closing left to the user.
 - not verified: none
 - decisions needed: none
