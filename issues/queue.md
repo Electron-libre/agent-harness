@@ -5,6 +5,7 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
 - [exit_3_when_the_launcher_cannot_parse_its_arguments](exit_3_when_the_launcher_cannot_parse_its_arguments.md) - small; after the probes of the hooks (BIN-15, BIN-16), it closes the lockout for the paths they miss
+- [exit_3_when_run_names_an_unknown_tool](exit_3_when_run_names_an_unknown_tool.md) - small; right after the exit 3 of the launcher's parser, it closes the last exit 2 a hook command can hit
 - [split_an_issue_too_large_for_one_session](split_an_issue_too_large_for_one_session.md) - before the larger issues of the queue, which it may split
 - [share_the_hash_stamp_check_of_the_shared_modules](share_the_hash_stamp_check_of_the_shared_modules.md) - after the binaries, which may remove the stamp it checks; a small cleanup before the spec proofs
 - [check_the_red_run_of_traced_tests](check_the_red_run_of_traced_tests.md) - makes the spec traceability prove more than a citation; independent of the above

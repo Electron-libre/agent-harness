@@ -261,6 +261,34 @@ fn run_exits_3_when_it_cannot_get_the_tool() {
     assert!(stderr.contains("harness.toml"), "{stderr}");
 }
 
+// spec: BIN-17
+#[test]
+fn the_launcher_exits_3_when_it_cannot_parse_its_arguments() {
+    let dir = tempdir().unwrap();
+    let launch = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_harness"))
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap()
+    };
+    for args in [
+        &["newcmd"][..],
+        &["check", "--no-such-flag"],
+        &["init"],
+        &[],
+    ] {
+        let out = launch(args);
+        assert_eq!(out.status.code(), Some(3), "{args:?}");
+        assert!(!out.stderr.is_empty(), "{args:?}: no message");
+    }
+    for args in [&["--help"][..], &["--version"], &["help", "check"]] {
+        let out = launch(args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        assert!(!out.stdout.is_empty(), "{args:?}: nothing printed");
+    }
+}
+
 /// Every file of `dir`, recursively.
 fn files_under(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();

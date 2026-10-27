@@ -29,3 +29,42 @@ cannot get a tool (BIN-14), would never block the agent, whatever the command.
 
 # Hints
 * Claude Code blocks on exit 2 only; any other non-zero code is a non-blocking error shown to the user.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Every argument the launcher's parser refuses exits 3 instead of clap's 2, so no hook command, however it reached the
+project, blocks the agent. Out of scope: the exit 2 of a tool the pinned binary does not know (BIN-7), and launchers
+installed before the change.
+
+## Plan
+1. [x] Exit 3 on a parse error: `main` uses `Cli::try_parse`, prints clap's error and exits 3 unless it is help or
+   version (exit 0); docs (`docs/architecture.md`) updated; verified by a test running the binary with an unknown
+   subcommand, an unknown flag and `--help`; makes true BIN-17.
+
+## Decisions
+- Mode: autonomous
+- Every parse error of the launcher exits 3, whatever the subcommand (not only `run` and `tool`).
+- The exit 2 of an unknown tool (BIN-7) becomes its own issue.
+- Base commit: `882a70cfd61d3f324839509c62596597d89b406a`
+
+## Deliverable 1
+done: `main` parses with `Cli::try_parse`; a parse error prints clap's message and exits 3, help and version exit 0.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass (BIN-17 traced) |
+| docs | `docs/architecture.md` updated |
+| code review | low, see below |
+
+red: `assertion left == right failed: ["newcmd"] left: Some(2) right: Some(3)`
+
+Code review: no findings
+
+not verified: a real Claude Code hook session with an unknown subcommand.
+
+decisions needed: none. Follow-up: `issues/exit_3_when_run_names_an_unknown_tool.md` (BIN-7).

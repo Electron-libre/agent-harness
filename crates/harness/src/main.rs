@@ -64,7 +64,8 @@ enum Command {
     },
 }
 
-/// The exit code of `run` when it cannot get the tool: not 2, which Claude Code reads as the refusal of a hook (BIN-14).
+/// The exit code of `run` when it cannot get the tool, and of the launcher when it cannot parse its arguments: not 2,
+/// which Claude Code reads as the refusal of a hook (BIN-14, BIN-17).
 const CANNOT_RUN: u8 = 3;
 
 /// Replace this process by the tool of the pinned revision, so its input, output and exit code are the tool's (BIN-1).
@@ -115,7 +116,15 @@ fn print_changes(report: &Report) -> bool {
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        // `--help` and `--version` print to stdout and exit 0.
+        Err(e) if !e.use_stderr() => e.exit(),
+        Err(e) => {
+            let _ = e.print();
+            return ExitCode::from(CANNOT_RUN);
+        }
+    };
     let warns_of_retention = !matches!(cli.command, Command::Init { .. });
     let result = match cli.command {
         Command::Init { source, rev } => init(&cli.root, &source, rev.as_deref()).map(|()| true),
