@@ -65,7 +65,7 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 3. [x] Architecture, hooks and gates: "Hooks and their declaration" as an overview with a sequence diagram of a commit
    (`review-gate` record, check, native; `clippy-gate` at Stop; `format-rust`), edge cases linked to
    `specs/review-gate.md`, `specs/clippy-gate.md`, ADRs 0004, 0005, 0007; same check; ~200 lines.
-4. [ ] Processes: a new `docs/workflow.md` with the issue lifecycle flowchart (create, queue, steps 0 to 3 with the
+4. [x] Processes: a new `docs/workflow.md` with the issue lifecycle flowchart (create, queue, steps 0 to 3 with the
    stops and the autonomous mode, merge back, close) and the parallel worktree lifecycle (`start-issue`,
    `finish-issue`); "Parallel issues" of the architecture trimmed to its design with a link; verified by checking each
    step name against `files/.claude/skills/issue-workflow/SKILL.md` and the recipes; ~200 lines.
@@ -123,6 +123,22 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 |---|---|
 | tests, lint, specs | `just check` passes |
 | docs | each dropped statement found in `specs/sync.md`, `specs/review-gate.md`, `specs/clippy-gate.md` or the doc comments of `review_gate.rs` (`--get`); the rest (marker content, waiver stamp, `GIT_INDEX_FILE`, nested project) kept; links resolve |
+| code review | see below |
+
+- red: none (docs only, no test)
+- Code review: no findings
+- not verified: the mermaid rendering
+- decisions needed: none
+
+## Deliverable 4
+- done: new `docs/workflow.md` (life of an issue, inside `issue-workflow`, parallel issues as a sequence diagram,
+  the evaluation skills); "Parallel issues" of the architecture cut to its design in bullets with the PAR ids; the
+  README and `docs/usage.md` link to it.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| docs | step names and numbers checked against `issue-workflow` SKILL.md and details.md ("Merge back", "Worktree of an issue"); dropped statements found in `specs/parallel-issues.md` (PAR-11, PAR-15, PAR-16) or moved to `workflow.md`; links and anchors resolve |
 | code review | see below |
 
 - red: none (docs only, no test)

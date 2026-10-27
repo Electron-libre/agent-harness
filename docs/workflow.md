@@ -1,0 +1,100 @@
+# Workflow
+
+How work goes from an idea to a merged change, with the skills and recipes of the harness. The skills hold the
+procedure (`.claude/skills/<name>/SKILL.md`); this page shows how they fit together.
+
+## The life of an issue
+
+```mermaid
+flowchart LR
+  idea["idea, smoke run,<br/>review finding"] -->|create-issue| file["issues/NAME.md"]
+  file -->|ranked| queue["issues/queue.md"]
+  queue -.->|prioritize-issues| queue
+  queue -->|just next-issue| work["issue-workflow"]
+  work -->|deliverables committed| close["just close-issue"]
+  close --> done["issues/done/NAME.md"]
+```
+
+| Step | Who | Tool |
+|---|---|---|
+| Write the issue (Goal, Findings, Approach, Resources) | agent | `skill:create-issue`, checked by `just check-issue` |
+| Rank it | agent proposes, user decides | `issues/queue.md`, `skill:prioritize-issues` to re-rank all |
+| Pick the next one | anyone | `just next-issue`: the first entry no branch or worktree has taken |
+| Drive it to done | agent, with one validation stop | `skill:issue-workflow` |
+| Close it | agent in the main worktree, on the user's agreement; the user after a parallel issue | `just close-issue issues/NAME.md`: moves it to `issues/done/`, drops its queue line |
+
+## Inside issue-workflow
+
+```mermaid
+flowchart TD
+  start(["issues/NAME.md"]) --> resume{"Tracking section?"}
+  resume -->|none| prepare["1. Prepare in the files:<br/>understanding, spec draft, plan"]
+  resume -->|"Plan: proposed"| validate
+  resume -->|"Plan: validated"| gather
+  prepare --> validate[["2. STOP: the user validates<br/>the plan and answers the questions"]]
+  validate --> gather["3.1 Gather"]
+  gather --> red["3.2 Test first: it fails<br/>for the right reason"]
+  red --> green["3.3 Implement, refactor"]
+  green --> docs["3.4 Docs: update-docs"]
+  docs --> review["3.5 just check +<br/>/code-review low"]
+  review --> human[["3.6 STOP: the user validates<br/>(lifted in autonomous mode)"]]
+  human --> track["3.7 Tick the plan line"]
+  track --> commit["3.8 Commit: commit-message"]
+  commit -->|next deliverable| gather
+  commit -->|last one| high["/code-review high<br/>on base..HEAD"]
+  high -->|"findings: one more deliverable"| gather
+  high -->|clean| ask[["Ask: close the issue?"]]
+```
+
+- **One validation stop** (step 2): the plan, the questions as a numbered table (`1 a, 2 c`, or `ok` for the
+  recommendations) and the mode. Every answer goes to `## Decisions` of the issue.
+- **Autonomous mode** (the default) lifts the stop of step 3.6: the summary of each deliverable (`done`,
+  `check | result`, `red:`, `Code review:`, `not verified`) is written in the issue instead, and the agent chains
+  into the next deliverable. It never lifts the review, the `high` review of the whole issue or the stop of step 2.
+  A blocking question, an unsettled finding or a red check stops the chain.
+- **Size limit**: ~1,000 changed lines per deliverable, ~3,000 and 6 deliverables per issue; a larger issue is split
+  at step 2.
+- **Specs**: when the issue changes what a capability does, `skill:write-spec` writes its requirements at step 1
+  and the tests of step 3.2 carry their `// spec: ID` ([specs/README.md](../specs/README.md)).
+- **Gates**: a commit fails while its diff holds a file the last review never saw; only the user can waive it, with
+  `just waive-review` ([architecture](architecture.md#the-review-gate)).
+
+## Parallel issues
+
+An issue usually runs in the main worktree. For two issues at once, the user gives the second its own worktree, so
+the files, index and `target/` of one session never reach the other
+([ADR 0003](adr/0003-one-worktree-per-issue.md), [ADR 0011](adr/0011-the-user-opens-the-issue-worktree.md), spec
+[`specs/parallel-issues.md`](../specs/parallel-issues.md)).
+
+```mermaid
+sequenceDiagram
+  participant U as user, main worktree
+  participant W as agent, issue worktree
+  U->>U: commit issues/NAME.md and its queue line
+  U->>U: just start-issue issues/NAME.md
+  Note over U: .claude/worktrees/NAME on branch NAME
+  U->>W: launch claude in the worktree
+  W->>W: issue-workflow, commits on NAME
+  W->>W: user agrees to close: rebase on main,<br/>just check-harness
+  W-->>U: prints the commands left
+  U->>U: git merge --ff-only NAME
+  U->>U: just close-issue issues/NAME.md, commit
+  U->>U: just finish-issue NAME
+```
+
+- The agent never creates, enters or leaves a worktree: a session entered with `EnterWorktree` or `claude --worktree`
+  is isolated by Claude Code, which refuses every command it cannot prove stays there.
+- While the branch or the worktree exists, `just next-issue` skips the issue for every other session.
+- The queue is edited only in the main worktree: `close-issue` refuses in a linked one.
+- `just check-harness` before the merge catches a hook the installed `harness` would refuse once merged; run the
+  `cargo install` it prints first.
+- The project's own tools run on `.` may read the nested worktrees: [usage.md](usage.md#parallel-issues-in-worktrees)
+  says how to keep them out.
+
+## Evaluating the harness
+
+`skill:evaluate-harness` reads the session transcripts and the git history and reports, per harness revision,
+whether the agent got more efficient, the delivered work better and the rules better followed
+([architecture](architecture.md#the-evaluation-from-the-transcripts)). `skill:audit-instructions` reads the
+instructions the user gave over time and proposes the skills and hooks worth adding; each validated proposal becomes
+an issue.

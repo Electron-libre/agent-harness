@@ -66,10 +66,11 @@ flowchart LR
 ```
 
 Tell the agent `issues/<name>.md` (or "the next issue"); it prepares a plan, stops once for your validation, then
-delivers.
+delivers. Details: [docs/workflow.md](docs/workflow.md).
 
 ## Read next
 
 - [docs/usage.md](docs/usage.md): every command in detail, the evaluation, parallel worktrees.
+- [docs/workflow.md](docs/workflow.md): how an issue goes from idea to merge, alone or in parallel.
 - [docs/architecture.md](docs/architecture.md): how the harness is built.
 - [specs/](specs/): what each capability must do; [docs/adr/](docs/adr/): why it is so.

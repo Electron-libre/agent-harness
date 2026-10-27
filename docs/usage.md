@@ -53,8 +53,8 @@ The skill `evaluate-harness` runs the readers below and reports the trend per ax
 ## Parallel issues in worktrees
 
 For an issue run in parallel, `just start-issue issues/<name>.md` creates the worktree `.claude/worktrees/<stem>` on
-a branch `<stem>`, inside the main one, and makes git ignore it; launch a plain `claude` there
-(`issue-workflow`, step 0).
+a branch `<stem>`, inside the main one, and makes git ignore it; launch a plain `claude` there. The steps are in
+[workflow.md](workflow.md#parallel-issues).
 
 The tools that run on `.` without git's `info/exclude` then read every issue in progress. Keep the worktrees out of
 them:

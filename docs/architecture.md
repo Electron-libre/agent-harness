@@ -275,32 +275,28 @@ numbers are never turned into a pass or a fail, since they would become targets.
 
 ## Parallel issues
 
-Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-issue.md),
+Two agents can drive two issues at once, each in its worktree `.claude/worktrees/<stem>` on a branch `<stem>`: separate
+working tree and index, shared object store ([ADR 0003](adr/0003-one-worktree-per-issue.md),
 [ADR 0008](adr/0008-issue-worktrees-nest-under-claude-worktrees.md),
-[ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md), spec
-[`specs/parallel-issues.md`](../specs/parallel-issues.md). `harness run issue-worktree` (`just start-issue`,
-`just finish-issue`) gives an issue the worktree `.claude/worktrees/<stem>` on a branch `<stem>`: separate working tree and
-index, shared object store, so one agent's uncommitted files and commits never reach the other. Claude Code enters a
-worktree there without asking for an approval; `start-issue` adds `/.claude/worktrees/` to `.git/info/exclude`, and the
-tools that scan the tree, `close-issue` and `check-specs`, take their files from git (the module `repo_files.rs` of
-the crate, `git ls-files -co --exclude-standard`),
-which never lists a nested worktree, ignored or not, so the main worktree never sees the nested ones. `close-issue` then drops `.git`,
-`target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by directory name; `check-specs`
-walks the disk only outside a git repository. A project's own tools run on `.` may still read the nested
-worktrees (measured in ADR 0009); [usage.md](usage.md) says how to keep them out. `finish-issue` still removes a
-worktree left at the former sibling path `../<repo>-<stem>`. Each worktree has its
-own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a cold build in 4 s; a larger
-project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:
-`next-issue` reads `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and no file
-needs cleaning. A leftover branch with neither is listed `Stale:` and `just finish-issue` cleans it (merged by
-ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close-issue` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. The worktree is the user's choice, for parallel work
-([ADR 0011](adr/0011-the-user-opens-the-issue-worktree.md)): an agent works where its session was started and never
-creates or enters one, since Claude Code isolates a session entered with `EnterWorktree` and refuses every command it
-cannot prove stays there. The user runs `just start-issue` and launches a plain `claude` in the worktree; the
-session's `cwd`, and the `cwd` of the hook events, are the worktree. The hooks act on the work tree of that `cwd`
-(a session launched in the worktree has it as `CLAUDE_PROJECT_DIR`, so the worktree's `.claude/settings.json`
-declares them, and `harness run` takes the revision of the `harness.toml` it finds from the `cwd`): `review-gate` keeps its marker and waiver in the git directory of each
-worktree (`git rev-parse --git-path`), `format-rust` and `clippy-gate` run cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, runs `just check-harness` there (and installs the `harness` of the branch when the installed one refuses a hook of it, BIN-15), then prints the commands left to the user in the main worktree: fast-forward the main branch, `just close-issue`, `just finish-issue`.
+[ADR 0011](adr/0011-the-user-opens-the-issue-worktree.md), spec
+[`specs/parallel-issues.md`](../specs/parallel-issues.md)). The steps are in [workflow.md](workflow.md#parallel-issues);
+the design:
+
+- **Tool**: `harness run issue-worktree` (`just start-issue`, `just finish-issue`), `next-issue` and `close-issue`.
+- **Taken** is the worktree itself, or a branch holding commits not on the main branch (PAR-3): `next-issue` reads
+  `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and
+  no file needs cleaning. A leftover branch with neither is listed `Stale:` for `finish-issue` to clean (PAR-4, PAR-6).
+- **Nesting**: `start-issue` makes git ignore `/.claude/worktrees/` (PAR-13), and the scanners (`close-issue`,
+  `check-specs`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
+  [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md)), which never lists a nested worktree.
+  `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by name.
+- **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as
+  `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `harness run` takes the revision of the
+  `harness.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,
+  so each worktree holds its own copy of the harness (a project that does not track it gets bare worktrees).
+- **Queue**: edited only at merge time, in the main worktree (PAR-8).
+- **Cost**: each worktree has its own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a
+  cold build in 4 s; a larger project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice).
 
 ## The cost of a turn
 
