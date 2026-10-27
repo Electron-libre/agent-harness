@@ -67,4 +67,27 @@ Code review: no findings
 
 not verified: a real Claude Code hook session with an unknown subcommand.
 
-decisions needed: none. Follow-up: `issues/exit_3_when_run_names_an_unknown_tool.md` (BIN-7).
+decisions needed: none. Follow-up: `issues/stop_exiting_2_outside_a_refusal.md` (BIN-7, runtime errors of `main`).
+
+2. [x] Fixes of the `high` review: BIN-17 limited to what the parser refuses, stale doc of `launcher.rs`, a single
+   error arm in `main`, the test checks clap's usage, paragraph re-wrapped; the runtime errors of `main` that exit 2
+   went to `issues/stop_exiting_2_outside_a_refusal.md`.
+
+## Deliverable 2
+done: the six findings of the `high` review settled (five fixed, one moved to the follow-up issue).
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | `docs/architecture.md`, `launcher.rs` doc comment |
+| code review | low, see below |
+
+red: none (a stricter assertion on an existing test, no new behaviour)
+
+Code review: no findings
+
+not verified: none.
+
+decisions needed: none.

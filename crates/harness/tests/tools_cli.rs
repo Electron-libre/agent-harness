@@ -280,7 +280,8 @@ fn the_launcher_exits_3_when_it_cannot_parse_its_arguments() {
     ] {
         let out = launch(args);
         assert_eq!(out.status.code(), Some(3), "{args:?}");
-        assert!(!out.stderr.is_empty(), "{args:?}: no message");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("Usage:"), "{args:?}: {stderr}");
     }
     for args in [&["--help"][..], &["--version"], &["help", "check"]] {
         let out = launch(args);

@@ -1,7 +1,8 @@
 //! The hook commands the installed `harness` must accept (spec `specs/tool-binaries.md`, BIN-15, BIN-16).
 //!
 //! The installed `harness` is the launcher every hook goes through: a hook command `harness <subcommand> ...` it does not
-//! know exits 2, which Claude Code reads as a refusal, so the agent is locked out. `check` asks the `harness` on the
+//! know does not run (it exits 3, BIN-17; a launcher older than BIN-17 exits 2, which Claude Code reads as a refusal, so
+//! the agent is locked out). `check` asks the `harness` on the
 //! path, `harness help <subcommand>`, before such settings take effect, and `update` refuses a revision whose hooks it
 //! refuses (BIN-16).
 

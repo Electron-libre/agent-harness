@@ -118,11 +118,10 @@ fn print_changes(report: &Report) -> bool {
 fn main() -> ExitCode {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
-        // `--help` and `--version` print to stdout and exit 0.
-        Err(e) if !e.use_stderr() => e.exit(),
+        // `--help` and `--version` print to stdout and exit 0; a real parse error goes to stderr.
         Err(e) => {
             let _ = e.print();
-            return ExitCode::from(CANNOT_RUN);
+            return ExitCode::from(if e.use_stderr() { CANNOT_RUN } else { 0 });
         }
     };
     let warns_of_retention = !matches!(cli.command, Command::Init { .. });
