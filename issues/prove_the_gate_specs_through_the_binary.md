@@ -29,4 +29,6 @@ temporary directories, so these specs and their tests form an acceptance suite t
 
 # Hints
 * After `prove_the_run_and_gate_specs_through_the_binary`: reuse the fake programs it adds to the test home.
+* After `accept_an_internal_proof_with_its_reason`: move a proof to the binary only when that test stays fast and
+  stable; otherwise keep the internal test and give its reason on the citation.
 * Git runs isolated from the caller (`Home::isolated`): a test run from a git hook must not touch the real repository.
