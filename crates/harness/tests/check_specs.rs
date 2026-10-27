@@ -508,13 +508,12 @@ fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
 }
 
-// spec: TRC-1, TRC-2, TRC-3
+// spec: TRC-1, TRC-2, TRC-3, TRC-4, TRC-5
 fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     let boundary = |name: &str, tests: &str, others: &[(&str, &str)]| {
         let stderr = case(name, SPEC, tests, others, None);
-        stderr
-            .lines()
-            .filter(|l| l.contains("only by tests under `src`"))
+        boundary_lines(&stderr)
+            .into_iter()
             .map(String::from)
             .collect::<Vec<_>>()
     };
@@ -547,18 +546,52 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
         "a spec proven outside src is not warned of",
         lines.is_empty(),
     );
+    let only_rer1 =
+        ["warning: specs/rerun.md: 1 requirement proven only by tests under `src`: RER-1"];
     let draft = SPEC.replace("status: accepted", "status: draft");
     let stderr = case(
         "an uncited draft requirement passes",
         &draft,
         "// spec: RER-1\nfn t() {}\n",
-        &[("crates/a/tests/cli.rs", "")],
+        &[],
         None,
     );
     report(
         "an uncited requirement is not listed",
-        stderr.contains("1 requirement proven only by tests under `src`: RER-1\n"),
+        boundary_lines(&stderr) == only_rer1,
     );
+    let withdrawn = SPEC.replace("A run must resume.", "withdrawn: resumes.");
+    let stderr = case(
+        "a withdrawn requirement cited under src passes",
+        &withdrawn,
+        TESTS,
+        &[],
+        None,
+    );
+    report(
+        "a withdrawn requirement is not listed",
+        boundary_lines(&stderr) == only_rer1,
+    );
+    let lines = boundary(
+        "a managed test under a src directory passes",
+        "",
+        &[(
+            ".claude/hooks/src/test_h.rs",
+            "// spec: RER-1, RER-2\nfn t() {}\n",
+        )],
+    );
+    report(
+        "a managed test under a src directory is a boundary proof",
+        lines.is_empty(),
+    );
+}
+
+/// The boundary warnings of a checker's stderr.
+fn boundary_lines(stderr: &str) -> Vec<&str> {
+    stderr
+        .lines()
+        .filter(|l| l.contains("only by tests under `src`"))
+        .collect()
 }
 
 // spec: CLR-3, CLR-4, CLR-5, CLR-6, CLR-7
@@ -669,7 +702,9 @@ fn wording_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
     report(
         "an accepted spec gets no wording warning",
-        !stderr.contains("vague word") && !stderr.contains("`must`"),
+        !stderr
+            .lines()
+            .any(|l| l.contains("warning") && !boundary_lines(&stderr).contains(&l)),
     );
 }
 
@@ -684,4 +719,47 @@ fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_harness"));
     cmd.arg("tool").arg(stem);
     cmd
+}
+
+/// In git the files come sorted, managed tests first: a crate test citing an unknown id is still flagged, and so is
+/// every other file citing it.
+#[test]
+fn an_unknown_id_is_flagged_in_every_crate_file() {
+    let root = tempfile::tempdir().unwrap();
+    let write = |path: &str, body: &str| {
+        std::fs::create_dir_all(root.path().join(path).parent().unwrap()).unwrap();
+        std::fs::write(root.path().join(path), body).unwrap();
+    };
+    write("docs/adr/0005-incremental.md", "x");
+    write("specs/rerun.md", SPEC);
+    write("crates/a/tests/t.rs", TESTS);
+    let cite = "// spec: PAR-1, RER-9\nfn t() {}\n";
+    write(".claude/hooks/h.rs", cite);
+    write("crates/a/tests/x.rs", cite);
+    write("crates/b/tests/y.rs", cite);
+    let ok = Command::new("git")
+        .args(["init", "-q", "."])
+        .current_dir(root.path())
+        .status()
+        .is_ok_and(|s| s.success());
+    assert!(ok, "git init failed");
+    let out = tool_command("check_specs.rs")
+        .arg(root.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(!out.status.success(), "{stdout}");
+    for line in [
+        "crates/a/tests/x.rs: cites `PAR-1`",
+        "crates/b/tests/y.rs: cites `PAR-1`",
+        "crates/a/tests/x.rs: cites `RER-9`",
+        "crates/b/tests/y.rs: cites `RER-9`",
+        ".claude/hooks/h.rs: cites `RER-9`",
+    ] {
+        assert!(stdout.contains(line), "missing {line:?} in:\n{stdout}");
+    }
+    assert!(
+        !stdout.contains(".claude/hooks/h.rs: cites `PAR-1`"),
+        "{stdout}"
+    );
 }

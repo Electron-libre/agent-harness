@@ -394,13 +394,12 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
         .iter()
         .flat_map(|s| s.requirements.iter().map(|r| r.id.as_str()))
         .collect();
-    for (id, files) in &cited {
-        let file = &files[0];
+    for (id, files) in cited.iter().filter(|(id, _)| !known.contains(id.as_str())) {
         // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
-        let foreign = !strict
-            && file.replace('\\', "/").starts_with(".claude/")
-            && !ids.contains_key(id.split('-').next().unwrap_or(""));
-        if !known.contains(id.as_str()) && !foreign {
+        let foreign = |file: &str| {
+            !strict && is_managed(file) && !ids.contains_key(id.split('-').next().unwrap_or(""))
+        };
+        for file in files.iter().filter(|f| !foreign(f)) {
             out.push(format!("{file}: cites `{id}`, which no spec defines"));
         }
     }
@@ -418,17 +417,24 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     out
 }
 
-/// Whether a test file calls the code from inside: it sits under a `src` directory (TRC-1).
-fn is_internal(file: &str) -> bool {
-    Path::new(file).components().any(|c| c.as_os_str() == "src")
+/// Whether a test file is a managed one, under `.claude/`.
+fn is_managed(file: &str) -> bool {
+    file.replace('\\', "/").starts_with(".claude/")
 }
 
-/// Warn, per spec, of the cited requirements whose every citation is internal (TRC-1 to TRC-3).
+/// Whether a test file calls the code from inside: it sits under a `src` directory, outside the managed tests
+/// (TRC-1, TRC-5).
+fn is_internal(file: &str) -> bool {
+    !is_managed(file) && Path::new(file).components().any(|c| c.as_os_str() == "src")
+}
+
+/// Warn, per spec, of the cited requirements whose every citation is internal (TRC-1 to TRC-4).
 fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<String>>) {
     for spec in specs {
         let internal: Vec<&str> = spec
             .requirements
             .iter()
+            .filter(|r| !r.exempt)
             .filter(|r| {
                 cited
                     .get(&r.id)

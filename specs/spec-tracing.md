@@ -19,6 +19,8 @@ internal proofs, as a warning until those proofs are moved.
 - **TRC-1** (deterministic) For each spec holding requirements cited only by tests under a `src` directory, the checker must print one warning to stderr naming the spec file, the count and the ids of those requirements, without failing.
 - **TRC-2** (deterministic) The checker must not list in that warning a requirement that a test outside every `src` directory also cites.
 - **TRC-3** (deterministic) The checker must not list in that warning a requirement that no test cites.
+- **TRC-4** (deterministic) The checker must not list in that warning a withdrawn requirement.
+- **TRC-5** (deterministic) The checker must count a test under `.claude/` as outside every `src` directory, whatever its path below.
 
 ## Scenarios
 
