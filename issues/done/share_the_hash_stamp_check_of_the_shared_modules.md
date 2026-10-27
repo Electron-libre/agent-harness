@@ -22,3 +22,9 @@ copy keeps passing on a stale format. One check should cover every `#[path]` inc
 # Resources
 * `docs/adr/0006-transcript-readers-are-managed-scripts.md`, `docs/adr/0009-scanners-list-the-repository-files-through-git.md`.
 * `issues/done/ship_the_harness_scripts_as_prebuilt_binaries.md`.
+
+# Tracking
+
+Closed without work (2026-10-27, `skill:prioritize-issues`): `ship_the_harness_scripts_as_prebuilt_binaries` moved
+the scripts into the `harness` binary, so no `#[path]` include, `// <module> sha256:` stamp or `rust-script` build
+is left to check. Left: the doc comment of `crates/harness/src/tools/repo_files.rs` still cites a `#[path]` include.

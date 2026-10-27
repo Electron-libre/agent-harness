@@ -112,7 +112,7 @@ walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `s
 - not fixed, with the reason: a global gitignore hiding `.claude/`, and a root inside an ignored directory, make the
   scan fail loudly (untraced requirements), and ADR 0009 states that an ignored file is no longer scanned;
   `--deduplicate` needs git 2.31 where the sort costs nothing; the copied stamp check became
-  `issues/share_the_hash_stamp_check_of_the_shared_modules.md`.
+  `issues/done/share_the_hash_stamp_check_of_the_shared_modules.md`.
 - checks: `just check` ok, `just test-harness` ok, `just check-harness` ok.
 - red: `crates/a/src/link.rs: cites RER-9`, `FAIL - in git, a failing git ls-files fails the check without walking
   the disk`, `FAIL - a failing git ls-files fails, naming --relink`.
