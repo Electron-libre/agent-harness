@@ -27,4 +27,4 @@ the harness documents which of them read the nested worktrees, and ships no sett
 * A change of `repo_files.rs` edits the hash line of every script that includes it (ADR 0006).
 * Measured on a throwaway consumer (2026-10-27): rg, tsc, pytest, ruff and mypy skip `.claude/worktrees/`; prettier,
   black, eslint 9, vitest and jest read it. A `/.claude/worktrees/` line in `.gitignore` is enough for prettier
-  and black; eslint, vitest and jest need their own ignore setting (README).
+  and black; eslint, vitest and jest need their own ignore setting (`docs/usage.md`).

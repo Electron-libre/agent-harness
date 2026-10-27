@@ -278,7 +278,7 @@ the crate, `git ls-files -co --exclude-standard`),
 which never lists a nested worktree, ignored or not, so the main worktree never sees the nested ones. `close-issue` then drops `.git`,
 `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by directory name; `check-specs`
 walks the disk only outside a git repository. A project's own tools run on `.` may still read the nested
-worktrees (measured in ADR 0009); the README says how to keep them out. `finish-issue` still removes a
+worktrees (measured in ADR 0009); [usage.md](usage.md) says how to keep them out. `finish-issue` still removes a
 worktree left at the former sibling path `../<repo>-<stem>`. Each worktree has its
 own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a cold build in 4 s; a larger
 project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:

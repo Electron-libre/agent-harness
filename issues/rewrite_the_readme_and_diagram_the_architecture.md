@@ -42,3 +42,59 @@ gates, issue workflow with its worktrees, evaluation from the transcripts) as me
 * Diagrams stay true only if small: one idea per diagram, names that exist in the code.
 * `prove_the_gate_specs_through_the_binary` is still open and may move more edge cases into the specs; leave the
   gate sections short and link the spec rather than restating it.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Make the README a one-screen entry point (what, what a project gets, install, daily commands, links) and the
+architecture a set of short component overviews, each with a mermaid diagram, its edge cases left to the specs, ADRs
+and doc comments that already hold them. Out of scope: any change of behaviour, the consumers' READMEs, the specs.
+
+## Plan
+1. [x] README and usage reference: rewrite `README.md` (what it is, what a project gets, install, one line per
+   command, the daily flow, links) with the components diagram; move the reference details (launcher install, transcript
+   retention, the transcript readers, the worktree ignore settings) to a new `docs/usage.md`; point the README rows of
+   `.claude/update-docs-map.md` at it too; verified by `skill:update-docs` (nothing lost) and the mermaid blocks parsing
+   (`mmdc` if available, else a GitHub preview); ~250 lines.
+2. [ ] Architecture, what is shared and the binary: restructure "What is shared, and how", "Making files identical",
+   "Tools and their binary" and "Sources" as overviews with a `sync` flowchart and a `harness run` launcher diagram,
+   duplicated edge cases replaced by links to `specs/sync.md`, `specs/tool-binaries.md` and the ADRs; verified by a
+   statement-by-statement check that each dropped one lives in a spec, an ADR or a doc comment; ~250 lines.
+3. [ ] Architecture, hooks and gates: "Hooks and their declaration" as an overview with a sequence diagram of a commit
+   (`review-gate` record, check, native; `clippy-gate` at Stop; `format-rust`), edge cases linked to
+   `specs/review-gate.md`, `specs/clippy-gate.md`, ADRs 0004, 0005, 0007; same check; ~200 lines.
+4. [ ] Processes: a new `docs/workflow.md` with the issue lifecycle flowchart (create, queue, steps 0 to 3 with the
+   stops and the autonomous mode, merge back, close) and the parallel worktree lifecycle (`start-issue`,
+   `finish-issue`); "Parallel issues" of the architecture trimmed to its design with a link; verified by checking each
+   step name against `files/.claude/skills/issue-workflow/SKILL.md` and the recipes; ~200 lines.
+5. [ ] Evaluation: "The instruction audit", "The evaluation from the transcripts" and "The cost of a turn" as an
+   overview with the pipeline diagram (transcripts and git history, readers, TSV, `harness-report`,
+   `evaluate-harness`), edge cases linked to `specs/evaluation.md`, `specs/rule-breaches.md`,
+   `specs/delivered-quality.md`, `specs/harness-report.md`; same check; ~200 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 0235194
+- Reference details out of the README go to a new `docs/usage.md`.
+- Edge cases already in a spec or an ADR are dropped from the architecture and linked.
+- The README addresses any project adopting the harness, not the author's projects only.
+- The processes go to a new `docs/workflow.md`.
+
+## Deliverable 1
+- done: README cut to one screen (what a project gets, components and daily flow diagrams, install, commands, links);
+  the reference moved to `docs/usage.md` (commands, launcher, evaluation readers, worktree ignore settings);
+  `update-docs-map.md`, `docs/architecture.md` and ADR 0009 repointed from the README to it.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| docs | every statement of the old README found in the new README or `docs/usage.md`; relative links resolve |
+| code review | see below |
+
+- red: none (docs only, no test)
+- Code review: no findings
+- not verified: the mermaid rendering (no mermaid CLI allowed here); the links to `docs/workflow.md` wait for
+  deliverable 4.
+- decisions needed: none
