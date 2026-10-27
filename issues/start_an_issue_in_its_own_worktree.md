@@ -69,21 +69,25 @@ a linked worktree to its repository), running the worktree's own copy of the hoo
   ran `cargo fmt` in `CLAUDE_PROJECT_DIR`, the launch directory.
 
 ## Plan
-1. [x] Hooks follow the event's `cwd`: `format_rust.rs` and `clippy_gate.rs` resolve the top-level of the event's
-   `cwd` (fallback `CLAUDE_PROJECT_DIR`, then `.`), as `require_code_review.rs record` does; verified by
+1. [x] Hooks follow the agent: `format_rust.rs` formats from the edited file's directory and `clippy_gate.rs`
+   resolves the work tree of the event's `cwd` (deliverable 3 settled both); verified by
    `test_hooks.rs` cases where `CLAUDE_PROJECT_DIR` points at another clean project; makes true PAR-12, CLG-6.
 2. [x] `issue-workflow` starts in the worktree: step 0 runs `just start-issue` then `EnterWorktree` with `path` when
    the session is in the main worktree and the issue is free (taken: stop), commits an uncommitted issue alone
    first (decision 1); the end of the issue merges back from the main worktree (decision 2); "Parallel agents" and
-   `details.md` rewritten as the default path, ADR 0003 and `docs/architecture.md` updated; verified by
+   `details.md` rewritten as the default path, `docs/architecture.md` updated (ADR 0003 unchanged, see Decisions); verified by
    `just test-harness`, `just check-harness` and the review (skill text, no automated test).
+3. [x] Fixes of the `high` review: the gate keeps the place of `CLAUDE_PROJECT_DIR` in its work tree (a crate in a
+   subdirectory) and falls back to it outside git; the format hook follows the edited file; step 0 detects the main
+   worktree with absolute paths and commits the issue with its queue line and nothing else staged; verified by
+   `test_hooks.rs`; makes true PAR-12, CLG-6 as amended.
 
 ## Decisions
 - Mode: autonomous
 - Base commit: 8a31a5df0f4e8c2026f25a8e9ff8774502c46dc1
-- 1a: an uncommitted issue is committed alone by the agent (`docs: open the issue ...`) before `start-issue`.
+- 1a: an uncommitted issue is committed (with its queue line, nothing else staged) by the agent (`docs: open the issue ...`) before `start-issue`.
 - ADR 0003 left as is: its decision (one worktree per issue) is unchanged; who starts it is in `docs/architecture.md`.
-- 2a: once the user agrees to close, the agent leaves the worktree (`ExitWorktree` keep), rebases and fast-forwards from the main worktree, then runs `close-issue` and `finish-issue`.
+- 2a: once the user agrees to close, the agent rebases the branch in the worktree, leaves it (`ExitWorktree` keep), fast-forwards from the main worktree, then runs `close-issue` and `finish-issue` (the rebase moved into the worktree: a branch checked out there cannot be rebased from the main one).
 
 ## Deliverable 1: hooks follow the event's `cwd`
 - done: `format_rust.rs` and `clippy_gate.rs` resolve the top-level of the event's `cwd` (fallback
@@ -104,3 +108,15 @@ a linked worktree to its repository), running the worktree's own copy of the hoo
 - red: none (skill text, no automated test).
 - Code review: no findings
 - not verified: a whole issue driven through this step 0 and merge back in a live session.
+
+## Deliverable 3: fixes of the `high` review
+- done: findings 1 to 6 and 9 of the `high` review fixed (see plan line 3); PAR-12 and CLG-6 amended, specs back to
+  `accepted`.
+- red: `FAIL - format hook formats the worktree of the edited file`, `FAIL - format hook leaves the project of the
+  session alone`, `FAIL - gate checks the crate's subdirectory in the worktree of the event's cwd`, `FAIL - gate
+  checks CLAUDE_PROJECT_DIR when the event's cwd is outside git`.
+- not fixed: 7 (three copies of the work-tree lookup: each hook is a standalone script, and the format hook no
+  longer has one); 8 (sibling worktrees left in the temp directory when a test panics, unescaped paths in the test
+  JSON: the existing temp project has the same behaviour, the temp paths hold no quote).
+- check: `just check` ok, `just test-harness` ok, `just check-harness` ok, code review low run.
+- Code review: no findings

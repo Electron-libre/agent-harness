@@ -1,8 +1,8 @@
 # Written by `harness sync`: hashes of the managed files. Do not edit.
-edd865a3fd2e381e9dd8ed0ca1e9fa3c1cbe0877abfdc672a4c06a97bebd66b6+x  .claude/hooks/clippy_gate.rs
-a9e8c8cb18668c2a4ed7628b133d2b656c72414403835def4e1f0eddee412079+x  .claude/hooks/format_rust.rs
+afca83926df442802f261aa7cce6f59a6b5d4313dca2233fe672b4cad5da8a40+x  .claude/hooks/clippy_gate.rs
+e19f15963cdaf97eb3fa24ce34463f9d1269627671ecccbc91799754ee4645a6+x  .claude/hooks/format_rust.rs
 d976e44da867bb4223883f010040400c451c8ad753d1b8e6e5e976a63cbe42c4  .claude/hooks/require_code_review.rs
-2da28de2e62feb69ab6b26e8645c7211fd69320a5f55470afafd3cfbbd8d896d+x  .claude/hooks/test_hooks.rs
+fd54e7e2e1012945a1438a5cb9a5d12e6b264a736f50fb16da183ed9ebb9cbf2+x  .claude/hooks/test_hooks.rs
 9f7ab65a4f341f67b1d946989bda79b06ced318125b73875cb2ce1350256113a  .claude/hooks/test_require_code_review.rs
 adb015a408ba21b51dcfbcade42911a22bb3559e66be924c269a370d36c4bd97  .claude/skills/audit-instructions/SKILL.md
 9f0d663472ace95794b7b8c4ce0c8ac9233228175ca2cf681e65bed778289cf5  .claude/skills/audit-instructions/audit_sources.rs
@@ -14,9 +14,9 @@ ae9f6efa0dfd5f07e7809685da315d7483da9ac6bb88902b34b8efff2214a5c0  .claude/skills
 5c5a0cbac46a42b78dbeeaffaa145413e01d53487b0f8923c65d9d9610c93e6a  .claude/skills/create-issue/check_issue.rs
 d2db744e6291a53f6c90457db7fa2704f044815c4ebbff5fc8c85497eced7894  .claude/skills/create-issue/test_check_issue.rs
 e632be85a3847d1043e3d277f89bbdc86042cf7f13143ae9882232a5a73367ea  .claude/skills/evaluate-harness/SKILL.md
-3e2295e7c6fff23d32ec260bfb17598cae02decc396a31a4b917ec109909fb0b  .claude/skills/issue-workflow/SKILL.md
+881413b1b27b8920c92406da9ad2602a4842281c1e3edc1783378c8e7234ced2  .claude/skills/issue-workflow/SKILL.md
 61ea05693783bc5826c503540b274bacaba2da288abd275528b102a8891098e4  .claude/skills/issue-workflow/close_issue.rs
-a5ee081f188a1d6daba2e994ba73f8735765e7e4b9420031a126fff1d12e9e62  .claude/skills/issue-workflow/details.md
+544387537d0864ee369ab8fa1230e0b47009beff11eefd1ce300cc249937f951  .claude/skills/issue-workflow/details.md
 ae87714b3fc1afbc4c73f80e016f15a79191ee5232a051631b33e363c33931e4+x  .claude/skills/issue-workflow/issue_worktree.rs
 59ca70c69792b4c6b4788d6889755b6ea579cf0d59a8fe614e411cd18160af1a  .claude/skills/issue-workflow/next_issue.rs
 103e8c02f720663e6eb47d2254fd6cf99c860d04e14bc20e3119476f8aa57510  .claude/skills/issue-workflow/test_close_issue.rs

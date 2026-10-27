@@ -14,11 +14,11 @@ message, `grep`) is fine.
 Step 0 of `SKILL.md` puts each issue in its own worktree: `just start-issue issues/<name>.md` creates
 `../<repo>-<name>` on a branch `<name>`, and the session enters it with `EnterWorktree` (`path`). A shell `cd` is no
 substitute: the Bash tool resets the directory after a command that left the launch directory. Once entered, the
-`cwd` of the hook events is the worktree, and the hooks act on it (`format_rust.rs`, `clippy_gate.rs`,
-`require_code_review.rs`); their scripts still come from the main worktree's `.claude/` (`CLAUDE_PROJECT_DIR`),
+`cwd` of the hook events is the worktree, and the hooks act on it (`clippy_gate.rs`, `require_code_review.rs`; `format_rust.rs` formats
+the project of the edited file); their scripts still come from the main worktree's `.claude/` (`CLAUDE_PROJECT_DIR`),
 which holds the same revision while both worktrees are on the same commit of the harness. While the branch or
 worktree exists, `just next-issue` skips the issue. `start-issue` refuses an issue not committed on the main
-branch, hence the commit of the issue alone before it. The user may also open a session in the worktree directly;
+branch, hence the commit of the issue (with its queue line) before it. The user may also open a session in the worktree directly;
 step 0 then has nothing to do.
 
 ## Merge back

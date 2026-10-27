@@ -205,6 +205,36 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     ));
     sh(project, "git", &["worktree", "remove", "--force", worktree.to_str().unwrap()]);
 
+    // the same with the crate in a subdirectory of the repository: the gate checks that subdirectory of the worktree
+    let mono = project.join("fake-mono");
+    fs::create_dir_all(mono.join("backend/src")).unwrap();
+    sh(&mono, "git", &["init", "-q", "."]);
+    fs::write(mono.join("backend/Cargo.toml"), "").unwrap();
+    fs::write(mono.join("backend/src/main.rs"), "fn main() {}\n").unwrap();
+    commit_all(&mono, "init");
+    let mono_tree = project.with_file_name(format!("{}-mono", project.file_name().unwrap().to_string_lossy()));
+    sh(&mono, "git", &["worktree", "add", "-q", "--detach", mono_tree.to_str().unwrap()]);
+    fs::write(mono_tree.join("backend/src/main.rs"), "fn main() {}\n// worktree edit\n").unwrap();
+    let before = fake_runs();
+    let event = format!("{{\"cwd\":\"{}\"}}", mono_tree.display());
+    checks.push((
+        "gate checks the crate's subdirectory in the worktree of the event's cwd",
+        run_hook_with(gate, &mono.join("backend"), &event, &fake_env).code == 2 && fake_runs() == before + 1,
+    ));
+    sh(&mono, "git", &["worktree", "remove", "--force", mono_tree.to_str().unwrap()]);
+
+    // an event's cwd outside any git work tree: the gate checks CLAUDE_PROJECT_DIR
+    let outside = project.with_file_name(format!("{}-nogit", project.file_name().unwrap().to_string_lossy()));
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(&main_rs, "fn main() {}\n// outside edit\n").unwrap();
+    let before = fake_runs();
+    let event = format!("{{\"cwd\":\"{}\"}}", outside.display());
+    checks.push((
+        "gate checks CLAUDE_PROJECT_DIR when the event's cwd is outside git",
+        run_hook_with(gate, project, &event, &fake_env).code == 2 && fake_runs() == before + 1,
+    ));
+    fs::remove_dir_all(&outside).unwrap();
+
     // a repository with no commit yet: a staged file edited again
     let fresh = project.join("fake-fresh");
     fs::create_dir_all(fresh.join("src")).unwrap();
@@ -231,8 +261,8 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
 }
 
 // spec: PAR-12
-/// A session that entered an issue worktree: the format hook formats the worktree of the event's `cwd`, not
-/// `CLAUDE_PROJECT_DIR`.
+/// An edit in an issue worktree: the format hook formats the project of the edited file, whatever the event's `cwd`
+/// and `CLAUDE_PROJECT_DIR` say.
 fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static str, bool)> {
     let main_rs = project.join("src/main.rs");
     let mut checks = Vec::new();
@@ -243,16 +273,16 @@ fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static 
     fs::write(worktree.join("src/main.rs"), unformatted).unwrap();
     let json = format!(
         "{{\"cwd\":\"{}\",\"tool_input\":{{\"file_path\":\"{}\"}}}}",
-        worktree.join("src").display(),
+        project.display(),
         worktree.join("src/main.rs").display()
     );
     run_hook(format_hook, project, &json);
     checks.push((
-        "format hook formats the worktree of the event's cwd",
+        "format hook formats the worktree of the edited file",
         fs::read_to_string(worktree.join("src/main.rs")).unwrap().contains("let a = 1;"),
     ));
     let untouched = fs::read_to_string(&main_rs).unwrap() == unformatted;
-    checks.push(("format hook leaves CLAUDE_PROJECT_DIR alone when the event has a cwd", untouched));
+    checks.push(("format hook leaves the project of the session alone", untouched));
     sh(project, "git", &["worktree", "remove", "--force", worktree.to_str().unwrap()]);
     fs::write(&main_rs, "fn main() {}\n").unwrap();
     checks

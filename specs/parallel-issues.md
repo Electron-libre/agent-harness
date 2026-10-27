@@ -25,7 +25,7 @@ deliberate step run from the main branch.
 - **PAR-7** (deterministic) `finish-issue` must refuse a worktree with uncommitted changes, and must not remove a worktree other than the one named after the issue stem.
 - **PAR-8** (deterministic) `close-issue` (with or without `--relink`) must refuse to run in a worktree other than the main one, and must refuse to close an issue whose `issues/` directory is in such a worktree, whatever directory it runs from, so that the queue is edited at merge time on the main branch and never on an issue branch.
 - **PAR-9** (deterministic) The hooks that use the git directory (the code review gate and its marker and waiver) must resolve it per worktree, so a review recorded in one worktree is not seen by another.
-- **PAR-12** (deterministic) `format_rust.rs` must run `cargo fmt` in the top-level directory of the work tree that holds the `cwd` of the event (the `cwd` itself outside a repository), and in `CLAUDE_PROJECT_DIR` only when the event has no `cwd`, so that an agent moved into an issue worktree formats that worktree and not the main one.
+- **PAR-12** (deterministic) `format_rust.rs` must run `cargo fmt` from the directory of the edited file, so that cargo formats the project holding that file (the main worktree, an issue worktree, a crate in a subdirectory) and not the one of `CLAUDE_PROJECT_DIR`.
 
 ## Scenarios
 

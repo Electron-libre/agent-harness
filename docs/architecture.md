@@ -52,9 +52,10 @@ line per diagnostic (`--message-format=short`: file, line, column, message) and 
 40, never the build progress, and runs clippy only when the Rust state changed since the last passing run: that run
 writes a hash of `HEAD` and of the path and content of each changed `.rs` file to `claude-clippy-pass` in the git
 directory of the worktree.
-The hooks that run cargo (`clippy_gate.rs`, and `format_rust.rs` after an edit of a `.rs` file) act on the work tree
-of the event's `cwd`, not on `CLAUDE_PROJECT_DIR`: a session opened in the main worktree that entered an issue
-worktree (`EnterWorktree`) keeps `CLAUDE_PROJECT_DIR` on the main one, where another agent may work.
+The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session opened in the main worktree that entered an
+issue worktree (`EnterWorktree`) keeps it on the main one, where another agent may work. `clippy_gate.rs` checks the
+work tree of the event's `cwd`, at the place `CLAUDE_PROJECT_DIR` has in its own (a crate in a subdirectory), and
+`format_rust.rs` runs `cargo fmt` from the directory of the edited file.
 For the same reason `just test-harness` prints nothing when every test script passes, and only the lines of the
 failing script that are not `ok` otherwise (`test_recipes.rs` proves it); the seeded `justfile` asks the same of the
 project's `check`.

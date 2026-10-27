@@ -4,7 +4,8 @@
 //! message), at most `MAX_DIAGNOSTICS`, since every line is billed to the agent. A passing run stamps the Rust state
 //! in the git directory, and clippy does not run again until that state changes. When the agent already retried once
 //! (`stop_hook_active`), let go to avoid an endless loop. It checks the work tree of the event's `cwd` (an agent that
-//! entered an issue worktree is checked there), else `CLAUDE_PROJECT_DIR`. Spec: `specs/clippy-gate.md`.
+//! entered an issue worktree is checked there), at the place `CLAUDE_PROJECT_DIR` has in its own. Spec:
+//! `specs/clippy-gate.md`.
 //!
 //! Declare: Stop
 //!
@@ -44,14 +45,17 @@ fn git(dir: &str, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
-/// The top-level of the work tree holding the event's `cwd` (the `cwd` itself outside a repository), else
-/// `CLAUDE_PROJECT_DIR`, else the current directory.
+/// The directory to check: where `CLAUDE_PROJECT_DIR` sits in its work tree, taken in the work tree of the event's
+/// `cwd` (an issue worktree the agent entered); `CLAUDE_PROJECT_DIR` itself when either is outside git.
 fn work_tree(event: &serde_json::Value) -> String {
-    let Some(cwd) = event["cwd"].as_str() else {
-        return std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
-    };
+    let project = std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
+    let Some(cwd) = event["cwd"].as_str() else { return project };
     let root = git(cwd, &["rev-parse", "--show-toplevel"]);
-    if root.trim().is_empty() { cwd.to_string() } else { root.trim().to_string() }
+    let prefix = git(&project, &["rev-parse", "--show-prefix"]);
+    if root.trim().is_empty() || git(&project, &["rev-parse", "--show-toplevel"]).trim().is_empty() {
+        return project;
+    }
+    Path::new(root.trim()).join(prefix.trim()).to_string_lossy().into_owned()
 }
 
 /// The changed and untracked `.rs` files, outside the `.claude` directories whose scripts are not crate code.

@@ -20,13 +20,14 @@ Reports to the user (stops, summaries, final report) are read at a glance:
 
 **Work in the issue's own worktree** (ADR 0003), so that another session's files, index and `target/` never mix
 with yours. In a linked worktree on the branch `<stem>` of the issue, go on. In the main worktree (`git rev-parse
---git-dir` equals `--git-common-dir`):
+--path-format=absolute --git-dir --git-common-dir` prints the same path twice):
 
 - The worktree `../<repo>-<stem>` exists: enter it with Claude Code's `EnterWorktree` tool, `path` set to it.
 - The branch `<stem>` exists without its worktree: stop and ask the user.
-- Otherwise: when `issues/<stem>.md` is untracked or modified, commit it alone first (`git add issues/<stem>.md`,
-  `docs: open the issue ...` through `skill:commit-message`); run `just start-issue issues/<stem>.md`, then
-  `EnterWorktree` with the path it prints.
+- Otherwise: when `issues/<stem>.md` is untracked or modified, commit it first with its queue line and nothing
+  else staged (`git add issues/<stem>.md issues/queue.md`, then `git commit -m <message> -- issues/<stem>.md
+  issues/queue.md`, the message `docs: open the issue ...` through `skill:commit-message`); run
+  `just start-issue issues/<stem>.md`, then `EnterWorktree` with the path it prints.
 
 From then on every command and edit happens in the worktree: a `cd` out of the launch directory does not last
 past its command, and never redirect to the main worktree (`git -C`, its paths). Details: [details.md](details.md).
