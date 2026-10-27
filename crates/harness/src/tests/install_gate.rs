@@ -776,6 +776,7 @@ fn update_reports_the_warnings_of_its_sync_once() {
         root.path(),
         None,
         &SyncOptions::default(),
+        &no_harness(),
     )
     .unwrap();
     assert!(done.applied);

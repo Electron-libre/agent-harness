@@ -68,3 +68,88 @@ fn check_looks_at_nothing_without_a_harness_on_the_path() {
         .problems
         .is_empty());
 }
+
+/// A git source whose head adds the hook `harness newcmd`, a project at its tag `v1`, the cache and the head.
+fn source_with_a_new_hook_command() -> (TempDir, TempDir, TempDir, String) {
+    let (repo, _first, _second) = git_source();
+    let root = git_project(&repo);
+    let cache = tempdir().unwrap();
+    update_in(
+        Some(cache.path()),
+        root.path(),
+        Some("v1"),
+        &SyncOptions::default(),
+        &no_harness(),
+    )
+    .unwrap();
+    put(
+        repo.path(),
+        &format!("entries/{}", entries::SETTINGS),
+        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "harness newcmd"}]}]}}"#,
+    );
+    git_in(repo.path(), &["add", "."]);
+    git_in(repo.path(), &["commit", "--quiet", "-m", "new hook"]);
+    let head = git_in(repo.path(), &["rev-parse", "HEAD"]);
+    (repo, root, cache, head)
+}
+
+// spec: BIN-16
+#[test]
+fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuses_a_hook() {
+    let (repo, root, cache, head) = source_with_a_new_hook_command();
+    let bin = tempdir().unwrap();
+    let old = harness_with_run(bin.path(), &bin.path().join("log"));
+    let (config, lock) = (get(root.path(), CONFIG), get(root.path(), LOCK));
+
+    let err = update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &SyncOptions::default(),
+        &old,
+    )
+    .unwrap_err();
+    let err = format!("{err:#}");
+    assert!(err.contains("`harness newcmd`"), "{err}");
+    let install = format!(
+        "cargo install --git file://{} --rev {head} --locked",
+        repo.path().display()
+    );
+    assert!(err.contains(&install), "{err}");
+    assert_eq!(get(root.path(), CONFIG), config);
+    assert_eq!(get(root.path(), LOCK), lock);
+
+    // once the harness of the target is installed, the same update goes through
+    let new = script(&bin.path().join("harness-new"), "exit 0\n");
+    let done = update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &SyncOptions::default(),
+        &new,
+    )
+    .unwrap();
+    assert!(done.applied);
+    assert_eq!(done.rev, head);
+}
+
+// spec: BIN-16
+#[test]
+fn update_dry_run_warns_of_a_hook_the_installed_harness_refuses() {
+    let (_repo, root, cache, _head) = source_with_a_new_hook_command();
+    let bin = tempdir().unwrap();
+    let old = harness_with_run(bin.path(), &bin.path().join("log"));
+    let options = SyncOptions {
+        force: false,
+        dry_run: true,
+    };
+    let done = update_in(Some(cache.path()), root.path(), None, &options, &old).unwrap();
+    assert!(!done.applied);
+    assert!(
+        done.sync.warnings.iter().any(|w| w.starts_with("warning:")
+            && w.contains("`harness newcmd`")
+            && w.contains("cargo install")),
+        "{:?}",
+        done.sync.warnings
+    );
+}

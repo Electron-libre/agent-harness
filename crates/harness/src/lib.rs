@@ -648,13 +648,13 @@ pub struct UpdateReport {
 }
 
 /// Move the project to `rev` of its git source (default: the head of the default branch): sync to it, then write
-/// the resolved commit to `rev` in `harness.toml`. A conflict, an unknown revision or an unreadable source leave the project as it was;
+/// the resolved commit to `rev` in `harness.toml`. A conflict, an unknown revision, an unreadable source or a hook the `harness` on the path refuses (BIN-16) leave the project as it was;
 /// an I/O error during the write itself is not rolled back, as for `sync`.
 ///
 /// # Errors
 /// When the source is a local directory, the revision is unknown, or the configuration or sync fails.
 pub fn update(root: &Path, rev: Option<&str>, options: &SyncOptions) -> Result<UpdateReport> {
-    let mut done = update_in(None, root, rev, options)?;
+    let mut done = update_in(None, root, rev, options, OsStr::new("harness"))?;
     if done.applied {
         let (source, _) = source_and_rev(root)?;
         done.sync.warnings.extend(prefetch(
@@ -672,6 +672,7 @@ fn update_in(
     root: &Path,
     rev: Option<&str>,
     options: &SyncOptions,
+    harness: &OsStr,
 ) -> Result<UpdateReport> {
     let (source, previous) = source_and_rev(root)?;
     if !is_git_url(&source) {
@@ -680,6 +681,24 @@ fn update_in(
     let dir = fetch(&cache_or_default(cache)?, &source)?;
     let commit = resolve_in(&dir, &source, rev)?;
     git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
+    // The hooks of the target must not lock the agent out: the installed launcher has to know their subcommands. A
+    // fragment that cannot be read fails the sync below, before anything is written.
+    let refused: Vec<String> = fs::read_to_string(dir.join(entries::FRAGMENT))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .map(|fragment| launcher::refused(&fragment, harness))
+        .unwrap_or_default()
+        .iter()
+        .map(|command| {
+            format!(
+                "the installed harness cannot run the hook `{command}` of {commit}: install the harness of {commit} first, `cargo install --git {} --rev {commit} --locked`, then run `harness update` again",
+                run::cargo_url(&source)
+            )
+        })
+        .collect();
+    if !refused.is_empty() && !options.dry_run {
+        bail!("{}", refused.join("\n"));
+    }
     let path = root.join(CONFIG);
     let text = set_rev(
         &fs::read_to_string(&path)?,
@@ -687,7 +706,7 @@ fn update_in(
         rev.unwrap_or("default branch"),
     )?;
     // Nothing is written before the dry run shows a clean sync.
-    let preview = sync_from(
+    let mut preview = sync_from(
         root,
         &dir,
         &SyncOptions {
@@ -695,6 +714,9 @@ fn update_in(
             ..*options
         },
     )?;
+    preview
+        .warnings
+        .extend(refused.iter().map(|line| format!("warning: {line}")));
     let applied = !options.dry_run && preview.conflicts() == 0;
     let sync = if applied {
         let sync = sync_from(root, &dir, options)?;

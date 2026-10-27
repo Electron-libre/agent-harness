@@ -41,7 +41,9 @@ Claude Code reads 2 as the refusal of a hook, and a hook that cannot run must no
 The launcher itself is not of the pinned revision: a hook command `harness <subcommand>` it does not know exits 2
 through its argument parser, and every hook refuses. `harness check` asks the `harness` on the path `harness help
 <subcommand>` for each subcommand the hooks of `.claude/settings.json` name, and fails on those it refuses
-(`crates/harness/src/launcher.rs`, BIN-15).
+(`crates/harness/src/launcher.rs`, BIN-15). `harness update` asks the same of the hooks of the target revision and
+writes nothing while one is refused, naming the `cargo install --git <source> --rev <commit> --locked` to run first
+(a warning under `--dry-run`, BIN-16).
 
 - Git source: the binary of the pinned commit and the platform, `<cache>/harness/bin/<commit>/<target>/harness`. A
   `rev` that is no commit hash (a branch, from `init --rev`) resolves in the clone `sync` left, without a fetch. When

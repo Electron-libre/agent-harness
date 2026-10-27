@@ -47,7 +47,7 @@ issue, the check being `harness help <subcommand>` run against the `harness` on 
 ## Plan
 1. [x] Launcher check in `check`: a hook command `harness <sub> ...` of `.claude/settings.json` whose `<sub>` the
    `harness` on the path refuses fails `check`; verified by tests with a fake `harness`; makes true BIN-15.
-2. [ ] `update` refuses such a target, naming `cargo install --git <source> --rev <commit> --locked`, and warns under
+2. [x] `update` refuses such a target, naming `cargo install --git <source> --rev <commit> --locked`, and warns under
    `--dry-run`; verified by tests with a fake `harness`; makes true BIN-16.
 3. [ ] Procedure and docs: `issue-workflow` "Merge back" runs `just check-harness` in the worktree before the
    fast-forward and installs the branch's `harness` (`just install` from the worktree) when it fails; the README says a
@@ -75,3 +75,24 @@ red: `assertion left == right failed: [] left: 0 right: 2` (no hook command refu
 Code review: no findings
 
 not verified: a real old launcher (one without `run`) against these settings; the fake `harness` stands for it.
+
+## Deliverable 2
+done: `harness update` reads the hooks of the target revision (`entries/.claude/settings.json`) and, when the
+`harness` on the path refuses one, writes nothing and fails with one line per hook naming
+`cargo install --git <source> --rev <commit> --locked`; under `--dry-run` the same lines are warnings.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass (BIN-16 traced, `specs/tool-binaries.md` back to `accepted`) |
+| docs | README, `docs/architecture.md`, `update` help and doc comment |
+| code review | low, see below |
+
+red: `called Result::unwrap_err() on an Ok value: UpdateReport { ..., applied: true, ... }`
+
+Code review: 1 finding
+- An unreadable or invalid target fragment skips the check: not fixed, no defect, since `entries::of_source` fails the
+  dry-run sync on it before anything is written; a comment says so.
+
+not verified: a real `harness update` from GitHub (network); the tests use a `file://` source and a fake `harness`.

@@ -15,7 +15,7 @@ use crate::Outcome;
 /// The settings of the project, relative to its root.
 pub const SETTINGS: &str = ".claude/settings.json";
 /// The managed entries, relative to the source.
-const FRAGMENT: &str = "entries/.claude/settings.json";
+pub const FRAGMENT: &str = "entries/.claude/settings.json";
 
 /// One managed entry: a rule of `permissions.deny`, or a hook object of an event and matcher of `hooks`.
 #[derive(Clone, Debug, PartialEq)]

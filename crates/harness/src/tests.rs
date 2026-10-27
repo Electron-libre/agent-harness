@@ -440,7 +440,14 @@ fn update_pins_the_resolved_commit_then_syncs_and_reports_both_revisions() {
     let cache = tempdir().unwrap();
     let opts = SyncOptions::default();
 
-    let done = update_in(Some(cache.path()), root.path(), Some("v1"), &opts).unwrap();
+    let done = update_in(
+        Some(cache.path()),
+        root.path(),
+        Some("v1"),
+        &opts,
+        &no_harness(),
+    )
+    .unwrap();
     assert_eq!(done.previous, None);
     assert_eq!(done.rev, first);
     assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Added));
@@ -452,7 +459,7 @@ fn update_pins_the_resolved_commit_then_syncs_and_reports_both_revisions() {
         "{config}"
     );
 
-    let done = update_in(Some(cache.path()), root.path(), None, &opts).unwrap();
+    let done = update_in(Some(cache.path()), root.path(), None, &opts, &no_harness()).unwrap();
     assert_eq!(done.previous.as_deref(), Some(first.as_str()));
     assert_eq!(done.rev, second);
     assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Updated));
@@ -463,7 +470,7 @@ fn update_pins_the_resolved_commit_then_syncs_and_reports_both_revisions() {
 
     // Already there: `rev` is rewritten as it was and nothing else happens.
     let before = get(root.path(), CONFIG);
-    let done = update_in(Some(cache.path()), root.path(), None, &opts).unwrap();
+    let done = update_in(Some(cache.path()), root.path(), None, &opts, &no_harness()).unwrap();
     assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Unchanged));
     assert_eq!(get(root.path(), CONFIG), before);
 }
@@ -489,6 +496,7 @@ fn updated_to_v1() -> (TempDir, String, TempDir, TempDir) {
         root.path(),
         Some("v1"),
         &SyncOptions::default(),
+        &no_harness(),
     )
     .unwrap();
     (repo, first, root, cache)
@@ -506,6 +514,7 @@ fn update_stops_on_a_conflict_unless_forced_and_writes_nothing() {
         root.path(),
         None,
         &SyncOptions::default(),
+        &no_harness(),
     )
     .unwrap();
     assert!(!done.applied);
@@ -519,7 +528,14 @@ fn update_stops_on_a_conflict_unless_forced_and_writes_nothing() {
         force: true,
         dry_run: false,
     };
-    let done = update_in(Some(cache.path()), root.path(), None, &options).unwrap();
+    let done = update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &options,
+        &no_harness(),
+    )
+    .unwrap();
     assert!(done.applied);
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a2"));
     assert!(!get(root.path(), CONFIG).unwrap().contains(&first));
@@ -532,16 +548,37 @@ fn update_to_an_unknown_revision_or_an_unreadable_source_changes_nothing() {
     let (config, lock) = (get(root.path(), CONFIG), get(root.path(), LOCK));
     let options = SyncOptions::default();
 
-    assert!(update_in(Some(cache.path()), root.path(), Some("nope"), &options).is_err());
+    assert!(update_in(
+        Some(cache.path()),
+        root.path(),
+        Some("nope"),
+        &options,
+        &no_harness()
+    )
+    .is_err());
 
     // A revision without files/: the source cannot be read as a harness.
     git_in(repo.path(), &["rm", "-rq", "files"]);
     git_in(repo.path(), &["commit", "--quiet", "-m", "empty"]);
-    assert!(update_in(Some(cache.path()), root.path(), None, &options).is_err());
+    assert!(update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &options,
+        &no_harness()
+    )
+    .is_err());
 
     let gone = git_project(&tempdir().unwrap());
     let gone_config = get(gone.path(), CONFIG);
-    assert!(update_in(Some(cache.path()), gone.path(), None, &options).is_err());
+    assert!(update_in(
+        Some(cache.path()),
+        gone.path(),
+        None,
+        &options,
+        &no_harness()
+    )
+    .is_err());
 
     assert_eq!(get(root.path(), CONFIG), config);
     assert_eq!(get(root.path(), LOCK), lock);
@@ -558,7 +595,14 @@ fn update_dry_run_reports_the_target_and_writes_nothing() {
         force: false,
         dry_run: true,
     };
-    let done = update_in(Some(cache.path()), root.path(), None, &options).unwrap();
+    let done = update_in(
+        Some(cache.path()),
+        root.path(),
+        None,
+        &options,
+        &no_harness(),
+    )
+    .unwrap();
     assert!(!done.applied);
     assert_ne!(done.rev, first);
     assert_eq!(done.sync.outcome("a.txt"), Some(Outcome::Updated));

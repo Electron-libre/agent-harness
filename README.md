@@ -9,7 +9,9 @@ cd my-project
 harness init ../agent-harness      # writes .claude/harness.toml (or a git URL with --rev)
 harness sync                       # managed files copied, project-owned ones seeded, git pre-commit review gate installed,
                                    # the harness's hooks and deny rules added to (or removed from) .claude/settings.json
-harness update [--rev <tag|branch|commit>] [--dry-run] [--force]  # git source: sync to it, then pin the commit in `rev`
+harness update [--rev <tag|branch|commit>] [--dry-run] [--force]  # git source: sync to it, then pin the commit in `rev`;
+                                   # refuses a revision whose hooks run a `harness` subcommand the installed harness
+                                   # does not know, naming the `cargo install` of that revision to run first
 harness check                      # fails if a managed file was modified or deleted, the git review gate is missing,
                                    # or a hook runs a `harness` subcommand the installed harness does not know;
                                    # warns when .claude/settings.json lacks a deny rule of the review waiver,

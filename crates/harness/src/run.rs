@@ -185,7 +185,7 @@ fn download(programs: &Programs, url: &str, to: &Path) -> Result<Option<String>>
 }
 
 /// The URL cargo reads for a git source: a scp-style `git@host:path` becomes `ssh://git@host/path`.
-fn cargo_url(source: &str) -> String {
+pub(crate) fn cargo_url(source: &str) -> String {
     match source.split_once(':') {
         Some((host, path)) if !source.contains("://") && host.contains('@') => {
             format!("ssh://{host}/{}", path.trim_start_matches('/'))

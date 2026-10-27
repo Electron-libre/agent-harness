@@ -37,7 +37,7 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Move the project to a revision of its git source (default: the head of its default branch), then sync.
+    /// Move the project to a revision of its git source (default: the head of its default branch), then sync; refuses a revision whose hooks run a subcommand the installed `harness` does not know.
     Update {
         /// Branch, tag or commit; `rev` stores the resolved commit.
         #[arg(long)]
