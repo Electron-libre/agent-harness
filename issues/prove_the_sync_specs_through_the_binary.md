@@ -44,7 +44,7 @@ on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
 1. [x] Init, sync and check: shared helpers `crates/harness/tests/common/mod.rs` (run the binary, put/get, a source),
    `crates/harness/tests/sync_cli.rs`, the matching tests of `src/tests.rs` dropped; verified by `just check` and
    `check-specs` no longer listing them; makes true SYN-1 to SYN-10 (~650 lines).
-2. [ ] Update: `crates/harness/tests/update_cli.rs` on a local git source, internal update tests dropped, `set_rev`
+2. [x] Update: `crates/harness/tests/update_cli.rs` on a local git source, internal update tests dropped, `set_rev`
    and `is_full_hash` kept uncited; makes true SYN-11 to SYN-17 (~650 lines).
 3. [ ] Settings entries: `crates/harness/tests/settings_entries_cli.rs`, `src/tests/settings_entries.rs` dropped;
    makes true SYN-29 to SYN-36 (~850 lines).
@@ -59,5 +59,16 @@ on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
 - red: none (the behaviour exists: the proofs move, no test can fail before the code)
 - Code review: 1 findings; the possible dead helpers and imports of `src/tests.rs` after the drop: not a defect,
   `just check` (clippy `-D warnings`) passes, the remaining tests use them (`use super::*` raises no unused warning).
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `tests/update_cli.rs` proves SYN-11 to SYN-17 through `update` and `sync` on a `file://` git source; the
+  internal update, resolve and pinned-hash tests dropped; `set_rev` (array lines, a name with a newline) and
+  `is_full_hash` kept as uncited unit tests.
+- red: none (the behaviour exists: the proofs move, no test can fail before the code)
+- Code review: 2 findings; (1) `git_source` and `git_project` possibly dead: no, `src/tests/launcher.rs` calls them
+  and clippy passes; (2) `set_rev` and `is_full_hash` tests lost their citation: by plan, they add detail, the
+  boundary tests prove SYN-12 and SYN-17.
 - not verified: none
 - decisions needed: none
