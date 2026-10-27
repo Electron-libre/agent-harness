@@ -40,7 +40,7 @@ project) and replaces itself (`exec`) by `<binary> tool <tool> [args]`, so input
 Claude Code reads 2 as the refusal of a hook, and a hook that cannot run must not block the agent (BIN-14).
 The launcher itself is not of the pinned revision: a hook command `harness <subcommand>` it does not know exits 2
 through its argument parser, and every hook refuses. `harness check` asks the `harness` on the path `harness help
-<subcommand>` for each subcommand the hooks of `.claude/settings.json` name, and fails on those it refuses
+<subcommand>` for each subcommand the hooks of `.claude/settings.json` name, and fails on those it refuses, naming the `cargo install` of the pinned revision
 (`crates/harness/src/launcher.rs`, BIN-15). `harness update` asks the same of the hooks of the target revision and
 writes nothing while one is refused, naming the `cargo install --git <source> --rev <commit> --locked` to run first
 (a warning under `--dry-run`, BIN-16).

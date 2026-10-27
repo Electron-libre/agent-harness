@@ -12,7 +12,7 @@ fn harness_with_run(dir: &Path, log: &Path) -> OsString {
     script(
         &dir.join("harness"),
         &format!(
-            "echo \"$*\" >> {log}\n[ \"$1\" = help ] && [ \"$2\" = run ]\n",
+            "echo \"$*\" >> '{log}'\n[ \"$1\" = help ] && [ \"$2\" = run ]\n",
             log = log.display()
         ),
     )
@@ -20,6 +20,7 @@ fn harness_with_run(dir: &Path, log: &Path) -> OsString {
 
 const HOOKS: &str = r#"{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
     {"type": "command", "command": "harness run review-gate check"},
+    {"type": "command", "command": "harness 'run' quoted"},
     {"type": "command", "command": "harness newcmd --flag"},
     {"type": "command", "command": "sh -c 'harness newcmd'"}
 ]}], "Stop": [{"hooks": [{"type": "command", "command": "harness newcmd again"}]}]}}"#;
@@ -35,7 +36,7 @@ fn project_with_hooks() -> (TempDir, TempDir) {
 // spec: BIN-15
 #[test]
 fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refuses() {
-    let (_source, root) = project_with_hooks();
+    let (source, root) = project_with_hooks();
     let bin = tempdir().unwrap();
     let log = bin.path().join("log");
     let harness = harness_with_run(bin.path(), &log);
@@ -50,8 +51,13 @@ fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refus
         problems[1].contains("`harness newcmd again`"),
         "{problems:?}"
     );
+    // the install of the project's source, run from its root
+    let install = format!(
+        "cargo install --path {}/crates/harness --locked",
+        source.path().display()
+    );
     assert!(
-        problems.iter().all(|p| p.contains("install")),
+        problems.iter().all(|p| p.contains(&install)),
         "{problems:?}"
     );
     // each subcommand is asked once
@@ -85,7 +91,8 @@ fn source_with_a_new_hook_command() -> (TempDir, TempDir, TempDir, String) {
     put(
         repo.path(),
         &format!("entries/{}", entries::SETTINGS),
-        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "harness newcmd"}]}]}}"#,
+        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "harness newcmd"},
+            {"type": "command", "command": "harness newcmd other"}]}]}}"#,
     );
     git_in(repo.path(), &["add", "."]);
     git_in(repo.path(), &["commit", "--quiet", "-m", "new hook"]);
@@ -115,7 +122,9 @@ fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuse
         "cargo install --git file://{} --rev {head} --locked",
         repo.path().display()
     );
-    assert!(err.contains(&install), "{err}");
+    assert!(err.contains("`harness newcmd other`"), "{err}");
+    // one install for all the hooks
+    assert_eq!(err.matches(&install).count(), 1, "{err}");
     assert_eq!(get(root.path(), CONFIG), config);
     assert_eq!(get(root.path(), LOCK), lock);
 
@@ -145,10 +154,14 @@ fn update_dry_run_warns_of_a_hook_the_installed_harness_refuses() {
     };
     let done = update_in(Some(cache.path()), root.path(), None, &options, &old).unwrap();
     assert!(!done.applied);
+    let warned = |text: &str| {
+        done.sync
+            .warnings
+            .iter()
+            .any(|w| w.starts_with("warning:") && w.contains(text))
+    };
     assert!(
-        done.sync.warnings.iter().any(|w| w.starts_with("warning:")
-            && w.contains("`harness newcmd`")
-            && w.contains("cargo install")),
+        warned("`harness newcmd`") && warned("cargo install"),
         "{:?}",
         done.sync.warnings
     );

@@ -683,19 +683,20 @@ fn update_in(
     git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
     // The hooks of the target must not lock the agent out: the installed launcher has to know their subcommands. A
     // fragment that cannot be read fails the sync below, before anything is written.
-    let refused: Vec<String> = fs::read_to_string(dir.join(entries::FRAGMENT))
+    let mut refused: Vec<String> = fs::read_to_string(dir.join(entries::FRAGMENT))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .map(|fragment| launcher::refused(&fragment, harness))
         .unwrap_or_default()
         .iter()
-        .map(|command| {
-            format!(
-                "the installed harness cannot run the hook `{command}` of {commit}: install the harness of {commit} first, `cargo install --git {} --rev {commit} --locked`, then run `harness update` again",
-                run::cargo_url(&source)
-            )
-        })
+        .map(|command| format!("the installed harness cannot run the hook `{command}` of {commit}"))
         .collect();
+    if !refused.is_empty() {
+        refused.push(format!(
+            "install the harness of {commit} first, `{}`, then run `harness update` again",
+            launcher::install(&source, Some(&commit))
+        ));
+    }
     if !refused.is_empty() && !options.dry_run {
         bail!("{}", refused.join("\n"));
     }
@@ -793,12 +794,16 @@ fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
         bail!("no {LOCK}: run `harness sync` first");
     };
     let gated = gate::manages(&lock.entries, lock.files.keys());
-    let settings = fs::read_to_string(root.join(entries::SETTINGS)).ok();
-    let hooks = settings
+    let text = fs::read_to_string(root.join(entries::SETTINGS)).ok();
+    let hooks = text
         .as_deref()
         .and_then(|text| serde_json::from_str(text).ok())
         .map(|settings| launcher::refused(&settings, harness))
         .unwrap_or_default();
+    let install = match source_and_rev(root) {
+        Ok((source, rev)) => format!("`{}`", launcher::install(&source, rev.as_deref())),
+        Err(_) => "the harness of this revision".to_string(),
+    };
     let problems = lock
         .files
         .iter()
@@ -807,11 +812,11 @@ fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
             Some(print) if print != *locked => Some(format!("modified: {rel}")),
             Some(_) => None,
         })
-        .chain(entries::missing(settings.as_deref(), &lock.entries))
+        .chain(entries::missing(text.as_deref(), &lock.entries))
         .chain(gate::problem(root, !ci && gated))
         .chain(hooks.iter().map(|command| {
             format!(
-                "refused: the installed harness cannot run the hook `{command}` of {}: install the harness of this revision first",
+                "refused: the installed harness cannot run the hook `{command}` of {}: install {install} first",
                 entries::SETTINGS
             )
         }))

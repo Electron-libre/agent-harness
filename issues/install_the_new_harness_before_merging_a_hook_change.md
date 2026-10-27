@@ -117,3 +117,33 @@ Code review: 1 finding
   step names that install for the local source `.` and `cargo install --git <source> --rev <rev> --locked` elsewhere.
 
 not verified: a real merge of a branch that adds a hook subcommand (no such branch here).
+
+## Deliverable 4 (fixes of the high review)
+Plan line: 4. [x] Fixes of the `high` review of `61cd209..f3a7882`; verified by the launcher tests; amends BIN-15, BIN-16.
+
+done: `check` names the exact install (`cargo install --git <cargo url> --rev <rev> --locked`, or `--path
+<source>/crates/harness`), and "Merge back" runs the install it prints (finding 1, 7); quoted subcommands are
+unquoted (3); a failed run of `harness` keeps the refusals found so far (4); BIN-16 judges the managed entries of the
+target, as the code does (6); `update` prints the install once (8); the settings text no longer shadows the
+`settings` module (9); the fake's log path is quoted (10).
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass (`specs/tool-binaries.md` BIN-15, BIN-16 reworded) |
+| docs | `docs/architecture.md`, `details.md` (synced) |
+| code review | high on the issue, low on this fix |
+
+red: `left: 3 right: 2` (the quoted `harness 'run' quoted` refused) and the install printed twice by `update`
+
+High review: 10 findings
+- 1, 3 (quotes), 4, 6, 7, 8, 9, 10: fixed as above.
+- 2 (`sync` does not probe): not fixed, `sync` was left out at validation.
+- 3 (a leading global flag such as `harness --root . x` is skipped): not fixed, no hook of the harness has one.
+- 5 (exit 3 on a parse error of the launcher): out of the requirements, opened as
+  `issues/exit_3_when_the_launcher_cannot_parse_its_arguments.md`.
+
+Code review: no findings
+
+not verified: an scp-style source (`git@host:path`) printed by `check`; `cargo_url` converts it and has its own tests.

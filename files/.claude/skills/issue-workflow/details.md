@@ -29,11 +29,9 @@ Once the user agreed to close the issue:
 
 1. In the worktree, commit the last tracking, then `git rebase <main branch>` (the branch checked out by the main
    worktree); a conflict stops here, for the user. Then run `just check-harness` in the worktree: when it names a
-   hook the installed `harness` refuses (the branch adds a subcommand the hooks call), install the `harness` of the
-   branch before going on: from the worktree, `cargo install --path crates/harness --locked` when its
-   `.claude/harness.toml` has the local source `.` (the repository of the harness), else `cargo install --git <source>
-   --rev <rev> --locked` with the `source` and `rev` of that file. After the fast-forward
-   every hook goes through the installed `harness`, and one it refuses blocks every command, the install included.
+   hook the installed `harness` refuses (the branch adds a subcommand the hooks call), run the `cargo install` it
+   prints, from the worktree, before going on. After the fast-forward every hook goes through the installed
+   `harness`, and one it refuses blocks every command, the install included.
 2. `ExitWorktree` with `keep`: the session is back in the main worktree.
 3. There, `git merge --ff-only <name>`, then `just close-issue issues/<name>.md` and commit the move (`docs: close
    ...`); when `close-issue` rewrote documents outside `issues/`, that commit needs its `low` review like any diff.
