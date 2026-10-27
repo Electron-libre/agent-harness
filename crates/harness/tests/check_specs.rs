@@ -580,7 +580,7 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
         "a managed test under a src directory is a boundary proof",
         lines.is_empty(),
     );
-    let reasoned = "// spec: RER-1, RER-2 (internal: the RER-9 fixture is slow)\nfn t() {}\n";
+    let reasoned = "// spec: RER-1, RER-2 (internal: the RER-9 fixture (git) is slow)\nfn t() {}\n";
     let lines = boundary("internal proofs with a reason pass", reasoned, &[]);
     report(
         "requirements whose internal proofs give a reason are not listed",
@@ -602,6 +602,32 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
             &format!("// spec: RER-1, RER-2 {blank}\nfn t() {{}}\n"),
             &[],
             Some("crates/a/src/t.rs:1: `(internal: <reason>)` gives no reason"),
+        );
+    }
+    for (bad, line) in [
+        (
+            "RER-1 (internal: slow) RER-2",
+            "RER-1, RER-2 (internal: slow) RER-2",
+        ),
+        (
+            "RER-1, RER-2 (internal: slow",
+            "RER-1, RER-2 (internal: slow",
+        ),
+        (
+            "RER-1 (internal: slow) RER-2)",
+            "RER-1, RER-2 (internal: slow) RER-2)",
+        ),
+        (
+            "(internal: slow)",
+            "RER-1, RER-2\nfn u() {}\n// spec: (internal: slow)",
+        ),
+    ] {
+        case(
+            &format!("a malformed reason `{bad}` is flagged"),
+            SPEC,
+            &format!("// spec: {line}\nfn t() {{}}\n"),
+            &[],
+            Some("`(internal: <reason>)` must follow the ids and end the line"),
         );
     }
 }

@@ -308,13 +308,11 @@ fn all_files(dir: &Path, found: &mut Vec<PathBuf>) {
 }
 
 /// The ids of a `// spec:` list and the reason it gives for an internal proof, `A-1, B-2 (internal: <reason>)`
-/// (TRC-6, TRC-8): the reason never adds an id. A blank reason is `Some("")`.
+/// (TRC-6, TRC-8): the reason never adds an id. The reason is the trimmed text after `(internal:`, its closing `)`
+/// included.
 pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>) {
     let (ids, reason) = match list.split_once("(internal:") {
-        Some((ids, reason)) => {
-            let reason = reason.trim();
-            (ids, Some(reason.strip_suffix(')').unwrap_or(reason).trim()))
-        }
+        Some((ids, reason)) => (ids, Some(reason.trim())),
         None => (list, None),
     };
     let ids = ids
@@ -329,8 +327,9 @@ struct Cite {
     reasoned: bool,
 }
 
-/// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them. A citation sits right above a
-/// test: only attributes and other comments may come between it and the `fn`; any other place is a problem.
+/// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them and whether the citation gives a
+/// reason. A citation sits right above a test: only attributes and other comments may come between it and the `fn`;
+/// any other place is a problem, and so is a reason that is blank, misplaced or unclosed (TRC-7).
 fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> {
     // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
     // lists, so never those of a nested worktree (ADR 0008) nor the build output
@@ -377,16 +376,25 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> 
                 ));
             }
             let (ids, reason) = citation(list);
-            if reason == Some("") {
+            let ids: Vec<&str> = ids.collect();
+            let problem = reason.and_then(|r| match r.strip_suffix(')') {
+                // a `)` of the reason closes one of its own `(`: an unmatched one ends the reason early
+                Some(r) if !ids.is_empty() && r.matches('(').count() == r.matches(')').count() => {
+                    r.trim().is_empty().then_some("gives no reason")
+                }
+                _ => Some("must follow the ids and end the line"),
+            });
+            if let Some(problem) = problem {
                 out.push(format!(
-                    "{name}:{}: `(internal: <reason>)` gives no reason",
+                    "{name}:{}: `(internal: <reason>)` {problem}",
                     i + 1
                 ));
             }
+            let reasoned = reason.is_some() && problem.is_none();
             for id in ids {
                 cited.entry(id.to_string()).or_default().push(Cite {
                     file: name.clone(),
-                    reasoned: reason.is_some_and(|r| !r.is_empty()),
+                    reasoned,
                 });
             }
         }

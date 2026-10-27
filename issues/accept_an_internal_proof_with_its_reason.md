@@ -52,6 +52,9 @@ requirement out of the TRC-1 warning, fails on a blank reason, and the reason ne
 3. [x] Reasons on this repo's internal-only citations (SYN-18 to SYN-24, REV-19, BIN-9), so `just check-specs` warns
    of nothing; verified by `just check-specs`. ~20 lines.
 
+4. [x] Fixes of the `high` review: a reason that is misplaced, unclosed or follows no id is a problem (TRC-7
+   amended); verified by `tests/check_specs.rs`.
+
 ## Decisions
 - Mode: autonomous
 - Base commit: f34ae899b66e605f52aace8dc3303ddc004b6567
@@ -111,3 +114,26 @@ requirement out of the TRC-1 warning, fails on a blank reason, and the reason ne
 - Code review: no findings (the test comments are not read at `low`)
 - not verified: none
 - decisions needed: none
+
+## Deliverable 4 (fixes of the `high` review)
+- done: TRC-7 also flags `(internal: ...)` with ids after it, no closing `)` or no id before it; doc of
+  `citations()` and `citation()` brought up to date; `reasoned` computed once per line.
+
+| check | result |
+|---|---|
+| tests | ok |
+| lint | ok |
+| specs | ok, no warning |
+| docs | doc comments |
+| code review | low: 1 finding, fixed |
+
+- red: TRC-7: the 4 malformed reasons passed the checker
+- Code review: 1 finding: `(internal: slow) RER-2)` passed (a second `)` ended the line); fixed, a reason's own
+  parentheses must balance.
+- High review findings: 8. Fixed: ids after the reason dropped, reason with no id, stale doc, recomputed
+  `reasoned`. Not fixed: near-miss spellings (`(Internal :`) already fail as unknown ids naming the text; a reason
+  outside `src` is harmless; closing the issue is the user's call; the reasons of deliverable 3, a decision for
+  the user (they say a binary test would be cheap, and they silence the warnings `prove_the_gate_specs_through_the_binary`
+  works from).
+- not verified: none
+- decisions needed: keep or revert deliverable 3

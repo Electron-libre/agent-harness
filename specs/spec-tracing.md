@@ -23,7 +23,7 @@ stable, not required: an internal test is the proof when its citation gives the 
 - **TRC-4** (deterministic) The checker must not list in that warning a withdrawn requirement.
 - **TRC-5** (deterministic) The checker must count a test under `.claude/` as outside every `src` directory, whatever its path below.
 - **TRC-6** (deterministic) The checker must not list in that warning a requirement whose every citation under a `src` directory carries a reason, the text `(internal: <reason>)` after its ids with a reason that is not blank.
-- **TRC-7** (deterministic) The checker must report as a problem a citation whose `(internal: ...)` reason is blank, naming its file and line.
+- **TRC-7** (deterministic) The checker must report as a problem, naming its file and line, a citation whose `(internal: ...)` reason is blank, does not end the line with its `)`, or follows no id.
 - **TRC-8** (deterministic) The checker must read from a citation with a reason the same requirement ids as from that citation without it.
 
 ## Scenarios
@@ -37,6 +37,8 @@ stable, not required: an internal test is the proof when its citation gives the 
 - (TRC-6) Given `SYN-2` cited in `crates/harness/src/a.rs` with `// spec: SYN-2 (internal: needs a fake clock)` and in
   `crates/harness/src/b.rs` with `// spec: SYN-2`, when the checker runs, then `SYN-2` is in the warning.
 - (TRC-7) Given `// spec: SYN-2 (internal: )`, when the checker runs, then it fails naming the file and line.
+- (TRC-7) Given `// spec: SYN-2 (internal: slow) SYN-3`, `// spec: SYN-2 (internal: slow` or
+  `// spec: (internal: slow)`, when the checker runs, then it fails naming the file and line.
 - (TRC-8) Given `// spec: SYN-2, SYN-3 (internal: the SYN-9 fixture is slow)`, when the checker runs, then it reads
   `SYN-2` and `SYN-3`, flags no unknown id, and `SYN-9` is not cited.
 
