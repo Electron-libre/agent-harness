@@ -628,6 +628,10 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
             "m4",
             &format!("Voici le diff :\n```\n{ENGLISH}\n```\net `{ENGLISH}` fini."),
         );
+        t.text(
+            "m6",
+            &format!("Voici la sortie :\n   ~~~\n{ENGLISH}\n   ~~~\nfini."),
+        );
         t.write(&projects.join(format!("-{name}/s.jsonl")));
         let mut sub = Transcript::new(&repo, "2026-02-01T10:01:00.000Z");
         sub.text("m5", ENGLISH);

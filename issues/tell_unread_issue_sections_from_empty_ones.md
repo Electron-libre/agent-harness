@@ -49,7 +49,7 @@ keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 
 2. [x] Unread sections: `section` tells a heading found only inside a fence from an absent one, and `deliverables`,
    `reviews` and `red_ids` turn the first into empty cells; verified by a fixture issue whose Goal fence stays open
    before `# Tracking`, and one with no `# Tracking` keeping 0; makes true QUA-12 (as amended). ~80 lines.
-3. [ ] BRE-10 reads fences with the shared `fenced` of `tools/mod.rs`; verified by an English text block in a `~~~`
+3. [x] BRE-10 reads fences with the shared `fenced` of `tools/mod.rs`; verified by an English text block in a `~~~`
    fence of a French session giving no breach; makes true BRE-10. ~40 lines.
 
 ## Decisions
@@ -70,6 +70,15 @@ keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 
   heading stands only inside a fence; `deliverables`, `reviews` and `red_ids` print empty cells for an unread one.
   The rows of this repository are unchanged.
 - red: QUA-12: `theta.deliverables: expected "", got Some("0")` (a Goal fence left open before `# Tracking`).
+- Code review: no findings (low).
+- not verified: none.
+- decisions needed: none.
+
+## Deliverable 3
+- done: `prose_words` of `rule_breaches.rs` drops the fenced lines given by the shared `fenced`, so tilde, indented
+  and longer fences hide their words too; BRE-10 cites the fence rule of QUA-12.
+- red: BRE-10: `FAIL - a long block of the session in the other language is a breach; short, code and sub-agent
+  blocks are not` (the English text of an indented `~~~` fence counted as prose).
 - Code review: no findings (low).
 - not verified: none.
 - decisions needed: none.

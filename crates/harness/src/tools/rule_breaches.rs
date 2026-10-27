@@ -246,17 +246,12 @@ fn stop_words(language: &str) -> Option<(&'static [&'static str], &'static [&'st
     }
 }
 
-/// The lower-cased words of a text once fenced and inline code are removed.
+/// The lower-cased words of a text once fenced code blocks (the fence rule of QUA-12) and inline code are removed.
 fn prose_words(text: &str) -> Vec<String> {
     let mut prose = String::new();
-    let mut fenced = false;
-    for line in text.lines() {
-        if line.trim_start().starts_with("```") {
-            fenced = !fenced;
-        } else if !fenced {
-            prose.extend(line.split('`').step_by(2).flat_map(|part| [part, " "]));
-            prose.push('\n');
-        }
+    for (line, _) in super::fenced(text.lines()).filter(|&(_, fenced)| !fenced) {
+        prose.extend(line.split('`').step_by(2).flat_map(|part| [part, " "]));
+        prose.push('\n');
     }
     prose
         .split(|c: char| !c.is_alphabetic())
