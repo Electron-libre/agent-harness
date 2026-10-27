@@ -18,6 +18,19 @@ Reports to the user (stops, summaries, final report) are read at a glance:
 
 ## 0. Resume or start
 
+**Work in the issue's own worktree** (ADR 0003), so that another session's files, index and `target/` never mix
+with yours. In a linked worktree on the branch `<stem>` of the issue, go on. In the main worktree (`git rev-parse
+--git-dir` equals `--git-common-dir`):
+
+- The worktree `../<repo>-<stem>` exists: enter it with Claude Code's `EnterWorktree` tool, `path` set to it.
+- The branch `<stem>` exists without its worktree: stop and ask the user.
+- Otherwise: when `issues/<stem>.md` is untracked or modified, commit it alone first (`git add issues/<stem>.md`,
+  `docs: open the issue ...` through `skill:commit-message`); run `just start-issue issues/<stem>.md`, then
+  `EnterWorktree` with the path it prints.
+
+From then on every command and edit happens in the worktree: a `cd` out of the launch directory does not last
+past its command, and never redirect to the main worktree (`git -C`, its paths). Details: [details.md](details.md).
+
 Read the issue file. No `# Tracking` section: start at step 1. If `# Tracking` says `Plan: proposed`, the plan was never
 validated: redo the stop of step 2. Otherwise (`Plan: validated`, or no marker: planned before it existed) show where it stands in two `next` / `left` lines (the next unchecked
 deliverable with the recorded mode, the deliverables left by name) and continue at step 3 in the mode recorded there (none recorded:
@@ -129,11 +142,11 @@ can switch it at any time.
   settle, a failing check you can't fix (never commit or build on a red base). After the last deliverable, give the
   final summary: a table `deliverable | commit`, then `left` (what remains, if anything); ask whether to close the issue.
 
-## Parallel agents
+## Merge back
 
-Two agents can work two issues at once, each in its own git worktree: read [details.md](details.md) before
-`just start-issue`, the merge or `just finish-issue`. In a linked worktree, report the issue as done and leave the
-closing to the merge.
+The issue is closed at the merge, from the main worktree (`close-issue` refuses in a linked one): on the user's
+agreement to close, follow [details.md](details.md), "Merge back" (rebase, `ExitWorktree`, fast-forward,
+`just close-issue`, `just finish-issue`).
 
 ## Rules
 
@@ -141,7 +154,7 @@ closing to the merge.
 - Don't re-litigate decisions already recorded in the issue.
 - If something blocks you, say what and propose one recommendation; don't enumerate every option.
 - When the issue is fully done, mark it in the issue and say what, if anything, remains. Then **ask the
-  user whether to close it** (in a linked worktree, see "Parallel agents"); on their agreement run `just close-issue issues/<name>.md` (moves it to
+  user whether to close it** (in a linked worktree, see "Merge back"); on their agreement run `just close-issue issues/<name>.md` (moves it to
   `issues/done/`, drops the issue from `issues/queue.md` and rewrites `issues/<name>.md` to
   `issues/done/<name>.md` in every other document that cites it) and include the
   move and those edits in the final commit. Never move it unasked.

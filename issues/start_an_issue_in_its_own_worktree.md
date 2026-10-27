@@ -72,7 +72,7 @@ a linked worktree to its repository), running the worktree's own copy of the hoo
 1. [x] Hooks follow the event's `cwd`: `format_rust.rs` and `clippy_gate.rs` resolve the top-level of the event's
    `cwd` (fallback `CLAUDE_PROJECT_DIR`, then `.`), as `require_code_review.rs record` does; verified by
    `test_hooks.rs` cases where `CLAUDE_PROJECT_DIR` points at another clean project; makes true PAR-12, CLG-6.
-2. [ ] `issue-workflow` starts in the worktree: step 0 runs `just start-issue` then `EnterWorktree` with `path` when
+2. [x] `issue-workflow` starts in the worktree: step 0 runs `just start-issue` then `EnterWorktree` with `path` when
    the session is in the main worktree and the issue is free (taken: stop), commits an uncommitted issue alone
    first (decision 1); the end of the issue merges back from the main worktree (decision 2); "Parallel agents" and
    `details.md` rewritten as the default path, ADR 0003 and `docs/architecture.md` updated; verified by
@@ -82,6 +82,7 @@ a linked worktree to its repository), running the worktree's own copy of the hoo
 - Mode: autonomous
 - Base commit: 8a31a5df0f4e8c2026f25a8e9ff8774502c46dc1
 - 1a: an uncommitted issue is committed alone by the agent (`docs: open the issue ...`) before `start-issue`.
+- ADR 0003 left as is: its decision (one worktree per issue) is unchanged; who starts it is in `docs/architecture.md`.
 - 2a: once the user agrees to close, the agent leaves the worktree (`ExitWorktree` keep), rebases and fast-forwards from the main worktree, then runs `close-issue` and `finish-issue`.
 
 ## Deliverable 1: hooks follow the event's `cwd`
@@ -93,3 +94,13 @@ a linked worktree to its repository), running the worktree's own copy of the hoo
 - Code review: no findings
 - not verified: a live session where the hooks run from the main worktree's `.claude/` against an issue worktree
   (covered by the hook tests with a real linked worktree).
+
+## Deliverable 2: `issue-workflow` starts in the worktree
+- done: step 0 enters the issue's worktree (existing one: `EnterWorktree`; free issue: commit it alone if needed,
+  `just start-issue`, `EnterWorktree`; branch without worktree: stop); "Parallel agents" became "Merge back";
+  `details.md` describes the start and the merge back (rebase, `ExitWorktree`, fast-forward, `close-issue`,
+  `finish-issue`); `docs/architecture.md` and `CLAUDE.md` updated.
+- check: `just check` ok, `just test-harness` ok, `just check-harness` ok, code review low run.
+- red: none (skill text, no automated test).
+- Code review: no findings
+- not verified: a whole issue driven through this step 0 and merge back in a live session.

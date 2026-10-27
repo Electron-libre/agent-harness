@@ -210,9 +210,13 @@ own `target/` (measured once, on this repository and a 24-core machine: 239 MB a
 project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:
 `next_issue.rs` reads `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and no file
 needs cleaning. A leftover branch with neither is listed `Stale:` and `just finish-issue` cleans it (merged by
-ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close_issue.rs` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. The hooks need
-nothing: `require_code_review.rs` keeps its marker and waiver in the git directory of each worktree
-(`git rev-parse --git-path`), and `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees).
+ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close_issue.rs` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. An agent
+handed an issue in the main worktree starts it itself (`issue-workflow`, step 0): `just start-issue`, then Claude
+Code's `EnterWorktree` with the path, since a shell `cd` out of the launch directory does not last; the session's
+`cwd`, and the `cwd` of the hook events, become the worktree. The hooks act on the work tree of that `cwd` (their
+scripts still come from the main worktree, `CLAUDE_PROJECT_DIR`): `require_code_review.rs` keeps its marker and
+waiver in the git directory of each worktree (`git rev-parse --git-path`), `format_rust.rs` and `clippy_gate.rs` run
+cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, leaves the worktree (`ExitWorktree`), fast-forwards the main branch, closes the issue and runs `just finish-issue`.
 
 ## The cost of a turn
 
