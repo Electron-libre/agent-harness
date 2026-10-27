@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [install_the_new_harness_before_merging_a_hook_change](install_the_new_harness_before_merging_a_hook_change.md) - first: a merge that changes the hook commands locks the agent out, and the next ones may
 - [work_in_an_issue_worktree_without_tripping_the_isolation_guard](work_in_an_issue_worktree_without_tripping_the_isolation_guard.md) - every issue runs in a worktree: each one after it pays the refused commands until this lands
 - [exit_3_when_the_launcher_cannot_parse_its_arguments](exit_3_when_the_launcher_cannot_parse_its_arguments.md) - small; after the probes of the hooks (BIN-15, BIN-16), it closes the lockout for the paths they miss
 - [split_an_issue_too_large_for_one_session](split_an_issue_too_large_for_one_session.md) - before the larger issues of the queue, which it may split
