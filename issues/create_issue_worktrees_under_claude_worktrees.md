@@ -76,6 +76,9 @@ scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they reso
    makes true PAR-14.
 3. [x] Transcripts: `repository()` of `transcripts.rs` maps a removed `<repo>/.claude/worktrees/<x>` cwd to
    `<repo>`; verified by `test_session_metrics.rs`; makes true EVA-7 (amended).
+4. [x] Fixes of the `high` review: `info/exclude` appended as bytes, written after `git worktree add`; `finish`
+   refuses a worktree holding another one; `repository()` falls back to the sibling rule; module doc and test
+   name; verified by `test_issue_worktree.rs`, `test_session_metrics.rs`; makes true PAR-7 (amended), PAR-13.
 
 ## Decisions
 - Mode: autonomous
@@ -102,3 +105,14 @@ scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they reso
 - done: `repository()` maps a removed cwd under `<repo>/.claude/worktrees/` to `<repo>`; the scripts that include
   `transcripts.rs` carry its new SHA-256; `specs/parallel-issues.md` and `specs/evaluation.md` back to `accepted`.
 - red: `FAIL - a removed worktree under .claude/worktrees counts with its repository`.
+
+## Deliverable 4
+- done: findings 1, 2, 3, 4, 6, 7, 8 of `/code-review high` fixed (see the plan line); findings 5 and 10 (walk the
+  tree through git; consumer tools that see the nested worktrees) are the new issue
+  `list_the_repository_files_through_git`; finding 9 (ADR 0003 marked superseded although only its location
+  changed) kept: `docs/adr/README.md` asks to mark the old ADR `Superseded by NNNN`, and ADR 0008 says the rest
+  stands.
+- red: `FAIL - info/exclude keeps its earlier lines, even not in UTF-8` and `FAIL - finish refuses, even with
+  --force, a worktree holding another worktree`; the write order and the `transcripts.rs` fallback are refactors
+  under green tests.
+- Code review (`low`): 1 finding, fixed: a failing `git worktree list` no longer counts as "no inner worktree".

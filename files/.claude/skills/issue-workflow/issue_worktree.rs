@@ -2,13 +2,15 @@
 //! Give an issue its own git worktree and branch, so that two agents can work on two issues at once.
 //! `start issues/<stem>.md` creates the worktree `<main worktree>/.claude/worktrees/<stem>`, on a new branch
 //! `<stem>` cut from the branch of the main worktree, and makes git ignore `/.claude/worktrees/` (`info/exclude`).
-//! `finish` also removes a worktree left at `<main worktree>-<stem>`, where `start` put it before ADR 0008. `finish <stem> [--force]` removes that worktree and branch once the
+//! `finish <stem> [--force]` removes that worktree and branch once the
 //! branch is merged into the branch of the main worktree (ancestor, or every commit has a patch-equivalent there,
 //! or a merge into it would change no file, which covers a rebase and a squash of any number of commits); `--force` also
 //! accepts a branch whose work is not on it, after the user agreed, and still refuses a worktree with uncommitted
-//! changes. `start` runs from any worktree; `finish` too, except from inside the worktree it would remove (it refuses and names the main worktree, `--force` or not).
+//! changes or holding another worktree. It also removes a worktree left at `<main worktree>-<stem>`, where `start` put
+//! it before ADR 0008. `start` runs from any worktree; `finish` too, except from inside the worktree it would remove (it refuses and names the main worktree, `--force` or not).
 //! Usage: `just start-issue issues/foo.md`, `just finish-issue foo` (`just finish-issue foo --force`).
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -65,12 +67,25 @@ fn exclude_worktrees(main: &Path) -> Result<(), String> {
     let common = PathBuf::from(git(main, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?);
     let exclude = common.join("info/exclude");
     let line = format!("/{WORKTREES}/");
-    let text = std::fs::read_to_string(&exclude).unwrap_or_default();
-    if text.lines().any(|l| l == line) {
+    let fail = |e: std::io::Error| format!("cannot update {}: {e}", exclude.display());
+    // bytes, not text: the user's patterns need not be UTF-8, and they are only ever appended to
+    let bytes = match std::fs::read(&exclude) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        read => read.map_err(fail)?,
+    };
+    if bytes.split(|b| *b == b'\n').any(|l| l == line.as_bytes()) {
         return Ok(());
     }
-    let separator = if text.is_empty() || text.ends_with('\n') { "" } else { "\n" };
-    std::fs::create_dir_all(common.join("info")).and_then(|()| std::fs::write(&exclude, format!("{text}{separator}{line}\n"))).map_err(|e| format!("cannot write {}: {e}", exclude.display()))
+    let separator = if bytes.is_empty() || bytes.ends_with(b"\n") { "" } else { "\n" };
+    std::fs::create_dir_all(common.join("info")).map_err(fail)?;
+    let mut file = std::fs::OpenOptions::new().append(true).create(true).open(&exclude).map_err(fail)?;
+    file.write_all(format!("{separator}{line}\n").as_bytes()).map_err(fail)
+}
+
+/// The worktrees nested in `dir`, such as an agent's: `git status` in `dir` does not see them, being ignored.
+fn worktrees_inside(main: &Path, dir: &Path) -> Result<Vec<PathBuf>, String> {
+    let list = git(main, &["worktree", "list", "--porcelain"])?;
+    Ok(list.lines().filter_map(|l| l.strip_prefix("worktree ")).map(PathBuf::from).filter(|w| w != dir && w.starts_with(dir)).collect())
 }
 
 fn valid_stem(stem: &str) -> bool {
@@ -98,8 +113,8 @@ fn start(cwd: &Path, issue: &str) -> Result<String, String> {
     if dir.exists() {
         return Err(format!("{} already exists", dir.display()));
     }
-    exclude_worktrees(&main)?;
     git(&main, &["worktree", "add", "-q", "-b", stem, &dir.to_string_lossy(), &base])?;
+    exclude_worktrees(&main)?;
     Ok(dir.display().to_string())
 }
 
@@ -141,6 +156,9 @@ fn finish(cwd: &Path, stem: &str, force: bool) -> Result<String, String> {
         Some(_) => {
             if !git(&dir, &["status", "--porcelain"])?.is_empty() {
                 return Err(format!("{} has uncommitted changes: nothing was removed", dir.display()));
+            }
+            if let Some(inner) = worktrees_inside(&main, &dir)?.first() {
+                return Err(format!("{} holds the worktree {}: remove that one first; nothing was removed", dir.display(), inner.display()));
             }
             git(&main, &["worktree", "remove", &dir.to_string_lossy()])?;
         }

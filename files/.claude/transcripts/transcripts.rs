@@ -165,14 +165,12 @@ pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
 /// or a removed issue worktree `<repo>-<branch>` (ADR 0003), counts with `<repo>` when that one still exists.
 pub fn repository(cwd: &str, branches: &[String]) -> Option<PathBuf> {
     let dir = Path::new(cwd);
-    let nested_in = dir.ancestors().find(|a| a.ends_with(".claude/worktrees")).and_then(|a| a.parent()?.parent()).filter(|r| r.exists());
-    if let (false, Some(repo)) = (dir.exists(), nested_in) {
-        return repository(repo.to_str()?, &[]);
-    }
     if !dir.exists() {
+        let nested = dir.ancestors().find(|a| a.ends_with(".claude/worktrees")).and_then(|a| a.parent()?.parent());
         let name = dir.file_name()?.to_string_lossy().into_owned();
-        let repo = branches.iter().find_map(|b| name.strip_suffix(&format!("-{b}")).map(|r| dir.with_file_name(r)))?;
-        return repository(repo.to_str()?, &[]);
+        let sibling = || branches.iter().find_map(|b| name.strip_suffix(&format!("-{b}")).map(|r| dir.with_file_name(r)));
+        let found = nested.filter(|r| r.exists()).and_then(|r| repository(r.to_str()?, &[]));
+        return found.or_else(|| repository(sibling()?.to_str()?, &[]));
     }
     let common = PathBuf::from(git(dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?);
     if common.file_name().is_some_and(|n| n == ".git") {

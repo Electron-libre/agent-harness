@@ -19,7 +19,8 @@ sibling path. Everything else of ADR 0003 stands: one branch per issue, the mark
 edited only at merge time, one `target/` per worktree.
 
 ## Consequences
-Starting or resuming an issue needs no interaction. A new script that walks the tree must skip
+Starting or resuming an issue needs no interaction. Being ignored, a worktree nested in an issue worktree (an
+agent's) escapes `git status` there, so `finish-issue` checks `git worktree list` before it removes one. A new script that walks the tree must skip
 `.claude/worktrees/`, or it reads every issue worktree too. The ignore rule lives outside the versioned files: a
 fresh clone gets it at its first `start-issue`. Cargo stops at the nested worktree's own workspace root, and the
 main workspace lists its members explicitly, so neither picks up the other's crates.
