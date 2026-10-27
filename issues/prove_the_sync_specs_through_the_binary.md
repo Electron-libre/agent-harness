@@ -46,7 +46,7 @@ on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
    `check-specs` no longer listing them; makes true SYN-1 to SYN-10 (~650 lines).
 2. [x] Update: `crates/harness/tests/update_cli.rs` on a local git source, internal update tests dropped, `set_rev`
    and `is_full_hash` kept uncited; makes true SYN-11 to SYN-17 (~650 lines).
-3. [ ] Settings entries: `crates/harness/tests/settings_entries_cli.rs`, `src/tests/settings_entries.rs` dropped;
+3. [x] Settings entries: `crates/harness/tests/settings_entries_cli.rs`, `src/tests/settings_entries.rs` dropped;
    makes true SYN-29 to SYN-36 (~850 lines).
 
 ## Decisions
@@ -70,5 +70,14 @@ on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
 - Code review: 2 findings; (1) `git_source` and `git_project` possibly dead: no, `src/tests/launcher.rs` calls them
   and clippy passes; (2) `set_rev` and `is_full_hash` tests lost their citation: by plan, they add detail, the
   boundary tests prove SYN-12 and SYN-17.
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3
+- done: `tests/settings_entries_cli.rs` proves SYN-29 to SYN-36 (and carries the SYN-25, SYN-26, SYN-27 citation of
+  the repository settings test) through `sync` and `check`; `src/tests/settings_entries.rs` dropped; the test home
+  puts a `harness` that knows every subcommand first on the `PATH`, so `check` judges no hook by the installed one.
+- red: none (the behaviour exists: the proofs move, no test can fail before the code)
+- Code review: no findings
 - not verified: none
 - decisions needed: none

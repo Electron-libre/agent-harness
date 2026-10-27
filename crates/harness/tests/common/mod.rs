@@ -1,6 +1,6 @@
-//! Helpers of the tests that run the `harness` binary on temp dirs, offline: the cache, the user settings and a
-//! failing `cargo` live in a temp home, so neither the prefetch of the tools binary (BIN-13) nor the retention
-//! warning (SYN-28) reaches outside it.
+//! Helpers of the tests that run the `harness` binary on temp dirs, offline. The cache, the user settings, a failing
+//! `cargo` and a `harness` that knows every subcommand live in a temp home: the prefetch of the tools binary (BIN-13),
+//! the retention warning (SYN-28) and the hooks `check` judges (BIN-15) never reach outside it.
 #![allow(dead_code)]
 
 use std::collections::BTreeMap;
@@ -60,13 +60,17 @@ impl Home {
             "config/settings.json",
             r#"{"cleanupPeriodDays": 365}"#,
         );
-        // the prefetch of a git source would build the tools binary with `cargo install`: it fails at once here
-        let cargo = dir.path().join("bin/cargo");
-        put(dir.path(), "bin/cargo", "#!/bin/sh\nexit 1\n");
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&cargo, fs::Permissions::from_mode(0o755)).unwrap();
+        // the prefetch of a git source would build the tools binary with `cargo install`: it fails at once here;
+        // the `harness` on the path knows every subcommand, so `check` refuses no hook whatever is installed (BIN-15)
+        for (program, code) in [("cargo", 1), ("harness", 0)] {
+            let rel = format!("bin/{program}");
+            put(dir.path(), &rel, &format!("#!/bin/sh\nexit {code}\n"));
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = fs::Permissions::from_mode(0o755);
+                fs::set_permissions(dir.path().join(rel), mode).unwrap();
+            }
         }
         Self { dir }
     }
