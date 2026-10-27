@@ -13,7 +13,7 @@ const SOURCE: &str = "https://github.com/owner/repo.git";
 
 /// Write an executable `sh` script. A child process writes it, so that no write descriptor of this process, which
 /// another test thread's fork could inherit, keeps it busy when it is executed (`ETXTBSY`).
-fn script(path: &Path, body: &str) -> OsString {
+pub(super) fn script(path: &Path, body: &str) -> OsString {
     let draft = path.with_extension("draft");
     fs::write(&draft, format!("#!/bin/sh\n{body}")).unwrap();
     let copied = Command::new("cp").arg(&draft).arg(path).status().unwrap();

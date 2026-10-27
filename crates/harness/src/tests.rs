@@ -6,6 +6,7 @@ use tempfile::{tempdir, TempDir};
 use super::*;
 
 mod install_gate;
+mod launcher;
 mod retention;
 mod run;
 mod settings_entries;
@@ -18,6 +19,11 @@ fn put(dir: &Path, rel: &str, text: &str) {
 
 fn get(dir: &Path, rel: &str) -> Option<String> {
     fs::read_to_string(dir.join(rel)).ok()
+}
+
+/// A `harness` that is not on the path: no hook command is looked at (BIN-15).
+fn no_harness() -> std::ffi::OsString {
+    "harness-not-on-the-path-of-the-tests".into()
 }
 
 /// A source with `files/a.txt`, `files/sub/b.txt` and `seed/s.txt`, and a project pointing at it.

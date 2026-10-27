@@ -122,7 +122,10 @@ fn the_lock_records_each_managed_entry() {
     let entries: Vec<&str> = lock.lines().filter(|l| l.starts_with("entry  ")).collect();
     assert_eq!(entries.len(), 3, "{lock}");
     // the lock still reads back, and its entries are no file
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
 }
 
 // spec: SYN-32
@@ -275,7 +278,7 @@ fn the_repository_settings_once_synced_give_check_nothing_to_warn_of() {
     let root = tempdir().unwrap();
     let report = sync_from(root.path(), &repo, &SyncOptions::default()).unwrap();
     assert_eq!(report.warnings, Vec::<String>::new());
-    let checked = check_with(root.path(), true).unwrap();
+    let checked = check_with(root.path(), true, &no_harness()).unwrap();
     assert_eq!(checked.warnings, Vec::<String>::new());
     assert_eq!(checked.problems, Vec::<String>::new());
 }
@@ -424,7 +427,10 @@ fn check_reports_nothing_of_settings_it_cannot_judge() {
             Some(text) => put(root.path(), SETTINGS, text),
         }
         assert!(
-            check_with(root.path(), false).unwrap().problems.is_empty(),
+            check_with(root.path(), false, &no_harness())
+                .unwrap()
+                .problems
+                .is_empty(),
             "{text:?}"
         );
     }
@@ -494,13 +500,18 @@ fn a_managed_entry_the_project_removed_or_edited_is_a_conflict_unless_forced() {
 #[test]
 fn check_reports_each_recorded_entry_the_settings_no_longer_hold() {
     let (_source, root) = synced();
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
     let mut edited = settings(&root);
     edited["permissions"]["deny"] = json!(["Bash(rm *)"]);
     edited["hooks"]["Stop"][0]["hooks"][0] = hook("not mine any more");
     put(root.path(), SETTINGS, &edited.to_string());
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec![format!("missing: {SETTINGS} deny {DENY}")]
     );
 }

@@ -38,6 +38,10 @@ the nearest `.claude/harness.toml` from the current directory (else from `CLAUDE
 project) and replaces itself (`exec`) by `<binary> tool <tool> [args]`, so input, output and exit code are the tool's
 (`crates/harness/src/tools/`, one module per tool, listed in `TOOLS`). When it cannot get the binary it exits 3, not 2:
 Claude Code reads 2 as the refusal of a hook, and a hook that cannot run must not block the agent (BIN-14).
+The launcher itself is not of the pinned revision: a hook command `harness <subcommand>` it does not know exits 2
+through its argument parser, and every hook refuses. `harness check` asks the `harness` on the path `harness help
+<subcommand>` for each subcommand the hooks of `.claude/settings.json` name, and fails on those it refuses
+(`crates/harness/src/launcher.rs`, BIN-15).
 
 - Git source: the binary of the pinned commit and the platform, `<cache>/harness/bin/<commit>/<target>/harness`. A
   `rev` that is no commit hash (a branch, from `init --rev`) resolves in the clone `sync` left, without a fetch. When

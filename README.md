@@ -10,7 +10,8 @@ harness init ../agent-harness      # writes .claude/harness.toml (or a git URL w
 harness sync                       # managed files copied, project-owned ones seeded, git pre-commit review gate installed,
                                    # the harness's hooks and deny rules added to (or removed from) .claude/settings.json
 harness update [--rev <tag|branch|commit>] [--dry-run] [--force]  # git source: sync to it, then pin the commit in `rev`
-harness check                      # fails if a managed file was modified or deleted, or the git review gate is missing;
+harness check                      # fails if a managed file was modified or deleted, the git review gate is missing,
+                                   # or a hook runs a `harness` subcommand the installed harness does not know;
                                    # warns when .claude/settings.json lacks a deny rule of the review waiver,
                                    # runs a missing hook or leaves the attribution on (sync and update warn too),
                                    # and when Claude Code keeps the transcripts less than a year

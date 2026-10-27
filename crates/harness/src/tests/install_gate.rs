@@ -146,7 +146,9 @@ fn a_source_of_an_older_revision_still_gets_and_checks_the_gate() {
     assert_eq!(report.outcome(gate::GATE), Some(Outcome::Added));
     fs::remove_file(pre_commit(&root)).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec!["missing: native review gate"]
     );
 }
@@ -466,46 +468,62 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
 fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     let (_source, root) = gated();
     run(&root);
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
 
     let managed = get(root.path(), ".git/hooks/pre-commit").unwrap();
     fs::write(pre_commit(&root), format!("{managed}# edited\n")).unwrap();
     set_executable(&pre_commit(&root), true).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec!["modified: native review gate"]
     );
 
     fs::write(pre_commit(&root), managed.clone()).unwrap();
     set_executable(&pre_commit(&root), false).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec!["modified: native review gate"]
     );
 
     fs::remove_file(pre_commit(&root)).unwrap();
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec!["missing: native review gate"]
     );
 
     // a hook of the user without ours is a missing gate too
     user_hook(&root, 0);
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec!["missing: native review gate"]
     );
     fs::remove_file(pre_commit(&root)).unwrap();
 
     // a gate that cannot be installed is not a problem to report
     git_in(root.path(), &["config", "core.hooksPath", ".githooks"]);
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
     git_in(root.path(), &["config", "--unset", "core.hooksPath"]);
 
     // the hook of the review gate removed from the settings since the sync is still recorded: the gate is still expected
     put(root.path(), ".claude/settings.json", "{}");
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec![
             format!("missing: {RECORD_ENTRY}"),
             "missing: native review gate".to_string()
@@ -513,7 +531,9 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     );
     // a fresh clone of a CI run has no git hooks
     assert_eq!(
-        check_with(root.path(), true).unwrap().problems,
+        check_with(root.path(), true, &no_harness())
+            .unwrap()
+            .problems,
         vec![format!("missing: {RECORD_ENTRY}")]
     );
 
@@ -521,13 +541,19 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     let (_source, plain) = setup();
     git_in(plain.path(), &["init", "--quiet", "-b", "main"]);
     run(&plain);
-    assert!(check_with(plain.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(plain.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
 
     // not a repository
     let (source, root) = setup();
     manage_the_review_gate(source.path());
     run(&root);
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
 }
 
 // spec: REV-19
@@ -559,7 +585,7 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     let settings = ".claude/settings.json";
     let warning = |rule: &str| format!("warning: {settings} lacks the deny rule {rule}");
     let deny_warnings = |root: &Path| -> Vec<String> {
-        check_with(root, false)
+        check_with(root, false, &no_harness())
             .unwrap()
             .warnings
             .into_iter()
@@ -568,7 +594,10 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     };
     // no settings file: nothing to warn about
     fs::remove_file(root.path().join(settings)).unwrap();
-    assert!(check_with(root.path(), false).unwrap().warnings.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .warnings
+        .is_empty());
 
     put(
         root.path(),
@@ -594,7 +623,9 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     );
     // a warning does not make `check` fail: the only problem is the hook entry these settings lack
     assert_eq!(
-        check_with(root.path(), false).unwrap().problems,
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .problems,
         vec![format!("missing: {RECORD_ENTRY}")]
     );
 
@@ -604,7 +635,9 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
 
     // settings that do not parse are said so, not reported as lacking every rule
     put(root.path(), settings, "{,}");
-    let invalid = check_with(root.path(), false).unwrap().warnings;
+    let invalid = check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .warnings;
     assert!(
         invalid.len() == 1
             && invalid[0].starts_with(&format!("warning: {settings} is not valid JSON")),
@@ -624,7 +657,9 @@ fn unparsable_settings_get_one_warning_without_the_review_hook() {
     let (_source, plain) = setup();
     run(&plain);
     put(plain.path(), ".claude/settings.json", "{,}");
-    let warnings = check_with(plain.path(), false).unwrap().warnings;
+    let warnings = check_with(plain.path(), false, &no_harness())
+        .unwrap()
+        .warnings;
     assert!(
         warnings.len() == 1 && warnings[0].contains("is not valid JSON"),
         "{warnings:?}"
@@ -656,7 +691,7 @@ fn check_warns_of_each_hook_the_settings_run_and_the_project_lacks() {
         ]}],
     });
     put(root.path(), ".claude/settings.json", &quiet(&hooks));
-    let checked = check_with(root.path(), false).unwrap();
+    let checked = check_with(root.path(), false, &no_harness()).unwrap();
     assert_eq!(
         checked.warnings,
         vec![
@@ -677,7 +712,9 @@ fn check_warns_when_the_settings_leave_the_attribution_on() {
     let warning = "warning: .claude/settings.json does not turn off the attribution".to_string();
     let warnings = |text: &str| {
         put(root.path(), ".claude/settings.json", text);
-        check_with(root.path(), false).unwrap().warnings
+        check_with(root.path(), false, &no_harness())
+            .unwrap()
+            .warnings
     };
     assert_eq!(warnings("{}"), vec![warning.clone()]);
     assert_eq!(
@@ -693,7 +730,10 @@ fn check_warns_when_the_settings_leave_the_attribution_on() {
     assert!(
         warnings(r#"{"attribution": {"commit": "", "pr": "", "sessionUrl": false}}"#).is_empty()
     );
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    assert!(check_with(root.path(), false, &no_harness())
+        .unwrap()
+        .problems
+        .is_empty());
 }
 
 const GONE: &str = "warning: .claude/settings.json runs the missing hook .claude/hooks/gone.rs";

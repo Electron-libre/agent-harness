@@ -1,6 +1,6 @@
 ---
 id: BIN
-status: accepted
+status: draft
 adrs: [0002, 0010]
 ---
 
@@ -28,6 +28,8 @@ tools of the revision its managed files come from.
 - **BIN-12** (deterministic) With a local directory source whose build fails, `run` must run the last binary built from that source, with a one-line warning on stderr, and exit 3 (BIN-14) with the build's errors only when there is none, so that a working tree that does not compile does not block every hook.
 - **BIN-13** (deterministic) `sync` and `update` must print a fetch that fails as a warning on stderr, without failing because of it, since `run` fetches again; under `--dry-run` they fetch nothing.
 - **BIN-14** (deterministic) When `run` cannot get the binary of the tool (no `.claude/harness.toml`, a fetch or a build that fails), it must exit 3 with the reason on stderr, a code Claude Code does not read as a refusal (it blocks on 2), so that a hook that cannot run never blocks the agent.
+- **BIN-15** (deterministic) `check` must fail with one line per hook command of the project's `.claude/settings.json` whose first word is `harness` and whose second word is a subcommand the `harness` on the path refuses (`harness help <subcommand>` exits non-zero), the line naming the command and saying to install the `harness` of the project's revision, and look at nothing when no `harness` is on the path, as BIN-9.
+- **BIN-16** (deterministic) `update` must write nothing and fail when a hook command of the settings it would write names a subcommand the `harness` on the path refuses (as BIN-15 judges it), naming the command and the install of the target, `cargo install --git <source> --rev <commit> --locked`, except under `--dry-run`, which prints the same lines as warnings without failing.
 
 ## Scenarios
 
@@ -44,6 +46,12 @@ tools of the revision its managed files come from.
   successful build run and stderr says the build failed.
 - (BIN-6) Given this repository (`source = "."`) with a change to a tool in its working tree, when a hook runs it,
   then the changed tool runs.
+- (BIN-15) Given a branch whose settings gained the hook `harness newcmd`, with an installed `harness` that has no
+  `newcmd`, when `harness check` of the branch's code runs in its worktree before the merge, then it fails naming the
+  hook; once the branch's `harness` is installed, it passes.
+- (BIN-16) Given an installed `harness` with no `run` and a target revision whose hooks call `harness run`, when
+  `harness update` runs, then nothing is written and the error names `cargo install --git <source> --rev <commit>
+  --locked`; after that install, the same `update` succeeds.
 
 ## Non-goals
 
@@ -51,3 +59,7 @@ tools of the revision its managed files come from.
 - Running the tools of another revision than the pinned one, or without `harness.toml`.
 - Signing the binaries: the digest proves the asset is the one published with the release, not who published it.
 - The release workflow itself: it runs on the source's CI and is checked by its own run, not by a test.
+- Checking the words after the subcommand (the tool of `harness run`): the pinned binary runs them (BIN-1), not the
+  installed one.
+- Hook commands that do not start with `harness`, and an installed `harness` older than BIN-15 and BIN-16: it cannot
+  refuse what it does not check.

@@ -49,7 +49,7 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn when the settings lack a deny rule of the review waiver, run a missing hook or leave the attribution on, or Claude Code keeps the transcripts less than a year.
+    /// Fail when a managed file was modified or deleted since the last sync, the git review gate is missing or edited (not looked at when `CI` is set), or a hook runs a subcommand the `harness` on the path refuses; warn when the settings lack a deny rule of the review waiver, run a missing hook or leave the attribution on, or Claude Code keeps the transcripts less than a year.
     Check,
     /// Run a tool of the harness (hook, check, transcript reader) with the `harness` binary of the pinned revision; with no tool, list them.
     Run {

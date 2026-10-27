@@ -75,17 +75,8 @@ fn missing_deny_rules(settings: &Value) -> Vec<String> {
 /// One warning per file under the project's `HOOKS` that a hook command names and the project lacks, in the order of
 /// the settings (SYN-25). A path under another directory, a directory or a glob is not looked at.
 fn missing_hooks(settings: &Value, present: &dyn Fn(&str) -> bool) -> Vec<String> {
-    let commands = settings["hooks"]
-        .as_object()
-        .into_iter()
-        .flat_map(|events| events.values())
-        .filter_map(Value::as_array)
-        .flatten()
-        .filter_map(|matcher| matcher["hooks"].as_array())
-        .flatten()
-        .filter_map(|hook| hook["command"].as_str());
     let mut missing: Vec<String> = Vec::new();
-    for word in commands.flat_map(str::split_whitespace) {
+    for word in hook_commands(settings).flat_map(str::split_whitespace) {
         let word: String = word.chars().filter(|c| !matches!(c, '"' | '\'')).collect();
         let Some(at) = word.find(HOOKS) else { continue };
         if !PROJECT_PREFIXES.contains(&&word[..at]) {
@@ -104,6 +95,19 @@ fn missing_hooks(settings: &Value, present: &dyn Fn(&str) -> bool) -> Vec<String
         .iter()
         .map(|path| format!("warning: {SETTINGS} runs the missing hook {path}"))
         .collect()
+}
+
+/// The commands of the hooks of `settings`, in the order of the settings.
+pub fn hook_commands(settings: &Value) -> impl Iterator<Item = &str> {
+    settings["hooks"]
+        .as_object()
+        .into_iter()
+        .flat_map(|events| events.values())
+        .filter_map(Value::as_array)
+        .flatten()
+        .filter_map(|matcher| matcher["hooks"].as_array())
+        .flatten()
+        .filter_map(|hook| hook["command"].as_str())
 }
 
 /// Whether `attribution` is `false`, or holds an empty `commit` and an empty `pr` (SYN-26).
