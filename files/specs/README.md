@@ -63,5 +63,5 @@ The order is therefore: write the spec (`draft`), get it validated, write the te
 `just check-specs` (part of `just check`) fails when: the format is wrong, an id is duplicated, a test cites an
 unknown id, an `accepted` spec has a requirement no test cites, or an `accepted` spec still holds a
 `[NEEDS CLARIFICATION: ...]` marker. On a `draft` it only warns (stderr): each marker with its question, and each
-requirement with a vague word or not exactly one "must". `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The script is `.claude/specs/check_specs.rs`, tested by
-`just test-harness`. `skill:write-spec` writes and validates a spec.
+requirement with a vague word or not exactly one "must". `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The checker is `harness run check-specs`, tested by
+the tests of the harness source. `skill:write-spec` writes and validates a spec.

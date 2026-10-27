@@ -30,6 +30,10 @@ install:
 check-harness:
     cargo run -q -p harness -- check
 
+# The spec checker of the working tree, whatever `harness` is installed (CI installs none for this repository).
+check-specs *args:
+    @cargo run -q -p harness -- run check-specs {{args}}
+
 # Bring this repository in step with its own `files/` and `seed/`.
 sync *args:
     cargo run -q -p harness -- sync {{args}}

@@ -27,7 +27,7 @@ This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `harness
 `specs/README.md` are copies of `files/`. After changing `files/`, run `just sync`; `just check-harness`
 fails when a copy drifted.
 
-Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability, needs `rust-script`) before
+Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability) before
 committing and `just test-harness` after touching `files/`; no `Co-Authored-By` or AI attribution in commits;
 everything in English; the shared files hold nothing specific to one project (project values go through
 `.claude/harness.toml`).

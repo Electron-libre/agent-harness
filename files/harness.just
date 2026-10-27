@@ -43,11 +43,11 @@ finish-issue stem *flags:
 
 # Validate a new issue file against the create-issue template.
 check-issue issue:
-    rust-script .claude/skills/create-issue/check_issue.rs {{issue}}
+    harness run check-issue {{issue}}
 
 # Validate specs/*.md and trace their requirements to the `// spec: ID` comments of the tests.
 check-specs *args:
-    @rust-script .claude/specs/check_specs.rs {{args}}
+    @harness run check-specs {{args}}
 
 # Fail when a managed harness file was modified or deleted since the last `harness sync`.
 check-harness:

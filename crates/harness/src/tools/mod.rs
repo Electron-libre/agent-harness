@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod check_commits;
+mod check_issue;
+mod check_specs;
 mod clippy_gate;
 mod close_issue;
 mod commit_check;
@@ -27,6 +29,16 @@ pub const TOOLS: &[Tool] = &[
         name: "check-commits",
         about: "validate the message of every non-merge commit of <base>..<head>",
         main: check_commits::main,
+    },
+    Tool {
+        name: "check-issue",
+        about: "validate a new issue file against the create-issue template",
+        main: check_issue::main,
+    },
+    Tool {
+        name: "check-specs",
+        about: "[--strict] [root]: validate specs/*.md and trace their requirements to the tests",
+        main: check_specs::main,
     },
     Tool {
         name: "clippy-gate",

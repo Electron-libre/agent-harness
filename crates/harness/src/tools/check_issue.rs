@@ -1,4 +1,3 @@
-#!/usr/bin/env rust-script
 //! Validate a new issue file against the template of `skill:create-issue`.
 //! Usage: `just check-issue issues/foo.md`. Prints one line per problem, exit 1 if any.
 
@@ -7,7 +6,10 @@ use std::path::Path;
 /// True when the section exists and has no text before the next `# ` heading.
 fn section_is_empty(text: &str, heading: &str) -> bool {
     let mut lines = text.lines();
-    lines.by_ref().any(|l| l.trim() == heading) && lines.take_while(|l| !l.starts_with("# ")).all(|l| l.trim().is_empty())
+    lines.by_ref().any(|l| l.trim() == heading)
+        && lines
+            .take_while(|l| !l.starts_with("# "))
+            .all(|l| l.trim().is_empty())
 }
 
 fn problems(path: &Path, text: &str) -> Vec<String> {
@@ -15,17 +17,31 @@ fn problems(path: &Path, text: &str) -> Vec<String> {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let stem = name.strip_suffix(".md").unwrap_or("");
     let snake = !stem.is_empty()
-        && stem.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
-    if !snake || path.parent().and_then(Path::file_name).is_none_or(|d| d != "issues") {
+        && stem
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+    if !snake
+        || path
+            .parent()
+            .and_then(Path::file_name)
+            .is_none_or(|d| d != "issues")
+    {
         out.push("file must be `issues/<snake_case>.md`".to_string());
     }
-    if path.parent().is_some_and(|d| d.join("done").join(name).exists()) {
-        out.push(format!("`issues/done/{name}` already exists: pick another name"));
+    if path
+        .parent()
+        .is_some_and(|d| d.join("done").join(name).exists())
+    {
+        out.push(format!(
+            "`issues/done/{name}` already exists: pick another name"
+        ));
     }
     let headings: Vec<&str> = text.lines().filter(|l| l.starts_with("# ")).collect();
     match headings.first() {
         None => out.push("no `# <Title>` heading".to_string()),
-        Some(t) if t.trim() == "# Goal" => out.push("first heading must be the title, not `# Goal`".to_string()),
+        Some(t) if t.trim() == "# Goal" => {
+            out.push("first heading must be the title, not `# Goal`".to_string())
+        }
         Some(_) => {}
     }
     for required in ["# Goal", "# Approach", "# Resources"] {
@@ -41,7 +57,10 @@ fn problems(path: &Path, text: &str) -> Vec<String> {
     }
     // `# Specs` is optional, but when present it must name something.
     if section_is_empty(text, "# Specs") {
-        out.push("`# Specs` is empty: name the spec and requirement ids, or drop the section".to_string());
+        out.push(
+            "`# Specs` is empty: name the spec and requirement ids, or drop the section"
+                .to_string(),
+        );
     }
     for (i, line) in text.lines().enumerate() {
         let n = i + 1;
@@ -55,9 +74,9 @@ fn problems(path: &Path, text: &str) -> Vec<String> {
     out
 }
 
-fn main() {
-    let Some(arg) = std::env::args().nth(1) else {
-        eprintln!("usage: check_issue.rs issues/<name>.md");
+pub(super) fn main(args: &[String]) -> u8 {
+    let Some(arg) = args.first().cloned() else {
+        eprintln!("usage: harness run check-issue issues/<name>.md");
         std::process::exit(2);
     };
     let path = Path::new(&arg);

@@ -1,21 +1,16 @@
 # Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.
-6addf7f1af2badb6ea6c6b1c7a56b6ccacf74b41e71262850fa6556c97c5ef24  .claude/repo_files.rs
 adb015a408ba21b51dcfbcade42911a22bb3559e66be924c269a370d36c4bd97  .claude/skills/audit-instructions/SKILL.md
 5530064af00eafad54c6eb8246beebfa2da4c6d316c338a235c6094a526fc6ad  .claude/skills/audit-instructions/audit_sources.rs
 1e27ed1965dd0a755f12948b637ce444b41504c67f12874dc338b2f6bb51995e  .claude/skills/audit-instructions/test_audit_sources.rs
 1c387fb566b400107419db34c47089fc5b7e0dcc9c4f7f5da2f4cdaaeb35bbca  .claude/skills/commit-message/SKILL.md
-737612b44cb092959fc2d3778b60961dc66d85d36b89a6d26ab2e13797902c36  .claude/skills/create-issue/SKILL.md
-5c5a0cbac46a42b78dbeeaffaa145413e01d53487b0f8923c65d9d9610c93e6a  .claude/skills/create-issue/check_issue.rs
-d2db744e6291a53f6c90457db7fa2704f044815c4ebbff5fc8c85497eced7894  .claude/skills/create-issue/test_check_issue.rs
+be07b37d099944faff8612e7e912b48c339ca73bf41c000798139582df2b9c48  .claude/skills/create-issue/SKILL.md
 e632be85a3847d1043e3d277f89bbdc86042cf7f13143ae9882232a5a73367ea  .claude/skills/evaluate-harness/SKILL.md
 7d8f859426308003cb509d3c53dc2ae406e7e4d92c96d9a3f1754902d64d081a  .claude/skills/issue-workflow/SKILL.md
 96fc13c68b8681d78f1ff2b0d04c6f4d3e2ba005b5f197f0d40f684ee09a16ee  .claude/skills/issue-workflow/details.md
 72ad3c6cf9cfd9f5fa459b083143e5aceb9e8e9395035d22438ae73f86be270e  .claude/skills/prioritize-issues/SKILL.md
 0def94569c3383e32d14786752c233a4428e59fd04f6a41c2a9768c8d79dca5f+x  .claude/skills/test_skills.rs
 fb2d21c5484dbad2bd0639f2a326a6385731bee3a4143fb8778807e1169d5e14  .claude/skills/update-docs/SKILL.md
-09ba72104a528d8363367261a60044e1009e9e65b3cab99c0a88356a7f6350cf  .claude/skills/write-spec/SKILL.md
-d1c75f59c8bba4ceade5cd282c6a1b3010efb97233686538e9a203f05fe52175  .claude/specs/check_specs.rs
-57cecfec0b3ecf8a80557f7587026e29fd73f0a3c9231a6222ef9e39226ad793  .claude/specs/test_check_specs.rs
+f6afc4738c3e69f5dd0d747a1646cfc46ceea123e7b57078fe3e8eb12f23c347  .claude/skills/write-spec/SKILL.md
 5ef0ab2500a2acedba5279f540433fe3d23dad8b3c60109ae769312e6cbbcdf5  .claude/test_recipes.rs
 4ba84da02a8f40f4277014846e4faeac47102f8c6d392824c0251edd0c9ee598  .claude/test_settings.rs
 8e0cdaac649fb053d053310574cbe3478e8df920a54e848d26391eb3e0a6d0f3  .claude/transcripts/delivered_quality.rs
@@ -32,8 +27,8 @@ e138cb3a79312c3f8aa9f6241683556d97073fe6f4f8cdda35d24d1394a80abf  .claude/transc
 106cfa4f1ac15357db4dfdf262503887e1bbf343d5ce02d120368fd9ab086ef4+x  .github/install_harness.sh
 1622e3fb72634f184f2c9d9861e63035dd8e9daa7bad334043e5fc89b7125a41  .github/workflows/harness.yml
 2cab19ded8c81cdd2d52e207c210f42f2addcfe91ae5c5c353276a7a53e68dc5  AGENTS.md
-27f042cf38aaf448194d0c3b7bf2f1a8395392761e79cec66c92502ce6da8e29  harness.just
-3f1ee7781182c25b631f1fb493e71dc4e5eb8199572c5daf8e1359fc17be70c0  specs/README.md
+8710ff336b3879f9559f6de7ba2e202c34fa9ea405016ef69f55459ff4e7f8f5  harness.just
+e48baa72bf64f137398114ecef3ac732e39639ac7244a9b5aee3f3cf7cb224f8  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}

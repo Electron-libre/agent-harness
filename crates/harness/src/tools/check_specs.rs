@@ -1,4 +1,3 @@
-#!/usr/bin/env rust-script
 //! Validate `specs/*.md` against `specs/README.md` and trace them to the tests (`// spec: ID`).
 //! Usage: `just check-specs` (from the repo root; an optional argument is another root; `--strict` also flags the
 //! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
@@ -6,14 +5,17 @@
 //! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
 //! `must`) is a warning.
 
-// repo_files.rs sha256: 6addf7f1af2badb6ea6c6b1c7a56b6ccacf74b41e71262850fa6556c97c5ef24
-#[path = "../repo_files.rs"]
-mod repo_files;
+use super::repo_files;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-const SECTIONS: [&str; 4] = ["## Intent", "## Requirements", "## Scenarios", "## Non-goals"];
+const SECTIONS: [&str; 4] = [
+    "## Intent",
+    "## Requirements",
+    "## Scenarios",
+    "## Non-goals",
+];
 
 struct Requirement {
     id: String,
@@ -33,8 +35,9 @@ fn is_id_prefix(s: &str) -> bool {
 }
 
 fn is_req_id(s: &str) -> bool {
-    s.split_once('-')
-        .is_some_and(|(p, n)| is_id_prefix(p) && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+    s.split_once('-').is_some_and(|(p, n)| {
+        is_id_prefix(p) && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())
+    })
 }
 
 /// `line` with the content of its inline code spans (a run of backticks up to the next run of the same length)
@@ -47,7 +50,9 @@ fn without_code_spans(line: &str) -> String {
         let run = rest[start..].len() - rest[start..].trim_start_matches('`').len();
         let after = &rest[start + run..];
         let fence = "`".repeat(run);
-        let close = after.match_indices(&fence).find(|(i, _)| !after[i + run..].starts_with('`') && !after[..*i].ends_with('`'));
+        let close = after
+            .match_indices(&fence)
+            .find(|(i, _)| !after[i + run..].starts_with('`') && !after[..*i].ends_with('`'));
         let Some((end, _)) = close else {
             out.push_str(&rest[start..]);
             return out;
@@ -93,7 +98,11 @@ fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<Strin
     for (i, line) in lines.iter().enumerate() {
         match (open, fence(line)) {
             (None, Some(f)) => open = Some(f),
-            (Some((c, len)), Some((d, n))) if c == d && n >= len && line.trim().trim_start_matches(c).is_empty() => open = None,
+            (Some((c, len)), Some((d, n)))
+                if c == d && n >= len && line.trim().trim_start_matches(c).is_empty() =>
+            {
+                open = None
+            }
             _ => {}
         }
         if open.is_some() || fence(line).is_some() {
@@ -105,7 +114,10 @@ fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<Strin
             let after = &rest[start + MARKER.len()..];
             let question = question(after);
             if accepted {
-                out.push(format!("{file}:{}: `{MARKER} ...]` left in an accepted spec: settle it", i + 1));
+                out.push(format!(
+                    "{file}:{}: `{MARKER} ...]` left in an accepted spec: settle it",
+                    i + 1
+                ));
             } else {
                 eprintln!("warning: {file}:{}: needs clarification: {question}", i + 1);
             }
@@ -122,7 +134,10 @@ const VAGUE: [&str; 5] = ["should", "may", "etc", "appropriate", "fast"];
 fn without_quotes(text: &str) -> String {
     let mut out = String::new();
     let mut rest = text;
-    while let Some((start, open)) = rest.char_indices().find(|(_, c)| matches!(c, '"' | '\u{201c}')) {
+    while let Some((start, open)) = rest
+        .char_indices()
+        .find(|(_, c)| matches!(c, '"' | '\u{201c}'))
+    {
         let after = &rest[start + open.len_utf8()..];
         let close = if open == '"' { '"' } else { '\u{201d}' };
         out.push_str(&rest[..start]);
@@ -142,8 +157,14 @@ fn without_quotes(text: &str) -> String {
 /// only: the word list has false positives.
 fn check_wording(file: &str, id: &str, statement: &str) {
     // `shouldn't` holds `should` and `mustn't` a `must`
-    let text = without_quotes(&without_code_spans(statement)).to_lowercase().replace("n't", " not").replace("n\u{2019}t", " not");
-    let words: Vec<&str> = text.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+    let text = without_quotes(&without_code_spans(statement))
+        .to_lowercase()
+        .replace("n't", " not")
+        .replace("n\u{2019}t", " not");
+    let words: Vec<&str> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
     let mut warned = BTreeSet::new();
     for word in words.iter().filter(|w| VAGUE.contains(w)) {
         if warned.insert(*word) {
@@ -159,27 +180,47 @@ fn check_wording(file: &str, id: &str, statement: &str) {
 
 fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
     let mut problem = |m: String| out.push(format!("{file}: {m}"));
-    let mut spec = Spec { file: file.to_string(), id: String::new(), status: String::new(), requirements: Vec::new() };
+    let mut spec = Spec {
+        file: file.to_string(),
+        id: String::new(),
+        status: String::new(),
+        requirements: Vec::new(),
+    };
     let lines: Vec<&str> = text.lines().collect();
-    let close = lines.iter().skip(1).position(|l| l.trim() == "---").map(|p| p + 1);
+    let close = lines
+        .iter()
+        .skip(1)
+        .position(|l| l.trim() == "---")
+        .map(|p| p + 1);
     if lines.first().map(|l| l.trim()) != Some("---") || close.is_none() {
         problem("no front matter (`---` ... `---`)".to_string());
         return spec;
     }
     let close = close.unwrap_or(0);
     for line in &lines[1..close] {
-        let Some((key, value)) = line.split_once(':') else { continue };
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
         let value = value.split('#').next().unwrap_or("").trim();
         match key.trim() {
             "id" => spec.id = value.to_string(),
             "status" => spec.status = value.to_string(),
             "adrs" => {
-                for n in value.trim_matches(|c| c == '[' || c == ']').split(',').map(str::trim).filter(|n| !n.is_empty()) {
+                for n in value
+                    .trim_matches(|c| c == '[' || c == ']')
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|n| !n.is_empty())
+                {
                     let found = std::fs::read_dir(root.join("docs/adr"))
                         .into_iter()
                         .flatten()
                         .flatten()
-                        .any(|e| e.file_name().to_string_lossy().starts_with(&format!("{n}-")));
+                        .any(|e| {
+                            e.file_name()
+                                .to_string_lossy()
+                                .starts_with(&format!("{n}-"))
+                        });
                     if !found {
                         problem(format!("adr {n} not found in docs/adr"));
                     }
@@ -189,7 +230,10 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         }
     }
     if !is_id_prefix(&spec.id) {
-        problem(format!("front matter `id` must be three capital letters, got `{}`", spec.id));
+        problem(format!(
+            "front matter `id` must be three capital letters, got `{}`",
+            spec.id
+        ));
     }
     // `implemented` was a status of its own, enforced like `accepted`: still read as such so older specs keep passing
     if spec.status == "implemented" {
@@ -197,7 +241,10 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         spec.status = "accepted".to_string();
     }
     if !["draft", "accepted"].contains(&spec.status.as_str()) {
-        problem(format!("front matter `status` must be draft or accepted, got `{}`", spec.status));
+        problem(format!(
+            "front matter `status` must be draft or accepted, got `{}`",
+            spec.status
+        ));
     }
     for section in SECTIONS {
         if !lines.iter().any(|l| l.trim() == section) {
@@ -213,31 +260,50 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         if !in_requirements || !line.starts_with("- ") {
             continue;
         }
-        let parsed = line.strip_prefix("- **").and_then(|r| r.split_once("**")).filter(|(id, _)| is_req_id(id));
+        let parsed = line
+            .strip_prefix("- **")
+            .and_then(|r| r.split_once("**"))
+            .filter(|(id, _)| is_req_id(id));
         let Some((id, after)) = parsed else {
-            problem(format!("requirement line must start with `- **{}-<n>**`: `{line}`", spec.id));
+            problem(format!(
+                "requirement line must start with `- **{}-<n>**`: `{line}`",
+                spec.id
+            ));
             continue;
         };
         if !id.starts_with(&format!("{}-", spec.id)) {
-            problem(format!("requirement {id} does not start with the spec id `{}`", spec.id));
+            problem(format!(
+                "requirement {id} does not start with the spec id `{}`",
+                spec.id
+            ));
         }
         if !seen.insert(id.to_string()) {
             problem(format!("duplicate requirement {id}"));
         }
-        let kind = after.trim().strip_prefix('(').and_then(|a| a.split_once(')'));
-        let (kind, statement) = kind.map_or((String::new(), ""), |(k, rest)| (k.to_string(), rest.trim()));
+        let kind = after
+            .trim()
+            .strip_prefix('(')
+            .and_then(|a| a.split_once(')'));
+        let (kind, statement) = kind.map_or((String::new(), ""), |(k, rest)| {
+            (k.to_string(), rest.trim())
+        });
         let withdrawn = statement.starts_with("withdrawn:");
         // `quality` was a kind proved by a benchmark: still read, untraced, so older specs keep passing
         if kind == "quality" && !withdrawn {
             eprintln!("warning: {file}: requirement {id}: kind `quality` is deprecated, reword it for a test or withdraw it");
         } else if kind != "deterministic" && kind != "quality" {
-            problem(format!("requirement {id}: kind must be `(deterministic)`, got `({kind})`"));
+            problem(format!(
+                "requirement {id}: kind must be `(deterministic)`, got `({kind})`"
+            ));
         }
         // with no `(kind)`, the statement was not found: the format problem is enough
         if spec.status == "draft" && !withdrawn && !kind.is_empty() {
             check_wording(file, id, statement);
         }
-        spec.requirements.push(Requirement { id: id.to_string(), exempt: withdrawn || kind == "quality" });
+        spec.requirements.push(Requirement {
+            id: id.to_string(),
+            exempt: withdrawn || kind == "quality",
+        });
     }
     check_markers(file, &lines, spec.status == "accepted", out);
     spec
@@ -245,7 +311,9 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
 
 /// Every file under `dir` (outside a git repository, where no worktree can nest).
 fn all_files(dir: &Path, found: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -275,19 +343,38 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
             Vec::new()
         }
     };
-    let files = files.into_iter().filter(|f| f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d)));
+    let files = files.into_iter().filter(|f| {
+        f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d))
+    });
     let mut cited = BTreeMap::new();
     for file in files {
-        let Ok(text) = std::fs::read_to_string(&file) else { continue };
-        let name = file.strip_prefix(root).unwrap_or(&file).display().to_string();
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let name = file
+            .strip_prefix(root)
+            .unwrap_or(&file)
+            .display()
+            .to_string();
         let lines: Vec<&str> = text.lines().collect();
         for (i, line) in lines.iter().enumerate() {
-            let Some(list) = line.trim().strip_prefix("// spec:") else { continue };
-            let next = lines[i + 1..].iter().map(|l| l.trim()).find(|l| !l.starts_with("#[") && !l.starts_with("//"));
+            let Some(list) = line.trim().strip_prefix("// spec:") else {
+                continue;
+            };
+            let next = lines[i + 1..]
+                .iter()
+                .map(|l| l.trim())
+                .find(|l| !l.starts_with("#[") && !l.starts_with("//"));
             if !next.is_some_and(|l| l.contains("fn ")) {
-                out.push(format!("{name}:{}: `// spec:` must sit right above a test `fn`", i + 1));
+                out.push(format!(
+                    "{name}:{}: `// spec:` must sit right above a test `fn`",
+                    i + 1
+                ));
             }
-            for id in list.split(|c: char| c == ',' || c.is_whitespace()).filter(|s| !s.is_empty()) {
+            for id in list
+                .split(|c: char| c == ',' || c.is_whitespace())
+                .filter(|s| !s.is_empty())
+            {
                 cited.entry(id.to_string()).or_insert_with(|| name.clone());
             }
         }
@@ -314,15 +401,22 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     let mut ids: BTreeMap<&str, &str> = BTreeMap::new();
     for spec in specs.iter().filter(|s| !s.id.is_empty()) {
         if let Some(other) = ids.insert(&spec.id, &spec.file) {
-            out.push(format!("{}: spec id `{}` is already used by {other}", spec.file, spec.id));
+            out.push(format!(
+                "{}: spec id `{}` is already used by {other}",
+                spec.file, spec.id
+            ));
         }
     }
     let cited = citations(root, &mut out);
-    let known: BTreeSet<&str> = specs.iter().flat_map(|s| s.requirements.iter().map(|r| r.id.as_str())).collect();
+    let known: BTreeSet<&str> = specs
+        .iter()
+        .flat_map(|s| s.requirements.iter().map(|r| r.id.as_str()))
+        .collect();
     for (id, file) in &cited {
         // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
         let foreign = !strict
-            && file.replace('\\', "/").starts_with(".claude/") && !ids.contains_key(id.split('-').next().unwrap_or(""));
+            && file.replace('\\', "/").starts_with(".claude/")
+            && !ids.contains_key(id.split('-').next().unwrap_or(""));
         if !known.contains(id.as_str()) && !foreign {
             out.push(format!("{file}: cites `{id}`, which no spec defines"));
         }
@@ -330,25 +424,32 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     for spec in specs.iter().filter(|s| s.status == "accepted") {
         for req in spec.requirements.iter().filter(|r| !r.exempt) {
             if !cited.contains_key(&req.id) {
-                out.push(format!("{}: requirement {}: no test cites `// spec: {}`", spec.file, req.id, req.id));
+                out.push(format!(
+                    "{}: requirement {}: no test cites `// spec: {}`",
+                    spec.file, req.id, req.id
+                ));
             }
         }
     }
     out
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+pub(super) fn main(args: &[String]) -> u8 {
+    let args: Vec<String> = args.to_vec();
     if let Some(flag) = args.iter().find(|a| a.starts_with('-') && *a != "--strict") {
-        eprintln!("unknown option `{flag}` (usage: check_specs.rs [--strict] [root])");
+        eprintln!("unknown option `{flag}` (usage: harness run check-specs [--strict] [root])");
         std::process::exit(2);
     }
     if args.iter().filter(|a| *a != "--strict").count() > 1 {
-        eprintln!("usage: check_specs.rs [--strict] [root]");
+        eprintln!("usage: harness run check-specs [--strict] [root]");
         std::process::exit(2);
     }
     let strict = args.iter().any(|a| a == "--strict");
-    let root = PathBuf::from(args.iter().find(|a| *a != "--strict").map_or(".", String::as_str));
+    let root = PathBuf::from(
+        args.iter()
+            .find(|a| *a != "--strict")
+            .map_or(".", String::as_str),
+    );
     let found = problems(&root, strict);
     for p in &found {
         println!("{p}");

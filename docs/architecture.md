@@ -28,7 +28,7 @@ Everything that differs between projects is a value, not code. Scripts read list
 
 The tools of the harness move from `rust-script` files to modules of the `harness` crate
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md));
-the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits` and the issue tools (`next-issue`, `issue-worktree`, `close-issue`) are ported, the other
+the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits`, the issue tools (`next-issue`, `issue-worktree`, `close-issue`), `check-specs` and `check-issue` are ported, the other
 scripts still run under `rust-script`. A hook, a recipe or a
 skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
 the nearest `.claude/harness.toml` from the current directory and replaces itself (`exec`) by
@@ -250,10 +250,10 @@ Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-is
 `just finish-issue`) gives an issue the worktree `.claude/worktrees/<stem>` on a branch `<stem>`: separate working tree and
 index, shared object store, so one agent's uncommitted files and commits never reach the other. Claude Code enters a
 worktree there without asking for an approval; `start-issue` adds `/.claude/worktrees/` to `.git/info/exclude`, and the
-tools that scan the tree, `close-issue` and `check_specs.rs`, take their files from git (`repo_files.rs`: a module of
-the crate, and a copy `check_specs.rs` includes by `#[path]` until it is ported, `git ls-files -co --exclude-standard`),
+tools that scan the tree, `close-issue` and `check-specs`, take their files from git (the module `repo_files.rs` of
+the crate, `git ls-files -co --exclude-standard`),
 which never lists a nested worktree, ignored or not, so the main worktree never sees the nested ones. `close-issue` then drops `.git`,
-`target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by directory name; `check_specs.rs`
+`target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by directory name; `check-specs`
 walks the disk only outside a git repository. A project's own tools run on `.` may still read the nested
 worktrees (measured in ADR 0009); the README says how to keep them out. `finish-issue` still removes a
 worktree left at the former sibling path `../<repo>-<stem>`. Each worktree has its

@@ -52,7 +52,7 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 3. [x] Hooks: `require_code_review`, `clippy_gate`, `format_rust` ported with their tests (REV, CLG traces), entries
    commands and the `pre-commit` gate on `harness run`; makes true BIN-9 and part of BIN-8.
 4. [x] Issue workflow: `next_issue`, `issue_worktree`, `close_issue`, `repo_files` ported with their tests (PAR).
-5. [ ] Checks: `check_specs`, `check_issue` ported with their tests (CLR); this repository's `check-specs` keeps working.
+5. [x] Checks: `check_specs`, `check_issue` ported with their tests (CLR); this repository's `check-specs` keeps working.
 6. [ ] Transcript readers and `audit_sources` ported with their tests (EVA, RER, QUA, REP, BRE); stamps removed;
    ADR 0006 marked superseded.
 7. [ ] No `rust-script` left: recipes, skills, seed allow rule, CI, `test-harness` (the content tests `test_skills`,
@@ -159,3 +159,21 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 - decisions needed: none.
 - Follow-up: the merge itself needs the new `harness` first: `just close-issue` and `just finish-issue` of the main
   branch call `harness run` once fast-forwarded, so run `just install` before them.
+
+## Deliverable 5
+- done: `check-specs` and `check-issue` ported with their tests (`tests/check_specs.rs`, `check_issue.rs`, 87 checks,
+  CLR and PAR traces kept, the hash stamp check dropped); the last copy of `repo_files.rs` under `files/` removed;
+  recipes, `write-spec`, `create-issue` and `specs/README.md` name `harness run`. This repository's `justfile` runs
+  `check-specs` with `cargo run`, so `just check` (and CI, which installs no `harness` here) uses the checker of the
+  working tree; `just check` no longer needs `rust-script`.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`, through the ported checker) | pass |
+| `just test-harness` | pass |
+| docs | architecture, CLAUDE.md, `specs/README.md`, write-spec and create-issue skills |
+
+- red: none before the code (tests ported with the code).
+- Code review: no findings (its one doubt, a duplicate `check-specs` recipe, is allowed by `set allow-duplicate-recipes`; `just check` ran through it).
+- not verified: none beyond the earlier ones.
+- decisions needed: none.
