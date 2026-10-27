@@ -1,6 +1,5 @@
-//! Behavior test for `session_metrics.rs` on fixture transcripts: columns, deduplicated assistant messages,
+//! Behavior test for `harness tool session-metrics` on fixture transcripts: columns, deduplicated assistant messages,
 //! sub-agents, typed messages, hook refusals, skills, project, tolerance to unknown lines, no message text.
-//! Usage: `just test-harness`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

@@ -33,4 +33,4 @@ only when there is something new to check and reports the problems in few lines.
 ## Non-goals
 
 - Detecting a change that only touches `Cargo.toml`, `clippy.toml` or the toolchain: the next `.rs` edit or `just check` catches it.
-- The output of the `just` recipes (`check`, `test-harness`): they are recipes of the harness, not a requirement of this hook.
+- The output of the `just` recipes (`check`): they are recipes of the harness, not a requirement of this hook.

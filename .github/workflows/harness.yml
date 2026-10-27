@@ -11,24 +11,15 @@ concurrency:
 
 jobs:
   harness:
-    name: agent harness tests
+    name: agent harness checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install the toolchain (the project's pinned one, else stable)
-        run: |
-          if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then
-            rustup toolchain install
-          else
-            rustup toolchain install stable --profile minimal -c rustfmt,clippy
-          fi
-      - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: just,rust-script
-      - name: Install harness (the release of the pinned revision, else built)
+          tool: just
+      - name: Install harness (the release of the pinned revision, else built with the runner's cargo)
         run: sh .github/install_harness.sh
-      - run: just test-harness
       - run: just check-specs
       - name: Check that no synced file was edited
         run: |

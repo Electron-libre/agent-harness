@@ -1,6 +1,5 @@
-//! Behavior test for `harness_report.rs` on fixture TSV files: the groups of revisions, the tables per axis, the
+//! Behavior test for `harness tool harness-report` on fixture TSV files: the groups of revisions, the tables per axis, the
 //! confounders next to the numbers, the refusal of what it cannot read.
-//! Usage: `just test-harness`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

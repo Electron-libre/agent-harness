@@ -28,7 +28,7 @@ This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `harness
 fails when a copy drifted.
 
 Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability) before
-committing and `just test-harness` after touching `files/`; no `Co-Authored-By` or AI attribution in commits;
+committing (it runs the tests of the tools and of the shared content too); no `Co-Authored-By` or AI attribution in commits;
 everything in English; the shared files hold nothing specific to one project (project values go through
 `.claude/harness.toml`).
 

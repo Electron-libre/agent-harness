@@ -1,5 +1,4 @@
-//! Behavior test for `next_issue.rs` and the queue handling of `close_issue.rs`.
-//! Usage: `just test-harness`.
+//! Behavior test for `harness tool next-issue` and the queue handling of `harness tool close-issue`.
 
 use std::path::Path;
 use std::process::Command;

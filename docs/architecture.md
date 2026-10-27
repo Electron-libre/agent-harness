@@ -26,11 +26,14 @@ Everything that differs between projects is a value, not code. Scripts read list
 
 ## Tools and their binary
 
-The tools of the harness move from `rust-script` files to modules of the `harness` crate
-([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md));
-the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits`, the issue tools (`next-issue`, `issue-worktree`, `close-issue`), `check-specs`, `check-issue`, the transcript readers and `audit-sources` are ported, the other
-scripts still run under `rust-script`. A hook, a recipe or a
-skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
+The tools of the harness are modules of the `harness` crate, no longer `rust-script` files
+([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md)):
+the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits`, the issue tools
+(`next-issue`, `issue-worktree`, `close-issue`), `check-specs`, `check-issue`, the transcript readers and
+`audit-sources`; `harness run` alone lists them. A consumer needs `harness` and `just`, Rust only for a commit with no
+published binary. Their tests, and those of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`), are
+`cargo test` of this repository; consumers run none, and a test fails when anything the source ships still names
+`rust-script`. A hook, a recipe or a skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
 the nearest `.claude/harness.toml` from the current directory and replaces itself (`exec`) by
 `<binary> tool <tool> [args]`, so input, output and exit code are the tool's (`crates/harness/src/tools/`, one module
 per tool, listed in `TOOLS`).
@@ -95,9 +98,7 @@ The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session opened in 
 issue worktree (`EnterWorktree`) keeps it on the main one, where another agent may work. `clippy-gate` checks the
 work tree of the event's `cwd`, at the place `CLAUDE_PROJECT_DIR` has in its own (a crate in a subdirectory), and
 `format-rust` runs `cargo fmt` from the directory of the edited file.
-For the same reason `just test-harness` prints nothing when every test script passes, and only the lines of the
-failing script that are not `ok` otherwise (`test_recipes.rs` proves it); the seeded `justfile` asks the same of the
-project's `check`.
+For the same reason the seeded `justfile` asks the project's `check` to print nothing on success.
 
 `review-gate` makes the code review of `issue-workflow` (step 3.5) a precondition of the commit. It is
 declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on
@@ -277,7 +278,6 @@ Everything a check prints is read by the agent and billed as tokens, every turn 
 | Output | Before | After |
 |---|---|---|
 | `just check`, success | 86 lines, 5.6 kB | nothing |
-| `just test-harness`, success | 267 lines, 12.7 kB | nothing |
 | clippy gate, 3 errors | 35 lines, 1.9 kB | 4 lines, 0.4 kB |
 | clippy gate, end of turn with no new Rust change | a full clippy run | no run |
 

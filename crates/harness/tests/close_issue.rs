@@ -1,5 +1,4 @@
-//! Behavior test for `close_issue.rs`: moves tracked and untracked issues, refuses bad targets.
-//! Usage: `just test-harness`.
+//! Behavior test for `harness tool close-issue`: moves tracked and untracked issues, refuses bad targets.
 
 use std::path::Path;
 use std::process::Command;

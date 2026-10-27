@@ -1,13 +1,5 @@
-# Recipes of the shared agent harness. Managed by `harness sync`: change them in the central repository.
-
-# Test the agent harness itself (hooks, skills, spec checker). Requires `rust-script`. Prints nothing on success, and
-# only the lines of the failing script that are not `ok` otherwise.
-test-harness:
-    #!/usr/bin/env sh
-    for t in .claude/hooks/test_*.rs .claude/skills/test_skills.rs .claude/skills/*/test_*.rs .claude/specs/test_*.rs .claude/transcripts/test_*.rs .claude/test_*.rs; do
-        [ -e "$t" ] || continue
-        out=$(rust-script "$t" 2>&1) || { printf '%s\n' "$out" | grep -v '^ok '; echo "FAILED: $t"; exit 1; }
-    done
+# Recipes of the shared agent harness. Managed by `harness sync`: change them in the central repository. The tools they
+# run are those of `harness run`, the binary of the revision `.claude/harness.toml` pins.
 
 # For the user only, never the agent: waive the code review of the next commit of this worktree (creates its waiver file and prints the path).
 waive-review:

@@ -1,5 +1,4 @@
-//! Behavior test for `issue_worktree.rs` (`start` and `finish`) against a throwaway git repository.
-//! Usage: `just test-harness`.
+//! Behavior test for `harness tool issue-worktree` (`start` and `finish`) against a throwaway git repository.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

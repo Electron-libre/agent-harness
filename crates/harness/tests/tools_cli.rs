@@ -289,3 +289,20 @@ fn every_tool_the_shared_harness_runs_exists() {
     }
     assert!(runs > 0, "no `harness run` found: the scan is broken");
 }
+
+// spec: BIN-8
+#[test]
+fn nothing_the_source_ships_runs_rust_script() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let shipped = ["files", "entries", "seed"]
+        .iter()
+        .flat_map(|dir| files_under(&repo.join(dir)));
+    for path in shipped {
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        assert!(
+            !text.contains("rust-script"),
+            "{} still names rust-script: run the tool through `harness run`",
+            path.display()
+        );
+    }
+}

@@ -94,15 +94,14 @@ again. Then set `Plan: validated` and the base commit. The spec file is the reco
 2. **Test first**: write a behavior or end-to-end test that fails for the right reason. When the capability has a
    spec, the test proves a requirement and carries `// spec: ABC-n` (placement in `specs/README.md`); the
    deliverable that traces the last untraced requirement sets the spec `accepted`. Follow the test
-   conventions of the project (the `test_conventions` note of `.claude/harness.toml` says where they are written). For non-Rust
-   deliverables (hooks, skills, scripts) write the script test in Rust (`rust-script`, no bash) and run it with `just test-harness`.
+   conventions of the project (the `test_conventions` note of `.claude/harness.toml` says where they are written). Write
+   the test of a hook, a skill or a script like the others, never in bash.
 3. **Implement** until the test passes, then **refactor** under the green tests: remove duplication, rename, simplify,
    no new behaviour. The clippy gate hook keeps the code warning-free; fix what it reports.
 4. **Docs**: run `skill:update-docs` (it covers the specs). If the change is an architectural decision, also write or finish its ADR in
    `docs/adr/` (template and numbering in `docs/adr/README.md`) and update the
    diagrams in the `architecture` document of `.claude/harness.toml` when the flow changed.
-5. **Review (mandatory, never skipped)**: run `just check` (fmt, clippy, tests, specs) and
-   `just test-harness`, then **invoke `/code-review low` on the diff with the Skill tool** (always name the level)
+5. **Review (mandatory, never skipped)**: run `just check` (fmt, clippy, tests, specs), then **invoke `/code-review low` on the diff with the Skill tool** (always name the level)
    and wait for its findings; reread the docs you changed. Fix the findings on the deliverable's own change, or say
    why one is not fixed; a finding outside the requirements of the deliverable becomes an issue
    (`skill:create-issue`), not a fix in this deliverable.

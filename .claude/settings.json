@@ -13,7 +13,7 @@
       "Bash(cargo check *)",
       "Bash(just)",
       "Bash(just *)",
-      "Bash(rust-script .claude/*)",
+      "Bash(harness run *)",
       "Bash(git status)",
       "Bash(git status *)",
       "Bash(git diff)",

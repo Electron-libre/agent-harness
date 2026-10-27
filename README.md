@@ -1,6 +1,6 @@
 # agent-harness
 
-The shared agent harness of my projects (Claude Code skills and hooks, `rust-script` checks, `just` recipes, CI),
+The shared agent harness of my projects (Claude Code skills and hooks, checks and transcript readers run by `harness run`, `just` recipes, CI),
 and `harness`, the tool that copies it into each project and tells when a copy drifted.
 
 ```sh

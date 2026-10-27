@@ -1,5 +1,4 @@
-//! Behavior test for `audit_sources.rs`: counts, typed-message filter, instruction files and memory.
-//! Usage: `just test-harness`.
+//! Behavior test for `harness tool audit-sources`: counts, typed-message filter, instruction files and memory.
 
 #[test]
 fn audit_sources() {

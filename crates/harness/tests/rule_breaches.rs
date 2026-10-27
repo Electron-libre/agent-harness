@@ -1,6 +1,5 @@
-//! Behavior test for `rule_breaches.rs` on fixture transcripts and repositories: the findings of each rule, `breach`
+//! Behavior test for `harness tool rule-breaches` on fixture transcripts and repositories: the findings of each rule, `breach`
 //! apart from `blocked`, their locations, the summary per rule and revision, no message text.
-//! Usage: `just test-harness`.
 
 use serde_json::json;
 use std::path::{Path, PathBuf};

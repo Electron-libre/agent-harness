@@ -55,7 +55,7 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 5. [x] Checks: `check_specs`, `check_issue` ported with their tests (CLR); this repository's `check-specs` keeps working.
 6. [x] Transcript readers and `audit_sources` ported with their tests (EVA, RER, QUA, REP, BRE); stamps removed;
    ADR 0006 marked superseded.
-7. [ ] No `rust-script` left: recipes, skills, seed allow rule, CI, `test-harness` (the content tests `test_skills`,
+7. [x] No `rust-script` left: recipes, skills, seed allow rule, CI, `test-harness` (the content tests `test_skills`,
    `test_recipes`, `test_settings` become cargo tests of this repository), README and architecture; a test fails on
    any `rust-script` in `files/`, `entries/`, `seed/`; makes true BIN-8, spec `accepted`.
 
@@ -196,4 +196,23 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 - red: `hook refusals are counted by hook` failed on the two new `harness run` refusals before `hook_name` knew them.
 - Code review: no findings (run twice: the first did not see the new files, after a refused `git add -N`).
 - not verified: none beyond the earlier ones.
+- decisions needed: none.
+
+## Deliverable 7
+- done: `test_skills.rs` and `test_settings.rs` became cargo tests of this repository (`tests/skills.rs`,
+  `tests/settings_hygiene.rs`; the allowlist must now cover `harness run`, the declaration check of `.claude/hooks/`
+  scripts went with the scripts); `test_recipes.rs` and the `test-harness` recipe removed (consumers run no harness
+  test); the seeded allowlist (and this repository's) allows `Bash(harness run *)` instead of `rust-script`; the shared
+  CI installs `just` and `harness` only; `issue-workflow` no longer asks for `just test-harness` nor `rust-script`; a
+  test fails when anything under `files/`, `entries/` or `seed/` names `rust-script` (BIN-8); spec BIN accepted.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `git grep rust-script -- files entries seed` | nothing |
+| docs | architecture (Tools, cost table), README, CLAUDE.md, clippy-gate non-goals |
+
+- red: not observed: the BIN-8 scan was written after the last `rust-script` left `files/`.
+- Code review: no findings.
+- not verified: the shared CI on GitHub (first push).
 - decisions needed: none.

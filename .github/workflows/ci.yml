@@ -20,6 +20,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: just,rust-script
+          tool: just
       - run: cargo fmt --all --check
       - run: just clippy test check-specs check-harness

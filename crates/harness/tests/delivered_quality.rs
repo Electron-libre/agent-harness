@@ -1,7 +1,6 @@
-//! Behavior test for `delivered_quality.rs` on a fixture repository: the commits of each done issue, the fixes and
+//! Behavior test for `harness tool delivered-quality` on a fixture repository: the commits of each done issue, the fixes and
 //! reverts of its files after the close, its deliverables, revision and reviews, the failed checks and typed messages
 //! of its sessions, no text of a commit, an issue or a message.
-//! Usage: `just test-harness`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

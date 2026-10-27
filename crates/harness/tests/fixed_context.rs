@@ -1,6 +1,5 @@
-//! Behavior test for `fixed_context.rs` on fixture transcripts and repositories: one row per project and revision,
+//! Behavior test for `harness tool fixed-context` on fixture transcripts and repositories: one row per project and revision,
 //! the commit the revision came in force with, the bytes read from its tree, the skills it ships.
-//! Usage: `just test-harness`.
 
 use serde_json::json;
 use std::path::{Path, PathBuf};
