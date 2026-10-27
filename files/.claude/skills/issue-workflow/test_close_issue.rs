@@ -74,6 +74,9 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
     std::fs::write(main.join("issues/baz.md"), "x").unwrap();
     std::fs::write(main.join("NOTES.md"), "see issues/foo.md\n").unwrap();
     std::fs::write(main.join("docs/worktrees/w.md"), "see issues/foo.md\n").unwrap();
+    // a tracked link into a nested worktree is not followed
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("../.claude/worktrees/bar/NOTES.md", main.join("docs/link.md")).unwrap();
     let git = |args: &[&str]| {
         let ok = Command::new("git")
             .args(["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"])
@@ -99,7 +102,10 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
     std::fs::write(main.join(".git/info/exclude"), "/.claude/worktrees/\n").unwrap();
     std::fs::write(main.join("docs/later.md"), "see issues/foo.md\n").unwrap();
     let (relinked, _) = run(script, &main, "--relink");
+    std::fs::write(main.join(".git/index"), "corrupt").unwrap();
+    let (relink_failed, failed_out) = run(script, &main, "--relink");
     let out = vec![
+        ("a failing git ls-files fails, naming --relink", !relink_failed && failed_out.contains("--relink")),
         ("closing an issue rewrites the main worktree's references", closed && read(&main.join("NOTES.md")) == "see issues/done/foo.md\n"),
         ("a directory named worktrees elsewhere is still scanned", read(&main.join("docs/worktrees/w.md")) == "see issues/done/foo.md\n"),
         ("an untracked document of the main worktree is rewritten", read(&main.join("docs/draft.md")) == "see issues/done/foo.md\n"),

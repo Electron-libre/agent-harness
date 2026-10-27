@@ -6,6 +6,7 @@ re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why he
 
 - [list_the_repository_files_through_git](list_the_repository_files_through_git.md) - right after the nested worktrees, whose hand-written skips it replaces before a new walker forgets one
 - [ship_the_harness_scripts_as_prebuilt_binaries](ship_the_harness_scripts_as_prebuilt_binaries.md) - after the propagation of the hook declarations, which it needs to change every hook command
+- [share_the_hash_stamp_check_of_the_shared_modules](share_the_hash_stamp_check_of_the_shared_modules.md) - after the binaries, which may remove the stamp it checks; a small cleanup before the spec proofs
 - [check_the_red_run_of_traced_tests](check_the_red_run_of_traced_tests.md) - makes the spec traceability prove more than a citation; independent of the above
 - [prove_the_specs_with_black_box_tests](prove_the_specs_with_black_box_tests.md) - after the red-run evidence, the other half of making a spec citation a real proof
 - [make_the_architecture_doc_skimmable](make_the_architecture_doc_skimmable.md) - after the binaries, which rewrite several of its sections

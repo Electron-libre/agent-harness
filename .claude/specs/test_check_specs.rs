@@ -156,6 +156,9 @@ fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
             .is_ok_and(|o| o.status.success());
         assert!(ok, "git {args:?} failed");
     };
+    // a tracked link into a nested worktree is not followed
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("../../y/crates/a/src/bad.rs", root.join("crates/a/src/link.rs")).unwrap();
     git(&["init", "-q", "-b", "trunk", "."]);
     git(&["add", "-A"]);
     git(&["commit", "-qm", "init", "--no-verify"]);
@@ -176,6 +179,10 @@ fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
     report("in git, the nested worktrees git does not ignore are not read, an untracked test is traced", run());
     write(".git/info/exclude", "/.claude/worktrees/\n");
     report("in git, the nested worktree git ignores is not read", run());
+    std::fs::write(root.join(".git/index"), "corrupt").unwrap();
+    let out = Command::new("rust-script").arg(script).arg(&root).output().expect("rust-script must be installed");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    report("in git, a failing git ls-files fails the check without walking the disk", !out.status.success() && stdout.contains("git ls-files") && !stdout.contains("RER-9"));
     let _ = std::fs::remove_dir_all(&root);
 }
 

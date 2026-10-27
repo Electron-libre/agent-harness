@@ -13,7 +13,7 @@
 //! toml = "0.8"
 //! ```
 
-// repo_files.rs sha256: cbf7f27d18f4b1a5a3dc15f45d88e334eb346596265f762fd5d06888185e83e4
+// repo_files.rs sha256: 6addf7f1af2badb6ea6c6b1c7a56b6ccacf74b41e71262850fa6556c97c5ef24
 #[path = "../../repo_files.rs"]
 mod repo_files;
 
@@ -42,15 +42,20 @@ fn is_text_file(path: &Path) -> bool {
 }
 
 /// The text files of the work tree at `root`, as git lists them (so never those of a nested worktree, ADR 0008),
-/// except under a directory named like one of `skipped`.
+/// except under a directory named like one of `skipped`. Exits with an error when git cannot list them, since the
+/// references would stay dangling.
 fn text_files(root: &Path, skipped: &[String]) -> Vec<std::path::PathBuf> {
     let skipped_dir = |path: &Path| {
         let mut dirs = path.strip_prefix(root).unwrap_or(path).parent().into_iter().flat_map(Path::components);
         dirs.any(|c| skipped.iter().any(|s| c.as_os_str() == s.as_str()))
     };
-    let Some(files) = repo_files::repo_files(root) else {
-        eprintln!("git ls-files failed in {}: references were not updated", root.display());
-        return Vec::new();
+    let files = match repo_files::repo_files(root, &[]) {
+        Ok(Some(files)) => files,
+        Ok(None) => vec![],
+        Err(e) => {
+            eprintln!("{e}\nreferences were not updated: fix git, then run `just close-issue --relink`");
+            std::process::exit(1);
+        }
     };
     files.into_iter().filter(|p| is_text_file(p) && !skipped_dir(p)).collect()
 }

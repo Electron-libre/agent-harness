@@ -105,6 +105,21 @@ walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `s
 - not verified: vitest's `configDefaults` form with vitest installed locally (checked with the literal list; the
   probe had no local vitest to import).
 
+## Deliverable 4 (fixes of the `high` review)
+- done: `repo_files` returns `Ok(None)` only for "not a git repository" and an error otherwise, which fails
+  `check_specs` (no walk of the disk) and exits `close_issue` with 1 naming `--relink`; symbolic links are dropped;
+  `check_specs` passes the pathspec `crates .claude`. ADR 0009 says so.
+- not fixed, with the reason: a global gitignore hiding `.claude/`, and a root inside an ignored directory, make the
+  scan fail loudly (untraced requirements), and ADR 0009 states that an ignored file is no longer scanned;
+  `--deduplicate` needs git 2.31 where the sort costs nothing; the copied stamp check became
+  `issues/share_the_hash_stamp_check_of_the_shared_modules.md`.
+- checks: `just check` ok, `just test-harness` ok, `just check-harness` ok.
+- red: `crates/a/src/link.rs: cites RER-9`, `FAIL - in git, a failing git ls-files fails the check without walking
+  the disk`, `FAIL - a failing git ls-files fails, naming --relink`.
+- Code review: 1 finding: "not a git repository" is matched in git's stderr, which git translates; fixed with
+  `LC_ALL=C` on the git command (checks rerun under `LANG=fr_FR.UTF-8`).
+- not verified: a refused `safe.directory` (simulated by a corrupt index, the same path through the code).
+
 ## Decisions
 - Mode: autonomous
 - Base commit: aa6ca4ef6c635b6b52b6741acd2db37d89ded987

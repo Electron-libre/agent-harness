@@ -16,7 +16,9 @@ The managed scripts that scan a repository take their files from `git ls-files -
 untracked, without the ignored ones) through one module, `files/.claude/repo_files.rs`, included by `#[path]` as in
 ADR 0006, with the `// repo_files.rs sha256:` line in each including script. `close_issue.rs` keeps its filter by
 directory name (`.git`, `target`, `node_modules`, `skipped_dirs`) on that list; `check_specs.rs` walks the disk
-only outside a git repository, where no worktree can nest. The project's own tools are the project's business:
+only outside a git repository, where no worktree can nest. Any other failure of git (a corrupt index, a refused
+`safe.directory`) fails the scan rather than falling back to the disk, and a symbolic link is never followed, since
+either would reach a nested worktree. The project's own tools are the project's business:
 the harness documents which of them read the nested worktrees, and ships no setting for them.
 
 ## Consequences

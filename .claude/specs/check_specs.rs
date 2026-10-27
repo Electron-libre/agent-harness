@@ -6,7 +6,7 @@
 //! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
 //! `must`) is a warning.
 
-// repo_files.rs sha256: cbf7f27d18f4b1a5a3dc15f45d88e334eb346596265f762fd5d06888185e83e4
+// repo_files.rs sha256: 6addf7f1af2badb6ea6c6b1c7a56b6ccacf74b41e71262850fa6556c97c5ef24
 #[path = "../repo_files.rs"]
 mod repo_files;
 
@@ -262,12 +262,17 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
     // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
     // lists, so never those of a nested worktree (ADR 0008) nor the build output
     let dirs = [root.join("crates"), root.join(".claude")];
-    let files: Vec<PathBuf> = match repo_files::repo_files(root) {
-        Some(files) => files,
-        None => {
+    let files: Vec<PathBuf> = match repo_files::repo_files(root, &["crates", ".claude"]) {
+        Ok(Some(files)) => files,
+        Ok(None) => {
             let mut files = Vec::new();
             dirs.iter().for_each(|dir| all_files(dir, &mut files));
             files
+        }
+        // never fall back to the disk, which holds the nested worktrees
+        Err(e) => {
+            out.push(e);
+            Vec::new()
         }
     };
     let files = files.into_iter().filter(|f| f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d)));
