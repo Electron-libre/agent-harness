@@ -6,7 +6,7 @@ A consumer project holds a `.claude/harness.toml` with the `[harness]` table (`s
 source) and its own values (`[project]`, read by the scripts and the skills). `harness sync` reads the source and:
 
 - copies every file under `files/` to the same relative path (managed: scripts, tests, hooks, skills, `harness.just`,
-  `AGENTS.md`, `specs/README.md`, the CI workflow);
+  `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_harness.sh`);
 - copies every file under `seed/` once, when the project lacks it (project-owned: `.claude/harness.toml`
   defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`);
 - merges the entries of `entries/.claude/settings.json` (the deny rules and hooks of the harness) into the
@@ -42,6 +42,13 @@ per tool, listed in `TOOLS`).
 - Local directory source (this repository): `cargo build -p harness` of the source on each call (about 40 ms when
   nothing changed), whose binary also goes to `<cache>/harness/bin/local-<hash of the path>/harness`; when the working
   tree does not compile, that last good build runs, with a warning, so the hooks keep working.
+
+This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): on each push to the
+main branch it builds `harness` for `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` and `aarch64-apple-darwin`
+and creates the release `harness-<commit>` with each binary and its `.sha256`. A commit pinned before its release
+exists (`harness update` right after a push) is built with `cargo` until it does. The CI of a consumer
+(`.github/install_harness.sh`) puts that asset where `harness run` looks for it and on the path, so its jobs need no
+Rust when the source publishes the commit; a digest mismatch fails the job, as it fails `harness run`.
 
 ## Hooks and their declaration
 
@@ -292,6 +299,7 @@ A pinned commit that a force-push or a deleted branch left without any ref is fe
 origin <hash>`); when the source no longer serves it, `sync` and `update` fail naming the commit and `harness
 update`. `check` compares the project with its lock and never reads the source; besides, it reports
 `missing: native review gate` (or `modified:`) when a project that manages the review hook lacks the managed git hook,
-unless `CI` is set, since a fresh clone has no git hooks. The CI step installs the tool
-with `cargo install --git --rev <hash>`, which depends on the same host behaviour: it can fail the same way, and the
+unless `CI` is set, since a fresh clone has no git hooks. The CI jobs install the tool with
+`.github/install_harness.sh`: the release asset of the pinned commit (see "Tools and their binary"), else
+`cargo install --git --rev <hash>`, which depends on the same host behaviour: it can fail the same way, and the
 fix is the same `harness update`.

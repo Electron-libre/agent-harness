@@ -46,7 +46,7 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 1. [x] Launcher: `harness run` (registry, local build, cache, curl fetch with digest, atomic install, cargo fallback),
    prefetch in `sync`/`update`, first tool ported (`commit-check`, `check-commits`); verified by cargo tests with fake
    `curl`/`cargo` on `PATH`; makes true BIN-1 to BIN-7, BIN-10, BIN-11.
-2. [ ] Release workflow: build `harness` for each platform on each push to the main branch, publish the asset and its
+2. [x] Release workflow: build `harness` for each platform on each push to the main branch, publish the asset and its
    SHA-256 in the release of the commit; the CI of `files/` installs `harness` from it; verified by its first run
    after a push (not testable offline).
 3. [ ] Hooks: `require_code_review`, `clippy_gate`, `format_rust` ported with their tests (REV, CLG traces), entries
@@ -91,4 +91,23 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
   fixture (fake tool exit argument, then `ETXTBSY` on a script written in-process), not on the code.
 - Code review: no findings (its one doubt, a prefetch under `update --dry-run`, cannot happen: `applied` is false then).
 - not verified: a real download from GitHub (no release yet, deliverable 2); the CI commits job.
+- decisions needed: none.
+
+## Deliverable 2
+- done: `.github/workflows/release.yml` (3 targets, release `harness-<commit>` per push to main); managed
+  `.github/install_harness.sh` used by both jobs of `harness.yml` (asset into the cache of `harness run` and on the
+  path, digest mismatch fails, otherwise `cargo install`; a local source of this repository installs its crate).
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `just test-harness` | pass |
+| install script | `sh -n`, and run offline with a fake `curl`/`cargo`: asset installed, mismatch exits 1, no asset builds |
+| workflows | parsed as YAML; not run |
+| docs | architecture (Tools and their binary, Sources, what is shared) |
+
+- red: none (no test for CI glue, as planned).
+- Code review: 2 findings, both fixed: a re-run of the release workflow failed on the existing release (now
+  uploads with `--clobber`); a `rev` that is not a full hash fell back to `cargo install` silently (now says so).
+- not verified: the release workflow and the CI jobs on GitHub: they run on the first push.
 - decisions needed: none.
