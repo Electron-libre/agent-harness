@@ -49,7 +49,7 @@ rules the spec names (no binary involved, but no code either).
    dropped; verified by the new tests; makes true SYN-18, SYN-19, BIN-9, BIN-14 (~600 lines).
 2. [x] Gate upkeep: reinstall, idempotence, dry run, linked worktree, `core.hooksPath`, no repository, `check` of the
    gate (with and without `CI`); the matching internal tests dropped; makes true SYN-20 to SYN-23 (~650 lines).
-3. [ ] Settings warnings: deny rules, missing hooks, attribution through `check`, `sync`, `update` and their dry
+3. [x] Settings warnings: deny rules, missing hooks, attribution through `check`, `sync`, `update` and their dry
    runs; REV-19 on the shipped entries; `src/tests/install_gate.rs` and the helpers of `src/tests.rs` left unused
    dropped; makes true SYN-24 to SYN-27, REV-19 (~600 lines).
 
@@ -73,6 +73,18 @@ rules the spec names (no binary involved, but no code either).
   source of an older revision; the 7 matching internal tests and their helpers dropped.
 - red: none (the behaviour exists: the proofs move); mutations checked: `core.hooksPath` ignored or a modified gate
   not reported fails 3 proofs.
+- Code review: no findings; the `low` review read only the non-test files (the diff is all tests), so the test files
+  were reread by hand: nothing found.
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3
+- done: `tests/settings_warnings_cli.rs` proves SYN-24 to SYN-27 through `check`, `sync`, `update` and their dry
+  runs, and REV-19 on the shipped `entries/.claude/settings.json` against the three rules the spec names (plus a
+  `check` with no deny warning on a project synced on them); `src/tests/install_gate.rs` dropped, and `src/tests.rs`
+  keeps only its two pure unit tests. No requirement of the three specs is proven only internally any more.
+- red: none (the behaviour exists: the proofs move); mutations checked: the attribution warning off, and the sync
+  judging the hooks on disk instead of as it would leave them, each fail a proof.
 - Code review: no findings; the `low` review read only the non-test files (the diff is all tests), so the test files
   were reread by hand: nothing found.
 - not verified: none
