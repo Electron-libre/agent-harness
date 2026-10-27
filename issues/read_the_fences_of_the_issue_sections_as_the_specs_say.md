@@ -8,7 +8,7 @@ read wrong. Expected: one fence rule, worded once and shared by QUA-3, QUA-6 and
 does, and a heading search that skips fenced lines.
 
 # Findings
-* Found by the `high` review of `issues/align_the_tracking_section_end_of_qua_6.md`.
+* Found by the `high` review of `issues/done/align_the_tracking_section_end_of_qua_6.md`.
 * `section` treats a line as a fence only when it starts at column 0 with three backticks: a `~~~` fence or an
   indented fence is not a fence. QUA-3 and QUA-6 say "outside a fenced code block": a `~~~` fence holding a
   column-0 `# build` ends `# Tracking` there, and the `Code review` lines after it are dropped.

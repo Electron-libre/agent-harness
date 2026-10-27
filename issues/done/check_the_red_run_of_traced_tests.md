@@ -108,7 +108,7 @@ hold no `red:` line, 11 hold at least one `red: none` or `not observed`, and no 
   `eta.traced: expected "1", got Some("2")`.
 - High review: 9 findings, 8 fixed here; the 9th (QUA-6 says its section ends "as in QUA-3", which would stop at
   `## Plan`, while the code ends it at `# `) is outside this issue: filed as
-  `issues/align_the_tracking_section_end_of_qua_6.md`, queued second.
+  `issues/done/align_the_tracking_section_end_of_qua_6.md`, queued second.
 - Code review: 1 finding, then no findings on the fix: the removed citations were pooled over the issue, so a citation one commit adds and a later
   one rewrites traced nothing; fixed, subtracted commit by commit (red: `eta.traced: expected "1", got Some("0")`).
 - not verified: the empty cells when `git show` fails (no fixture makes it fail).
