@@ -160,45 +160,11 @@ fn issue_commits(repo: &Path, log: &[Commit], stem: &str) -> Vec<usize> {
         .collect()
 }
 
-/// The fenced code block open after `line` (QUA-12), given the one `open` before it (its character and length): a line
-/// starting, indent allowed, with three or more backticks or tildes opens one; a line of only its character, at
-/// least as many, closes it.
-fn fence(open: Option<(char, usize)>, line: &str) -> Option<(char, usize)> {
-    match open {
-        Some((c, n)) => {
-            let line = line.trim();
-            let closes = line.len() >= n && line.chars().all(|x| x == c);
-            if closes {
-                None
-            } else {
-                open
-            }
-        }
-        None => {
-            let line = line.trim_start();
-            ['`', '~'].into_iter().find_map(|c| {
-                let n = line.chars().take_while(|&x| x == c).count();
-                (n >= 3).then_some((c, n))
-            })
-        }
-    }
-}
-
-/// The lines of `text`, each with whether it belongs to a fenced code block, its fence lines included (QUA-12).
-fn fenced_lines(text: &str) -> impl Iterator<Item = (&str, bool)> {
-    let mut open = None;
-    text.lines().map(move |line| {
-        let before = open;
-        open = fence(open, line);
-        (line, before.is_some() || open.is_some())
-    })
-}
-
 /// The lines of `text` after the line `heading`, up to the next line that `ends` accepts, both outside a fenced code
 /// block (QUA-12); `None` when no such heading.
 fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Option<Vec<&'a str>> {
-    let mut lines =
-        fenced_lines(text).skip_while(|&(line, fenced)| fenced || line.trim_end() != heading);
+    let mut lines = super::fenced(text.lines())
+        .skip_while(|&(line, fenced)| fenced || line.trim_end() != heading);
     lines.next()?;
     Some(
         lines

@@ -133,6 +133,31 @@ pub fn run(args: &[String]) -> u8 {
     crate::NOT_A_REFUSAL
 }
 
+/// The fenced code block open after `line`, given the one `open` before it (its character and length): a line
+/// starting, indent allowed, with three or more backticks (none after them, else it is inline code) or tildes opens
+/// one; a line of only its character, at least as many, closes it.
+fn fence(open: Option<(char, usize)>, line: &str) -> Option<(char, usize)> {
+    let Some((c, n)) = open else {
+        let line = line.trim_start();
+        let c = line.chars().next().filter(|c| *c == '`' || *c == '~')?;
+        let rest = line.trim_start_matches(c);
+        let n = line.len() - rest.len();
+        return (n >= 3 && !(c == '`' && rest.contains('`'))).then_some((c, n));
+    };
+    let line = line.trim();
+    open.filter(|_| line.len() < n || !line.chars().all(|x| x == c))
+}
+
+/// Whether each line of `lines` belongs to a fenced code block, its fence lines included.
+fn fenced<'a>(lines: impl IntoIterator<Item = &'a str>) -> impl Iterator<Item = (&'a str, bool)> {
+    let mut open = None;
+    lines.into_iter().map(move |line| {
+        let before = open;
+        open = fence(open, line);
+        (line, before.is_some() || open.is_some())
+    })
+}
+
 /// Root of the repository holding the current directory.
 fn repo_root() -> Result<PathBuf, String> {
     let out = Command::new("git")

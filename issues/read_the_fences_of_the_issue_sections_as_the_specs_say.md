@@ -44,6 +44,9 @@ found and ended outside fences only. The code is widened to it (option "widen" o
    rule, and `deliverables` picks `## Plan` only outside a fence; verified by a fixture issue whose Goal quotes
    `# Tracking` in a backtick fence and whose Tracking holds an indented `~~~` fence with `# build`; makes true QUA-12
    (and QUA-3, QUA-6, QUA-11 as amended). ~80 lines.
+2. [x] Fixes of the `high` review: a line opening with backticks that holds more backticks is inline code, not a
+   fence; one fence reader shared by `delivered_quality` and `check_specs` (`tools/mod.rs`); the fixture also proves
+   the `red:` items of QUA-11 outside fences; makes true QUA-11, QUA-12.
 
 ## Decisions
 - Mode: autonomous
@@ -54,6 +57,20 @@ found and ended outside fences only. The code is widened to it (option "widen" o
 - done: `fence`/`fenced_lines` read the QUA-12 fences; `section` finds and ends its heading outside them and returns
   `None` without one, so `deliverables` falls back to `# Tracking` only when no `## Plan` stands outside a fence.
 - red: QUA-12: `delta.deliverables: expected "2", got Some("4")` (the `## Plan` quoted in the Goal fence was read).
+- Code review: no findings (low).
+- not verified: none.
+- decisions needed: none.
+
+## Deliverable 2
+- done: `fence`/`fenced` moved to `crates/harness/src/tools/mod.rs` and used by `check_specs` too; a backtick line
+  with more backticks after its run no longer opens a fence (QUA-12 amended); the fixture adds inline code at a line
+  start and `red:` items inside and outside a fence.
+- red: QUA-11, QUA-12: `delta.deliverables: expected "2", got Some("0")`, `delta.traced_without_red: expected "1",
+  got Some("2")` (the inline code opened a fence to the end of the file).
+- High review (base..HEAD): 7 findings. Fixed: inline code opening a fence, the duplicated fence reader, the
+  untested QUA-11 path, the `if`/`else` of `fence`. Not fixed: the double scan of `deliverables` (cost negligible
+  at issue sizes). Moved to `issues/tell_unread_issue_sections_from_empty_ones.md`: the fence-blind QUA-2 start and
+  the zeros printed for a section not found (both outside QUA-3, QUA-6, QUA-11, QUA-12 as amended).
 - Code review: no findings (low).
 - not verified: none.
 - decisions needed: none.

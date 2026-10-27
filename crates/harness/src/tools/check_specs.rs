@@ -67,14 +67,6 @@ fn without_code_spans(line: &str) -> String {
 
 const MARKER: &str = "[NEEDS CLARIFICATION:";
 
-/// The fence a line opens or closes (its character and length): three or more backticks or tildes.
-fn fence(line: &str) -> Option<(char, usize)> {
-    let line = line.trim_start();
-    let c = line.chars().next().filter(|c| *c == '`' || *c == '~')?;
-    let len = line.len() - line.trim_start_matches(c).len();
-    (len >= 3).then_some((c, len))
-}
-
 /// The text of a marker up to its closing bracket, brackets inside it included.
 fn question(after: &str) -> &str {
     let mut depth = 1;
@@ -94,19 +86,8 @@ fn question(after: &str) -> &str {
 /// An open question left in the spec: a problem once `accepted`, a warning while `draft`. A marker cited in a code
 /// span or a fenced code block is an example, not a question.
 fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<String>) {
-    // the open fence: only a line of the same character, at least as long and with nothing after, closes it
-    let mut open: Option<(char, usize)> = None;
-    for (i, line) in lines.iter().enumerate() {
-        match (open, fence(line)) {
-            (None, Some(f)) => open = Some(f),
-            (Some((c, len)), Some((d, n)))
-                if c == d && n >= len && line.trim().trim_start_matches(c).is_empty() =>
-            {
-                open = None
-            }
-            _ => {}
-        }
-        if open.is_some() || fence(line).is_some() {
+    for (i, (line, fenced)) in super::fenced(lines.iter().copied()).enumerate() {
+        if fenced {
             continue;
         }
         let text = without_code_spans(line);

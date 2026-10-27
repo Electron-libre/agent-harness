@@ -336,10 +336,11 @@ fn review_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
 }
 
 /// An issue file whose Goal quotes the template in a backtick fence and whose old-layout Tracking holds an indented
-/// `~~~` fence and a longer backtick fence, each with a line that would be a heading outside it.
-const DELTA: &str = "# delta\n\n# Goal\nThe template:\n```md\n# Tracking\n\n## Plan\n1. [x] a\n2. [x] b\n- Code review: 9 findings\n```\n\n# Tracking\n\n1. [x] one\n   ~~~sh\n# build\n   ```\n   ~~~\n````md\n```\n# not a heading\n````\n2. [x] two\n- Code review: 2 findings\n\n# Notes\n- Code review: 4 findings\n";
+/// `~~~` fence and a longer backtick fence, each with a line that would be a heading outside it; its Findings open a
+/// line with inline code, not a fence.
+const DELTA: &str = "# delta\n\n# Goal\nThe template:\n```md\n# Tracking\n\n## Plan\n1. [x] a\n2. [x] b\n- Code review: 9 findings\n- red: ABC-1: failed\n```\n\n# Findings\n```just check``` fails.\n\n# Tracking\n\n1. [x] one\n   ~~~sh\n# build\n   ```\n   ~~~\n````md\n```\n# not a heading\n````\n2. [x] two\n- Code review: 2 findings\n- red: ABC-2: failed\n\n# Notes\n- Code review: 4 findings\n";
 
-// spec: QUA-12
+// spec: QUA-11, QUA-12
 fn fence_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let repo = tmp.join("fences");
     std::fs::create_dir_all(&repo).unwrap();
@@ -354,7 +355,10 @@ fn fence_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         &repo,
         "2026-01-02T00:00:00Z",
         "feat: delta",
-        &[("issues/delta.md", Some(DELTA))],
+        &[
+            ("issues/delta.md", Some(DELTA)),
+            ("tests/d.rs", Some("// spec: ABC-1, ABC-2\nfn d() {}\n")),
+        ],
     );
     commit_at(
         &repo,
@@ -367,13 +371,19 @@ fn fence_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     );
     let (_, out) = run(dir, &repo, &[]);
     let r = rows(&out);
-    vec![(
-        "a heading inside a fence neither starts nor ends a section, whatever the fence"
-            .to_string(),
-        has(&r, "delta", "deliverables", "2")
-            && has(&r, "delta", "reviews", "1")
-            && has(&r, "delta", "review_findings", "2"),
-    )]
+    vec![
+        (
+            "a heading inside a fence neither starts nor ends a section, whatever the fence"
+                .to_string(),
+            has(&r, "delta", "deliverables", "2")
+                && has(&r, "delta", "reviews", "1")
+                && has(&r, "delta", "review_findings", "2"),
+        ),
+        (
+            "a red: item quoted in a fence records no red run".to_string(),
+            has(&r, "delta", "traced", "2") && has(&r, "delta", "traced_without_red", "1"),
+        ),
+    ]
 }
 
 /// A repository where `eps` adds three citations and records the red run of two, `zeta` only renames a test and
