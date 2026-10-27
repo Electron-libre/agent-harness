@@ -19,12 +19,15 @@ only when there is something new to check and reports the problems in few lines.
 - **CLG-3** (deterministic) The gate must report at most 40 diagnostics; when there are more, it must end with one line giving how many were left out.
 - **CLG-4** (deterministic) After a passing run, the gate must record a stamp of the Rust state (the `HEAD` commit and the path and content of every changed or untracked `.rs` file) in the git directory of the worktree, and must exit 0 without running clippy while that state is unchanged.
 - **CLG-5** (deterministic) A failing run must not record a stamp, and any change of a `.rs` file, of the `HEAD` commit or of the set of untracked `.rs` files since the stamp must run clippy again.
+- **CLG-6** (deterministic) The gate must check the work tree that holds the `cwd` of the event (its top-level directory, the `cwd` itself outside a repository), and `CLAUDE_PROJECT_DIR` only when the event has no `cwd`.
 
 ## Scenarios
 
 - (CLG-4) Given a passing run, when the agent ends another turn having edited only Markdown files, then clippy does not run.
 - (CLG-5) Given a failing run, when the agent ends the next turn without touching the Rust code, then clippy runs again and reports the same problems.
 - (CLG-5) Given a passing run, when the agent commits the Rust changes, then the next end of turn with a dirty `.rs` file runs clippy (the `HEAD` changed).
+
+- (CLG-6) Given a session opened in the main worktree that entered an issue worktree, when the agent ends a turn with a clippy warning in the issue worktree, then the gate reports it, whatever the state of the main worktree.
 
 ## Non-goals
 

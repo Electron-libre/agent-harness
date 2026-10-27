@@ -47,3 +47,49 @@ directory or only creates its own.
   worktree's scripts: the same revision only while both are on the same commit of `files/`.
 * A session opened in the worktree gets its own Claude Code project directory, which the transcript readers must map
   back to the repository (`transcripts.rs` resolves a project from its directory).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+An agent handed an issue in the main worktree starts it in its own worktree (`just start-issue`, then Claude Code's
+`EnterWorktree` with `path`), and the hooks that run cargo act on the worktree of the event's `cwd`. Out of scope:
+refusing to start in a dirty main worktree (approach 3, no longer needed), the transcript readers (they already map
+a linked worktree to its repository), running the worktree's own copy of the hook scripts.
+
+## Measures (2026-10-27, Claude Code session in this repository)
+- A Bash `cd` to a directory outside the launch directory is reset after the command ("Shell cwd was reset"): an
+  agent cannot "run every command from the worktree" by `cd`.
+- `EnterWorktree` with `path` enters an existing worktree listed by `git worktree list` (here a detached one in
+  `/tmp`): the session's working directory and the `cwd` of the events become the worktree, the tool refuses a
+  `git -C <main worktree>`, and the transcript continues in a new project directory named after the worktree.
+  `ExitWorktree` with `keep` returns to the launch directory and leaves the worktree on disk.
+- After `EnterWorktree`, an unformatted edit of a Rust file of the worktree stayed unformatted: `format_rust.rs`
+  ran `cargo fmt` in `CLAUDE_PROJECT_DIR`, the launch directory.
+
+## Plan
+1. [x] Hooks follow the event's `cwd`: `format_rust.rs` and `clippy_gate.rs` resolve the top-level of the event's
+   `cwd` (fallback `CLAUDE_PROJECT_DIR`, then `.`), as `require_code_review.rs record` does; verified by
+   `test_hooks.rs` cases where `CLAUDE_PROJECT_DIR` points at another clean project; makes true PAR-12, CLG-6.
+2. [ ] `issue-workflow` starts in the worktree: step 0 runs `just start-issue` then `EnterWorktree` with `path` when
+   the session is in the main worktree and the issue is free (taken: stop), commits an uncommitted issue alone
+   first (decision 1); the end of the issue merges back from the main worktree (decision 2); "Parallel agents" and
+   `details.md` rewritten as the default path, ADR 0003 and `docs/architecture.md` updated; verified by
+   `just test-harness`, `just check-harness` and the review (skill text, no automated test).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 8a31a5df0f4e8c2026f25a8e9ff8774502c46dc1
+- 1a: an uncommitted issue is committed alone by the agent (`docs: open the issue ...`) before `start-issue`.
+- 2a: once the user agrees to close, the agent leaves the worktree (`ExitWorktree` keep), rebases and fast-forwards from the main worktree, then runs `close-issue` and `finish-issue`.
+
+## Deliverable 1: hooks follow the event's `cwd`
+- done: `format_rust.rs` and `clippy_gate.rs` resolve the top-level of the event's `cwd` (fallback
+  `CLAUDE_PROJECT_DIR`); PAR-12 and CLG-6 traced, both specs back to `accepted`; `docs/architecture.md` says so.
+- red: `FAIL - format hook formats the worktree of the event's cwd`, `FAIL - format hook leaves CLAUDE_PROJECT_DIR
+  alone when the event has a cwd`, `FAIL - gate checks the worktree of the event's cwd`.
+- check: `just check` ok, `just test-harness` ok, specs traced, docs updated, code review low run.
+- Code review: no findings
+- not verified: a live session where the hooks run from the main worktree's `.claude/` against an issue worktree
+  (covered by the hook tests with a real linked worktree).

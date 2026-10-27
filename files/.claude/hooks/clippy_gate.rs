@@ -3,7 +3,8 @@
 //! Exit 2 sends clippy's diagnostics back to the agent so it fixes the code: one line each (file, line, column,
 //! message), at most `MAX_DIAGNOSTICS`, since every line is billed to the agent. A passing run stamps the Rust state
 //! in the git directory, and clippy does not run again until that state changes. When the agent already retried once
-//! (`stop_hook_active`), let go to avoid an endless loop. Spec: `specs/clippy-gate.md`.
+//! (`stop_hook_active`), let go to avoid an endless loop. It checks the work tree of the event's `cwd` (an agent that
+//! entered an issue worktree is checked there), else `CLAUDE_PROJECT_DIR`. Spec: `specs/clippy-gate.md`.
 //!
 //! Declare: Stop
 //!
@@ -41,6 +42,16 @@ fn git(dir: &str, args: &[&str]) -> String {
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
         .unwrap_or_default()
+}
+
+/// The top-level of the work tree holding the event's `cwd` (the `cwd` itself outside a repository), else
+/// `CLAUDE_PROJECT_DIR`, else the current directory.
+fn work_tree(event: &serde_json::Value) -> String {
+    let Some(cwd) = event["cwd"].as_str() else {
+        return std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
+    };
+    let root = git(cwd, &["rev-parse", "--show-toplevel"]);
+    if root.trim().is_empty() { cwd.to_string() } else { root.trim().to_string() }
 }
 
 /// The changed and untracked `.rs` files, outside the `.claude` directories whose scripts are not crate code.
@@ -93,7 +104,7 @@ fn main() {
     if event["stop_hook_active"].as_bool().unwrap_or(false) {
         return;
     }
-    let dir = std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
+    let dir = work_tree(&event);
 
     if !Path::new(&dir).join("Cargo.toml").exists() {
         return;

@@ -48,7 +48,7 @@ fn commit_all(project: &Path, msg: &str) {
     sh(project, "git", &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", msg]);
 }
 
-// spec: CLG-1, CLG-2, CLG-3, CLG-4, CLG-5
+// spec: CLG-1, CLG-2, CLG-3, CLG-4, CLG-5, CLG-6
 /// The clippy gate in one Cargo project, in order: the stamp of a passing run decides the runs that follow.
 fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> {
     let main_rs = project.join("src/main.rs");
@@ -189,6 +189,22 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         run_hook_with(gate, project, "{}", &fake_env).code == 2,
     ));
 
+    // a session that entered an issue worktree: the gate checks the worktree of the event's `cwd`, not the passing
+    // `CLAUDE_PROJECT_DIR`
+    fs::write(&fake_pass, "").unwrap();
+    run_hook_with(gate, project, "{}", &fake_env);
+    let worktree = project.with_file_name(format!("{}-gate", project.file_name().unwrap().to_string_lossy()));
+    sh(project, "git", &["worktree", "add", "-q", "--detach", worktree.to_str().unwrap()]);
+    fs::write(worktree.join("src/main.rs"), "fn main() {}\n// worktree edit\n").unwrap();
+    fs::remove_file(&fake_pass).unwrap();
+    let before = fake_runs();
+    let event = format!("{{\"cwd\":\"{}\"}}", worktree.join("src").display());
+    checks.push((
+        "gate checks the worktree of the event's cwd",
+        run_hook_with(gate, project, &event, &fake_env).code == 2 && fake_runs() == before + 1,
+    ));
+    sh(project, "git", &["worktree", "remove", "--force", worktree.to_str().unwrap()]);
+
     // a repository with no commit yet: a staged file edited again
     let fresh = project.join("fake-fresh");
     fs::create_dir_all(fresh.join("src")).unwrap();
@@ -211,6 +227,34 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         run_hook_with(gate, &fresh, "{}", &fake_env).code == 0 && fake_runs() == before,
     ));
 
+    checks
+}
+
+// spec: PAR-12
+/// A session that entered an issue worktree: the format hook formats the worktree of the event's `cwd`, not
+/// `CLAUDE_PROJECT_DIR`.
+fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static str, bool)> {
+    let main_rs = project.join("src/main.rs");
+    let mut checks = Vec::new();
+    let worktree = project.with_file_name(format!("{}-wt", project.file_name().unwrap().to_string_lossy()));
+    sh(project, "git", &["worktree", "add", "-q", "--detach", worktree.to_str().unwrap()]);
+    let unformatted = "fn main(){let  a=1;println!(\"{a}\");}\n";
+    fs::write(&main_rs, unformatted).unwrap();
+    fs::write(worktree.join("src/main.rs"), unformatted).unwrap();
+    let json = format!(
+        "{{\"cwd\":\"{}\",\"tool_input\":{{\"file_path\":\"{}\"}}}}",
+        worktree.join("src").display(),
+        worktree.join("src/main.rs").display()
+    );
+    run_hook(format_hook, project, &json);
+    checks.push((
+        "format hook formats the worktree of the event's cwd",
+        fs::read_to_string(worktree.join("src/main.rs")).unwrap().contains("let a = 1;"),
+    ));
+    let untouched = fs::read_to_string(&main_rs).unwrap() == unformatted;
+    checks.push(("format hook leaves CLAUDE_PROJECT_DIR alone when the event has a cwd", untouched));
+    sh(project, "git", &["worktree", "remove", "--force", worktree.to_str().unwrap()]);
+    fs::write(&main_rs, "fn main() {}\n").unwrap();
     checks
 }
 
@@ -246,6 +290,10 @@ fn main() {
     );
     fs::write(&main_rs, "fn main() {}\n").unwrap();
     commit_all(&project, "clean");
+
+    for (name, ok) in format_hook_follows_cwd(&format_hook, &project) {
+        check(name, ok);
+    }
 
     for (name, ok) in clippy_gate_checks(&gate, &project) {
         check(name, ok);
