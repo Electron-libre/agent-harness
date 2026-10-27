@@ -36,3 +36,33 @@ Measure first: classify every `// spec:` citation as boundary (runs the binary o
 * Split by size (2026-10-27, `skill:prioritize-issues`): 105 citations of `crates/harness/src` are internal; moving
   them all is several thousand lines.
 * Related to `check_the_red_run_of_traced_tests`: both make a citation prove more.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Set the rule (a requirement is proven by a test that drives the program from outside `src/`) and have `check-specs`
+warn, per spec, of the requirements proven only from inside `src/`. Moving the proofs is out of scope (two split issues).
+Measured on 2026-10-27: 49 requirements have internal proofs only (SYN 35, BIN 13, REV 1); every other spec is proven at the boundary.
+
+## Plan
+1. [x] Boundary warning: the rule in `files/specs/README.md` (synced), the per-spec warning in
+   `crates/harness/src/tools/check_specs.rs`, new spec `specs/spec-tracing.md`; verified by tests of
+   `crates/harness/tests/check_specs.rs` running the binary on temp repos; makes true TRC-1, TRC-2, TRC-3 (~200 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 306da7dd1679d752348dc0bdaddcedfddaf3fb94
+- A test is internal when it sits under a `src` directory, boundary elsewhere (by place, any language).
+- The requirements of the warning go in a new spec `specs/spec-tracing.md` (TRC), not in `spec-clarity.md`.
+- One warning line per spec (count and ids), not one per requirement.
+
+## Deliverable 1
+- done: rule in `specs/README.md`; `check-specs` warns per spec of the requirements cited only under `src`; spec
+  `spec-tracing.md` (TRC) accepted. On this repo: SYN 35, BIN 13, REV 1, as measured.
+- red: TRC-1, TRC-2, TRC-3: `FAIL - requirements proven only under src are warned of in one line`, `FAIL - a
+  requirement also proven outside src is not listed`, `FAIL - an uncited requirement is not listed`
+- Code review: no findings
+- not verified: none
+- decisions needed: none

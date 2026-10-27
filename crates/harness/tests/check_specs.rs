@@ -276,6 +276,7 @@ fn check_specs() {
 
     marker_checks(&case, &report);
     wording_checks(&case, &report);
+    boundary_checks(&case, &report);
 
     strict.set(true);
     case(
@@ -507,6 +508,59 @@ fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
 }
 
+// spec: TRC-1, TRC-2, TRC-3
+fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
+    let boundary = |name: &str, tests: &str, others: &[(&str, &str)]| {
+        let stderr = case(name, SPEC, tests, others, None);
+        stderr
+            .lines()
+            .filter(|l| l.contains("only by tests under `src`"))
+            .map(String::from)
+            .collect::<Vec<_>>()
+    };
+    let lines = boundary("internal proofs only pass", TESTS, &[]);
+    report(
+        "requirements proven only under src are warned of in one line",
+        lines
+            == [
+                "warning: specs/rerun.md: 2 requirements proven only by tests under `src`: RER-1, RER-2",
+            ],
+    );
+    let lines = boundary(
+        "a boundary proof passes",
+        TESTS,
+        &[("crates/a/tests/cli.rs", "// spec: RER-1\nfn t() {}\n")],
+    );
+    report(
+        "a requirement also proven outside src is not listed",
+        lines == ["warning: specs/rerun.md: 1 requirement proven only by tests under `src`: RER-2"],
+    );
+    let lines = boundary(
+        "managed tests are boundary proofs",
+        "",
+        &[(
+            ".claude/hooks/test_h.rs",
+            "// spec: RER-1, RER-2\nfn t() {}\n",
+        )],
+    );
+    report(
+        "a spec proven outside src is not warned of",
+        lines.is_empty(),
+    );
+    let draft = SPEC.replace("status: accepted", "status: draft");
+    let stderr = case(
+        "an uncited draft requirement passes",
+        &draft,
+        "// spec: RER-1\nfn t() {}\n",
+        &[("crates/a/tests/cli.rs", "")],
+        None,
+    );
+    report(
+        "an uncited requirement is not listed",
+        stderr.contains("1 requirement proven only by tests under `src`: RER-1\n"),
+    );
+}
+
 // spec: CLR-3, CLR-4, CLR-5, CLR-6, CLR-7
 fn wording_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     let draft = SPEC.replace("status: accepted", "status: draft");
@@ -615,7 +669,7 @@ fn wording_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
     report(
         "an accepted spec gets no wording warning",
-        !stderr.contains("warning"),
+        !stderr.contains("vague word") && !stderr.contains("`must`"),
     );
 }
 

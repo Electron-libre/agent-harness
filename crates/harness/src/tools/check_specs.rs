@@ -3,7 +3,7 @@
 //! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
 //! Prints one line per problem, exit 1 if any; a `[NEEDS CLARIFICATION: ...]` marker is a problem in an `accepted`
 //! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
-//! `must`) is a warning.
+//! `must`) is a warning, and so are the requirements proven only by tests under a `src` directory (TRC-1).
 
 use super::repo_files;
 
@@ -306,9 +306,9 @@ fn all_files(dir: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
-/// Ids cited by `// spec: A-1, B-2` comments, with the file that cites them. A citation sits right above a
+/// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them. A citation sits right above a
 /// test: only attributes and other comments may come between it and the `fn`; any other place is a problem.
-fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
+fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<String>> {
     // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
     // lists, so never those of a nested worktree (ADR 0008) nor the build output
     let dirs = [root.join("crates"), root.join(".claude")];
@@ -328,7 +328,7 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
     let files = files.into_iter().filter(|f| {
         f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d))
     });
-    let mut cited = BTreeMap::new();
+    let mut cited: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for file in files {
         let Ok(text) = std::fs::read_to_string(&file) else {
             continue;
@@ -357,7 +357,7 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
                 .split(|c: char| c == ',' || c.is_whitespace())
                 .filter(|s| !s.is_empty())
             {
-                cited.entry(id.to_string()).or_insert_with(|| name.clone());
+                cited.entry(id.to_string()).or_default().push(name.clone());
             }
         }
     }
@@ -394,7 +394,8 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
         .iter()
         .flat_map(|s| s.requirements.iter().map(|r| r.id.as_str()))
         .collect();
-    for (id, file) in &cited {
+    for (id, files) in &cited {
+        let file = &files[0];
         // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
         let foreign = !strict
             && file.replace('\\', "/").starts_with(".claude/")
@@ -413,7 +414,38 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
             }
         }
     }
+    boundary_warnings(&specs, &cited);
     out
+}
+
+/// Whether a test file calls the code from inside: it sits under a `src` directory (TRC-1).
+fn is_internal(file: &str) -> bool {
+    Path::new(file).components().any(|c| c.as_os_str() == "src")
+}
+
+/// Warn, per spec, of the cited requirements whose every citation is internal (TRC-1 to TRC-3).
+fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<String>>) {
+    for spec in specs {
+        let internal: Vec<&str> = spec
+            .requirements
+            .iter()
+            .filter(|r| {
+                cited
+                    .get(&r.id)
+                    .is_some_and(|files| files.iter().all(|f| is_internal(f)))
+            })
+            .map(|r| r.id.as_str())
+            .collect();
+        if !internal.is_empty() {
+            let plural = if internal.len() == 1 { "" } else { "s" };
+            eprintln!(
+                "warning: {}: {} requirement{plural} proven only by tests under `src`: {}",
+                spec.file,
+                internal.len(),
+                internal.join(", ")
+            );
+        }
+    }
 }
 
 pub(super) fn main(args: &[String]) -> u8 {

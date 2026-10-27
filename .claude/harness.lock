@@ -12,7 +12,7 @@ f6afc4738c3e69f5dd0d747a1646cfc46ceea123e7b57078fe3e8eb12f23c347  .claude/skills
 2b97d7a8180410864f346bb576e743cabc626aeeb14de7b4d9023a00c0e9ae4f  .github/workflows/harness.yml
 2cab19ded8c81cdd2d52e207c210f42f2addcfe91ae5c5c353276a7a53e68dc5  AGENTS.md
 de7bf22e311216feb9a3746a263de6c5db5b2e9e631da1fe8d5fa1477c4af52b  harness.just
-e48baa72bf64f137398114ecef3ac732e39639ac7244a9b5aee3f3cf7cb224f8  specs/README.md
+634f372dd0f43d4eeeabc186f135dbe839b47a9b8835f4d78a9089871ac2c6e1  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}

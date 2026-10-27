@@ -38,6 +38,11 @@ former `quality` kind is read untraced, with a warning: reword it for a test or 
 `// spec: RER-1` comment right above it, attributes and other comments included, and directly above a `fn` (several
 ids: `// spec: RER-1, RER-2`). A test under `.claude/` (a managed one) may cite a spec the project does not have: the repository that ships it traces it. Only a prefix with no spec in the project is exempt: an unknown id of a spec the project has, and any citation outside `.claude/`, are still flagged. The repository that ships those tests runs the script with `--strict`, which removes the exemption.
 
+A spec and its tests must survive a rewrite of the code, so a requirement is proven by a test that drives the
+program from its boundary (command line, files, exit code, output), placed outside every `src` directory (`tests/`,
+the managed tests under `.claude/`). A test under `src` calls the code from inside: it may add detail, but it does not
+count as the proof. `check-specs` warns, per spec, of the requirements only such tests cite.
+
 ### Open questions
 
 A point the writer cannot settle from the repo or the issue is marked where it belongs, never guessed:
@@ -63,5 +68,5 @@ The order is therefore: write the spec (`draft`), get it validated, write the te
 `just check-specs` (part of `just check`) fails when: the format is wrong, an id is duplicated, a test cites an
 unknown id, an `accepted` spec has a requirement no test cites, or an `accepted` spec still holds a
 `[NEEDS CLARIFICATION: ...]` marker. On a `draft` it only warns (stderr): each marker with its question, and each
-requirement with a vague word or not exactly one "must". `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The checker is `harness run check-specs`, tested by
+requirement with a vague word or not exactly one "must". On any spec it warns of the requirements proven only by tests under `src`. `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The checker is `harness run check-specs`, tested by
 the tests of the harness source. `skill:write-spec` writes and validates a spec.
