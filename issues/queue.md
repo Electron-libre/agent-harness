@@ -4,7 +4,7 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [work_in_an_issue_worktree_without_tripping_the_isolation_guard](work_in_an_issue_worktree_without_tripping_the_isolation_guard.md) - every issue runs in a worktree: each one after it pays the refused commands until this lands
+- [make_the_issue_worktree_optional_and_opened_by_the_user](make_the_issue_worktree_optional_and_opened_by_the_user.md) - every issue entered in a worktree pays the refused commands until this lands
 - [exit_3_when_the_launcher_cannot_parse_its_arguments](exit_3_when_the_launcher_cannot_parse_its_arguments.md) - small; after the probes of the hooks (BIN-15, BIN-16), it closes the lockout for the paths they miss
 - [split_an_issue_too_large_for_one_session](split_an_issue_too_large_for_one_session.md) - before the larger issues of the queue, which it may split
 - [share_the_hash_stamp_check_of_the_shared_modules](share_the_hash_stamp_check_of_the_shared_modules.md) - after the binaries, which may remove the stamp it checks; a small cleanup before the spec proofs
