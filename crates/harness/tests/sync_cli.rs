@@ -1,10 +1,12 @@
 //! `init`, `sync` and `check` run as the binary on temp dirs (SYN-1 to SYN-10).
+#![cfg(unix)]
 
 mod common;
 
 use std::fs;
 
 use common::{get, project, put, snapshot, Home, CONFIG, LOCK};
+use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 
 // spec: SYN-1
@@ -243,11 +245,16 @@ fn a_lock_path_outside_the_project_is_refused_by_sync_and_check() {
     let outside = tempdir().unwrap();
     put(outside.path(), "x", "precious");
     let evil = outside.path().join("x");
+    // its real hash: were the path let through, `sync` would delete it as a file the source dropped
+    let hash: String = Sha256::digest(b"precious")
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
     let lock = get(root.path(), LOCK).unwrap();
     put(
         root.path(),
         LOCK,
-        &format!("{lock}{}  {}\n", "0".repeat(64), evil.display()),
+        &format!("{lock}{hash}  {}\n", evil.display()),
     );
     for args in [&["sync"][..], &["check"]] {
         let run = home.harness(root.path(), args);

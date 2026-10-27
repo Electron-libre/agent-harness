@@ -1,4 +1,5 @@
 //! `update`, and `sync` on a pinned commit, run as the binary on a local git source (SYN-11 to SYN-17).
+#![cfg(unix)]
 
 mod common;
 
@@ -8,36 +9,18 @@ use std::process::Command;
 use common::{get, put, snapshot, Home, CONFIG, LOCK};
 use tempfile::{tempdir, TempDir};
 
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-    String::from_utf8(out.stdout).unwrap().trim().to_string()
-}
-
 /// A git repository with `v1` on its first commit and `main` on its second; returns both hashes.
-fn git_source() -> (TempDir, String, String) {
+fn git_source(home: &Home) -> (TempDir, String, String) {
     let repo = tempdir().unwrap();
-    git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
     put(repo.path(), "files/a.txt", "a1");
-    git(repo.path(), &["add", "."]);
-    git(repo.path(), &["commit", "--quiet", "-m", "one"]);
-    git(repo.path(), &["tag", "v1"]);
-    let first = git(repo.path(), &["rev-parse", "HEAD"]);
+    home.git(repo.path(), &["add", "."]);
+    home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
+    home.git(repo.path(), &["tag", "v1"]);
+    let first = home.git(repo.path(), &["rev-parse", "HEAD"]);
     put(repo.path(), "files/a.txt", "a2");
-    git(repo.path(), &["commit", "--quiet", "-am", "two"]);
-    let second = git(repo.path(), &["rev-parse", "HEAD"]);
+    home.git(repo.path(), &["commit", "--quiet", "-am", "two"]);
+    let second = home.git(repo.path(), &["rev-parse", "HEAD"]);
     (repo, first, second)
 }
 
@@ -58,7 +41,7 @@ fn git_project(repo: &Path) -> TempDir {
 
 /// A project moved to `v1` by `update`, with its repository and the hash of `v1`.
 fn updated_to_v1(home: &Home) -> (TempDir, String, TempDir) {
-    let (repo, first, _second) = git_source();
+    let (repo, first, _second) = git_source(home);
     let root = git_project(repo.path());
     home.ok(root.path(), &["update", "--rev", "v1"]);
     (repo, first, root)
@@ -68,7 +51,7 @@ fn updated_to_v1(home: &Home) -> (TempDir, String, TempDir) {
 #[test]
 fn update_pins_the_resolved_commit_then_syncs_and_reports_both_revisions() {
     let home = Home::new();
-    let (repo, first, second) = git_source();
+    let (repo, first, second) = git_source(&home);
     let root = git_project(repo.path());
 
     let run = home.ok(root.path(), &["update", "--rev", "v1"]);
@@ -107,14 +90,14 @@ fn update_pins_the_resolved_commit_then_syncs_and_reports_both_revisions() {
 #[test]
 fn update_resolves_a_branch_a_tag_and_a_commit_to_a_full_hash() {
     let home = Home::new();
-    let (repo, first, second) = git_source();
+    let (repo, first, second) = git_source(&home);
     let root = git_project(repo.path());
-    let pinned = |hash: &str, comment: &str| format!("rev = \"{hash}\"{comment}\n");
+    let rev_line = |hash: &str, comment: &str| format!("rev = \"{hash}\"{comment}\n");
     for (rev, line) in [
-        ("main", pinned(&second, "  # main")),
-        ("v1", pinned(&first, "  # v1")),
+        ("main", rev_line(&second, "  # main")),
+        ("v1", rev_line(&first, "  # v1")),
         // a commit needs no comment naming it again
-        (first.as_str(), pinned(&first, "")),
+        (first.as_str(), rev_line(&first, "")),
     ] {
         home.ok(root.path(), &["update", "--rev", rev]);
         let config = get(root.path(), CONFIG).unwrap();
@@ -126,7 +109,7 @@ fn update_resolves_a_branch_a_tag_and_a_commit_to_a_full_hash() {
 #[test]
 fn update_changes_only_the_rev_line() {
     let home = Home::new();
-    let (repo, first, _second) = git_source();
+    let (repo, first, _second) = git_source(&home);
     let root = tempdir().unwrap();
     let source = url(repo.path());
     let text = |rev: &str| {
@@ -144,7 +127,7 @@ fn update_changes_only_the_rev_line() {
 #[test]
 fn update_inserts_a_missing_rev_right_after_source() {
     let home = Home::new();
-    let (repo, first, _second) = git_source();
+    let (repo, first, _second) = git_source(&home);
     let root = tempdir().unwrap();
     let source = url(repo.path());
     put(
@@ -163,22 +146,28 @@ fn update_inserts_a_missing_rev_right_after_source() {
 
 // spec: SYN-12
 #[test]
-fn update_fails_changing_nothing_on_a_rev_it_cannot_edit() {
+fn update_fails_changing_nothing_on_a_quoted_or_dotted_key() {
     let home = Home::new();
-    let (repo, _first, _second) = git_source();
-    let root = tempdir().unwrap();
-    put(
-        root.path(),
-        CONFIG,
-        &format!(
-            "[harness]\nsource = \"{}\"\n\"rev\" = \"old\"\n",
-            url(repo.path())
+    let (repo, _first, _second) = git_source(&home);
+    let source = url(repo.path());
+    for (config, error) in [
+        (
+            format!("[harness]\nsource = \"{source}\"\n\"rev\" = \"old\"\n"),
+            "cannot rewrite `rev`",
         ),
-    );
-    let before = snapshot(root.path());
-    let run = home.harness(root.path(), &["update", "--rev", "v1"]);
-    assert_eq!(run.code, Some(3), "{run:?}");
-    assert_eq!(snapshot(root.path()), before);
+        (
+            format!("harness.source = \"{source}\"\nharness.rev = \"old\"\n"),
+            "missing `source`",
+        ),
+    ] {
+        let root = tempdir().unwrap();
+        put(root.path(), CONFIG, &config);
+        let before = snapshot(root.path());
+        let run = home.harness(root.path(), &["update", "--rev", "v1"]);
+        assert_eq!(run.code, Some(3), "{config}: {run:?}");
+        assert!(run.stderr.contains(error), "{config}: {run:?}");
+        assert_eq!(snapshot(root.path()), before);
+    }
 }
 
 // spec: SYN-13
@@ -212,10 +201,11 @@ fn update_to_an_unknown_revision_or_an_unreadable_source_changes_nothing() {
     assert!(run.stderr.contains("unknown revision"), "{run:?}");
 
     // a revision without files/: the source cannot be read as a harness
-    git(repo.path(), &["rm", "-rq", "files"]);
-    git(repo.path(), &["commit", "--quiet", "-m", "empty"]);
+    home.git(repo.path(), &["rm", "-rq", "files"]);
+    home.git(repo.path(), &["commit", "--quiet", "-m", "empty"]);
     let run = home.harness(root.path(), &["update"]);
     assert_eq!(run.code, Some(3), "{run:?}");
+    assert!(run.stderr.contains("no files/ directory"), "{run:?}");
     assert_eq!(snapshot(root.path()), before);
 
     let gone = git_project(&tempdir().unwrap().path().join("gone"));
@@ -258,25 +248,24 @@ fn update_dry_run_reports_the_target_and_writes_nothing() {
 
 /// A source whose pinned commit `first` no branch or tag points to any more; `kept` tells whether the
 /// source still holds it (else it was pruned).
-fn rewritten_source(kept: bool) -> (TempDir, String) {
-    let (repo, first, _second) = git_source();
-    git(repo.path(), &["tag", "-d", "v1"]);
-    git(
+fn rewritten_source(home: &Home, kept: bool) -> (TempDir, String) {
+    let (repo, first, _second) = git_source(home);
+    home.git(repo.path(), &["tag", "-d", "v1"]);
+    home.git(
         repo.path(),
         &["checkout", "--quiet", "--orphan", "rewritten"],
     );
     put(repo.path(), "files/a.txt", "a3");
-    git(repo.path(), &["add", "."]);
-    git(repo.path(), &["commit", "--quiet", "-m", "three"]);
-    git(repo.path(), &["branch", "-M", "main"]);
-    git(repo.path(), &["reflog", "expire", "--expire=now", "--all"]);
+    home.git(repo.path(), &["add", "."]);
+    home.git(repo.path(), &["commit", "--quiet", "-m", "three"]);
+    home.git(repo.path(), &["branch", "-M", "main"]);
+    home.git(repo.path(), &["reflog", "expire", "--expire=now", "--all"]);
     if !kept {
-        git(repo.path(), &["gc", "--quiet", "--prune=now"]);
-        let still = Command::new("git")
-            .args(["cat-file", "-e", &format!("{first}^{{commit}}")])
-            .current_dir(repo.path())
-            .status()
-            .unwrap();
+        home.git(repo.path(), &["gc", "--quiet", "--prune=now"]);
+        let mut cat = Command::new("git");
+        cat.args(["cat-file", "-e", &format!("{first}^{{commit}}")])
+            .current_dir(repo.path());
+        let still = home.isolated(&mut cat).output().unwrap().status;
         // CI served the commit after the gc alone: fail here, not in the test, if it is still there
         assert!(!still.success(), "the commit is still in the source");
     }
@@ -295,10 +284,12 @@ fn pinned(repo: &Path, rev: &str) -> TempDir {
 #[test]
 fn a_pinned_hash_no_ref_points_to_any_more_is_fetched_by_hash() {
     let home = Home::new();
-    let (repo, first) = rewritten_source(true);
+    let (repo, first) = rewritten_source(&home, true);
     let root = pinned(repo.path(), &first);
     home.ok(root.path(), &["sync"]);
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+    // a home of its own: the cache of the sync above holds the commit already, `update` must fetch it
+    let home = Home::new();
     let root = git_project(repo.path());
     home.ok(root.path(), &["update", "--rev", &first]);
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
@@ -308,7 +299,7 @@ fn a_pinned_hash_no_ref_points_to_any_more_is_fetched_by_hash() {
 #[test]
 fn a_pinned_hash_the_source_does_not_serve_fails_naming_update_and_changes_nothing() {
     let home = Home::new();
-    let (repo, first) = rewritten_source(false);
+    let (repo, first) = rewritten_source(&home, false);
     let root = pinned(repo.path(), &first);
     let before = snapshot(root.path());
     for args in [&["sync"][..], &["update", "--rev", &first]] {

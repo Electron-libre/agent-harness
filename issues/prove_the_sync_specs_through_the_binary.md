@@ -81,3 +81,15 @@ on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
 - Code review: no findings
 - not verified: none
 - decisions needed: none
+
+## Deliverable 4 (fixes of the `high` review)
+- done: the 10 findings fixed: the update half of the fetch-by-hash test gets an empty cache; SYN-35 asserts the
+  shape warning itself; the outside-path lock line carries the real hash of the file; the refusals of SYN-12 and
+  SYN-13 assert their cause, and a dotted key is refused too; `snapshot` records directories and symlinks; git runs
+  with the temp home, no system or global config and no `GIT_*` of the caller, for the fixtures and the binary; the
+  `PATH` is joined portably and the files run on Unix only (the fakes are shell scripts); the `cat-file` probe no
+  longer prints to the test output; the closure `pinned` renamed `rev_line`.
+- red: none (the fixes harden the proofs of behaviour that exists)
+- Code review: 1 findings; `GIT_CONFIG_PARAMETERS` (the `git -c` options of a calling hook) not removed: fixed.
+- not verified: none
+- decisions needed: none

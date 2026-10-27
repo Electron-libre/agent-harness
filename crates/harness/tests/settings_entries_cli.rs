@@ -1,4 +1,5 @@
 //! The managed entries of the project's settings, run as the binary on temp dirs (SYN-29 to SYN-36).
+#![cfg(unix)]
 
 mod common;
 
@@ -263,19 +264,23 @@ fn settings_that_cannot_be_merged_are_left_alone_and_their_entries_kept() {
     put(root.path(), SETTINGS, "{}");
     home.ok(root.path(), &["sync"]);
     let lock = get(root.path(), LOCK);
-    for text in [
-        "{ not json",
-        "[]",
-        r#"{"hooks": []}"#,
-        r#"{"permissions": {"deny": "all"}}"#,
+    let shape = "is not in the shape of Claude Code settings";
+    for (text, why) in [
+        ("{ not json", "not valid JSON"),
+        ("[]", shape),
+        (r#"{"hooks": []}"#, shape),
+        (r#"{"permissions": {"deny": "all"}}"#, shape),
     ] {
         put(root.path(), SETTINGS, text);
         let run = home.ok(root.path(), &["sync"]);
         assert_eq!(get(root.path(), SETTINGS).as_deref(), Some(text));
         assert_eq!(get(root.path(), LOCK), lock, "{text}");
+        let warning = format!("warning: {SETTINGS} ");
         assert!(
-            run.stderr.contains("warning:"),
-            "{text}: a warning says why"
+            run.stderr
+                .lines()
+                .any(|l| l.starts_with(&warning) && l.contains(why)),
+            "{text}: a warning says why: {run:?}"
         );
     }
     fs::remove_file(root.path().join(SETTINGS)).unwrap();
