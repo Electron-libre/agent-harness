@@ -80,6 +80,11 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
         "`Code review: <n> findings`",
         "the count of findings opens the line delivered-quality reads",
     ),
+    (
+        "issue-workflow",
+        "`red: ABC-3, ABC-4: <failure>`",
+        "the red line names the traced ids delivered-quality reads",
+    ),
 ];
 
 /// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.

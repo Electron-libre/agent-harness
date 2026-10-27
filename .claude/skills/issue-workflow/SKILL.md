@@ -110,8 +110,9 @@ again. Then set `Plan: validated` and the base commit. The spec file is the reco
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
    waive the review: never do it yourself ([details.md](details.md), "Review waiver").
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
-   review), one line `red:` with the failure message the test of step 3.2 gave before the code (`none` for a deliverable
-   with no test), then the line `Code review: <n> findings` (`Code review: no findings` if it came back clean; the
+   review), one line `red:` opening with the ids its tests trace, then the failure message the test of step 3.2 gave before
+   the code (`red: ABC-3, ABC-4: <failure>`, `harness run delivered-quality` counts a traced id it lacks; `none` for a
+   deliverable with no test), then the line `Code review: <n> findings` (`Code review: no findings` if it came back clean; the
    count first, `harness run delivered-quality` reads it) with what was done about each, then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
    not invoke the review, go back to step 5 instead of presenting the deliverable. Wait for the user's validation.
    Don't commit before it. In autonomous mode, write this summary in the issue and go on.

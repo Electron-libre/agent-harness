@@ -37,7 +37,7 @@ hold no `red:` line, 11 hold at least one `red: none` or `not observed`, and no 
 1. [x] `delivered-quality` columns `traced` and `traced_without_red` (after `review_findings`), summed by
    `--summary` and accepted by `harness-report` (its `QUALITY` header, REP-6 sums every column); verified by
    `tests/delivered_quality.rs` and `tests/harness_report.rs`; makes true QUA-1, QUA-11 (spec set `accepted`).
-2. [ ] `issue-workflow` step 3.6: the `red:` line opens with the ids its test traces
+2. [x] `issue-workflow` step 3.6: the `red:` line opens with the ids its test traces
    (`red: ABC-3, ABC-4: <failure>`), `none` only for a deliverable that traces none; verified by `tests/skills.rs`
    and `just check-harness` after `just sync`.
 
@@ -65,4 +65,21 @@ hold no `red:` line, 11 hold at least one `red: none` or `not observed`, and no 
 - Code review: 1 finding: `traced` with no commit would read `HEAD`; not fixed, unreachable (`issue_row` returns early when the issue has no commit).
 - not verified: a `red:` line that names an id in prose (not as a traced id) hides it from `traced_without_red`;
   seen once on this repository (`install_a_git_pre_commit_review_gate`, 10 traced, 9 without red).
+- decisions needed: none
+
+## Deliverable 2
+
+- done: `issue-workflow` step 3.6 asks for `red: ABC-3, ABC-4: <failure>`; synced to `.claude/`.
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy clean |
+| specs | no change (skill text, QUA-11 reads it) |
+| docs | the skill itself |
+| code review | low, see below |
+
+- red: none (no requirement traced): `FAIL - issue-workflow: missing '`red: ABC-3, ABC-4: <failure>`'`.
+- Code review: no findings
+- not verified: none
 - decisions needed: none
