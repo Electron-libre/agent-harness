@@ -37,3 +37,47 @@ every issue in progress. List the files through git instead, which already honou
 * `git ls-files` lists a nested worktree as nothing when it is ignored, but as an embedded repository when the
   `info/exclude` line is missing (a clone that never ran `start-issue`): check both cases.
 * `close_issue.rs` rewrites untracked documents too (`-o` is needed, not only the tracked files).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Replace the two hand-written walks of the repository (`close_issue.rs` `text_files`, `check_specs.rs` `rust_files`)
+by one listing through `git ls-files -co --exclude-standard`, so no scanner needs to know `.claude/worktrees/`. Then
+measure which consumer tools read the nested worktrees and document how to keep them out. Out of scope: the
+walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `specs/`, the `files/` tree of `sync`).
+
+## Plan
+1. [x] Shared module `files/.claude/repo_files.rs` (`#[path]` include, ADR 0006, with its sha256 line): the files of
+   a root from `git ls-files -co --exclude-standard -z`, dropping the directory entries of an embedded repository
+   (`dir/`, a nested worktree when `info/exclude` lacks its line) and the paths that no longer exist; `None` outside
+   a git repository. `close_issue.rs` uses it, keeping `.git`, `target`, `node_modules` and `skipped_dirs` as a
+   filter by directory name on the listed paths; verified by `test_close_issue.rs` (nested worktree ignored and not
+   ignored, untracked document rewritten); makes true PAR-14.
+2. [ ] `check_specs.rs` uses the module, and falls back to the walk skipping `target/` outside a git repository;
+   verified by `test_check_specs.rs` (cases in a git repo with a nested worktree with and without the exclude
+   line, an untracked test still traced, the existing cases outside git); makes true PAR-14, PAR-16; spec back to
+   `accepted`.
+3. [ ] ADR 0008 and `docs/architecture.md` restated ("the scanners list the files through git"); measure in a
+   throwaway consumer with a nested worktree which tools read it (cargo, rg, and through `npx`/`uvx`: prettier,
+   eslint, tsc, vitest, pytest, ruff, mypy), and write the result with the way out in `docs/architecture.md`
+   (note for the project owner) or a seed default, per the measure.
+
+## Deliverable 1
+- done: `files/.claude/repo_files.rs` lists the files through git; `close_issue.rs` rewrites the git-listed text
+  files, minus `.git`, `target`, `node_modules` and `skipped_dirs` by directory name.
+- checks: `just check` ok, `just test-harness` ok, `just check-specs` ok (spec in `draft`, old wording warnings only),
+  docs: `docs/architecture.md` (parallel issues).
+- red: `FAIL - the files of a worktree nested anywhere else are untouched`, `FAIL - --relink leaves the worktree git
+  ignores untouched`, `FAIL - close_issue.rs includes the shared module`.
+- Code review: 1 finding: a failed `git ls-files` relinked nothing silently; fixed, `relink` now warns (it only
+  runs once `git rev-parse --show-toplevel` succeeded, so the case is rare).
+- not verified: a consumer with submodules (dropped, not tested).
+
+## Decisions
+- Mode: autonomous
+- Base commit: aa6ca4ef6c635b6b52b6741acd2db37d89ded987
+- 1 a: one shared module `files/.claude/repo_files.rs` (ADR 0006 pattern).
+- 2 a: `close_issue.rs` keeps `.git`, `target`, `node_modules` and `skipped_dirs` as a name filter on the git list.
+- 3 a: the consumer measure may fetch tools through `npx` and `uvx`.

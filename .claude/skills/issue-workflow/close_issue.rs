@@ -2,8 +2,8 @@
 //! Move a finished issue file into `issues/done/` (only run after the user agreed).
 //! Uses `git mv` when the file is tracked, a plain rename otherwise. Refuses to overwrite.
 //! Then rewrites every `issues/foo.md` mentioned in the other text files of the repo to
-//! `issues/done/foo.md`, so no document keeps pointing at the old path; the issue worktrees nested under
-//! `.claude/worktrees/` keep their own files.
+//! `issues/done/foo.md`, so no document keeps pointing at the old path. The files are those git lists (tracked and
+//! untracked, not ignored), so the issue worktrees nested under `.claude/worktrees/` keep their own files.
 //! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: the
 //! queue is edited at merge time, on the main worktree.
 //! Usage: `just close-issue issues/foo.md`; `just close-issue --relink` fixes the references to
@@ -12,6 +12,10 @@
 //! [dependencies]
 //! toml = "0.8"
 //! ```
+
+// repo_files.rs sha256: f4e77dcfa83c4aa2a444404b5974da83152921cce31f101a72da76435c30dabf
+#[path = "../../repo_files.rs"]
+mod repo_files;
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -37,20 +41,18 @@ fn is_text_file(path: &Path) -> bool {
             .is_some_and(|e| ["md", "rs", "toml", "yaml", "yml", "txt", "json"].contains(&e))
 }
 
-/// The text files under `dir`, except in the `skipped` directory names and the `worktrees` directory (the issue
-/// worktrees nested in the main one, ADR 0008), matched by full path.
-fn text_files(dir: &Path, out: &mut Vec<std::path::PathBuf>, skipped: &[String], worktrees: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            if path != worktrees && !path.file_name().and_then(|n| n.to_str()).is_some_and(|n| skipped.iter().any(|s| s == n)) {
-                text_files(&path, out, skipped, worktrees);
-            }
-        } else if is_text_file(&path) {
-            out.push(path);
-        }
-    }
+/// The text files of the work tree at `root`, as git lists them (so never those of a nested worktree, ADR 0008),
+/// except under a directory named like one of `skipped`.
+fn text_files(root: &Path, skipped: &[String]) -> Vec<std::path::PathBuf> {
+    let skipped_dir = |path: &Path| {
+        let mut dirs = path.strip_prefix(root).unwrap_or(path).parent().into_iter().flat_map(Path::components);
+        dirs.any(|c| skipped.iter().any(|s| c.as_os_str() == s.as_str()))
+    };
+    let Some(files) = repo_files::repo_files(root) else {
+        eprintln!("git ls-files failed in {}: references were not updated", root.display());
+        return Vec::new();
+    };
+    files.into_iter().filter(|p| is_text_file(p) && !skipped_dir(p)).collect()
 }
 
 /// Insert `done/` in `issues/<stem>.md` for the given stems, only where `issues/` starts a path
@@ -77,11 +79,9 @@ fn relink_text(text: &str, stems: &HashSet<String>) -> String {
 
 /// Rewrite the references to the given closed issues in every text file under `root`.
 fn relink(root: &Path, stems: &HashSet<String>) {
-    let mut files = Vec::new();
     let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
     skipped.extend(config_list(root, "skipped_dirs"));
-    text_files(root, &mut files, &skipped, &root.join(".claude/worktrees"));
-    for file in files {
+    for file in text_files(root, &skipped) {
         let Ok(text) = std::fs::read_to_string(&file) else { continue };
         let updated = relink_text(&text, stems);
         if updated == text {

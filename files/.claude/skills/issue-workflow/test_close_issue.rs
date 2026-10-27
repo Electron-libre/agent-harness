@@ -1,6 +1,10 @@
 #!/usr/bin/env rust-script
 //! Behavior test for `close_issue.rs`: moves tracked and untracked issues, refuses bad targets.
 //! Usage: `just test-harness`.
+//! ```cargo
+//! [dependencies]
+//! sha2 = "0.10"
+//! ```
 
 use std::path::Path;
 use std::process::Command;
@@ -56,15 +60,18 @@ fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
 }
 
 // spec: PAR-14
-/// The issue worktrees nest in the main one (ADR 0008): closing an issue there must not rewrite their files.
+/// The issue worktrees nest in the main one (ADR 0008): closing an issue there must not rewrite their files, ignored
+/// by git (`info/exclude`) or listed as an embedded repository (a clone that never ran `start-issue`), wherever they are.
 fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
     let main = std::fs::canonicalize(std::env::temp_dir()).unwrap().join(format!("close_issue_nested_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&main);
     let nested = main.join(".claude/worktrees/bar");
+    let elsewhere = main.join("docs/baz");
     std::fs::create_dir_all(main.join("issues")).unwrap();
     std::fs::create_dir_all(main.join("docs/worktrees")).unwrap();
     std::fs::write(main.join("issues/foo.md"), "x").unwrap();
     std::fs::write(main.join("issues/bar.md"), "x").unwrap();
+    std::fs::write(main.join("issues/baz.md"), "x").unwrap();
     std::fs::write(main.join("NOTES.md"), "see issues/foo.md\n").unwrap();
     std::fs::write(main.join("docs/worktrees/w.md"), "see issues/foo.md\n").unwrap();
     let git = |args: &[&str]| {
@@ -82,18 +89,42 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
     git(&["add", "-A"]);
     git(&["commit", "-qm", "init", "--no-verify"]);
     git(&["worktree", "add", "-q", "-b", "bar", nested.to_str().unwrap()]);
+    git(&["worktree", "add", "-q", "-b", "baz", elsewhere.to_str().unwrap()]);
+    std::fs::write(main.join("docs/draft.md"), "see issues/foo.md\n").unwrap();
     let read = |p: &Path| std::fs::read_to_string(p).unwrap();
+    let kept = |wt: &Path| read(&wt.join("NOTES.md")) == "see issues/foo.md\n" && read(&wt.join("docs/worktrees/w.md")) == "see issues/foo.md\n";
     let (closed, _) = run(script, &main, "issues/foo.md");
-    let nested_kept = read(&nested.join("NOTES.md")) == "see issues/foo.md\n" && read(&nested.join("docs/worktrees/w.md")) == "see issues/foo.md\n";
+    let nested_kept = kept(&nested);
+    let elsewhere_kept = kept(&elsewhere);
+    std::fs::write(main.join(".git/info/exclude"), "/.claude/worktrees/\n").unwrap();
+    std::fs::write(main.join("docs/later.md"), "see issues/foo.md\n").unwrap();
     let (relinked, _) = run(script, &main, "--relink");
     let out = vec![
         ("closing an issue rewrites the main worktree's references", closed && read(&main.join("NOTES.md")) == "see issues/done/foo.md\n"),
         ("a directory named worktrees elsewhere is still scanned", read(&main.join("docs/worktrees/w.md")) == "see issues/done/foo.md\n"),
-        ("the files of a worktree under .claude/worktrees are untouched", nested_kept),
-        ("--relink leaves them untouched too", relinked && read(&nested.join("NOTES.md")) == "see issues/foo.md\n"),
+        ("an untracked document of the main worktree is rewritten", read(&main.join("docs/draft.md")) == "see issues/done/foo.md\n"),
+        ("the files of a worktree under .claude/worktrees git does not ignore are untouched", nested_kept),
+        ("the files of a worktree nested anywhere else are untouched", elsewhere_kept),
+        ("--relink rewrites an untracked document", relinked && read(&main.join("docs/later.md")) == "see issues/done/foo.md\n"),
+        ("--relink leaves the worktree git ignores untouched", kept(&nested) && kept(&elsewhere)),
     ];
     let _ = std::fs::remove_dir_all(&main);
     out
+}
+
+/// `rust-script` rebuilds a script only when its own text changes (ADR 0006): it carries the hash of the module.
+fn includes_repo_files(script: &Path) -> Vec<(&'static str, bool)> {
+    use sha2::Digest;
+    let text = std::fs::read_to_string(script).unwrap_or_default();
+    let module = script.parent().unwrap().join("../../repo_files.rs");
+    let stamp = format!("// repo_files.rs sha256: {:x}", sha2::Sha256::digest(std::fs::read(module).unwrap_or_default()));
+    if !text.contains(&stamp) {
+        println!("close_issue.rs: write the line `{stamp}` so rust-script rebuilds it with the current repo_files.rs");
+    }
+    vec![
+        ("close_issue.rs includes the shared module", text.contains("#[path = \"../../repo_files.rs\"]")),
+        ("close_issue.rs carries the SHA-256 of the current repo_files.rs", text.contains(&stamp)),
+    ]
 }
 
 fn main() {
@@ -129,9 +160,18 @@ fn main() {
     std::fs::write(tmp.join("issues/done/README.md"), "x").unwrap();
     std::fs::write(tmp.join("NOTES.md"), "issues/untracked.md issues/README.md issues/other.md").unwrap();
     std::fs::write(tmp.join("issues/other.md"), "x").unwrap();
+    for dir in [".claude", "vendor/docs", "node_modules/pkg"] {
+        std::fs::create_dir_all(tmp.join(dir)).unwrap();
+    }
+    std::fs::write(tmp.join(".claude/harness.toml"), "[project]\nskipped_dirs = [\"vendor\"]\n").unwrap();
+    std::fs::write(tmp.join("vendor/docs/v.md"), "issues/untracked.md").unwrap();
+    std::fs::write(tmp.join("node_modules/pkg/n.md"), "issues/untracked.md").unwrap();
     let (ok, _) = run(&script, &tmp, "--relink");
     let notes = std::fs::read_to_string(tmp.join("NOTES.md")).unwrap();
     check("--relink repairs done issues only", ok && notes == "issues/done/untracked.md issues/README.md issues/other.md");
+    let untouched = |p: &str| std::fs::read_to_string(tmp.join(p)).unwrap() == "issues/untracked.md";
+    check("skipped_dirs and node_modules are not rewritten", untouched("vendor/docs/v.md") && untouched("node_modules/pkg/n.md"));
+    std::fs::remove_dir_all(tmp.join("node_modules")).unwrap();
     std::fs::create_dir_all(tmp.join("elsewhere")).unwrap();
     std::fs::write(tmp.join("elsewhere/x.md"), "x").unwrap();
     let (ok, out) = run(&script, &tmp, "elsewhere/x.md");
@@ -161,7 +201,7 @@ fn main() {
     let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
     check("closing the last entry leaves the header ending with one newline", ok && queue == header);
 
-    for (name, ok) in refuses_a_linked_worktree(&script).into_iter().chain(skips_the_nested_worktrees(&script)) {
+    for (name, ok) in refuses_a_linked_worktree(&script).into_iter().chain(skips_the_nested_worktrees(&script)).chain(includes_repo_files(&script)) {
         check(name, ok);
     }
 
