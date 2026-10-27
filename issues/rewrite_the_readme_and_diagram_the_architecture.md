@@ -69,7 +69,7 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
    stops and the autonomous mode, merge back, close) and the parallel worktree lifecycle (`start-issue`,
    `finish-issue`); "Parallel issues" of the architecture trimmed to its design with a link; verified by checking each
    step name against `files/.claude/skills/issue-workflow/SKILL.md` and the recipes; ~200 lines.
-5. [ ] Evaluation: "The instruction audit", "The evaluation from the transcripts" and "The cost of a turn" as an
+5. [x] Evaluation: "The instruction audit", "The evaluation from the transcripts" and "The cost of a turn" as an
    overview with the pipeline diagram (transcripts and git history, readers, TSV, `harness-report`,
    `evaluate-harness`), edge cases linked to `specs/evaluation.md`, `specs/rule-breaches.md`,
    `specs/delivered-quality.md`, `specs/harness-report.md`; same check; ~200 lines.
@@ -139,6 +139,22 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 |---|---|
 | tests, lint, specs | `just check` passes |
 | docs | step names and numbers checked against `issue-workflow` SKILL.md and details.md ("Merge back", "Worktree of an issue"); dropped statements found in `specs/parallel-issues.md` (PAR-11, PAR-15, PAR-16) or moved to `workflow.md`; links and anchors resolve |
+| code review | see below |
+
+- red: none (docs only, no test)
+- Code review: no findings
+- not verified: the mermaid rendering
+- decisions needed: none
+
+## Deliverable 5
+- done: "The evaluation from the transcripts" as a pipeline diagram, a table of the readers and five design choices;
+  "The instruction audit" folded into it as one paragraph; edge cases linked to the EVA, BRE, QUA and REP ids.
+  `docs/architecture.md`: 330 lines, 30.4 kB at the base, 286 lines, 19.3 kB now, with 4 diagrams.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| docs | dropped statements spot-checked in the four specs (medians, `self:`, the 20-word language rule, commits in no session, sub-agents, `--window-days`, `--anonymous`); links resolve |
 | code review | see below |
 
 - red: none (docs only, no test)
