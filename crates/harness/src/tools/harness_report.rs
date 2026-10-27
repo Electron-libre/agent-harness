@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
-const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
+const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
 const USAGE: &str = "usage: harness run harness-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--min-sessions <n>] [--anonymous]";
@@ -281,6 +281,8 @@ fn quality(groups: &[Group], files: &[Vec<Row>]) {
         "reverts_after",
         "reviews",
         "review_findings",
+        "traced",
+        "traced_without_red",
         "sessions",
         "failed_checks",
         "validations",

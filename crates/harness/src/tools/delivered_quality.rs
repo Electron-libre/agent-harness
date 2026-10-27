@@ -18,8 +18,8 @@ use transcripts::{
     revision, sessions, sorted_entries, subagents, typed_text, Place,
 };
 
-const SUMMARY_HEADER: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
-const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
+const SUMMARY_HEADER: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
+const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 
 /// The paths whose later fixes say nothing of the issue's work: the issue files, the docs and the lock of the sync.
 const UNRELATED_PREFIXES: &[&str] = &["issues/", "docs/"];
@@ -221,6 +221,58 @@ fn reviews(text: &str) -> (usize, Option<usize>) {
         .collect::<Option<Vec<usize>>>()
         .map(|c| c.iter().sum());
     (lines.len(), sum)
+}
+
+/// Whether `word` has the shape of a requirement id: capitals, `-`, digits (`ABC-3`).
+fn is_id(word: &str) -> bool {
+    word.split_once('-').is_some_and(|(prefix, number)| {
+        !prefix.is_empty()
+            && prefix.chars().all(|c| c.is_ascii_uppercase())
+            && !number.is_empty()
+            && number.chars().all(|c| c.is_ascii_digit())
+    })
+}
+
+/// The requirement ids the commits `own` cite on the `// spec: ` lines they add to the files of the issue (QUA-11),
+/// renames detected so a moved test traces nothing.
+fn traced(repo: &Path, own: &[&Commit]) -> BTreeSet<String> {
+    let mut args = vec![
+        "-c",
+        "core.quotePath=false",
+        "show",
+        "-M",
+        "-U0",
+        "--no-color",
+        "--format=",
+    ];
+    args.extend(own.iter().map(|c| c.hash.as_str()));
+    args.extend(["--", "."]);
+    let excluded: Vec<String> = UNRELATED_PREFIXES
+        .iter()
+        .chain(UNRELATED_FILES)
+        .map(|p| format!(":(exclude){}", p.trim_end_matches('/')))
+        .collect();
+    args.extend(excluded.iter().map(String::as_str));
+    git(repo, &args)
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| l.starts_with('+') && !l.starts_with("+++"))
+        .filter_map(|l| l.split_once("// spec: ").map(|(_, list)| list))
+        .flat_map(|list| list.split(|c: char| c == ',' || c.is_whitespace()))
+        .filter(|w| is_id(w))
+        .map(str::to_string)
+        .collect()
+}
+
+/// The requirement ids named on the lines of the `# Tracking` section of an issue file that hold `red:` (QUA-11).
+fn red_ids(text: &str) -> BTreeSet<String> {
+    section(text, "# Tracking", |l| l.starts_with("# "))
+        .into_iter()
+        .filter(|l| l.contains("red:"))
+        .flat_map(|l| l.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-')))
+        .filter(|w| is_id(w))
+        .map(str::to_string)
+        .collect()
 }
 
 /// Whether `commit` reverts the work of the issue (QUA-4): a `revert` type or a `Revert "` subject changing one of
@@ -430,6 +482,8 @@ fn issue_row(
         .filter(|c| matches!(c.kind(), "fix" | "revert"))
         .count();
     let (review_count, findings) = reviews(&text);
+    let traced = traced(repo, &mine);
+    let red = red_ids(&text);
     let transcript = sessions.map(|s| session_cells(log, &own, &stem, s));
     let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
@@ -441,6 +495,8 @@ fn issue_row(
         reverts_after.to_string(),
         review_count.to_string(),
         findings.map(|n| n.to_string()).unwrap_or_default(),
+        traced.len().to_string(),
+        traced.difference(&red).count().to_string(),
     ];
     cells.extend((0..4).map(|k| transcript.map(|t| t[k].to_string()).unwrap_or_default()));
     Some(Row {

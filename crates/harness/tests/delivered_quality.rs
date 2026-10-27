@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const COLUMNS: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
+const COLUMNS: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 
 fn sh(dir: &Path, args: &[&str]) {
     let ok = Command::new("git")
@@ -335,6 +335,84 @@ fn review_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+/// A repository where `eps` adds three citations and records the red run of two, and `zeta` only renames a test.
+fn traced_fixture(tmp: &Path) -> PathBuf {
+    let repo = tmp.join("proj");
+    std::fs::create_dir_all(&repo).unwrap();
+    sh(&repo, &["init", "-q", "-b", "main"]);
+    let test = "// spec: OLD-1\nfn old() {}\n";
+    commit_at(
+        &repo,
+        "2026-01-01T00:00:00Z",
+        "chore: sync",
+        &[
+            (".claude/harness.toml", Some(&toml("r1"))),
+            ("tests/old.rs", Some(test)),
+            ("issues/eps.md", Some("# eps\n")),
+            ("issues/zeta.md", Some("# zeta\n")),
+        ],
+    );
+    let eps = "# eps\n\n# Tracking\n\n## Plan\n1. [x] one\n\n## Deliverable 1\n- red: ABC-1, ABC-3: assertion failed\n- red: none\n\n# Notes\nred: ABC-2\n";
+    commit_at(
+        &repo,
+        "2026-01-02T00:00:00Z",
+        "feat(files): eps",
+        &[
+            ("tests/a.rs", Some("// spec: ABC-1, ABC-2\nfn a() {}\n// spec: ABC-3\nfn b() {}\n// spec: ABC-1\nfn c() {}\n")),
+            ("docs/a.md", Some("// spec: ABC-4\n")),
+            ("issues/eps.md", Some(eps)),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-03T00:00:00Z",
+        "docs: close eps",
+        &[("issues/eps.md", None), ("issues/done/eps.md", Some(eps))],
+    );
+    let zeta = "# zeta\n\n# Tracking\n\n## Plan\n1. [x] one\n";
+    commit_at(
+        &repo,
+        "2026-01-04T00:00:00Z",
+        "refactor(files): move the test",
+        &[
+            ("tests/old.rs", None),
+            ("tests/moved.rs", Some(test)),
+            ("issues/zeta.md", Some(zeta)),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-05T00:00:00Z",
+        "docs: close zeta",
+        &[
+            ("issues/zeta.md", None),
+            ("issues/done/zeta.md", Some(zeta)),
+        ],
+    );
+    repo
+}
+
+// spec: QUA-11
+fn traced_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let repo = traced_fixture(&tmp.join("traced"));
+    let (_, out) = run(dir, &repo, &[]);
+    let r = rows(&out);
+    vec![
+        (
+            "the distinct ids of the added citations are traced, docs excluded".to_string(),
+            has(&r, "eps", "traced", "3"),
+        ),
+        (
+            "the traced ids no red line of the Tracking names have no red run".to_string(),
+            has(&r, "eps", "traced_without_red", "1"),
+        ),
+        (
+            "a renamed test traces nothing".to_string(),
+            has(&r, "zeta", "traced", "0") && has(&r, "zeta", "traced_without_red", "0"),
+        ),
+    ]
+}
+
 /// A transcript line of `kind` in `cwd` at `ts`, with `fields` merged in.
 fn line(kind: &str, cwd: &Path, ts: &str, fields: serde_json::Value) -> String {
     let mut line = serde_json::json!({"type": kind, "cwd": cwd, "timestamp": ts, "sessionId": "x", "gitBranch": "main"});
@@ -472,10 +550,10 @@ fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     );
     let (ok, out) = run(dir, &repo, &["--summary"]);
     let expected = [
-        "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages",
-        "r1\t1\t2\t3\t1\t2\t3\t3\t7\t\t\t\t",
-        "r2\t2\t3\t2\t0\t0\t0\t3\t\t\t\t\t",
-        "a0\t1\t1\t1\t0\t0\t0\t0\t0\t\t\t\t",
+        "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages",
+        "r1\t1\t2\t3\t1\t2\t3\t3\t7\t0\t0\t\t\t\t",
+        "r2\t2\t3\t2\t0\t0\t0\t3\t\t0\t0\t\t\t\t",
+        "a0\t1\t1\t1\t0\t0\t0\t0\t0\t0\t0\t\t\t\t",
     ];
     let lines: Vec<&str> = out.lines().collect();
     if lines != expected {
@@ -492,6 +570,7 @@ fn delivered_quality() {
     let checks: Vec<_> = git_checks(&dir, &tmp)
         .into_iter()
         .chain(review_checks(&dir, &tmp))
+        .chain(traced_checks(&dir, &tmp))
         .chain(session_checks(&dir, &tmp))
         .chain(summary_checks(&dir, &tmp))
         .collect();

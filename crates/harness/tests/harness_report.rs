@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
-const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\tsessions\tfailed_checks\tvalidations\tother_messages";
+const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
 const SELF: &str = "self:1111111111111111111111111111111111111111";
@@ -289,14 +289,14 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         &tmp.join("quality-a.tsv"),
         QUALITY,
         &[
-            format!("{SELF}\t2\t4\t6\t1\t1\t0\t2\t3\t2\t1\t3\t4"),
-            "zzz\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9".into(),
+            format!("{SELF}\t2\t4\t6\t1\t1\t0\t2\t3\t5\t2\t2\t1\t3\t4"),
+            "zzz\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9\t9".into(),
         ],
     );
     let quality_b = write(
         &tmp.join("quality-b.tsv"),
         QUALITY,
-        &["r-b\t1\t1\t2\t0\t0\t0\t1\t\t1\t0\t1\t0".into()],
+        &["r-b\t1\t1\t2\t0\t0\t0\t1\t\t1\t1\t1\t0\t1\t0".into()],
     );
     let context = write(
         &tmp.join("context.tsv"),
@@ -382,7 +382,9 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             ok && cell(quality, first, "issues") == "3"
                 && cell(quality, first, "commits") == "8"
                 && cell(quality, first, "issue_sessions") == "3"
-                && cell(quality, first, "other_messages") == "4",
+                && cell(quality, first, "other_messages") == "4"
+                && cell(quality, first, "traced") == "6"
+                && cell(quality, first, "traced_without_red") == "3",
         ),
         (
             "an empty value empties its sum and its ratio",

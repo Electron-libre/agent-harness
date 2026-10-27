@@ -231,7 +231,8 @@ commits of an issue are those of the default branch touching its file, from the 
 `# Tracking` to the one that moves it to `issues/done/`, except the closes of other issues that only rewrite a
 citation. Its files (issue files, `docs/` and `harness.lock` left out) give the `fix` and `revert` commits of the
 next `--window-days` (30) after the close; its plan lines give the deliverables, and its `Code review` lines of `# Tracking` (not the rows of the `check | result`
-table) the reviews and their findings (the count opens the line, `issue-workflow` step 3.6; a line with no count leaves the sum empty); the revision is the one in force just
+table) the reviews and their findings (the count opens the line, `issue-workflow` step 3.6; a line with no count leaves the sum empty); the `// spec:` lines its commits add to its files (renames detected) give
+the requirement ids it traced, and those no `red:` line of `# Tracking` names count as traced with no red run; the revision is the one in force just
 before its first commit, so an issue that changes the harness is measured with the harness it was made with. The
 sessions of an issue are those of the projects directory that made its commits (the latest-starting session of the
 repository whose span holds the commit date, as for the commit rules above, a session on the issue's branch first, so

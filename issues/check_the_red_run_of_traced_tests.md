@@ -22,3 +22,47 @@ it. Make the evidence that each traced test was seen failing checkable.
 # Resources
 * `files/.claude/skills/issue-workflow/SKILL.md` (steps 3.2 and 3.6), `files/.claude/transcripts/delivered_quality.rs`
 * `files/.claude/specs/check_specs.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Make "each traced test was seen failing" measurable: the `red:` line names the requirement ids, and
+`delivered-quality` counts the ids an issue traced and those with no recorded red run. Out of scope: the mutation
+check (approach 3), refusing a commit. Measured over `issues/done/`: 32 issues add `// spec:` citations; 15 of them
+hold no `red:` line, 11 hold at least one `red: none` or `not observed`, and no `red:` line names an id.
+
+## Plan
+1. [x] `delivered-quality` columns `traced` and `traced_without_red` (after `review_findings`), summed by
+   `--summary` and accepted by `harness-report` (its `QUALITY` header, REP-6 sums every column); verified by
+   `tests/delivered_quality.rs` and `tests/harness_report.rs`; makes true QUA-1, QUA-11 (spec set `accepted`).
+2. [ ] `issue-workflow` step 3.6: the `red:` line opens with the ids its test traces
+   (`red: ABC-3, ABC-4: <failure>`), `none` only for a deliverable that traces none; verified by `tests/skills.rs`
+   and `just check-harness` after `just sync`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 914591c7d40cd923fab39887018e09b2537e9f83
+- Means: the `red:` line names the ids and `delivered-quality` counts them (approach 2), not a mutation check.
+- The older issues count: their traced ids with no id in a `red:` line fall in `traced_without_red` (the baseline).
+
+## Deliverable 1
+
+- done: `delivered-quality` prints `traced` and `traced_without_red` after `review_findings` (QUA-11, spec
+  `accepted`); `harness-report` reads the new header and sums both in its quality table.
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy clean |
+| specs | QUA-11 traced |
+| docs | `docs/architecture.md` |
+| code review | low, see below |
+
+- red: QUA-11: `FAIL - the distinct ids of the added citations are traced, docs excluded`, `... have no red run`,
+  `... a renamed test traces nothing` (and the header checks of QUA-1).
+- Code review: 1 finding: `traced` with no commit would read `HEAD`; not fixed, unreachable (`issue_row` returns early when the issue has no commit).
+- not verified: a `red:` line that names an id in prose (not as a traced id) hides it from `traced_without_red`;
+  seen once on this repository (`install_a_git_pre_commit_review_gate`, 10 traced, 9 without red).
+- decisions needed: none
