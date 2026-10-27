@@ -48,6 +48,7 @@ on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
    and `is_full_hash` kept uncited; makes true SYN-11 to SYN-17 (~650 lines).
 3. [x] Settings entries: `crates/harness/tests/settings_entries_cli.rs`, `src/tests/settings_entries.rs` dropped;
    makes true SYN-29 to SYN-36 (~850 lines).
+4. [x] Fixes of the `high` review: the proofs fail when the behaviour breaks, git isolated from the caller.
 
 ## Decisions
 - Mode: autonomous
