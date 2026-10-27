@@ -114,8 +114,7 @@ pub const TOOLS: &[Tool] = &[
     },
 ];
 
-/// Run the tool `args[0]` with the rest; exit 3 with the list of the tools when there is none or it is unknown (BIN-7):
-/// not 2, which Claude Code reads as the refusal of a hook.
+/// Run the tool `args[0]` with the rest; exit 3 with the list of the tools when there is none or it is unknown (BIN-7).
 #[must_use]
 pub fn run(args: &[String]) -> u8 {
     let found = args
@@ -131,7 +130,7 @@ pub fn run(args: &[String]) -> u8 {
     for tool in TOOLS {
         eprintln!("  {:<16} {}", tool.name, tool.about);
     }
-    3
+    crate::NOT_A_REFUSAL
 }
 
 /// Root of the repository holding the current directory.

@@ -26,8 +26,9 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    ```
 
    The checker reads the scopes from `.claude/harness.toml` at the repository root, from any directory. If
-   that file is missing or invalid, or the directory is not a git repository, it prints `error: …` on stderr
-   and exits 2: fix the setup, the message was not checked.
+   that file is missing or invalid, or the directory is not a git repository, it prints the error on stderr
+   and exits non-zero (3 when `harness run` finds no `harness.toml`, else 2): fix the setup, the message was not
+   checked.
 
 5. **Deliver**:
    - If the user commits themselves: output **only the message**, with no preamble, no summary, no code

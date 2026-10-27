@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use harness::{
     check, init, retention_warnings, run, sync, tools, update, Outcome, Report, SyncOptions,
+    NOT_A_REFUSAL,
 };
 
 #[derive(Parser)]
@@ -64,10 +65,6 @@ enum Command {
     },
 }
 
-/// The exit code of `run` when it cannot get the tool, of the launcher when it cannot parse its arguments, and of an
-/// error of the other subcommands: not 2, which Claude Code reads as the refusal of a hook (BIN-14, BIN-17, SYN-37).
-const CANNOT_RUN: u8 = 3;
-
 /// Replace this process by the tool of the pinned revision, so its input, output and exit code are the tool's (BIN-1).
 fn run(root: &Path, tool: &[OsString]) -> ExitCode {
     let project = std::env::var_os("CLAUDE_PROJECT_DIR").map(PathBuf::from);
@@ -82,7 +79,7 @@ fn run(root: &Path, tool: &[OsString]) -> ExitCode {
         Ok(cmd) => cmd,
         Err(e) => {
             eprintln!("harness run: {e:#}");
-            return ExitCode::from(CANNOT_RUN);
+            return ExitCode::from(NOT_A_REFUSAL);
         }
     };
     #[cfg(unix)]
@@ -90,14 +87,14 @@ fn run(root: &Path, tool: &[OsString]) -> ExitCode {
         use std::os::unix::process::CommandExt;
         let e = cmd.exec();
         eprintln!("harness run: cannot run the harness binary: {e}");
-        ExitCode::from(CANNOT_RUN)
+        ExitCode::from(NOT_A_REFUSAL)
     }
     #[cfg(not(unix))]
     match cmd.status() {
-        Ok(status) => ExitCode::from(status.code().map_or(CANNOT_RUN, |c| c as u8)),
+        Ok(status) => ExitCode::from(status.code().map_or(NOT_A_REFUSAL, |c| c as u8)),
         Err(e) => {
             eprintln!("harness run: cannot run the harness binary: {e}");
-            ExitCode::from(CANNOT_RUN)
+            ExitCode::from(NOT_A_REFUSAL)
         }
     }
 }
@@ -121,7 +118,7 @@ fn main() -> ExitCode {
         // `--help` and `--version` print to stdout and exit 0; a real parse error goes to stderr.
         Err(e) => {
             let _ = e.print();
-            return ExitCode::from(if e.use_stderr() { CANNOT_RUN } else { 0 });
+            return ExitCode::from(if e.use_stderr() { NOT_A_REFUSAL } else { 0 });
         }
     };
     let warns_of_retention = !matches!(cli.command, Command::Init { .. });
@@ -170,7 +167,7 @@ fn main() -> ExitCode {
         Ok(false) => ExitCode::from(1),
         Err(e) => {
             eprintln!("error: {e:#}");
-            ExitCode::from(CANNOT_RUN)
+            ExitCode::from(NOT_A_REFUSAL)
         }
     }
 }

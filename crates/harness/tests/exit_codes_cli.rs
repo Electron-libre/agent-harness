@@ -23,15 +23,32 @@ fn harness(root: &Path, args: &[&str]) -> (Option<i32>, String) {
 #[test]
 fn an_error_of_a_subcommand_exits_3_with_the_error_on_stderr() {
     let root = tempdir().unwrap();
-    let source = tempdir().unwrap();
-    for args in [&["sync"][..], &["update"][..], &["check"][..]] {
+    // `init` refuses to overwrite the `harness.toml` the first `init` wrote.
+    assert_eq!(harness(root.path(), &["init", "/a/source"]).0, Some(0));
+    fs::write(root.path().join(".claude/harness.toml"), "[harness]\n").unwrap();
+    for args in [
+        &["sync"][..],
+        &["update"][..],
+        &["check"][..],
+        &["init", "/a/source"][..],
+    ] {
         let (code, stderr) = harness(root.path(), args);
         assert_eq!(code, Some(3), "{args:?}: {stderr}");
         assert!(stderr.contains("error:"), "{args:?}: {stderr}");
     }
-    fs::create_dir_all(root.path().join(".claude")).unwrap();
-    fs::write(root.path().join(".claude/harness.toml"), "[harness]\n").unwrap();
-    let (code, stderr) = harness(root.path(), &["init", source.path().to_str().unwrap()]);
-    assert_eq!(code, Some(3), "init: {stderr}");
-    assert!(stderr.contains("error:"), "init: {stderr}");
+}
+
+// spec: SYN-37
+#[test]
+fn a_drift_exits_1_not_3() {
+    let source = tempdir().unwrap();
+    fs::create_dir_all(source.path().join("files")).unwrap();
+    fs::write(source.path().join("files/managed.txt"), "managed\n").unwrap();
+    let root = tempdir().unwrap();
+    let source = source.path().to_str().unwrap();
+    assert_eq!(harness(root.path(), &["init", source]).0, Some(0));
+    assert_eq!(harness(root.path(), &["sync"]).0, Some(0));
+    fs::write(root.path().join("managed.txt"), "edited\n").unwrap();
+    let (code, stderr) = harness(root.path(), &["check"]);
+    assert_eq!(code, Some(1), "{stderr}");
 }

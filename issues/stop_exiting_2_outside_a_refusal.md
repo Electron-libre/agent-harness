@@ -46,6 +46,8 @@ refuses, `commit-check` on a broken setup) are out of scope: they are the tool's
    `no_tool_or_an_unknown_one_exits_3_listing_the_tools`; makes true BIN-7.
 2. [x] Runtime error of `main` exits 3: the `Err` arm uses `CANNOT_RUN`; verified by a CLI test (`sync` with no
    `harness.toml`, `check` with no lock source) asserting exit 3 and `error:` on stderr; makes true SYN-37.
+3. [x] Fixes of the `high` review: one shared `NOT_A_REFUSAL` constant, the caveat of a binary pinned before BIN-7,
+   the exit code of `commit-check` in its skill, a real `init` error and a drift exiting 1 in the tests.
 
 ## Decisions
 - Mode: autonomous
@@ -88,6 +90,34 @@ or a conflict; `docs/architecture.md` says so. No recipe or skill read exit 2 of
 | code review | `/code-review low` |
 
 red: `["sync"]: error: no .claude/harness.toml ... left: Some(2) right: Some(3)`
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none
+
+### 3. Fixes of the `high` review
+done: `NOT_A_REFUSAL` (lib) replaces `CANNOT_RUN` and the literal 3 of `tools::run`; `docs/architecture.md` rewrapped,
+says a binary pinned before BIN-7 still exits 2; the `commit-message` skill says `harness run commit-check` exits 3
+with no `harness.toml`; the SYN-37 test makes `init` fail on an existing `harness.toml` and checks that a drift exits 1.
+
+Findings of the `high` review not fixed:
+- The pre-commit gate lets a commit through on exit 3, now also an unknown `review-gate`: `sync` installs the gate
+  only from a source whose hooks run `review-gate` (SYN-22), and that revision's binary has it, so only a hand-edited
+  pin hits it; SYN-18 already chose a warning over a locked commit there.
+- The `harness` helper of `exit_codes_cli.rs` next to the `stderr` one of `retention_cli.rs`: two short helpers with
+  different outputs; a shared module is not worth it.
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy clean |
+| specs | `just check-specs` green |
+| docs | `docs/architecture.md`, `files/.claude/skills/commit-message/SKILL.md` |
+| code review | `/code-review low` |
+
+red: none (fixes of a review; the reworked `init` case was first red, `left: Some(0) right: Some(3)`, from a wrong setup of the test)
 
 Code review: no findings
 

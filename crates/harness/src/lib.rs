@@ -20,6 +20,10 @@ use sha2::{Digest, Sha256};
 pub const CONFIG: &str = ".claude/harness.toml";
 /// Hashes of the managed files as last written, relative to the project root.
 pub const LOCK: &str = ".claude/harness.lock";
+/// The exit code of a failure that is not the verdict of a hook: `run` that cannot get the tool or does not know it,
+/// the launcher that cannot parse its arguments, an error of the other subcommands. Not 2, which Claude Code reads as
+/// the refusal of a hook (BIN-7, BIN-14, BIN-17, SYN-37).
+pub const NOT_A_REFUSAL: u8 = 3;
 
 mod entries;
 mod gate;
