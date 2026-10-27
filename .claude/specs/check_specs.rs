@@ -3,7 +3,8 @@
 //! Usage: `just check-specs` (from the repo root; an optional argument is another root; `--strict` also flags the
 //! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
 //! Prints one line per problem, exit 1 if any; a `[NEEDS CLARIFICATION: ...]` marker is a problem in an `accepted`
-//! spec and a warning on stderr in a `draft` one.
+//! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
+//! `must`) is a warning.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -83,6 +84,41 @@ fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<Strin
     }
 }
 
+/// Words that leave the obligation of a requirement open (`etc` stands for `etc.`).
+const VAGUE: [&str; 5] = ["should", "may", "etc", "appropriate", "fast"];
+
+/// `text` without its double-quoted parts, straight or curly: a quoted message is not the requirement's wording.
+fn without_quotes(text: &str) -> String {
+    let mut quoted = false;
+    text.chars()
+        .filter(|&c| {
+            if matches!(c, '"' | '\u{201c}' | '\u{201d}') {
+                quoted = !quoted;
+                return false;
+            }
+            !quoted
+        })
+        .collect()
+}
+
+/// Warns of a `draft` requirement whose wording is vague: a word of `VAGUE`, or not exactly one `must`. Warnings
+/// only: the word list has false positives.
+fn check_wording(file: &str, id: &str, statement: &str) {
+    let text = without_quotes(&without_code_spans(statement)).to_lowercase();
+    let words: Vec<&str> = text.split(|c: char| !c.is_alphanumeric() && c != '\'').filter(|w| !w.is_empty()).collect();
+    let mut warned = BTreeSet::new();
+    for word in words.iter().filter(|w| VAGUE.contains(w)) {
+        if warned.insert(*word) {
+            let shown = if *word == "etc" { "etc." } else { word };
+            eprintln!("warning: {file}: requirement {id}: vague word `{shown}`");
+        }
+    }
+    let musts = words.iter().filter(|w| **w == "must").count();
+    if musts != 1 {
+        eprintln!("warning: {file}: requirement {id}: holds {musts} `must`, expected 1");
+    }
+}
+
 fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
     let mut problem = |m: String| out.push(format!("{file}: {m}"));
     let mut spec = Spec { file: file.to_string(), id: String::new(), status: String::new(), requirements: Vec::new() };
@@ -158,6 +194,9 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
             eprintln!("warning: {file}: requirement {id}: kind `quality` is deprecated, reword it for a test or withdraw it");
         } else if kind != "deterministic" && kind != "quality" {
             problem(format!("requirement {id}: kind must be `(deterministic)`, got `({kind})`"));
+        }
+        if spec.status == "draft" && !withdrawn {
+            check_wording(file, id, statement);
         }
         spec.requirements.push(Requirement { id: id.to_string(), exempt: withdrawn || kind == "quality" });
     }

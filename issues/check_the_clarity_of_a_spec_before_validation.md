@@ -43,7 +43,7 @@ tell the model to write the marker instead of guessing. Out of scope: a spec of 
 
 ## Plan
 1. [x] Clarification marker: `check_specs.rs` fails on a marker in an `accepted` spec, warns in a `draft`, ignores code spans; verified by new cases of `test_check_specs.rs`; makes true CLR-1, CLR-2, CLR-5 (markers).
-2. [ ] Wording warnings: forbidden words and the single `must` on `draft` requirements, outside code spans and quotes, none on `accepted`; verified by new cases of `test_check_specs.rs`; makes true CLR-3, CLR-4, CLR-5, CLR-6, CLR-7; sets `specs/spec-clarity.md` `accepted`.
+2. [x] Wording warnings: forbidden words and the single `must` on `draft` requirements, outside code spans and quotes, none on `accepted`; verified by new cases of `test_check_specs.rs`; makes true CLR-3, CLR-4, CLR-5, CLR-6, CLR-7; sets `specs/spec-clarity.md` `accepted`.
 3. [ ] Skills and format doc: `write-spec` (marker rule, completeness checklist), `issue-workflow` step 2 (one question row per marker), `specs/README.md` (marker and warnings); verified by `just check-harness` and a reread.
 
 ## Decisions
@@ -64,5 +64,19 @@ tell the model to write the marker instead of guessing. Out of scope: a spec of 
 - red: `FAIL - a clarification marker in an accepted spec is flagged with its line`, `FAIL - a clarification marker in a draft spec is warned of with its question`
 - Code review: 1 finding
   - a marker in a fenced code block was flagged: fixed (fenced blocks skipped, test added, CLR-5 widened while `draft`).
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `check_specs.rs` warns on a `draft` requirement holding a vague word (`should`, `may`, `etc.`, `appropriate`, `fast`) or not exactly one `must`, outside code spans and quotes, skipping withdrawn requirements and `accepted` specs; `specs/spec-clarity.md` is `accepted`.
+
+| check | result |
+|---|---|
+| tests (`just check`, `just test-harness`) | pass |
+| specs | pass, `check-specs --strict` too; no existing draft spec warned of |
+| docs | header of `check_specs.rs`; `specs/README.md` in deliverable 3 |
+
+- red: `FAIL - a vague word is warned of: should` (and `fast`, `etc.`), `FAIL - a requirement with no must is warned of`, `FAIL - a requirement with two musts is warned of`
+- Code review: no findings
 - not verified: none
 - decisions needed: none

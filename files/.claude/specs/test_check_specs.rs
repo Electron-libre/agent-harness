@@ -93,6 +93,7 @@ fn main() {
     report("an implemented spec is warned of", stderr.contains("warning: specs/rerun.md: status `implemented` is deprecated, use `accepted`"));
 
     marker_checks(&case, &report);
+    wording_checks(&case, &report);
 
     strict.set(true);
     case("strict: a managed test citing a spec the project lacks is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: PAR-1\nfn t() {}\n")], Some("PAR-1"));
@@ -131,4 +132,32 @@ fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     report("a clarification marker in a code span is not warned of", !stderr.contains("needs clarification"));
     let fenced = SPEC.replace("- None.\n", "- None.\n\n```markdown\n[NEEDS CLARIFICATION: x]\n```\n");
     case("a clarification marker in a fenced block of an accepted spec passes", &fenced, TESTS, &[], None);
+}
+
+// spec: CLR-3, CLR-4, CLR-5, CLR-6, CLR-7
+fn wording_checks(case: &Case, report: &dyn Fn(&str, bool)) {
+    let draft = SPEC.replace("status: accepted", "status: draft");
+    let stderr = case("a clear draft passes", &draft, "", &[], None);
+    report("a clear draft is not warned of", !stderr.contains("warning"));
+    let vague = draft.replace("A run must resume.", "A run Should resume fast, etc.");
+    let stderr = case("a vague draft requirement passes", &vague, "", &[], None);
+    for word in ["should", "fast", "etc."] {
+        report(&format!("a vague word is warned of: {word}"), stderr.contains(&format!("warning: specs/rerun.md: requirement RER-2: vague word `{word}`")));
+    }
+    report("a requirement with no must is warned of", stderr.contains("warning: specs/rerun.md: requirement RER-2: holds 0 `must`, expected 1"));
+    let two = draft.replace("A run must resume.", "A run must resume and must not stop.");
+    let stderr = case("a draft requirement with two musts passes", &two, "", &[], None);
+    report("a requirement with two musts is warned of", stderr.contains("requirement RER-2: holds 2 `must`, expected 1"));
+    let negated = draft.replace("A run must resume.", "A run must not stop.");
+    let stderr = case("a draft requirement with must not passes", &negated, "", &[], None);
+    report("must not counts as one must", !stderr.contains("warning"));
+    let quiet = draft.replace("A run must resume.", "A run must print `may_fail`, \"you may retry, must you\" and `must`.");
+    let stderr = case("words in code spans and quotes pass", &quiet, "", &[], None);
+    report("words in code spans and quotes are not warned of", !stderr.contains("warning"));
+    let withdrawn = draft.replace("A run must resume.", "withdrawn: A run may resume.");
+    let stderr = case("a withdrawn vague requirement passes", &withdrawn, "", &[], None);
+    report("a withdrawn requirement is not warned of", !stderr.contains("warning"));
+    let accepted = SPEC.replace("A run must resume.", "A run may resume.");
+    let stderr = case("a vague accepted requirement passes", &accepted, TESTS, &[], None);
+    report("an accepted spec gets no wording warning", !stderr.contains("warning"));
 }
