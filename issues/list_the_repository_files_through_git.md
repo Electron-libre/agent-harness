@@ -59,7 +59,7 @@ walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `s
    verified by `test_check_specs.rs` (cases in a git repo with a nested worktree with and without the exclude
    line, an untracked test still traced, the existing cases outside git); makes true PAR-14, PAR-16; spec back to
    `accepted`.
-3. [ ] ADR 0008 and `docs/architecture.md` restated ("the scanners list the files through git"); measure in a
+3. [x] ADR 0008 and `docs/architecture.md` restated ("the scanners list the files through git"); measure in a
    throwaway consumer with a nested worktree which tools read it (cargo, rg, and through `npx`/`uvx`: prettier,
    eslint, tsc, vitest, pytest, ruff, mypy), and write the result with the way out in `docs/architecture.md`
    (note for the project owner) or a seed default, per the measure.
@@ -85,6 +85,25 @@ walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `s
 - Code review: no findings (one doubt, paths relative to `root`, ruled out: `repo_files` joins them to `root`, and
   the `in_git` test traces RER-2 only through an untracked file).
 - not verified: nothing.
+
+## Deliverable 3
+- done: ADR 0009 (the scanners list the files through git, with the measure), a pointer in ADR 0008, `adrs` of the
+  PAR spec, `docs/architecture.md`; a README note for the project owner (no seed default: the settings belong to
+  each tool's config, which the harness does not own).
+- measure (throwaway consumer, nested worktree ignored by `info/exclude`, one bad file per tool): rg, tsc 5, pytest,
+  ruff (check and format), mypy skip it; prettier 3, black, eslint 9, vitest 3, jest 29 read it. A `.gitignore`
+  line fixes prettier and black; eslint `ignores`, vitest `exclude` and jest `testPathIgnorePatterns` +
+  `modulePathIgnorePatterns` fix the others (each checked).
+- seen on the way: Claude Code registers the skills of a nested worktree's `files/.claude/skills` as scoped variants
+  once a file there is read; harmless (they are named by their path), not acted on.
+- checks: `just check` ok, `just test-harness` ok, `just check-harness` ok.
+- red: none (docs and a measure).
+- Code review: 3 findings on `repo_files.rs` and `check_specs.rs` of the earlier deliverables. Fixed: a file in a
+  merge conflict listed once per stage (now deduplicated), a non-UTF-8 name lost by a lossy conversion (now built
+  from the bytes on unix). Not fixed: "the fallback outside git no longer skips `target/`": the old skip was
+  `root/target`, never under `crates/` nor `.claude/`, so nothing changed (PAR-16).
+- not verified: vitest's `configDefaults` form with vitest installed locally (checked with the literal list; the
+  probe had no local vitest to import).
 
 ## Decisions
 - Mode: autonomous

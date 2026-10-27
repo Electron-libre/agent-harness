@@ -216,7 +216,8 @@ numbers are never turned into a pass or a fail, since they would become targets.
 ## Parallel issues
 
 Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-issue.md),
-[ADR 0008](adr/0008-issue-worktrees-nest-under-claude-worktrees.md), spec
+[ADR 0008](adr/0008-issue-worktrees-nest-under-claude-worktrees.md),
+[ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md), spec
 [`specs/parallel-issues.md`](../specs/parallel-issues.md). `issue_worktree.rs` (`just start-issue`,
 `just finish-issue`) gives an issue the worktree `.claude/worktrees/<stem>` on a branch `<stem>`: separate working tree and
 index, shared object store, so one agent's uncommitted files and commits never reach the other. Claude Code enters a
@@ -225,7 +226,8 @@ scripts that scan the tree, `close_issue.rs` and `check_specs.rs`, take their fi
 shared by `#[path]` include as in ADR 0006, `git ls-files -co --exclude-standard`), which never lists a nested
 worktree, ignored or not, so the main worktree never sees the nested ones. `close_issue.rs` then drops `.git`,
 `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by directory name; `check_specs.rs`
-walks the disk only outside a git repository. `finish-issue` still removes a
+walks the disk only outside a git repository. A project's own tools run on `.` may still read the nested
+worktrees (measured in ADR 0009); the README says how to keep them out. `finish-issue` still removes a
 worktree left at the former sibling path `../<repo>-<stem>`. Each worktree has its
 own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a cold build in 4 s; a larger
 project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:

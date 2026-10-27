@@ -23,4 +23,5 @@ Starting or resuming an issue needs no interaction. Being ignored, a worktree ne
 agent's) escapes `git status` there, so `finish-issue` checks `git worktree list` before it removes one. A new script that walks the tree must skip
 `.claude/worktrees/`, or it reads every issue worktree too. The ignore rule lives outside the versioned files: a
 fresh clone gets it at its first `start-issue`. Cargo stops at the nested worktree's own workspace root, and the
-main workspace lists its members explicitly, so neither picks up the other's crates.
+main workspace lists its members explicitly, so neither picks up the other's crates. ADR 0009 replaces the skip of
+`.claude/worktrees/` in the scripts by a listing of the files through git.

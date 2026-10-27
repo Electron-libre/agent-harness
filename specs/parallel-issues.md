@@ -1,7 +1,7 @@
 ---
 id: PAR
 status: accepted
-adrs: [0003, 0008]
+adrs: [0003, 0008, 0009]
 ---
 
 # Parallel issue isolation
