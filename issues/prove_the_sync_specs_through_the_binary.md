@@ -27,3 +27,37 @@ form an acceptance suite that survives a rewrite of the code.
 * After `prove_the_specs_with_black_box_tests`: it sets the rule and reports the internal-only proofs this issue
   removes.
 * Black-box tests through the binary are slower; keep them on temp dirs with no network, per `CLAUDE.md`.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Re-prove SYN-1 to SYN-17 and SYN-29 to SYN-36 by running the `harness` binary (`init`, `sync`, `update`, `check`) on
+temp dirs, asserting files, exit code, stdout and stderr; the internal tests either lose their citation (kept as unit
+detail: `set_rev`, `is_full_hash`) or are dropped. Out of scope: SYN-18 to SYN-28 (install gate, warnings, retention:
+`prove_the_run_and_gate_specs_through_the_binary`), except the citation SYN-25, SYN-26, SYN-27 of the settings test
+that moves with it. Offline: local or `file://` sources, `XDG_CACHE_HOME` in a temp dir, a fake failing `cargo` first
+on the `PATH` so the prefetch of the tools binary (BIN-13) builds nothing.
+
+## Plan
+1. [x] Init, sync and check: shared helpers `crates/harness/tests/common/mod.rs` (run the binary, put/get, a source),
+   `crates/harness/tests/sync_cli.rs`, the matching tests of `src/tests.rs` dropped; verified by `just check` and
+   `check-specs` no longer listing them; makes true SYN-1 to SYN-10 (~650 lines).
+2. [ ] Update: `crates/harness/tests/update_cli.rs` on a local git source, internal update tests dropped, `set_rev`
+   and `is_full_hash` kept uncited; makes true SYN-11 to SYN-17 (~650 lines).
+3. [ ] Settings entries: `crates/harness/tests/settings_entries_cli.rs`, `src/tests/settings_entries.rs` dropped;
+   makes true SYN-29 to SYN-36 (~850 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 9d11cef45c6773bc0af41451336fd0836f3a47c7
+
+## Deliverable 1
+- done: `tests/common/mod.rs` (binary in a temp home: cache, user settings, failing `cargo`), `tests/sync_cli.rs`
+  proves SYN-1 to SYN-10 through `init`, `sync`, `check`; their internal tests of `src/tests.rs` dropped.
+- red: none (the behaviour exists: the proofs move, no test can fail before the code)
+- Code review: 1 findings; the possible dead helpers and imports of `src/tests.rs` after the drop: not a defect,
+  `just check` (clippy `-D warnings`) passes, the remaining tests use them (`use super::*` raises no unused warning).
+- not verified: none
+- decisions needed: none
