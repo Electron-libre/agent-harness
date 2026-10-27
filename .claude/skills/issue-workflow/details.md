@@ -12,11 +12,13 @@ message, `grep`) is fine.
 ## Split an issue
 
 An issue over the size limit of step 1 is cut where its parts can be delivered and closed alone (a launcher, then
-the tools moved to it, then the cleanup). The original file keeps the first cut: its Goal, Approach and plan are
-narrowed to it, its Findings stay. Each other cut is a new issue written with `skill:create-issue`, citing the
-original in `# Findings` and the issue it needs in `# Hints` (`after <stem>`), ranked in `issues/queue.md` right
-after the one it needs. A split at step 2 takes the deliverables of the other cuts out of the plan, and the
-new plan is validated again.
+the tools moved to it, then the cleanup), each under the limit. The cuts are proposed to the user before any file
+is written. The first cut keeps the original file (at creation, the name of the whole): its Goal, Approach and plan
+are narrowed to it, its Findings stay. Each other cut is a new issue written with steps 1 to 4 of
+`skill:create-issue` (not its queue and deliver steps), citing the first in `# Findings` and the issue it needs in
+`# Hints` (`after <stem>`); its queue line goes right after the one it needs. A split at step 2 takes the
+deliverables of the other cuts out of the plan, and the new plan is validated again. In a linked worktree, write
+no cut: stop and leave the split to the user in the main worktree, where `start-issue` and `next-issue` see it.
 
 ## Worktree of an issue
 

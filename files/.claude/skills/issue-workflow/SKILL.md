@@ -27,7 +27,8 @@ Read the issue file. No `# Tracking` section: start at step 1. If `# Tracking` s
 validated: redo the stop of step 2. Otherwise (`Plan: validated`, or no marker: planned before it existed) show where it stands in two `next` / `left` lines (the next unchecked
 deliverable with the recorded mode, the deliverables left by name) and continue at step 3 in the mode recorded there (none recorded:
 validation at each deliverable), unless the issue changes a capability whose spec is missing, still `draft` with no validated
-requirements, or not named in its `# Specs` section: then write the spec as step 1 says, keeping `# Tracking` as it is, and validate it (step 2) first.
+requirements, or not named in its `# Specs` section: then write the spec as step 1 says, keeping `# Tracking` as it is, and validate it (step 2) first. A plan whose
+deliverables left exceed the size limit of step 1 also goes back to the stop of step 2, with the split proposed.
 
 ## 1. Prepare in the files (no stop)
 
@@ -63,8 +64,9 @@ the console only shows the link and the questions.
 - **Size limit**: estimate the changed lines of each deliverable (added + removed, outside `issues/` and lock
   files). At most ~1,000 per deliverable (a `low` review reads it whole), ~3,000 and 6 deliverables per issue (the
   `high` review reads `base..HEAD`, the context grows with each deliverable). A pure `git mv` counts as renames; a
-  move that also edits counts twice, so move in a deliverable of its own. A deliverable over the limit is cut in
-  two; an issue over it gets a split proposed at step 2 ([details.md](details.md), "Split an issue").
+  move that also edits counts twice, so move in a deliverable of its own (in the issue total, a moved file edited
+  later still counts twice). A deliverable over the limit is cut until each part is under it; an issue over it
+  gets a split proposed at step 2 ([details.md](details.md), "Split an issue").
 
 ## 2. Validate (STOP)
 
@@ -97,7 +99,8 @@ again. Then set `Plan: validated` and the base commit. The spec file is the reco
 4. **Docs**: run `skill:update-docs` (it covers the specs). If the change is an architectural decision, also write or finish its ADR in
    `docs/adr/` (template and numbering in `docs/adr/README.md`) and update the
    diagrams in the `architecture` document of `.claude/harness.toml` when the flow changed.
-5. **Review (mandatory, never skipped)**: run `just check` (fmt, clippy, tests, specs), then **invoke `/code-review low` on the diff with the Skill tool** (always name the level)
+5. **Review (mandatory, never skipped)**: run `just check` (fmt, clippy, tests, specs); when `git diff --shortstat`
+   (new files included) exceeds the size limit of step 1, cut the deliverable before the review; then **invoke `/code-review low` on the diff with the Skill tool** (always name the level)
    and wait for its findings; reread the docs you changed. Fix the findings on the deliverable's own change, or say
    why one is not fixed; a finding outside the requirements of the deliverable becomes an issue
    (`skill:create-issue`), not a fix in this deliverable.

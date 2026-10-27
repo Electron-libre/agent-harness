@@ -66,6 +66,10 @@ did not read it all either, it just did not say. Moved code counts twice unless 
    dependencies in `# Hints`); `create-issue` checks the Approach against the limit and splits before writing;
    `prioritize-issues` flags an open issue over it and proposes its split; verified by `just check` (links,
    harness copies) and a reread of the three skills; makes true no spec requirement (skill text).
+2. [x] Fixes of the `high` review: cut until each part is under the limit, re-check the real diff at step 3.5,
+   re-check a resumed plan at step 0, a moved file edited later counts twice in the issue total, `create-issue`
+   proposes the cuts before writing them, the cuts skip the queue step of `create-issue`, no split written in a
+   linked worktree; verified by `just check` and a reread.
 
 ## Decisions
 - Mode: autonomous
@@ -88,4 +92,25 @@ did not read it all either, it just did not say. Moved code counts twice unless 
 
 - red: none (skill text, no test).
 - not verified: a real split by an agent; the first one is the next `prioritize-issues` run.
+- Code review: no findings.
+
+## High review
+- Code review: 9 findings (`high`, `94a4c18..6ecc7bc`). Fixed in deliverable 2: 1 (cut in two), 2 (create-issue
+  split unasked), 3 (queue written twice), 4 (moves in the issue total), 5 (split in a linked worktree), 6 (no
+  re-check of the real diff), 9 (resumed plan not checked). Not fixed: 7 (`issues/` and lock files left out of the
+  count: their lines are mechanical and within the `~` of the limit) and 8 (the fix deliverable of the `high`
+  review over the 6 cap: the 6 measured includes such deliverables).
+
+## Deliverable 2
+- done: the 7 fixes above in `issue-workflow` (steps 0, 1, 3.5, `details.md`) and `create-issue`.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| harness copies (`just sync`) | synced |
+| docs | unchanged |
+| code review | no findings |
+
+- red: none (skill text, no test).
+- not verified: a real split by an agent.
 - Code review: no findings.
