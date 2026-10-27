@@ -28,8 +28,8 @@ adrs: [0005]       # ADR numbers that justify the spec
 
 ### Requirements
 
-One list item per requirement (every top-level item under `## Requirements` is one), `- **<ID>-<n>** (deterministic) <statement>`. The statement says "must" or "must
-not". The ids are stable once the spec is `accepted`: tests and issues cite them; a dropped requirement keeps
+One list item per requirement (every top-level item under `## Requirements` is one), `- **<ID>-<n>** (deterministic) <statement>`. The statement holds exactly one "must" or "must
+not" (two obligations are two requirements) and none of the vague words `should`, `may`, `etc.`, `appropriate`, `fast`; text in a code span or in double quotes is not checked. The ids are stable once the spec is `accepted`: tests and issues cite them; a dropped requirement keeps
 its number (start its statement with `withdrawn:`, which exempts it from the check) and a new one takes the next number.
 
 The kind, `deterministic`, says that a test with no network and no external service (fakes, temp dirs, pure
@@ -37,6 +37,12 @@ functions) proves the requirement; what only a model's output could show is not 
 former `quality` kind is read untraced, with a warning: reword it for a test or withdraw it). The test carries a
 `// spec: RER-1` comment right above it, attributes and other comments included, and directly above a `fn` (several
 ids: `// spec: RER-1, RER-2`). A test under `.claude/` (a managed one) may cite a spec the project does not have: the repository that ships it traces it. Only a prefix with no spec in the project is exempt: an unknown id of a spec the project has, and any citation outside `.claude/`, are still flagged. The repository that ships those tests runs the script with `--strict`, which removes the exemption.
+
+### Open questions
+
+A point the writer cannot settle from the repo or the issue is marked where it belongs, never guessed:
+`[NEEDS CLARIFICATION: <question>]`, on one line. A `draft` spec may hold markers; an `accepted` one may not. A marker
+in a code span or a fenced code block is an example, not a question.
 
 ### Scenarios
 
@@ -55,5 +61,7 @@ The order is therefore: write the spec (`draft`), get it validated, write the te
 ### Check
 
 `just check-specs` (part of `just check`) fails when: the format is wrong, an id is duplicated, a test cites an
-unknown id, or an `accepted` spec has a requirement no test cites. `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The script is `.claude/specs/check_specs.rs`, tested by
+unknown id, an `accepted` spec has a requirement no test cites, or an `accepted` spec still holds a
+`[NEEDS CLARIFICATION: ...]` marker. On a `draft` it only warns (stderr): each marker with its question, and each
+requirement with a vague word or not exactly one "must". `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The script is `.claude/specs/check_specs.rs`, tested by
 `just test-harness`. `skill:write-spec` writes and validates a spec.

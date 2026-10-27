@@ -44,7 +44,7 @@ tell the model to write the marker instead of guessing. Out of scope: a spec of 
 ## Plan
 1. [x] Clarification marker: `check_specs.rs` fails on a marker in an `accepted` spec, warns in a `draft`, ignores code spans; verified by new cases of `test_check_specs.rs`; makes true CLR-1, CLR-2, CLR-5 (markers).
 2. [x] Wording warnings: forbidden words and the single `must` on `draft` requirements, outside code spans and quotes, none on `accepted`; verified by new cases of `test_check_specs.rs`; makes true CLR-3, CLR-4, CLR-5, CLR-6, CLR-7; sets `specs/spec-clarity.md` `accepted`.
-3. [ ] Skills and format doc: `write-spec` (marker rule, completeness checklist), `issue-workflow` step 2 (one question row per marker), `specs/README.md` (marker and warnings); verified by `just check-harness` and a reread.
+3. [x] Skills and format doc: `write-spec` (marker rule, completeness checklist), `issue-workflow` step 2 (one question row per marker), `specs/README.md` (marker and warnings); verified by `just check-harness` and a reread.
 
 ## Decisions
 - Mode: autonomous
@@ -79,4 +79,18 @@ tell the model to write the marker instead of guessing. Out of scope: a spec of 
 - red: `FAIL - a vague word is warned of: should` (and `fast`, `etc.`), `FAIL - a requirement with no must is warned of`, `FAIL - a requirement with two musts is warned of`
 - Code review: no findings
 - not verified: none
+- decisions needed: none
+
+## Deliverable 3
+- done: `specs/README.md` documents the marker, the wording rule and what the check warns of; `write-spec` writes a marker instead of guessing, runs a content checklist, fixes or justifies a wording warning and asks one question per marker; `issue-workflow` step 2 turns each marker into a question row.
+
+| check | result |
+|---|---|
+| tests (`just check`, `just test-harness`) | pass |
+| copies (`just check-harness`) | pass |
+| docs | reread; `docs/architecture.md` does not describe the checker |
+
+- red: none (skill and doc text, no test)
+- Code review: no findings
+- not verified: how a model follows the new `write-spec` steps (only a real session shows it)
 - decisions needed: none

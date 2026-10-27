@@ -31,8 +31,8 @@ the console only shows the link and the questions.
 
 - Read the issue, plus the resources it names (docs, `git log`, the `roadmap` documents of `.claude/harness.toml`, memory).
 - **Spec**, when the issue changes what a capability does (skip it for docs, harness, pure refactor, a measure): run
-  `skill:write-spec` up to its format check (requirements with stable ids, `deterministic`, left `draft`); don't do its
-  validation stop: step 2 replaces it. The tests of step 3 come from these requirements, not the other way round.
+  `skill:write-spec` up to its format check (requirements with stable ids, `deterministic`, left `draft`, a
+  `[NEEDS CLARIFICATION]` marker where you would guess); don't do its validation stop: step 2 replaces it. The tests of step 3 come from these requirements, not the other way round.
 - **Write `# Tracking`** at the end of the issue:
 
   ```markdown
@@ -63,7 +63,9 @@ Show, and nothing else:
   one more line when the means differs from the issue's, and the ids of the requirements written.
 - The questions you can't answer from the repo, if any, as a table `# | question | options | why | impact`: questions
   numbered `1`, `2`…, options lettered `a`, `b`… with the recommended one marked, so the user answers `1 a, 2 c` (a bare
-  `ok` takes every recommendation). Don't ask what has a conventional default. The details stay in the files.
+  `ok` takes every recommendation). Don't ask what has a conventional default. The details stay in the files. Each
+  `[NEEDS CLARIFICATION: ...]` marker of the spec (warned of by `just check-specs`) is one row; the answer replaces
+  the marker in the spec.
 - One line: the mode of step 3, **autonomous (default)** or a validation at each deliverable.
 
 **Wait for the user.** Apply their answers and corrections to the files (the answers go to `## Decisions`). When an

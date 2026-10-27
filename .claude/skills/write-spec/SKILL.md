@@ -25,12 +25,21 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
      require. Link ADRs by number in the front matter, never repeat their reasoning.
    * Amending: a new requirement takes the next number; a dropped one keeps its number and its statement
      starts with `withdrawn:`; never renumber an `accepted` spec, tests and issues cite the ids.
+   * A point you cannot settle from the repo or the issue: write `[NEEDS CLARIFICATION: <question>]` where it
+     belongs instead of guessing.
    * Status `draft` while it is being written. English only, no confidential test repository named.
-3. **Validate the format**: run `just check-specs` and read the lines that name the spec you edited; there
-   must be none, warnings included (other specs may have their own problems). A `draft` spec is not asked for tests yet.
-4. **Validate with the user (STOP)**: show the requirements and ask what is missing or too strong. The
+3. **Check the content** before showing it:
+   * each requirement is observable from outside (an exit code, an output, a file), not a property of the code;
+   * each boundary a requirement draws (a limit, an empty input, an error) has a scenario;
+   * the non-goals cover what a reader would assume the capability does.
+4. **Validate the format**: run `just check-specs` and read the lines that name the spec you edited (other specs
+   may have their own problems). A problem must be fixed. A wording warning is fixed, or kept when it is a false
+   positive and said so in the report. A clarification warning is expected: it becomes a question of the next
+   step. A `draft` spec is not asked for tests yet.
+5. **Validate with the user (STOP)**: show the requirements and ask what is missing or too strong, with one
+   question per `[NEEDS CLARIFICATION]` marker; replace each marker by the settled text once answered. The
    spec stays `draft`.
-5. **Trace**: write the tests from the requirements; each carries `// spec: ID` placed as `specs/README.md`
+6. **Trace**: write the tests from the requirements; each carries `// spec: ID` placed as `specs/README.md`
    says. When every requirement is traced, set `accepted`; `just check-specs` then enforces it.
 
 ## Rules
