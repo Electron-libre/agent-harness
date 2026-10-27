@@ -188,3 +188,6 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 - Code review: no findings
 - not verified: the mermaid rendering
 - decisions needed: none
+
+## Status
+Done: all six deliverables committed; left: the mermaid rendering to check in a GitHub preview.
