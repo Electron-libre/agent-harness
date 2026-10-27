@@ -30,20 +30,20 @@ them after 30 days by default, for every project at once: keep them a year in yo
 { "cleanupPeriodDays": 365 }
 ```
 
-`rust-script .claude/transcripts/session_metrics.rs` prints one row of numbers per session (cost, user
+`harness run session-metrics` prints one row of numbers per session (cost, user
 interventions, project, issue, harness revision, model, version), with no message text; `--archive <file>` also merges
 them into a file kept outside the repositories, so the history outlives the transcripts.
-`rust-script .claude/transcripts/rule_breaches.rs [--summary]` lists the breaches of the harness rules a program can
+`harness run rule-breaches [--summary]` lists the breaches of the harness rules a program can
 see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue,
 the commit message format and no AI attribution, the conversation language),
 apart from what a gate blocked, and counts them per rule and harness revision.
-`rust-script .claude/transcripts/delivered_quality.rs [repo] [--summary]` prints one row per done issue: its commits and
+`harness run delivered-quality [repo] [--summary]` prints one row per done issue: its commits and
 deliverables, the fixes inside it, the fixes and reverts of its files in the 30 days after its close, its
 reviews and their findings, and the failed checks and typed messages of the sessions that made it; `--summary` sums
 them per harness revision.
-`rust-script .claude/transcripts/fixed_context.rs` prints, per project and harness revision, the bytes of `CLAUDE.md`,
+`harness run fixed-context` prints, per project and harness revision, the bytes of `CLAUDE.md`,
 `AGENTS.md` and the skill descriptions that every session pays, and the skills the revision ships.
-`rust-script .claude/transcripts/harness_report.rs --sessions <file> [--breaches <file>] [--quality <file>]...
+`harness run harness-report --sessions <file> [--breaches <file>] [--quality <file>]...
 [--context <file>]` joins the outputs of these scripts into one markdown table per axis (efficiency, quality, rules,
 skills, fixed context), a row per group of consecutive revisions with enough sessions (`--min-sessions`, 10), the
 model, version and project mix next to the numbers (`--anonymous` keeps only the count of projects).

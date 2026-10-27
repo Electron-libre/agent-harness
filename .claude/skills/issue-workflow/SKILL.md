@@ -114,7 +114,7 @@ again. Then set `Plan: validated` and the base commit. The spec file is the reco
 6. **Human review (STOP, except in autonomous mode)**: show one line `done` (what changed, not the diff), a table `check | result` (tests, lint, specs, docs, code
    review), one line `red:` with the failure message the test of step 3.2 gave before the code (`none` for a deliverable
    with no test), then the line `Code review: <n> findings` (`Code review: no findings` if it came back clean; the
-   count first, `delivered_quality.rs` reads it) with what was done about each, then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
+   count first, `harness run delivered-quality` reads it) with what was done about each, then the lists `not verified` (state it plainly) and `decisions needed`, empty when nothing applies. If you did
    not invoke the review, go back to step 5 instead of presenting the deliverable. Wait for the user's validation.
    Don't commit before it. In autonomous mode, write this summary in the issue and go on.
 7. **Track**: tick the deliverable in the issue's `# Tracking` and note decisions or follow-ups.

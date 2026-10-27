@@ -1,32 +1,40 @@
-#!/usr/bin/env rust-script
 //! Print one tab-separated row of numbers per session of the Claude Code transcripts (`specs/evaluation.md`): cost,
 //! user interventions, and what may explain a difference (project, issue, harness revision, model, version). The
 //! sub-agent transcripts count with their session; the harness revision comes from the git history of the
 //! project's `.claude/harness.toml`. No text of a message is printed, so the rows can be archived.
 //! With `--archive <file>`, also merge the rows into that file, so the history outlives the transcripts.
-//! Usage: `rust-script session_metrics.rs [projects_dir] [--archive <file>]` (default `~/.claude/projects`).
-//! ```cargo
-//! [dependencies]
-//! serde_json = "1"
-//! chrono = "0.4"
-//! toml = "0.8"
-//! ```
+//! Usage: `harness run session-metrics [projects_dir] [--archive <file>]` (default `~/.claude/projects`).
 
-// transcripts.rs sha256: 5d07593149555e3aa4de02315cfb6b495510e75d5b515b96b01bf14d334292af
-#[path = "transcripts.rs"]
-mod transcripts;
+use super::transcripts;
 
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use transcripts::{for_each_line, is_validation, project_name, projects, push_distinct, projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place};
+use transcripts::{
+    for_each_line, is_validation, project_name, projects, projects_root, push_distinct, repository,
+    result_text, revision, sessions, subagents, typed_text, Place,
+};
 
 const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
 /// The line types seen in the transcripts; any other is counted in `unknown_lines`, since the format moves.
 const KNOWN_TYPES: &[&str] = &[
-    "user", "assistant", "attachment", "system", "summary", "ai-title", "custom-title", "last-prompt", "queue-operation", "api-request",
-    "api-request-blob", "api-request-shape", "atis-latch", "mode", "cost-state", "file-history-snapshot",
+    "user",
+    "assistant",
+    "attachment",
+    "system",
+    "summary",
+    "ai-title",
+    "custom-title",
+    "last-prompt",
+    "queue-operation",
+    "api-request",
+    "api-request-blob",
+    "api-request-shape",
+    "atis-latch",
+    "mode",
+    "cost-state",
+    "file-history-snapshot",
 ];
 
 /// The lines of the conversation: the only ones that must carry a `timestamp`.
@@ -56,15 +64,32 @@ struct Session {
 
 /// A refusal of a hook: `PreToolUse:<tool> hook error:`, the tool name holding no space.
 fn is_refusal(text: &str) -> bool {
-    text.strip_prefix("PreToolUse:").and_then(|rest| rest.split_once(" hook error:")).is_some_and(|(tool, _)| !tool.is_empty() && !tool.contains(char::is_whitespace))
+    text.strip_prefix("PreToolUse:")
+        .and_then(|rest| rest.split_once(" hook error:"))
+        .is_some_and(|(tool, _)| !tool.is_empty() && !tool.contains(char::is_whitespace))
 }
 
-/// The hook a refusal names: the stem of the first `.rs` file name its text cites, `unknown` when none.
+/// The hook a refusal names: the tool of the first `harness run <tool>` its text cites, under the name of the script
+/// it was (`-` written `_`, `review-gate` named `require_code_review`) so the counts compare across revisions; else
+/// the stem of the first `.rs` file name it cites; `unknown` when none.
 fn hook_name(text: &str) -> String {
     let name_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';
+    if let Some((_, rest)) = text.split_once("harness run ") {
+        let tool: String = rest.chars().take_while(|c| name_char(*c)).collect();
+        if !tool.is_empty() {
+            return match tool.as_str() {
+                "review-gate" => "require_code_review".to_string(),
+                tool => tool.replace('-', "_"),
+            };
+        }
+    }
     for (end, _) in text.match_indices(".rs") {
         let ends_name = !text[end + 3..].starts_with(name_char);
-        let stem: String = text[..end].chars().rev().take_while(|c| name_char(*c)).collect();
+        let stem: String = text[..end]
+            .chars()
+            .rev()
+            .take_while(|c| name_char(*c))
+            .collect();
         if ends_name && !stem.is_empty() {
             return stem.chars().rev().collect();
         }
@@ -97,11 +122,22 @@ impl Session {
     }
 
     fn assistant(&mut self, message: &Value) {
-        let blocks = message["content"].as_array().map(Vec::as_slice).unwrap_or_default();
+        let blocks = message["content"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_default();
         for block in blocks.iter().filter(|b| b["type"] == "tool_use") {
             self.tool_calls += 1;
             if block["name"] == "Skill" {
-                *self.skills.entry(block["input"]["skill"].as_str().unwrap_or("unknown").to_string()).or_default() += 1;
+                *self
+                    .skills
+                    .entry(
+                        block["input"]["skill"]
+                            .as_str()
+                            .unwrap_or("unknown")
+                            .to_string(),
+                    )
+                    .or_default() += 1;
             }
         }
         let usage = &message["usage"];
@@ -119,7 +155,9 @@ impl Session {
         self.output += tokens("output_tokens");
         self.cache_read += tokens("cache_read_input_tokens");
         self.cache_creation += tokens("cache_creation_input_tokens");
-        self.thinking += usage["output_tokens_details"]["thinking_tokens"].as_u64().unwrap_or(0);
+        self.thinking += usage["output_tokens_details"]["thinking_tokens"]
+            .as_u64()
+            .unwrap_or(0);
     }
 
     fn user(&mut self, line: &Value, main: bool) {
@@ -128,8 +166,14 @@ impl Session {
             Some(_) => self.others += 1,
             None => {}
         }
-        let blocks = line["message"]["content"].as_array().map(Vec::as_slice).unwrap_or_default();
-        for block in blocks.iter().filter(|b| b["type"] == "tool_result" && b["is_error"].as_bool() == Some(true)) {
+        let blocks = line["message"]["content"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        for block in blocks
+            .iter()
+            .filter(|b| b["type"] == "tool_result" && b["is_error"].as_bool() == Some(true))
+        {
             let text = result_text(block);
             if is_refusal(&text) {
                 *self.hooks.entry(hook_name(&text)).or_default() += 1;
@@ -138,7 +182,12 @@ impl Session {
     }
 
     fn row(&self, id: &str, project: &str, revision: &str) -> String {
-        let pairs = |map: &BTreeMap<String, u64>| map.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join(";");
+        let pairs = |map: &BTreeMap<String, u64>| {
+            map.iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join(";")
+        };
         let (start, duration) = match (&self.place.start, self.place.end) {
             (Some((s, text)), Some(e)) => (text.clone(), (e - *s).num_seconds().to_string()),
             _ => (String::new(), String::new()),
@@ -174,7 +223,8 @@ impl Session {
 /// The new row of an archived session, keeping the archived project and revision when the new one lost its revision
 /// (the repository is gone or unreadable since).
 fn keep_resolved(old: &str, new: &str) -> String {
-    let (old, mut new): (Vec<&str>, Vec<&str>) = (old.split('\t').collect(), new.split('\t').collect());
+    let (old, mut new): (Vec<&str>, Vec<&str>) =
+        (old.split('\t').collect(), new.split('\t').collect());
     if new.get(3).is_some_and(|r| r.is_empty()) && old.get(3).is_some_and(|r| !r.is_empty()) {
         new[1] = old[1];
         new[3] = old[3];
@@ -192,11 +242,17 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
     };
     let mut lines = existing.lines();
     if lines.next().is_some_and(|header| header != HEADER) {
-        return Err(format!("{} has other columns than this script: archive elsewhere", path.display()));
+        return Err(format!(
+            "{} has other columns than this script: archive elsewhere",
+            path.display()
+        ));
     }
     let session = |row: &str| row.split('\t').next().unwrap_or_default().to_string();
     let start = |row: &str| row.split('\t').nth(6).unwrap_or_default().to_string();
-    let mut merged: BTreeMap<String, String> = lines.filter(|l| !l.is_empty()).map(|l| (session(l), l.to_string())).collect();
+    let mut merged: BTreeMap<String, String> = lines
+        .filter(|l| !l.is_empty())
+        .map(|l| (session(l), l.to_string()))
+        .collect();
     for row in rows {
         let new = match merged.get(&session(row)) {
             Some(old) => keep_resolved(old, row),
@@ -207,16 +263,22 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
     let mut merged: Vec<String> = merged.into_values().collect();
     merged.sort_by_key(|r| start(r));
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent).map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
     }
     let partial = path.with_extension("tsv.partial");
-    let text = std::iter::once(HEADER.to_string()).chain(merged).map(|l| l + "\n").collect::<String>();
-    std::fs::write(&partial, text).and_then(|()| std::fs::rename(&partial, path)).map_err(|e| format!("cannot write {}: {e}", path.display()))
+    let text = std::iter::once(HEADER.to_string())
+        .chain(merged)
+        .map(|l| l + "\n")
+        .collect::<String>();
+    std::fs::write(&partial, text)
+        .and_then(|()| std::fs::rename(&partial, path))
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
-fn main() {
-    const USAGE: &str = "usage: session_metrics.rs [projects_dir] [--archive <file>]";
-    let mut args = std::env::args().skip(1);
+pub(super) fn main(args: &[String]) -> u8 {
+    const USAGE: &str = "usage: harness run session-metrics [projects_dir] [--archive <file>]";
+    let mut args = args.iter().cloned();
     let (mut dir, mut archive_path) = (None, None);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -252,9 +314,19 @@ fn main() {
             }
             let id = path.file_stem().unwrap().to_string_lossy().into_owned();
             let cwd = session.place.cwd.clone().unwrap_or_default();
-            let repo = repositories.entry(cwd.clone()).or_insert_with(|| if cwd.is_empty() { None } else { repository(&cwd, &session.place.issues) });
+            let repo = repositories.entry(cwd.clone()).or_insert_with(|| {
+                if cwd.is_empty() {
+                    None
+                } else {
+                    repository(&cwd, &session.place.issues)
+                }
+            });
             let start = session.place.start_text();
-            let revision = repo.as_deref().filter(|_| !start.is_empty()).map(|r| revision(r, start)).unwrap_or_default();
+            let revision = repo
+                .as_deref()
+                .filter(|_| !start.is_empty())
+                .map(|r| revision(r, start))
+                .unwrap_or_default();
             rows.push(session.row(&id, &project_name(&cwd, repo.as_deref()), &revision));
         }
     }
@@ -266,4 +338,5 @@ fn main() {
         eprintln!("{e}");
         std::process::exit(1);
     }
+    0
 }

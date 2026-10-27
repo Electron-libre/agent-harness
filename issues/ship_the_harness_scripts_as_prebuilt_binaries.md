@@ -53,7 +53,7 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
    commands and the `pre-commit` gate on `harness run`; makes true BIN-9 and part of BIN-8.
 4. [x] Issue workflow: `next_issue`, `issue_worktree`, `close_issue`, `repo_files` ported with their tests (PAR).
 5. [x] Checks: `check_specs`, `check_issue` ported with their tests (CLR); this repository's `check-specs` keeps working.
-6. [ ] Transcript readers and `audit_sources` ported with their tests (EVA, RER, QUA, REP, BRE); stamps removed;
+6. [x] Transcript readers and `audit_sources` ported with their tests (EVA, RER, QUA, REP, BRE); stamps removed;
    ADR 0006 marked superseded.
 7. [ ] No `rust-script` left: recipes, skills, seed allow rule, CI, `test-harness` (the content tests `test_skills`,
    `test_recipes`, `test_settings` become cargo tests of this repository), README and architecture; a test fails on
@@ -175,5 +175,25 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 
 - red: none before the code (tests ported with the code).
 - Code review: no findings (its one doubt, a duplicate `check-specs` recipe, is allowed by `set allow-duplicate-recipes`; `just check` ran through it).
+- not verified: none beyond the earlier ones.
+- decisions needed: none.
+
+## Deliverable 6
+- done: `session-metrics`, `rule-breaches`, `delivered-quality`, `fixed-context`, `harness-report`, `audit-sources`
+  and the `transcripts` module ported (`chrono` joins the crate), their tests cargo tests (125 checks); the hash
+  stamps and their checks gone: EVA-13 and BRE-12 withdrawn, the stamp clause of QUA-10 and REP-8 dropped, EVA-12
+  checked on the sources of the crate; ADR 0006 superseded by 0010; EVA-5 names a refusal of `harness run <tool>` by
+  the script it was (`review-gate` as `require_code_review`), so the counts compare across revisions; the skills
+  `evaluate-harness`, `audit-instructions`, `issue-workflow` and `test_skills.rs` name the tools.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `just test-harness` | pass |
+| smoke | `run session-metrics` reads 246 sessions of this machine, `run rule-breaches --summary` prints its table |
+| docs | architecture (instruction audit, evaluation), README, ADR 0006, specs EVA, BRE, QUA, REP |
+
+- red: `hook refusals are counted by hook` failed on the two new `harness run` refusals before `hook_name` knew them.
+- Code review: no findings (run twice: the first did not see the new files, after a refused `git add -N`).
 - not verified: none beyond the earlier ones.
 - decisions needed: none.

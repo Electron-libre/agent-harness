@@ -4,17 +4,24 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod audit_sources;
 mod check_commits;
 mod check_issue;
 mod check_specs;
 mod clippy_gate;
 mod close_issue;
 mod commit_check;
+mod delivered_quality;
+mod fixed_context;
 mod format_rust;
+mod harness_report;
 mod issue_worktree;
 mod next_issue;
 mod repo_files;
 mod review_gate;
+mod rule_breaches;
+mod session_metrics;
+mod transcripts;
 
 /// A tool: its name on the command line, a summary, and its entry point.
 pub struct Tool {
@@ -25,6 +32,11 @@ pub struct Tool {
 
 /// Every tool, by name.
 pub const TOOLS: &[Tool] = &[
+    Tool {
+        name: "audit-sources",
+        about: "[projects_dir] [--messages]: the instruction sources and typed messages of every project",
+        main: audit_sources::main,
+    },
     Tool {
         name: "check-commits",
         about: "validate the message of every non-merge commit of <base>..<head>",
@@ -56,9 +68,24 @@ pub const TOOLS: &[Tool] = &[
         main: commit_check::main,
     },
     Tool {
+        name: "delivered-quality",
+        about: "[repo] [--summary]: one row per done issue, its fixes, reviews and failed checks",
+        main: delivered_quality::main,
+    },
+    Tool {
+        name: "fixed-context",
+        about: "[projects_dir]: the bytes every session pays, per project and harness revision",
+        main: fixed_context::main,
+    },
+    Tool {
         name: "format-rust",
         about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
         main: format_rust::main,
+    },
+    Tool {
+        name: "harness-report",
+        about: "--sessions <file> [...]: the markdown report of the readers, by group of revisions",
+        main: harness_report::main,
     },
     Tool {
         name: "issue-worktree",
@@ -74,6 +101,16 @@ pub const TOOLS: &[Tool] = &[
         name: "review-gate",
         about: "record | check | native: the code review gate of a commit",
         main: review_gate::main,
+    },
+    Tool {
+        name: "rule-breaches",
+        about: "[projects_dir] [--summary]: where the agent broke a rule a program can check",
+        main: rule_breaches::main,
+    },
+    Tool {
+        name: "session-metrics",
+        about: "[projects_dir] [--archive <file>]: one row of numbers per session of every project",
+        main: session_metrics::main,
     },
 ];
 

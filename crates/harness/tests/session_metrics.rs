@@ -1,12 +1,6 @@
-#!/usr/bin/env rust-script
 //! Behavior test for `session_metrics.rs` on fixture transcripts: columns, deduplicated assistant messages,
 //! sub-agents, typed messages, hook refusals, skills, project, tolerance to unknown lines, no message text.
 //! Usage: `just test-harness`.
-//! ```cargo
-//! [dependencies]
-//! sha2 = "0.10"
-//! tempfile = "3"
-//! ```
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -15,13 +9,20 @@ use std::process::Command;
 const COLUMNS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
 fn sh(dir: &Path, args: &[&str]) {
-    let ok = Command::new("git").args(args).current_dir(dir).output().is_ok_and(|o| o.status.success());
+    let ok = Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .is_ok_and(|o| o.status.success());
     assert!(ok, "git {args:?} failed in {}", dir.display());
 }
 
 /// A transcript line of `type` in `cwd` at `ts`, with extra fields (`,"k":v` form).
 fn line(kind: &str, cwd: &Path, ts: &str, extra: &str) -> String {
-    format!("{{\"type\":\"{kind}\",\"cwd\":{:?},\"timestamp\":\"{ts}\",\"sessionId\":\"x\"{extra}}}\n", cwd.display().to_string())
+    format!(
+        "{{\"type\":\"{kind}\",\"cwd\":{:?},\"timestamp\":\"{ts}\",\"sessionId\":\"x\"{extra}}}\n",
+        cwd.display().to_string()
+    )
 }
 
 fn typed(cwd: &Path, ts: &str, text: &str) -> String {
@@ -33,7 +34,9 @@ fn assistant(cwd: &Path, ts: &str, id: &str, model: &str, blocks: &str, usage: &
 }
 
 fn usage(input: u64, output: u64, thinking: Option<u64>, read: u64, creation: u64) -> String {
-    let details = thinking.map(|t| format!(",\"output_tokens_details\":{{\"thinking_tokens\":{t}}}")).unwrap_or_default();
+    let details = thinking
+        .map(|t| format!(",\"output_tokens_details\":{{\"thinking_tokens\":{t}}}"))
+        .unwrap_or_default();
     format!(",\"usage\":{{\"input_tokens\":{input},\"output_tokens\":{output},\"cache_read_input_tokens\":{read},\"cache_creation_input_tokens\":{creation}{details}}}")
 }
 
@@ -47,7 +50,8 @@ fn error_result(cwd: &Path, ts: &str, text: &str) -> String {
 
 const SKILL: &str = "{\"type\":\"tool_use\",\"id\":\"a\",\"name\":\"Skill\",\"input\":{\"skill\":\"commit-message\",\"args\":\"SECRET args\"}}";
 const BASH: &str = "{\"type\":\"tool_use\",\"id\":\"b\",\"name\":\"Bash\",\"input\":{\"command\":\"echo SECRET\"}}";
-const REVIEW: &str = "{\"type\":\"tool_use\",\"id\":\"c\",\"name\":\"Skill\",\"input\":{\"skill\":\"code-review\"}}";
+const REVIEW: &str =
+    "{\"type\":\"tool_use\",\"id\":\"c\",\"name\":\"Skill\",\"input\":{\"skill\":\"code-review\"}}";
 const TEXT: &str = "{\"type\":\"text\",\"text\":\"SECRET answer\"}";
 
 /// Rows of the output keyed by session, each a map column -> value; `None` when the header is wrong.
@@ -60,7 +64,11 @@ fn rows(out: &str) -> Option<HashMap<String, HashMap<String, String>>> {
     Some(
         lines
             .map(|l| {
-                let row: HashMap<String, String> = header.iter().map(|h| h.to_string()).zip(l.split('\t').map(str::to_string)).collect();
+                let row: HashMap<String, String> = header
+                    .iter()
+                    .map(|h| h.to_string())
+                    .zip(l.split('\t').map(str::to_string))
+                    .collect();
                 (row.get("session").cloned().unwrap_or_default(), row)
             })
             .collect(),
@@ -72,9 +80,32 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
     let repo = tmp.join("myrepo");
     std::fs::create_dir_all(&repo).unwrap();
     sh(&repo, &["init", "-q", "-b", "main"]);
-    sh(&repo, &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"]);
+    sh(
+        &repo,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+    );
     let worktree = tmp.join("myrepo-my_issue");
-    sh(&repo, &["worktree", "add", "-q", "-b", "my_issue", worktree.to_str().unwrap()]);
+    sh(
+        &repo,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "my_issue",
+            worktree.to_str().unwrap(),
+        ],
+    );
     let projects = tmp.join("projects");
     let proj = projects.join("-tmp-myrepo");
     std::fs::create_dir_all(proj.join("s1/subagents")).unwrap();
@@ -85,18 +116,78 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
         typed(&worktree, "2026-10-26T10:00:07.000Z", "c'est bon."),
         typed(&worktree, "2026-10-26T10:00:08.000Z", "4k"),
         typed(&worktree, "2026-10-26T10:00:09.000Z", "2a"),
-        assistant(&worktree, "2026-10-26T10:00:10.000Z", "m1", "model-a", SKILL, &usage(10, 20, Some(5), 100, 7)),
-        assistant(&worktree, "2026-10-26T10:00:11.000Z", "m1", "model-a", BASH, &usage(10, 20, Some(5), 100, 7)),
-        assistant(&worktree, "2026-10-26T10:00:12.000Z", "m1", "model-a", TEXT, &usage(10, 20, Some(5), 100, 7)),
-        assistant(&worktree, "2026-10-26T10:00:20.000Z", "m2", "model-b", BASH, &usage(1, 2, None, 3, 4)),
-        refusal(&worktree, "2026-10-26T10:00:21.000Z", ".claude/hooks/require_code_review.rs"),
-        refusal(&worktree, "2026-10-26T10:00:22.000Z", ".claude/hooks/require_code_review.rs"),
+        assistant(
+            &worktree,
+            "2026-10-26T10:00:10.000Z",
+            "m1",
+            "model-a",
+            SKILL,
+            &usage(10, 20, Some(5), 100, 7),
+        ),
+        assistant(
+            &worktree,
+            "2026-10-26T10:00:11.000Z",
+            "m1",
+            "model-a",
+            BASH,
+            &usage(10, 20, Some(5), 100, 7),
+        ),
+        assistant(
+            &worktree,
+            "2026-10-26T10:00:12.000Z",
+            "m1",
+            "model-a",
+            TEXT,
+            &usage(10, 20, Some(5), 100, 7),
+        ),
+        assistant(
+            &worktree,
+            "2026-10-26T10:00:20.000Z",
+            "m2",
+            "model-b",
+            BASH,
+            &usage(1, 2, None, 3, 4),
+        ),
+        refusal(
+            &worktree,
+            "2026-10-26T10:00:21.000Z",
+            ".claude/hooks/require_code_review.rs",
+        ),
+        refusal(
+            &worktree,
+            "2026-10-26T10:00:22.000Z",
+            ".claude/hooks/require_code_review.rs",
+        ),
         refusal(&worktree, "2026-10-26T10:00:23.000Z", "nothing"),
-        refusal(&worktree, "2026-10-26T10:00:23.500Z", "~/.rsync/notes.rst .claude/hooks/block_ai_attribution.rs"),
-        error_result(&worktree, "2026-10-26T10:00:23.700Z", "PreToolUse:Bash failed: the hook error: was elsewhere"),
+        refusal(
+            &worktree,
+            "2026-10-26T10:00:23.500Z",
+            "~/.rsync/notes.rst .claude/hooks/block_ai_attribution.rs",
+        ),
+        error_result(
+            &worktree,
+            "2026-10-26T10:00:23.700Z",
+            "PreToolUse:Bash failed: the hook error: was elsewhere",
+        ),
+        // the hooks became tools of `harness run`: same names as the scripts they were
+        error_result(
+            &worktree,
+            "2026-10-26T10:00:23.800Z",
+            "PreToolUse:Bash hook error: [harness run review-gate check]: SECRET refusal text",
+        ),
+        error_result(
+            &worktree,
+            "2026-10-26T10:00:23.900Z",
+            "PreToolUse:Bash hook error: [harness run some-new-tool]: SECRET refusal text",
+        ),
         line("brand-new-type", &worktree, "2026-10-26T10:00:24.000Z", ""),
         "{not json\n".to_string(),
-        line("assistant", &worktree, "2026-10-26T10:00:25.000Z", ",\"message\":{\"id\":\"m9\",\"model\":\"model-a\",\"content\":[]}"),
+        line(
+            "assistant",
+            &worktree,
+            "2026-10-26T10:00:25.000Z",
+            ",\"message\":{\"id\":\"m9\",\"model\":\"model-a\",\"content\":[]}",
+        ),
         line("attachment", &worktree, "2026-10-26T11:00:00.000Z", ""),
         "{\"type\":\"ai-title\",\"sessionId\":\"x\"}\n".to_string(),
     ]
@@ -117,15 +208,49 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
     let lib = tmp.join("lib");
     std::fs::create_dir_all(&lib).unwrap();
     sh(&lib, &["init", "-q", "-b", "main"]);
-    sh(&lib, &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"]);
-    sh(&repo, &["-c", "protocol.file.allow=always", "submodule", "add", "-q", lib.to_str().unwrap(), "vendor/lib"]);
+    sh(
+        &lib,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+    );
+    sh(
+        &repo,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "-q",
+            lib.to_str().unwrap(),
+            "vendor/lib",
+        ],
+    );
     let s3 = typed(&repo.join("vendor/lib"), "2026-10-26T09:00:00.000Z", "yes");
     let removed = tmp.join("myrepo-gone_issue");
-    let s4 = line("user", &removed, "2026-10-26T09:00:00.000Z", ",\"gitBranch\":\"gone_issue\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}");
+    let s4 = line(
+        "user",
+        &removed,
+        "2026-10-26T09:00:00.000Z",
+        ",\"gitBranch\":\"gone_issue\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}",
+    );
     std::fs::write(proj.join("s3.jsonl"), s3).unwrap();
     std::fs::write(proj.join("s4.jsonl"), s4).unwrap();
     let nested = repo.join(".claude/worktrees/gone_nested/crates");
-    let s5 = line("user", &nested, "2026-10-26T09:00:00.000Z", ",\"gitBranch\":\"gone_nested\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}");
+    let s5 = line(
+        "user",
+        &nested,
+        "2026-10-26T09:00:00.000Z",
+        ",\"gitBranch\":\"gone_nested\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}",
+    );
     std::fs::write(proj.join("s5.jsonl"), s5).unwrap();
     (projects, repo)
 }
@@ -133,7 +258,10 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
 // spec: EVA-1, EVA-2, EVA-3, EVA-4, EVA-5, EVA-6, EVA-7, EVA-9, EVA-10
 fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let (projects, _) = fixture(tmp);
-    let out = Command::new("rust-script").arg(dir.join("session_metrics.rs")).arg(&projects).output().expect("rust-script must be installed");
+    let out = tool_command(dir.join("session_metrics.rs"))
+        .arg(&projects)
+        .output()
+        .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let rows = rows(&stdout).unwrap_or_default();
     let empty = HashMap::new();
@@ -142,7 +270,8 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let s3 = rows.get("s3").unwrap_or(&empty);
     let s4 = rows.get("s4").unwrap_or(&empty);
     let s5 = rows.get("s5").unwrap_or(&empty);
-    let col = |r: &HashMap<String, String>, c: &str| r.get(c).cloned().unwrap_or_else(|| "<none>".into());
+    let col =
+        |r: &HashMap<String, String>, c: &str| r.get(c).cloned().unwrap_or_else(|| "<none>".into());
     vec![
         ("the script succeeds", out.status.success()),
         ("header names every column, one row per session, none for the sub-agent", rows.len() == 5),
@@ -157,7 +286,7 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ("start is the earliest timestamp, duration to the latest", col(s1, "start") == "2026-10-26T10:00:00.000Z" && col(s1, "duration_s") == "3600"),
         ("plain validations and stop answers are told apart from the rest", col(s1, "validations") == "3" && col(s1, "other_messages") == "3"),
         ("a bare yes is a validation", col(s2, "validations") == "1" && col(s2, "other_messages") == "0"),
-        ("hook refusals are counted by hook, sorted, sub-agent included", col(s1, "hook_refusals") == "block_ai_attribution=1;clippy_gate=1;require_code_review=2;unknown=1"),
+        ("hook refusals are counted by hook, sorted, sub-agent included", col(s1, "hook_refusals") == "block_ai_attribution=1;clippy_gate=1;require_code_review=3;some_new_tool=1;unknown=1"),
         ("skills are counted by name, sorted", col(s1, "skills") == "code-review=1;commit-message=1"),
         ("a linked worktree counts with its main repository", col(s1, "project") == "myrepo"),
         ("a cwd outside git falls back to its last component", col(s2, "project") == "elsewhere"),
@@ -171,24 +300,22 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: EVA-12, EVA-13
-fn shared_reader_checks(dir: &Path) -> Vec<(&'static str, bool)> {
-    use sha2::Digest;
-    let audit = std::fs::read_to_string(dir.join("../skills/audit-instructions/audit_sources.rs")).unwrap_or_default();
-    let metrics = std::fs::read_to_string(dir.join("session_metrics.rs")).unwrap_or_default();
-    let module = std::fs::read(dir.join("transcripts.rs")).unwrap_or_default();
-    let stamp = format!("// transcripts.rs sha256: {:x}", sha2::Sha256::digest(&module));
-    for (name, text) in [("audit_sources.rs", &audit), ("session_metrics.rs", &metrics)] {
-        if !text.contains(&stamp) {
-            println!("{name}: write the line `{stamp}` so rust-script rebuilds it with the current transcripts.rs");
-        }
-    }
-    let includes = |s: &str, path: &str| s.contains(&format!("#[path = \"{path}\"]"));
+// spec: EVA-12
+fn shared_reader_checks(_dir: &Path) -> Vec<(&'static str, bool)> {
+    let tools = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tools");
+    let uses = |name: &str| {
+        std::fs::read_to_string(tools.join(name))
+            .is_ok_and(|s| s.contains("use super::transcripts;"))
+    };
     vec![
-        ("audit_sources.rs includes the shared module", includes(&audit, "../../transcripts/transcripts.rs")),
-        ("session_metrics.rs includes the shared module", includes(&metrics, "transcripts.rs")),
-        ("both scripts carry the SHA-256 of the current transcripts.rs", audit.contains(&stamp) && metrics.contains(&stamp)),
-        ("neither script defines its own typed-message filter", !audit.contains("fn typed_text") && !metrics.contains("fn typed_text")),
+        (
+            "audit_sources reads the transcripts through the shared module",
+            uses("audit_sources.rs"),
+        ),
+        (
+            "session_metrics reads the transcripts through the shared module",
+            uses("session_metrics.rs"),
+        ),
     ]
 }
 
@@ -201,14 +328,33 @@ fn commit_at(repo: &Path, date: &str, files: &[(&str, &str)]) -> String {
     }
     sh(repo, &["add", "-A", "--force"]);
     let out = Command::new("git")
-        .args(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", date])
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            date,
+        ])
         .env("GIT_AUTHOR_DATE", date)
         .env("GIT_COMMITTER_DATE", date)
         .current_dir(repo)
         .output()
         .unwrap();
-    assert!(out.status.success(), "commit failed in {}: {}{}", repo.display(), String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
-    let head = Command::new("git").args(["rev-parse", "HEAD"]).current_dir(repo).output().unwrap();
+    assert!(
+        out.status.success(),
+        "commit failed in {}: {}{}",
+        repo.display(),
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let head = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
     String::from_utf8_lossy(&head.stdout).trim().to_string()
 }
 
@@ -222,17 +368,56 @@ fn new_repo(dir: &Path) -> PathBuf {
 fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let tmp = tmp.join("revision");
     let pinned = new_repo(&tmp.join("pinned"));
-    let toml = |rev: &str| format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"  # v1\n");
-    commit_at(&pinned, "2026-01-01T10:00:00Z", &[(".claude/harness.toml", &toml("aaa"))]);
-    commit_at(&pinned, "2026-01-01T12:00:00Z", &[(".claude/harness.toml", &toml("bbb"))]);
+    let toml = |rev: &str| {
+        format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"  # v1\n")
+    };
+    commit_at(
+        &pinned,
+        "2026-01-01T10:00:00Z",
+        &[(".claude/harness.toml", &toml("aaa"))],
+    );
+    commit_at(
+        &pinned,
+        "2026-01-01T12:00:00Z",
+        &[(".claude/harness.toml", &toml("bbb"))],
+    );
     let worktree = tmp.join("pinned-branch");
-    sh(&pinned, &["worktree", "add", "-q", "-b", "branch", worktree.to_str().unwrap()]);
-    commit_at(&worktree, "2026-01-01T12:30:00Z", &[(".claude/harness.toml", &toml("ccc"))]);
+    sh(
+        &pinned,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "branch",
+            worktree.to_str().unwrap(),
+        ],
+    );
+    commit_at(
+        &worktree,
+        "2026-01-01T12:30:00Z",
+        &[(".claude/harness.toml", &toml("ccc"))],
+    );
     sh(&pinned, &["checkout", "-q", "-b", "bump"]);
-    commit_at(&pinned, "2026-01-01T12:15:00Z", &[(".claude/harness.toml", &toml("ddd"))]);
+    commit_at(
+        &pinned,
+        "2026-01-01T12:15:00Z",
+        &[(".claude/harness.toml", &toml("ddd"))],
+    );
     sh(&pinned, &["checkout", "-q", "main"]);
     let merge = Command::new("git")
-        .args(["-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "merge", "bump"])
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "merge",
+            "-q",
+            "--no-ff",
+            "-m",
+            "merge",
+            "bump",
+        ])
         .env("GIT_AUTHOR_DATE", "2026-01-01T14:00:00Z")
         .env("GIT_COMMITTER_DATE", "2026-01-01T14:00:00Z")
         .current_dir(&pinned)
@@ -240,11 +425,25 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         .unwrap();
     assert!(merge.status.success(), "merge failed");
     let own = new_repo(&tmp.join("own"));
-    commit_at(&own, "2026-01-01T10:00:00Z", &[(".claude/harness.toml", "[harness]\nsource = \".\"\n"), ("files/a", "1")]);
+    commit_at(
+        &own,
+        "2026-01-01T10:00:00Z",
+        &[
+            (".claude/harness.toml", "[harness]\nsource = \".\"\n"),
+            ("files/a", "1"),
+        ],
+    );
     let files_commit = commit_at(&own, "2026-01-01T11:00:00Z", &[("files/a", "2")]);
     commit_at(&own, "2026-01-01T11:10:00Z", &[("other", "x")]);
     let unpinned = new_repo(&tmp.join("unpinned"));
-    commit_at(&unpinned, "2026-01-01T10:00:00Z", &[(".claude/harness.toml", "[harness]\nsource = \"https://example.org/harness\"\n")]);
+    commit_at(
+        &unpinned,
+        "2026-01-01T10:00:00Z",
+        &[(
+            ".claude/harness.toml",
+            "[harness]\nsource = \"https://example.org/harness\"\n",
+        )],
+    );
     let projects = tmp.join("projects");
     let sessions: [(&str, &Path, &str); 8] = [
         ("before", &pinned, "2026-01-01T09:00:00.000Z"),
@@ -254,25 +453,58 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ("on_branch", &worktree, "2026-01-01T13:00:00.000Z"),
         ("own", &own, "2026-01-01T11:30:00.000Z"),
         ("unpinned", &unpinned, "2026-01-01T11:00:00.000Z"),
-        ("gone", Path::new("/nonexistent/gone"), "2026-01-01T11:00:00.000Z"),
+        (
+            "gone",
+            Path::new("/nonexistent/gone"),
+            "2026-01-01T11:00:00.000Z",
+        ),
     ];
     for (id, cwd, ts) in sessions {
         let proj = projects.join(format!("-{id}"));
         std::fs::create_dir_all(&proj).unwrap();
         std::fs::write(proj.join(format!("{id}.jsonl")), typed(cwd, ts, "ok")).unwrap();
     }
-    let out = Command::new("rust-script").arg(dir.join("session_metrics.rs")).arg(&projects).output().expect("rust-script must be installed");
+    let out = tool_command(dir.join("session_metrics.rs"))
+        .arg(&projects)
+        .output()
+        .unwrap();
     let rows = rows(&String::from_utf8_lossy(&out.stdout)).unwrap_or_default();
-    let rev = |id: &str| rows.get(id).and_then(|r| r.get("revision")).cloned().unwrap_or_else(|| "<none>".into());
+    let rev = |id: &str| {
+        rows.get(id)
+            .and_then(|r| r.get("revision"))
+            .cloned()
+            .unwrap_or_else(|| "<none>".into())
+    };
     vec![
         ("no revision before the first pin", rev("before").is_empty()),
-        ("the pin in force at the start of the session", rev("first") == "aaa"),
-        ("a later pin applies to a later session, not one merged later", rev("second") == "bbb"),
-        ("a pin merged into the default branch applies after the merge", rev("merged") == "ddd"),
-        ("a linked worktree reads the pin of the default branch", rev("on_branch") == "bbb"),
-        ("the harness repository itself gives its last commit touching files/", rev("own") == format!("self:{files_commit}")),
-        ("a harness.toml with no rev is unpinned", rev("unpinned") == "unpinned"),
-        ("an unreadable project gives an empty revision", rev("gone").is_empty()),
+        (
+            "the pin in force at the start of the session",
+            rev("first") == "aaa",
+        ),
+        (
+            "a later pin applies to a later session, not one merged later",
+            rev("second") == "bbb",
+        ),
+        (
+            "a pin merged into the default branch applies after the merge",
+            rev("merged") == "ddd",
+        ),
+        (
+            "a linked worktree reads the pin of the default branch",
+            rev("on_branch") == "bbb",
+        ),
+        (
+            "the harness repository itself gives its last commit touching files/",
+            rev("own") == format!("self:{files_commit}"),
+        ),
+        (
+            "a harness.toml with no rev is unpinned",
+            rev("unpinned") == "unpinned",
+        ),
+        (
+            "an unreadable project gives an empty revision",
+            rev("gone").is_empty(),
+        ),
     ]
 }
 
@@ -282,46 +514,124 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let projects = tmp.join("projects/-p");
     std::fs::create_dir_all(&projects).unwrap();
     let cwd = Path::new("/nonexistent/p");
-    std::fs::write(projects.join("b.jsonl"), [typed(cwd, "2026-01-02T00:00:00.000Z", "ok"), typed(cwd, "2026-01-02T00:00:01.000Z", "ok")].concat()).unwrap();
-    std::fs::write(projects.join("c.jsonl"), typed(cwd, "2026-01-01T12:00:00.000Z", "ok")).unwrap();
+    std::fs::write(
+        projects.join("b.jsonl"),
+        [
+            typed(cwd, "2026-01-02T00:00:00.000Z", "ok"),
+            typed(cwd, "2026-01-02T00:00:01.000Z", "ok"),
+        ]
+        .concat(),
+    )
+    .unwrap();
+    std::fs::write(
+        projects.join("c.jsonl"),
+        typed(cwd, "2026-01-01T12:00:00.000Z", "ok"),
+    )
+    .unwrap();
     let archive = tmp.join("state/deep/sessions.tsv");
-    let run = || Command::new("rust-script").arg(dir.join("session_metrics.rs")).arg(tmp.join("projects")).arg("--archive").arg(&archive).output().expect("rust-script must be installed");
+    let run = || {
+        tool_command(dir.join("session_metrics.rs"))
+            .arg(tmp.join("projects"))
+            .arg("--archive")
+            .arg(&archive)
+            .output()
+            .unwrap()
+    };
     let first = run();
     let created = std::fs::read_to_string(&archive).unwrap_or_default();
-    let old_row = |id: &str, start: &str| format!("{id}\tp\t\t\t\t\t{start}\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n");
+    let old_row = |id: &str, start: &str| {
+        format!("{id}\tp\t\t\t\t\t{start}\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n")
+    };
     std::fs::create_dir_all(archive.parent().unwrap()).unwrap();
-    let resolved = "c\tkeep\t\trrr\t\t\t2026-01-01T12:00:00.000Z\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n";
-    std::fs::write(&archive, format!("{COLUMNS}\n{}{}{resolved}", old_row("b", "2026-01-02T00:00:00.000Z"), old_row("a", "2026-01-01T00:00:00.000Z"))).unwrap();
+    let resolved =
+        "c\tkeep\t\trrr\t\t\t2026-01-01T12:00:00.000Z\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n";
+    std::fs::write(
+        &archive,
+        format!(
+            "{COLUMNS}\n{}{}{resolved}",
+            old_row("b", "2026-01-02T00:00:00.000Z"),
+            old_row("a", "2026-01-01T00:00:00.000Z")
+        ),
+    )
+    .unwrap();
     let merged = run();
     let text = std::fs::read_to_string(&archive).unwrap_or_default();
-    let ids: Vec<&str> = text.lines().skip(1).map(|l| l.split('\t').next().unwrap_or_default()).collect();
+    let ids: Vec<&str> = text
+        .lines()
+        .skip(1)
+        .map(|l| l.split('\t').next().unwrap_or_default())
+        .collect();
     let merged_rows = rows(&text).unwrap_or_default();
-    let cell = |id: &str, c: &str| merged_rows.get(id).and_then(|r| r.get(c)).cloned().unwrap_or_default();
+    let cell = |id: &str, c: &str| {
+        merged_rows
+            .get(id)
+            .and_then(|r| r.get(c))
+            .cloned()
+            .unwrap_or_default()
+    };
     let b_validations = cell("b", "validations");
     let foreign = "session\tsomething_else\na\tx\n";
     std::fs::write(&archive, foreign).unwrap();
     let refused = run();
     vec![
-        ("the archive and its missing parent directories are created", first.status.success() && created.lines().count() == 3),
-        ("the rows are still printed with --archive", String::from_utf8_lossy(&merged.stdout).lines().count() == 3),
-        ("one header, sessions kept, replaced or added, sorted by start", merged.status.success() && text.starts_with(COLUMNS) && ids == ["a", "c", "b"]),
-        ("an archived session is replaced by its new row", b_validations == "2"),
-        ("a resolved project and revision survive a new row that lost them", cell("c", "project") == "keep" && cell("c", "revision") == "rrr" && cell("c", "validations") == "1"),
-        ("an archive with another header is refused and left unchanged", !refused.status.success() && std::fs::read_to_string(&archive).unwrap_or_default() == foreign),
+        (
+            "the archive and its missing parent directories are created",
+            first.status.success() && created.lines().count() == 3,
+        ),
+        (
+            "the rows are still printed with --archive",
+            String::from_utf8_lossy(&merged.stdout).lines().count() == 3,
+        ),
+        (
+            "one header, sessions kept, replaced or added, sorted by start",
+            merged.status.success() && text.starts_with(COLUMNS) && ids == ["a", "c", "b"],
+        ),
+        (
+            "an archived session is replaced by its new row",
+            b_validations == "2",
+        ),
+        (
+            "a resolved project and revision survive a new row that lost them",
+            cell("c", "project") == "keep"
+                && cell("c", "revision") == "rrr"
+                && cell("c", "validations") == "1",
+        ),
+        (
+            "an archive with another header is refused and left unchanged",
+            !refused.status.success()
+                && std::fs::read_to_string(&archive).unwrap_or_default() == foreign,
+        ),
     ]
 }
 
-fn main() {
-    let dir = std::fs::canonicalize(Path::new(file!()).parent().unwrap()).unwrap();
+#[test]
+fn session_metrics() {
+    let dir = std::path::PathBuf::from("/tools");
     let temp = tempfile::tempdir().unwrap();
     let tmp = temp.path().to_path_buf();
-    let checks: Vec<_> = row_checks(&dir, &tmp).into_iter().chain(revision_checks(&dir, &tmp)).chain(archive_checks(&dir, &tmp)).chain(shared_reader_checks(&dir)).collect();
+    let checks: Vec<_> = row_checks(&dir, &tmp)
+        .into_iter()
+        .chain(revision_checks(&dir, &tmp))
+        .chain(archive_checks(&dir, &tmp))
+        .chain(shared_reader_checks(&dir))
+        .collect();
     let mut failed = false;
     for (name, ok) in checks {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
         failed |= !ok;
     }
-    if failed {
-        std::process::exit(1);
-    }
+    assert!(!failed, "a check failed: see the FAIL lines");
+}
+
+/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
+    let stem = script
+        .as_ref()
+        .file_stem()
+        .unwrap()
+        .to_string_lossy()
+        .replace('_', "-");
+    let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_harness"));
+    cmd.arg("tool").arg(stem);
+    cmd
 }

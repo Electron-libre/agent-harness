@@ -7,6 +7,7 @@ description = "Synchronise the shared agent harness (skills, hooks, scripts) int
 
 [dependencies]
 anyhow = "1"
+chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"

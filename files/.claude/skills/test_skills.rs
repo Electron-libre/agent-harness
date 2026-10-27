@@ -16,11 +16,11 @@ const BUILT_IN_ROOT_DOCS: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 
 /// Passages a skill must keep, as (skill, passage, why).
 const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
-    ("audit-instructions", "rule_breaches.rs --summary", "the rules broken often feed the audit as hook candidates"),
+    ("audit-instructions", "rule-breaches --summary", "the rules broken often feed the audit as hook candidates"),
     ("audit-instructions", "skill:evaluate-harness", "the audit points to the skill that measures whether the rules paid off"),
-    ("evaluate-harness", "harness_report.rs", "the tables come from the report script, not from the agent's arithmetic"),
-    ("evaluate-harness", "fixed_context.rs", "the fixed context of each revision is measured"),
-    ("evaluate-harness", "delivered_quality.rs", "the quality axis reads each repository with done issues"),
+    ("evaluate-harness", "harness run harness-report", "the tables come from the report script, not from the agent's arithmetic"),
+    ("evaluate-harness", "harness run fixed-context", "the fixed context of each revision is measured"),
+    ("evaluate-harness", "harness run delivered-quality", "the quality axis reads each repository with done issues"),
     ("evaluate-harness", "--anonymous", "a report that lands in a shared file names no project"),
     ("evaluate-harness", "never a pass or a fail", "numbers become targets once shown: trends only"),
     ("issue-workflow", "## Autonomous mode", "section defining the autonomous mode"),
@@ -29,7 +29,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ("issue-workflow", "Plan: proposed", "the plan is written in the issue before its validation"),
     ("issue-workflow", "set `Plan: validated`", "the validation is recorded so a resume skips the stop"),
     ("issue-workflow", "`1 a, 2 c`", "questions answered by number and option letter"),
-    ("issue-workflow", "`Code review: <n> findings`", "the count of findings opens the line delivered_quality.rs reads"),
+    ("issue-workflow", "`Code review: <n> findings`", "the count of findings opens the line delivered-quality reads"),
 ];
 
 /// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.

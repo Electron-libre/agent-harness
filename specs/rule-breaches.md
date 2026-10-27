@@ -1,14 +1,14 @@
 ---
 id: BRE
 status: accepted
-adrs: [0003, 0005, 0006]
+adrs: [0003, 0005, 0006, 0010]
 ---
 
 # Breaches of the harness rules in the session transcripts
 
 ## Intent
 
-`.claude/transcripts/rule_breaches.rs` reads the Claude Code transcripts of every project and lists where the agent
+`harness run rule-breaches` reads the Claude Code transcripts of every project and lists where the agent
 broke a rule the harness states (`AGENTS.md`, the skills, the ADRs), apart from where a gate refused it, then counts
 them per rule and per harness revision over the sessions where the rule applied, so `audit-instructions` can tell a
 rule broken often (a hook candidate) from a rule that rarely applies. Only the breaches a program can see are in
@@ -16,8 +16,8 @@ scope.
 
 ## Requirements
 
-- **BRE-1** (deterministic) `rule_breaches.rs [projects_dir]` must print a header line then one tab-separated row per finding, with the columns `session`, `project`, `revision`, `rule`, `kind`, `location`, `detail`; `kind` is `breach` when the act went through and `blocked` when a hook or a permission rule refused it; `location` is `<transcript file name>:<line>` (1-based, the file name of a sub-agent transcript being `subagents/<name>`), empty for a finding read from git.
-- **BRE-2** (deterministic) `project` and `revision` must be resolved as in `session_metrics.rs` (EVA-7, EVA-8), through the shared module `transcripts.rs`, so both scripts give a session the same project and revision; no rule applies to a session whose `revision` is empty (the project had no harness then).
+- **BRE-1** (deterministic) `rule-breaches [projects_dir]` must print a header line then one tab-separated row per finding, with the columns `session`, `project`, `revision`, `rule`, `kind`, `location`, `detail`; `kind` is `breach` when the act went through and `blocked` when a hook or a permission rule refused it; `location` is `<transcript file name>:<line>` (1-based, the file name of a sub-agent transcript being `subagents/<name>`), empty for a finding read from git.
+- **BRE-2** (deterministic) `project` and `revision` must be resolved as in `session-metrics` (EVA-7, EVA-8), through the shared module `transcripts.rs`, so both scripts give a session the same project and revision; no rule applies to a session whose `revision` is empty (the project had no harness then).
 - **BRE-3** (deterministic) With `--summary`, the script must print instead a header then one row per rule and revision, with the columns `rule`, `revision`, `applied` (sessions where the rule applied, as each requirement below defines), `breached` (those with at least one `breach`), `breaches` and `blocked` (counts of findings), sorted by rule then revision.
 - **BRE-4** (deterministic) Rule `no-verify`: a `Bash` call whose command holds the words `git` and `commit` or `push` and the token `--no-verify` must be a finding (`blocked` when its result is an error). It applies to the sessions with a `Bash` call holding `git` and `commit` or `push`.
 - **BRE-5** (deterministic) Rule `review-before-commit`: an error result of a `Bash` call holding `git` and `commit` whose text holds `Refused:` and `code review` but not `Refused: only the user waives` must be a `blocked` finding (a refusal of another command is a mistake of the gate, not of the agent); a `Bash` call holding `git` and `commit` whose result is not an error, after such a refusal with neither a `Skill` call whose skill name ends with `code-review` nor a user turn in between (a typed message, the filter of `transcripts.rs`, or a command the user typed: a user line, not meta nor sidechain, whose text holds `<command-name>/` or starts with `<bash-input>`), must be a `breach` (the bypass of ADR 0005). It applies to the sessions with a `Bash` call holding `git` and `commit`.
@@ -27,7 +27,7 @@ scope.
 - **BRE-9** (deterministic) Rules `commit-attribution` and `commit-format`: each non-merge commit of the local branches of the project's repository whose author date lies between the `start` and the end of a session of that project must be checked once, against the latest-starting such session (a commit in no session was the user's and is skipped); a message with a line holding `co-authored-by:`, `noreply@anthropic.com`, or `generated with` and `claude` (case-insensitive) is a `commit-attribution` breach, and a subject that is not `<type>(<scope>): <description>` or `<type>: <description>` with a type of `AGENTS.md`, a scope among `docs`, `harness` and the `commit_scopes` of the `.claude/harness.toml` of that commit, at most 72 characters, a description not starting with a capital letter nor ending with `.` is a `commit-format` breach; `detail` is the abbreviated hash. Both apply to the sessions with at least one checked commit.
 - **BRE-10** (deterministic) Rule `user-language`: when the `.claude/harness.toml` committed at the session's `start` names a `user_language` of `French` or `English`, each assistant text block of the session's own transcript that holds at least 20 words once fenced code and inline code are removed, and holds more stop words of the other language than of that one (from the two lists of the script), must be a `breach`. It applies to the sessions with at least one such block.
 - **BRE-11** (deterministic) The output must hold no text of a message, of a tool input or of a tool result: only identifiers, rule names, counts, paths and commit hashes.
-- **BRE-12** (deterministic) `rule_breaches.rs` must carry the `// transcripts.rs sha256: <hex>` line of EVA-13, checked by `just test-harness`.
+- **BRE-12** (deterministic) withdrawn: as EVA-13, no hash line since the readers are modules of `harness`.
 
 ## Scenarios
 

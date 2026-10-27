@@ -28,7 +28,7 @@ Everything that differs between projects is a value, not code. Scripts read list
 
 The tools of the harness move from `rust-script` files to modules of the `harness` crate
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md));
-the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits`, the issue tools (`next-issue`, `issue-worktree`, `close-issue`), `check-specs` and `check-issue` are ported, the other
+the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits`, the issue tools (`next-issue`, `issue-worktree`, `close-issue`), `check-specs`, `check-issue`, the transcript readers and `audit-sources` are ported, the other
 scripts still run under `rust-script`. A hook, a recipe or a
 skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
 the nearest `.claude/harness.toml` from the current directory and replaces itself (`exec`) by
@@ -160,8 +160,8 @@ another tool is out of reach.
 ## The instruction audit
 
 `audit-instructions` and `evaluate-harness` are the skills that read outside the repository. The audit reads the
-user's session transcripts, memory and instruction files under `~/.claude/projects`, through `audit_sources.rs` (which shares the transcript reading of
-the evaluation, below), and the summary of `rule_breaches.rs`, whose rules broken often are hook candidates. It only
+user's session transcripts, memory and instruction files under `~/.claude/projects`, through `audit-sources` (which shares the transcript reading of
+the evaluation, below), and the summary of `rule-breaches`, whose rules broken often are hook candidates. It only
 proposes skills and hooks;
 the report holds private content, so it stays in the conversation (or a file outside the repository) and each
 validated proposal becomes an issue in generic wording. It is a skill rather than a `harness` subcommand
@@ -170,7 +170,7 @@ project specifics.
 
 ## The evaluation from the transcripts
 
-`.claude/transcripts/session_metrics.rs` prints one tab-separated row of numbers per session of every project
+`harness run session-metrics` prints one tab-separated row of numbers per session of every project
 (spec [`specs/evaluation.md`](../specs/evaluation.md)): tokens by kind, turns, tool calls, hook refusals, skill calls,
 typed messages split into plain validations and the rest, tagged with the project, the issue branches, the models and
 the Claude Code versions, and the harness revision in force: the transcripts do not record it, so it is the `rev` of
@@ -181,11 +181,11 @@ so an unreadable line, an unknown type or a missing field is counted in its own 
 No text of a message is printed, so `--archive <file>` can merge the rows into a file outside the repositories
 (a session replaced by its new row, a session whose transcript is gone kept): the history then outlives the retention
 of the transcripts. The transcript reading (projects, sessions, sub-agents, the typed-message filter, and the
-project and harness revision a session resolves to) lives once in `transcripts.rs`, which `audit_sources.rs` and
-`rule_breaches.rs` include too ([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md)); each including
-script carries the SHA-256 of the module, since `rust-script` would otherwise keep running the build of the old one.
+project and harness revision a session resolves to) lives once in the module `transcripts.rs` of the tools, which `audit-sources` and
+`rule-breaches` use too ([ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md), its script form superseded by
+ADR 0010).
 
-`.claude/transcripts/rule_breaches.rs` lists where the agent broke a rule a program can check (spec
+`harness run rule-breaches` lists where the agent broke a rule a program can check (spec
 [`specs/rule-breaches.md`](../specs/rule-breaches.md)): one row per finding, `breach` when the act went through,
 `blocked` when a hook or a permission rule refused it, located by transcript line. The rules are read from the tool
 calls and their results: `--no-verify`, a commit after a review refusal with no review nor user turn (a typed
@@ -205,7 +205,7 @@ project had no harness then is skipped. `--summary` counts the
 findings per rule and revision over the sessions where the rule applied, so a rule that rarely applies does not read
 as respected.
 
-`.claude/transcripts/delivered_quality.rs [repo]` measures the quality of the delivered work from the git history
+`harness run delivered-quality [repo]` measures the quality of the delivered work from the git history
 instead (spec [`specs/delivered-quality.md`](../specs/delivered-quality.md)): one row per file of `issues/done/`. The
 commits of an issue are those of the default branch touching its file, from the first whose version holds
 `# Tracking` to the one that moves it to `issues/done/`, except the closes of other issues that only rewrite a
@@ -217,11 +217,11 @@ sessions of an issue are those of the projects directory that made its commits (
 repository whose span holds the commit date, as for the commit rules above, a session on the issue's branch first, so
 a parallel session in another worktree does not take it); within each, from the last commit of other work (from its
 start on the issue's branch) to the last commit of the issue, the failed `just check…`/`just test…` runs and the typed messages, split
-as `session_metrics.rs` splits them (`is_validation`, now in `transcripts.rs`). `--summary` sums the columns per harness revision, in the order the revisions were used (a sum over an empty value
+as `session-metrics` splits them (`is_validation`, now in `transcripts.rs`). `--summary` sums the columns per harness revision, in the order the revisions were used (a sum over an empty value
 stays empty), the
 input of the report by revision. These are signals, not verdicts: a later fix may come from a new need.
 
-`.claude/transcripts/fixed_context.rs` measures what a revision costs in every session before any work (spec
+`harness run fixed-context` measures what a revision costs in every session before any work (spec
 [`specs/harness-report.md`](../specs/harness-report.md)): one row per project and revision used by a session, the bytes
 of `CLAUDE.md`, `AGENTS.md` (a symbolic link counted as its target) and the `name` and `description` of each skill
 (what Claude Code loads at the start), read
@@ -229,7 +229,7 @@ from the tree of the oldest commit of the default branch where the revision is i
 commit itself for `self:`), with the list of the skills it ships. The shared hooks print nothing in a session but their
 refusals, already counted.
 
-`.claude/transcripts/harness_report.rs` joins these outputs (it reads their TSV files, never the transcripts) into
+`harness run harness-report` joins these outputs (it reads their TSV files, never the transcripts) into
 one markdown table per axis. The revisions are taken in the order of their first session and cut into groups of
 consecutive revisions holding at least `--min-sessions` (10) sessions, since a `self:` revision often covers one issue;
 the last group, when short, shows only its size. Next to the numbers (medians per session, so one long session does

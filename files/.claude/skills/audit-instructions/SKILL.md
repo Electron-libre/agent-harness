@@ -13,12 +13,12 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
 
 ## Procedure
 
-1. **Collect**: `rust-script .claude/skills/audit-instructions/audit_sources.rs` lists, per project of
+1. **Collect**: `harness run audit-sources` lists, per project of
    `~/.claude/projects`, the sessions, the typed messages, the memory files and the instruction files. Then
-   read, project by project, `rust-script .claude/skills/audit-instructions/audit_sources.rs --messages`
+   read, project by project, `harness run audit-sources --messages`
    (pipe it through `grep -P '^<project>\t'`), the instruction files and the memory files listed. The output
    holds private content: keep it in the conversation, never in a file of the repository.
-   Also run `rust-script .claude/transcripts/rule_breaches.rs --summary`: per rule of the harness and revision,
+   Also run `harness run rule-breaches --summary`: per rule of the harness and revision,
    the sessions where it applied, those where the agent broke it and the refusals of a gate (no message text).
 2. **Detect** candidates:
    - a procedure the user re-explained or re-triggered in several sessions or projects (same steps, same

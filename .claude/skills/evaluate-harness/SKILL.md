@@ -15,15 +15,15 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
 
 1. **Collect** from the repository root into `<dir>`, a directory made by `mktemp -d` and removed at the end (the
    rows name projects and issues: never write them in the repository):
-   - `rust-script .claude/transcripts/session_metrics.rs > <dir>/sessions.tsv`; if the user keeps an archive of the rows
+   - `harness run session-metrics > <dir>/sessions.tsv`; if the user keeps an archive of the rows
      (`--archive <file>`), pass `--archive` to it and use the archive instead, since it outlives the transcripts; the
      other scripts read only the transcripts still kept, so a group older than them has empty rules, quality and
      fixed context cells: say the data is missing, never read it as a trend;
-   - `rust-script .claude/transcripts/rule_breaches.rs --summary > <dir>/breaches.tsv`;
-   - `rust-script .claude/transcripts/delivered_quality.rs <repo> --summary > <dir>/quality-<n>.tsv` for each repository
+   - `harness run rule-breaches --summary > <dir>/breaches.tsv`;
+   - `harness run delivered-quality <repo> --summary > <dir>/quality-<n>.tsv` for each repository
      the sessions name that has an `issues/done/` directory (the current one at least);
-   - `rust-script .claude/transcripts/fixed_context.rs > <dir>/context.tsv`;
-   - `rust-script .claude/transcripts/harness_report.rs --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv`,
+   - `harness run fixed-context > <dir>/context.tsv`;
+   - `harness run harness-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv`,
      with `--min-sessions <n>` when the user asks for another sample size than 10.
 2. **Read** each table of the report, oldest group first: the tables are the numbers, never recompute them.
    - A trend is a change kept over two groups or more; one group out of line is noise.

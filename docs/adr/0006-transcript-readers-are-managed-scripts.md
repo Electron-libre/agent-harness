@@ -1,6 +1,6 @@
 # 0006. The transcript readers are managed scripts sharing one module
 
-Status: Accepted
+Status: Superseded by 0010
 Date: 2026-10-26
 
 ## Context
