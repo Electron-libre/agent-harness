@@ -69,7 +69,7 @@ found and ended outside fences only. The code is widened to it (option "widen" o
   got Some("2")` (the inline code opened a fence to the end of the file).
 - High review (base..HEAD): 7 findings. Fixed: inline code opening a fence, the duplicated fence reader, the
   untested QUA-11 path, the `if`/`else` of `fence`. Not fixed: the double scan of `deliverables` (cost negligible
-  at issue sizes). Moved to `issues/tell_unread_issue_sections_from_empty_ones.md`: the fence-blind QUA-2 start and
+  at issue sizes). Moved to `issues/done/tell_unread_issue_sections_from_empty_ones.md`: the fence-blind QUA-2 start and
   the zeros printed for a section not found (both outside QUA-3, QUA-6, QUA-11, QUA-12 as amended).
 - Code review: no findings (low).
 - not verified: none.

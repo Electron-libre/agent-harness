@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [tell_unread_issue_sections_from_empty_ones](tell_unread_issue_sections_from_empty_ones.md) - follow-up of the fence issue, same tool and spec while it is fresh; before the proof rule, which tests the specs as written
 - [prove_the_specs_with_black_box_tests](prove_the_specs_with_black_box_tests.md) - after the red-run evidence, the other half of making a citation a proof; sets the rule the next two apply
 - [prove_the_sync_specs_through_the_binary](prove_the_sync_specs_through_the_binary.md) - after the rule and its report; moves the SYN proofs of init, sync, update, check and the settings entries
 - [prove_the_run_and_gate_specs_through_the_binary](prove_the_run_and_gate_specs_through_the_binary.md) - after the sync proofs, same method; moves the run, launcher, install gate and retention proofs
