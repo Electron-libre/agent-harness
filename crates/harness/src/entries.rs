@@ -187,13 +187,27 @@ pub fn merge(text: Option<&str>, wanted: &[Entry], recorded: &[Entry], force: bo
         return left_alone(Some(settings), Some(warning));
     }
     let mut outcomes = Vec::new();
-    // an entry dropped by the source goes when the settings hold it unchanged (SYN-31)
+    let mut changed = false;
+    // an entry dropped by the source goes when the settings hold it unchanged (SYN-31): a hook the source changed
+    // takes its place, the first new hook of its event and matcher
+    let mut new: Vec<&Entry> = wanted
+        .iter()
+        .filter(|entry| !recorded.contains(entry) && !holds(&settings, entry))
+        .collect();
     for entry in recorded.iter().filter(|entry| !wanted.contains(entry)) {
-        if remove(&mut settings, entry) {
+        let successor = new.iter().position(|next| same_place(entry, next));
+        let by = successor.map(|at| new.remove(at));
+        if replace(&mut settings, entry, by) {
             outcomes.push((entry.label(), Outcome::Removed));
+            outcomes.extend(by.map(|by| (by.label(), Outcome::Added)));
+            changed = true;
+        } else {
+            outcomes.push((entry.label(), Outcome::Kept));
+            if let Some(by) = by {
+                new.push(by);
+            }
         }
     }
-    let mut changed = !outcomes.is_empty();
     for entry in wanted {
         if holds(&settings, entry) {
             continue;
@@ -221,17 +235,46 @@ pub fn merge(text: Option<&str>, wanted: &[Entry], recorded: &[Entry], force: bo
     }
 }
 
-/// The groups of `event` in `settings` whose matcher is `matcher`.
-fn groups<'a>(
-    settings: &'a Value,
-    event: &'a str,
-    matcher: Option<&'a str>,
-) -> impl Iterator<Item = &'a Value> {
+/// Whether the `matcher` of a group is `matcher`: none, `""` and `"*"` all match every tool, so they are one value.
+fn matches(group: &Value, matcher: Option<&str>) -> bool {
+    let all = |m: Option<&str>| m.is_none_or(|m| m.is_empty() || m == "*");
+    let have = group["matcher"].as_str();
+    have == matcher || all(have) && all(matcher)
+}
+
+/// Whether `new` belongs where `old` is: a hook of the same event and matcher.
+fn same_place(old: &Entry, new: &Entry) -> bool {
+    match (old, new) {
+        (
+            Entry::Hook { event, matcher, .. },
+            Entry::Hook {
+                event: next_event,
+                matcher: next_matcher,
+                ..
+            },
+        ) => event == next_event && matcher == next_matcher,
+        _ => false,
+    }
+}
+
+/// Where `settings` hold the hook `hook` of `event` and `matcher`: the group's index and the hook's in it.
+fn locate(
+    settings: &Value,
+    event: &str,
+    matcher: Option<&str>,
+    hook: &Value,
+) -> Option<(usize, usize)> {
     settings["hooks"][event]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(move |group| group["matcher"].as_str() == matcher)
+        .as_array()?
+        .iter()
+        .enumerate()
+        .filter(|(_, group)| matches(group, matcher))
+        .find_map(|(g, group)| {
+            Some((
+                g,
+                group["hooks"].as_array()?.iter().position(|h| h == hook)?,
+            ))
+        })
 }
 
 /// Whether `settings` hold `entry` (JSON equality, key order ignored).
@@ -244,11 +287,7 @@ fn holds(settings: &Value, entry: &Entry) -> bool {
             event,
             matcher,
             hook,
-        } => groups(settings, event, matcher.as_deref()).any(|group| {
-            group["hooks"]
-                .as_array()
-                .is_some_and(|hooks| hooks.contains(hook))
-        }),
+        } => locate(settings, event, matcher.as_deref(), hook).is_some(),
     }
 }
 
@@ -266,10 +305,10 @@ fn add(settings: &mut Value, entry: &Entry) {
             hook,
         } => {
             let groups = array(object(settings, "hooks"), event);
-            let found = groups
+            match groups
                 .iter_mut()
-                .find(|group| group["matcher"].as_str() == matcher.as_deref());
-            match found {
+                .find(|group| matches(group, matcher.as_deref()))
+            {
                 Some(group) => group["hooks"]
                     .as_array_mut()
                     .expect("checked by `entries`")
@@ -287,9 +326,10 @@ fn add(settings: &mut Value, entry: &Entry) {
     }
 }
 
-/// `settings` without the first occurrence of `entry`, its group and event dropped when left empty (SYN-31); whether
-/// `settings` held it. `settings` is in the shape of SYN-29.
-fn remove(settings: &mut Value, entry: &Entry) -> bool {
+/// `settings` with the first occurrence of `entry` replaced by the hook of `by`, or removed when there is none, its
+/// group and event then dropped when left empty (SYN-31); whether `settings` held `entry`. `by` is a hook of the same
+/// event and matcher, and `settings` are in the shape of SYN-29.
+fn replace(settings: &mut Value, entry: &Entry, by: Option<&Entry>) -> bool {
     match entry {
         Entry::Deny(rule) => {
             let Some(deny) = settings["permissions"]["deny"].as_array_mut() else {
@@ -306,30 +346,23 @@ fn remove(settings: &mut Value, entry: &Entry) -> bool {
             matcher,
             hook,
         } => {
-            let Some(hooks) = settings["hooks"].as_object_mut() else {
+            let Some((g, at)) = locate(settings, event, matcher.as_deref(), hook) else {
                 return false;
             };
-            let Some(groups) = hooks.get_mut(event).and_then(Value::as_array_mut) else {
-                return false;
-            };
-            let found = groups.iter().enumerate().find_map(|(g, group)| {
-                let held = group["hooks"].as_array()?;
-                let at = held.iter().position(|h| h == hook)?;
-                (group["matcher"].as_str() == matcher.as_deref()).then_some((g, at))
-            });
-            let Some((g, at)) = found else {
-                return false;
-            };
-            let held = groups[g]["hooks"]
-                .as_array_mut()
-                .expect("checked by `entries`");
+            let hooks = settings["hooks"].as_object_mut().expect("located");
+            let groups = hooks[event].as_array_mut().expect("located");
+            let held = groups[g]["hooks"].as_array_mut().expect("located");
+            if let Some(Entry::Hook { hook: by, .. }) = by {
+                held[at] = by.clone();
+                return true;
+            }
             held.remove(at);
             if held.is_empty() {
                 groups.remove(g);
             }
             if groups.is_empty() {
                 // `shift_remove`, not `remove`: the other events keep their order
-                hooks.shift_remove(event);
+                hooks.shift_remove(event.as_str());
             }
             true
         }
@@ -337,13 +370,15 @@ fn remove(settings: &mut Value, entry: &Entry) -> bool {
 }
 
 /// One `missing: .claude/settings.json <entry>` per entry of `recorded` the settings `text` no longer hold (SYN-36);
-/// none when the settings cannot be parsed or are not in the shape of SYN-29, which the warnings report.
+/// none when there are no settings (the next sync seeds them again, entries included), or when they cannot be parsed
+/// or are not in the shape of SYN-29 (the warnings say so).
 pub fn missing(text: Option<&str>, recorded: &[Entry]) -> Vec<String> {
-    let settings = match text.map(serde_json::from_str::<Value>) {
-        None => Value::Object(Map::new()),
-        Some(Ok(settings)) if entries(&settings).is_ok() => settings,
-        Some(_) => return Vec::new(),
+    let Some(Ok(settings)) = text.map(serde_json::from_str::<Value>) else {
+        return Vec::new();
     };
+    if entries(&settings).is_err() {
+        return Vec::new();
+    }
     recorded
         .iter()
         .filter(|entry| !holds(&settings, entry))

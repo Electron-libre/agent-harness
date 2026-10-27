@@ -353,6 +353,85 @@ fn a_changed_hook_replaces_the_old_one_in_its_group() {
 
 // spec: SYN-31
 #[test]
+fn a_changed_hook_alone_in_its_group_keeps_its_place() {
+    let (source, root) = with_fragment(&fragment());
+    let before = json!({"permissions": {"deny": [DENY]}, "hooks": {
+        "PostToolUse": [
+            {"matcher": "Skill", "hooks": [hook(RECORD)]},
+            {"matcher": "Edit", "hooks": [hook("mine")]},
+        ],
+        "Stop": [{"hooks": [hook(GATE)]}],
+        "PreCompact": [{"hooks": [hook("mine")]}],
+    }});
+    put(root.path(), SETTINGS, &before.to_string());
+    run(&root);
+    let mut changed = fragment();
+    changed["hooks"]["PostToolUse"][0]["hooks"][0] = hook("record");
+    changed["hooks"]["Stop"][0]["hooks"][0] = hook("gate");
+    put(source.path(), FRAGMENT, &changed.to_string());
+    run(&root);
+    let mut expected = before;
+    expected["hooks"]["PostToolUse"][0]["hooks"][0] = hook("record");
+    expected["hooks"]["Stop"][0]["hooks"][0] = hook("gate");
+    let got = settings(&root);
+    assert_eq!(got, expected);
+    assert_eq!(keys(&got["hooks"]), ["PostToolUse", "Stop", "PreCompact"]);
+    assert_eq!(got["hooks"]["PostToolUse"][0]["matcher"], "Skill");
+}
+
+// spec: SYN-29
+#[test]
+fn an_empty_or_star_matcher_is_the_same_as_none() {
+    let (_source, root) = with_fragment(&fragment());
+    let held = json!({"hooks": {"Stop": [{"matcher": "", "hooks": [hook(GATE)]}],
+        "PostToolUse": [{"matcher": "Skill", "hooks": [hook(RECORD)]}]},
+        "permissions": {"deny": [DENY]}});
+    put(root.path(), SETTINGS, &held.to_string());
+    run(&root);
+    assert_eq!(settings(&root), held);
+    put(
+        root.path(),
+        SETTINGS,
+        &held
+            .to_string()
+            .replace(r#""matcher":"""#, r#""matcher":"*""#),
+    );
+    run(&root);
+    assert_eq!(
+        settings(&root)["hooks"]["Stop"][0]["hooks"],
+        json!([hook(GATE)])
+    );
+}
+
+// spec: SYN-33
+#[test]
+fn settings_seeded_again_get_the_managed_entries_without_conflict() {
+    let (source, root) = synced();
+    put(source.path(), &format!("seed/{SETTINGS}"), "{}");
+    fs::remove_file(root.path().join(SETTINGS)).unwrap();
+    let report = run(&root);
+    assert_eq!(report.conflicts(), 0, "{:?}", report.entries);
+    assert_eq!(settings(&root), fragment());
+}
+
+// spec: SYN-36
+#[test]
+fn check_reports_nothing_of_settings_it_cannot_judge() {
+    let (_source, root) = synced();
+    for text in [None, Some("{ not json")] {
+        match text {
+            None => fs::remove_file(root.path().join(SETTINGS)).unwrap(),
+            Some(text) => put(root.path(), SETTINGS, text),
+        }
+        assert!(
+            check_with(root.path(), false).unwrap().problems.is_empty(),
+            "{text:?}"
+        );
+    }
+}
+
+// spec: SYN-31
+#[test]
 fn a_dropped_entry_the_project_edited_is_left_as_it_is() {
     let (source, root) = synced();
     let mut edited = settings(&root);
@@ -364,6 +443,15 @@ fn a_dropped_entry_the_project_edited_is_left_as_it_is() {
     let report = run(&root);
     assert_eq!(settings(&root)["hooks"]["Stop"], edited["hooks"]["Stop"]);
     assert_eq!(report.conflicts(), 0);
+    // said once, as for a dropped file modified locally
+    assert_eq!(
+        report.outcome(&format!("{SETTINGS} hook Stop {GATE}")),
+        Some(Outcome::Kept)
+    );
+    assert_eq!(
+        run(&root).outcome(&format!("{SETTINGS} hook Stop {GATE}")),
+        None
+    );
 }
 
 // spec: SYN-33

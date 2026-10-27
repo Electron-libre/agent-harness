@@ -105,6 +105,31 @@ project, so approach 3 is out (ADR 0007).
    Code review: no findings
    not verified: none.
    decisions needed: none.
+4. [x] Fixes of the `high` review of the issue (10 findings).
+
+   done: a changed hook takes the old one's place (group and event kept); settings seeded again take the entries
+   without conflict; a dropped entry the project edited is reported `kept`; `check` reports nothing of missing or
+   unparsable settings; `""` and `"*"` matchers equal none; one `SETTINGS` constant. SYN-29, SYN-31, SYN-36 and the
+   scenarios amended, architecture adjusted.
+
+   | check | result |
+   |---|---|
+   | tests | `just check` ok (79 + 1) |
+   | lint | clippy clean |
+   | specs | accepted, all traced |
+   | docs | architecture, `specs/sync.md` |
+   | harness | `just test-harness` ok |
+
+   red: `a_changed_hook_alone_in_its_group_keeps_its_place` (`PreToolUse`… order changed), `settings_seeded_again_…`
+   (3 conflicts), `a_dropped_entry_the_project_edited_…` (no `kept`), `check_reports_nothing_…` (missing reported),
+   `an_empty_or_star_matcher_…` (hook added twice).
+   High review, not fixed: an older `harness` reading `entry` lock lines (CI installs the pinned revision, so only a
+   stale local binary); `DENY_RULES` doubling the managed deny rules (SYN-24 holds for any source, and a test keeps
+   the fragment a superset of REV-19); `entries()` cloning to validate (a few hooks, not worth a second walker).
+   Code review: 1 finding — `missing()` silent on absent settings: intended (SYN-36), but its comment wrongly cited
+   a warning; fixed.
+   not verified: none.
+   decisions needed: none.
 
 ## Decisions
 - Mode: autonomous

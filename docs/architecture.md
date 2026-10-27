@@ -33,7 +33,7 @@ in `entries/.claude/settings.json` ([ADR 0007](adr/0007-sync-manages-entries-of-
 objects of the `hooks` table. `harness sync` appends to the project's settings each such entry they lack (a hook in the
 first group of its event with the same matcher, else in a new group), removes the entries the source dropped when the
 settings still hold them unchanged, and records the entries in the lock (`entry  <json>` lines). A hook whose command
-changes is one removal and one addition. A recorded entry the project removed or edited is a conflict, like a
+changes takes the place of the old one in its group (one removal and one addition reported). A recorded entry the project removed or edited is a conflict, like a
 modified managed file: `sync` fails unless `--force` adds it back, and `harness check` reports it as
 `missing: .claude/settings.json <entry>`. Every other key stays as the project wrote it, in its order; the file is
 rewritten (JSON indented by two spaces) only when an entry is added or removed. Settings that are not valid JSON or

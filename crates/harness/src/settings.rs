@@ -8,14 +8,14 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use crate::entries::SETTINGS;
+
 /// The `permissions.deny` rules that keep the review waiver from the agent (REV-19).
 pub const DENY_RULES: [&str; 3] = [
     "Bash(just waive-review)",
     "Bash(just waive-review *)",
     "Edit(//**/claude-review-waived)",
 ];
-/// The settings of the project, relative to its root.
-const SETTINGS: &str = ".claude/settings.json";
 /// The settings of the project kept out of git, relative to its root.
 const LOCAL_SETTINGS: &str = ".claude/settings.local.json";
 /// The days Claude Code keeps the transcripts when `cleanupPeriodDays` is unset.

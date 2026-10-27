@@ -575,6 +575,8 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let seeded = report.outcome(entries::SETTINGS) == Some(Outcome::Seeded);
     let base = if seeded { &seeds } else { root };
     let text = fs::read_to_string(base.join(entries::SETTINGS)).ok();
+    // settings seeded again hold nothing of the project's: no recorded entry is in conflict there
+    let recorded = if seeded { Vec::new() } else { recorded };
     let merge = entries::merge(text.as_deref(), &wanted, &recorded, options.force);
     if let (Some(text), false) = (&merge.write, options.dry_run) {
         write(&root.join(entries::SETTINGS), text.as_bytes())?;
