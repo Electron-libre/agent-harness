@@ -6,7 +6,7 @@
 //! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
 //! `must`) is a warning.
 
-// repo_files.rs sha256: f4e77dcfa83c4aa2a444404b5974da83152921cce31f101a72da76435c30dabf
+// repo_files.rs sha256: cbf7f27d18f4b1a5a3dc15f45d88e334eb346596265f762fd5d06888185e83e4
 #[path = "../repo_files.rs"]
 mod repo_files;
 
