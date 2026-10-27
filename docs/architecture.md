@@ -103,110 +103,88 @@ jobs need no Rust when the source publishes the commit.
 
 ## Hooks and their declaration
 
-The hooks are tools of `harness` (`harness run <tool>`, above) but Claude Code runs them only once declared in
-`.claude/settings.json`, which is seeded and then owned by the project. The source therefore declares what it manages
-in `entries/.claude/settings.json` ([ADR 0007](adr/0007-sync-manages-entries-of-the-seeded-settings.md),
-`crates/harness/src/entries.rs`, SYN-29 to SYN-36): the `permissions.deny` rules of the review waiver and the hook
-objects of the `hooks` table. `harness sync` appends to the project's settings each such entry they lack (a hook in the
-first group of its event with the same matcher, else in a new group), removes the entries the source dropped when the
-settings still hold them unchanged, and records the entries in the lock (`entry  <json>` lines). A hook whose command
-changes takes the place of the old one in its group (one removal and one addition reported). A recorded entry the project removed or edited is a conflict, like a
-modified managed file: `sync` fails unless `--force` adds it back, and `harness check` reports it as
-`missing: .claude/settings.json <entry>`. Every other key stays as the project wrote it, in its order; the file is
-rewritten (JSON indented by two spaces) only when an entry is added or removed. Settings that are not valid JSON or
-not in the shape of Claude Code's are left alone, with a warning. There is no separate file to own instead: Claude
-Code reads one shared settings file per project, besides the personal `settings.local.json`.
+| Event | Matcher | Tool | Does | Spec |
+|---|---|---|---|---|
+| `PreToolUse` | `Bash` | `review-gate check` | refuses a command that would skip the git hook | [`review-gate.md`](../specs/review-gate.md) REV-12 |
+| `PostToolUse` | `Skill` | `review-gate record` | records what the code review saw | [`review-gate.md`](../specs/review-gate.md) |
+| `PostToolUse` | `Edit\|Write` | `format-rust` | `cargo fmt` the project of an edited `.rs` file | |
+| `Stop` | | `clippy-gate` | blocks the end of a turn while clippy reports a problem | [`clippy-gate.md`](../specs/clippy-gate.md) |
+| git `pre-commit` | | `review-gate native` | refuses a commit whose diff the review never saw | [`review-gate.md`](../specs/review-gate.md) REV-9 |
 
-`harness check` also warns of what the settings lack or run in vain: a deny rule of the review waiver, a hook script
-under `.claude/hooks/` the project no longer has (a hook of the project's own, or one from before the tools moved to
-`harness`), an attribution left on. `harness sync` and `harness update` print the same
-warnings, judged on the project as the sync leaves it (or would, under `--dry-run`). A test of the crate
-(`every_tool_the_shared_harness_runs_exists`) fails when a declared hook, a recipe or a skill runs a tool
-`harness run` does not know.
+Claude Code runs a hook only once declared in `.claude/settings.json`, which is seeded and then owned by the project.
+The source therefore declares what it manages in `entries/.claude/settings.json`: the hooks above and the
+`permissions.deny` rules of the review waiver ([ADR 0007](adr/0007-sync-manages-entries-of-the-seeded-settings.md),
+`crates/harness/src/entries.rs`). `sync` adds the entries the settings lack, removes those the source dropped when they
+are unchanged, records them in the lock, and leaves every other key as the project wrote it (SYN-29 to SYN-36). There is
+no separate file to own instead: Claude Code reads one shared settings file per project, besides the personal
+`settings.local.json`.
 
-No hook guards the attribution: the seeded settings turn it off at the source (`"attribution": {"commit": "", "pr": "",
-"sessionUrl": false}`), `harness run commit-check` rejects a credit line in a message (run by `skill:commit-message` and by CI
-through `just check-commits`), and `harness check` warns of settings that leave it on.
+`check`, `sync` and `update` warn of what the settings lack or run in vain: a deny rule of the waiver, a hook under
+`.claude/hooks/` the project no longer has, an attribution left on (SYN-24 to SYN-27), and a transcript retention under
+a year outside CI (SYN-28, `settings::retention`), since the evaluation reads the transcripts of several revisions. A
+test of the crate (`every_tool_the_shared_harness_runs_exists`) fails when a declared hook, a recipe or a skill runs a
+tool `harness run` does not know.
 
-The transcripts of the sessions are what the harness is evaluated from, across several of its revisions, and Claude
-Code deletes them after `cleanupPeriodDays` (30 days by default). The sweep deletes those of every project with the
-value of the session that runs it, so only the user settings, which the harness never writes, keep them all.
-`harness check`, `sync` and `update` warn, outside CI, when the user settings keep them less than 365 days or a
-settings file of the project lowers the period (`settings::retention`).
+No hook guards the attribution: the seeded settings turn it off (`"attribution": {"commit": "", "pr": "",
+"sessionUrl": false}`), `harness run commit-check` rejects a credit line (run by `skill:commit-message` and by CI through
+`just check-commits`), and `check` warns of settings that leave it on.
 
-The Stop hook `harness run clippy-gate` blocks the end of a turn while `cargo clippy` reports a problem in a project with a
-`Cargo.toml` and a changed `.rs` file outside the `.claude` directories, whose scripts are not crate code (spec
-[`specs/clippy-gate.md`](../specs/clippy-gate.md)). What it prints is billed to the agent at each turn, so it sends one
-line per diagnostic (`--message-format=short`: file, line, column, message) and per error with no location, at most
-40, never the build progress, and runs clippy only when the Rust state changed since the last passing run: that run
-writes a hash of `HEAD` and of the path and content of each changed `.rs` file to `claude-clippy-pass` in the git
-directory of the worktree.
-The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session opened in the main worktree that entered another
-worktree (`EnterWorktree`, an agent's) keeps it on the main one, where another agent may work. `clippy-gate` checks the
-work tree of the event's `cwd`, at the place `CLAUDE_PROJECT_DIR` has in its own (a crate in a subdirectory), and
-`format-rust` runs `cargo fmt` from the directory of the edited file.
-For the same reason the seeded `justfile` asks the project's `check` to print nothing on success.
+### The review gate
 
-`review-gate` makes the code review of `issue-workflow` (step 3.5) a precondition of the commit. It is
-declared twice in `.claude/settings.json`, one mode per event: `record` on `PostToolUse` `Skill`, `check` on
-`PreToolUse` `Bash` (a third mode, `native`, is run by git, see below):
+`review-gate` makes the code review of `issue-workflow` (step 3.5) a precondition of the commit. The gates catch the
+mistakes of a cooperative agent, not deliberate bypasses
+([ADR 0005](adr/0005-the-gates-catch-mistakes-not-bypasses.md)); the judgement moved from the command text to the
+repository git resolves ([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md),
+`crates/harness/src/gate.rs`).
 
-```json
-"PostToolUse": [
-  { "matcher": "Skill", "hooks": [
-    { "type": "command", "command": "harness run review-gate record" } ] }
-]
+```mermaid
+sequenceDiagram
+  participant A as agent
+  participant CC as Claude Code
+  participant G as git
+  A->>CC: /code-review low (Skill)
+  CC->>CC: PostToolUse: review-gate record<br/>marker = HEAD, tree hash, files seen
+  A->>CC: Bash: git commit
+  CC->>CC: PreToolUse: review-gate check<br/>refuses --no-verify, -n, core.hooksPath
+  CC->>G: git commit
+  G->>G: pre-commit: review-gate native
+  alt a file of the diff the review never saw
+    G-->>A: exit 2: run /code-review low
+  else reviewed, waived, or issues/ only
+    G-->>A: commit made
+  end
 ```
 
-When the `code-review` skill ends (it runs forked, so the hook fires at the end of the review), `record` writes
-the marker `claude-code-review.json` in the git directory, never a file of the work tree: the `HEAD`, a hash of
-the working tree against `HEAD` (tracked changes and untracked files, what an add of everything followed by a
-commit commits) and the files it covers. The hook sees the review text in the `Skill` response but does not parse it.
+- **record** writes `claude-code-review.json` in the git directory, never in the work tree: the `HEAD`, a hash of the
+  working tree against `HEAD` (tracked changes and untracked files) and the files it covers. It does not parse the
+  review text. `code-review` runs forked, so the hook fires when the review ends.
+- **native** recomputes that snapshot and refuses when the marker is missing, older than the last commit, or the diff
+  holds a file the review never saw (REV-9, REV-10); a fix to a reviewed file passes, documentation is reviewed like
+  code, and the temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is the one `record`
+  took. Each linked worktree has its own marker and waiver (REV-11, REV-15).
+- **check** reads a command only for what would skip the git hook (REV-12): a native hook does not run under
+  `--no-verify` or `-n`, nor once `core.hooksPath` points elsewhere. A commit made by another tool is out of reach.
+- **Waiver**: only the user waives the next commit, with `just waive-review` (it creates `claude-review-waived` at
+  `git rev-parse --git-path`, REV-17). The managed deny rules make Claude Code refuse the agent the recipe and an edit
+  of the file (REV-19); they match the command the agent usually writes, not a `touch` or a script. A waiver is stamped
+  with `HEAD` when it lets a commit through and removed at the first run after `HEAD` moved, so a command that does not
+  commit leaves it usable.
+- **Install**: `sync` writes the git `pre-commit` (a small `sh` script marked by its second line) in the hooks
+  directory of the common git directory, keeps a user's own hook as `pre-commit.user` run after it, and skips a
+  `core.hooksPath` set elsewhere (SYN-18 to SYN-23); a project nested in another repository, or outside any, gets
+  no gate and no error. `.git/hooks` is not cloned, so each clone needs its own `sync`. A
+  missing `harness`, or a launcher that cannot run the tool (exit 3), is a warning, not a refusal.
 
-The gates catch the mistakes of a cooperative agent, not deliberate bypasses
-([ADR 0005](adr/0005-the-gates-catch-mistakes-not-bypasses.md)): the review is judged by the native hook below, on the
-repository git resolved, and `check` reads the text of a command only for what would skip that hook. The user waives
-the review of the next commit with `just waive-review` (it creates `claude-review-waived` at the path
-`git rev-parse --git-path` gives, right in a linked worktree too). The `permissions.deny` rules that `harness sync`
-manages in `.claude/settings.json` (`Bash(just waive-review)`, `Bash(just waive-review *)`,
-`Edit(//**/claude-review-waived)`) make Claude Code refuse the agent the recipe and an edit of the file; they match the
-command the agent usually writes, not a `touch` or a script. `harness check` still prints a `warning:` line for each
-rule the settings lack (`DENY_RULES` of `crates/harness/src/settings.rs`), whatever the source manages.
+### The Rust hooks
 
-A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` installs
-([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md), `crates/harness/src/gate.rs`;
-`.git/hooks` is neither versioned nor cloned, so each clone needs its own `sync`). The installed file is a small `sh`
-script, marked by its second line, that starts `harness run review-gate native` from the
-work tree (or `rust-script .claude/hooks/require_code_review.rs native` in a work tree of a revision from before the
-tools moved into `harness`: the gate is shared by every worktree of the repository) and then the `pre-commit` the user
-already had, which `sync` moved to `pre-commit.user` (it never overwrites a hook that is not its own, and stops before
-writing anything when `pre-commit.user` exists too). A work tree with neither the hook script nor
-`.claude/harness.toml` (a branch that predates the harness), a machine without the program it needs or with a `harness`
-older than `run`, and a launcher that cannot run the tool (exit 3) are a warning on stderr, not a refusal. `sync`
-installs the gate when the source manages a hook running `harness run review-gate` or ships the old hook script
-(`check` expects it when the lock records either), reinstalls the script when it is missing, edited or no longer
-executable, and `--dry-run` only reports. `init` writes `harness.toml` only: the gate is not there until the first `sync`.
+`clippy-gate` runs `cargo clippy` at the end of a turn only in a project with a `Cargo.toml` and a changed `.rs` file
+outside the `.claude` directories, and only when the Rust state changed since the last passing run (CLG-1, CLG-4). What
+it prints is billed to the agent at each turn, so it sends one short line per diagnostic, at most 40 (CLG-2, CLG-3).
 
-The gate goes to the hooks directory of the repository whose top is the project, so a linked worktree (or a `.git` that
-is a file) installs it once in the hooks of the common git directory, for all its worktrees; a project nested in another
-repository, a directory outside any repository and a source without the review hook get no gate and no error. When
-`core.hooksPath` is set, git reads its hooks elsewhere, often a versioned directory: `sync` then installs nothing,
-reports `skipped (…)` with the line to add to the user's own `pre-commit`, and still succeeds.
-Git runs the hook in the repository that really receives the commit, with `GIT_DIR` and the work tree already
-resolved, so `native` reads no event and no command (spec [`specs/review-gate.md`](../specs/review-gate.md)). It
-recomputes the snapshot and exits 2, telling the agent to run the review, when the marker is missing, was made before
-the last commit, or the diff holds a file the review never saw. A fix to a file the review saw passes. A tree with
-nothing to commit and a diff under `issues/` only are let through. Documentation is reviewed like code. A waiver is
-stamped with `HEAD` when it lets a commit through and removed at the first run after `HEAD` moved, so a command that
-does not commit leaves it usable; a waiver that cannot be read or stamped waives nothing, and a refusal tells the agent to ask
-the user to fix it. The temporary index of `git commit -a` (`GIT_INDEX_FILE`) is ignored so the snapshot is the one
-`record` took.
-
-A native hook does not run under `--no-verify` or `-n`, nor once `core.hooksPath` points elsewhere, so `check` refuses
-a commit that carries `--no-verify` (or an abbreviation) or `-n` (alone or in a bundle such as `-anm`), and any command
-that sets `core.hooksPath` (`-c`, `--config-env`, `git config`, `GIT_CONFIG_KEY_n`). The value of `-m` and of the other
-options that take one is not read, and `--get` is let through. Only the Claude hook can refuse these; a commit made by
-another tool is out of reach.
+The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session that entered another worktree keeps it on the
+main one, where another agent may work. `clippy-gate` checks the work tree of the event's `cwd` (CLG-6) and
+`format-rust` runs `cargo fmt` from the directory of the edited file. For the same reason the seeded `justfile` asks
+the project's `check` to print nothing on success.
 
 ## The instruction audit
 

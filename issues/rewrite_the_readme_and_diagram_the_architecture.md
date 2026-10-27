@@ -62,7 +62,7 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
    "Tools and their binary" and "Sources" as overviews with a `sync` flowchart and a `harness run` launcher diagram,
    duplicated edge cases replaced by links to `specs/sync.md`, `specs/tool-binaries.md` and the ADRs; verified by a
    statement-by-statement check that each dropped one lives in a spec, an ADR or a doc comment; ~250 lines.
-3. [ ] Architecture, hooks and gates: "Hooks and their declaration" as an overview with a sequence diagram of a commit
+3. [x] Architecture, hooks and gates: "Hooks and their declaration" as an overview with a sequence diagram of a commit
    (`review-gate` record, check, native; `clippy-gate` at Stop; `format-rust`), edge cases linked to
    `specs/review-gate.md`, `specs/clippy-gate.md`, ADRs 0004, 0005, 0007; same check; ~200 lines.
 4. [ ] Processes: a new `docs/workflow.md` with the issue lifecycle flowchart (create, queue, steps 0 to 3 with the
@@ -107,6 +107,22 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 |---|---|
 | tests, lint, specs | `just check` passes |
 | docs | each dropped statement found in `specs/sync.md` or `specs/tool-binaries.md`; the two found nowhere (a branch `rev` resolved without fetch, exit 2 before BIN-7 and BIN-17) kept; links resolve |
+| code review | see below |
+
+- red: none (docs only, no test)
+- Code review: no findings
+- not verified: the mermaid rendering
+- decisions needed: none
+
+## Deliverable 3
+- done: "Hooks and their declaration" as a hook table, the declaration and warnings in two paragraphs, the review gate
+  as a sequence diagram with one bullet per mode, the Rust hooks in two paragraphs; edge cases linked to the SYN, REV
+  and CLG ids.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| docs | each dropped statement found in `specs/sync.md`, `specs/review-gate.md`, `specs/clippy-gate.md` or the doc comments of `review_gate.rs` (`--get`); the rest (marker content, waiver stamp, `GIT_INDEX_FILE`, nested project) kept; links resolve |
 | code review | see below |
 
 - red: none (docs only, no test)
