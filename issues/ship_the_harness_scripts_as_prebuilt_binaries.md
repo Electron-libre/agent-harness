@@ -51,7 +51,7 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
    after a push (not testable offline).
 3. [x] Hooks: `require_code_review`, `clippy_gate`, `format_rust` ported with their tests (REV, CLG traces), entries
    commands and the `pre-commit` gate on `harness run`; makes true BIN-9 and part of BIN-8.
-4. [ ] Issue workflow: `next_issue`, `issue_worktree`, `close_issue`, `repo_files` ported with their tests (PAR).
+4. [x] Issue workflow: `next_issue`, `issue_worktree`, `close_issue`, `repo_files` ported with their tests (PAR).
 5. [ ] Checks: `check_specs`, `check_issue` ported with their tests (CLR); this repository's `check-specs` keeps working.
 6. [ ] Transcript readers and `audit_sources` ported with their tests (EVA, RER, QUA, REP, BRE); stamps removed;
    ADR 0006 marked superseded.
@@ -138,3 +138,24 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
   - Deliverable 6: `session_metrics.rs` names a hook refusal by the `.rs` file its text cites; a refusal of
     `harness run review-gate` cites none. Map the tool names (`review-gate` to `require_code_review`, `clippy-gate`
     to `clippy_gate`) so the counts stay comparable across revisions.
+
+## Deliverable 4
+- done: `next-issue`, `issue-worktree`, `close-issue` and the `repo_files` module ported (code moved as is, usage
+  lines name `harness run`), their tests turned into cargo tests (`tests/next_issue.rs`, `close_issue.rs`,
+  `issue_worktree.rs`, 76 checks, PAR traces kept; the hash stamp check of `repo_files.rs` dropped, the crate needs
+  none); the recipes call `harness run`. `files/.claude/repo_files.rs` stays for `check_specs.rs` until deliverable 5.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| `just test-harness` | pass |
+| smoke | `cargo run -- run next-issue` in this worktree prints the queue |
+| docs | architecture (Tools, Parallel issues) |
+
+- red: none before the code (tests ported with the code).
+- Code review: no findings; it saw part of the moved modules only (73 kB diff), so each was diffed against its original through rustfmt: only the entry point and usage lines differ.
+- not verified: `just start-issue`, `finish-issue`, `close-issue` through an installed `harness` (this machine's
+  predates `run`).
+- decisions needed: none.
+- Follow-up: the merge itself needs the new `harness` first: `just close-issue` and `just finish-issue` of the main
+  branch call `harness run` once fast-forwarded, so run `just install` before them.

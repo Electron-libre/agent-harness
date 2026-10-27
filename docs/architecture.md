@@ -28,7 +28,7 @@ Everything that differs between projects is a value, not code. Scripts read list
 
 The tools of the harness move from `rust-script` files to modules of the `harness` crate
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md));
-the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check` and `check-commits` are ported, the other
+the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits` and the issue tools (`next-issue`, `issue-worktree`, `close-issue`) are ported, the other
 scripts still run under `rust-script`. A hook, a recipe or a
 skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
 the nearest `.claude/harness.toml` from the current directory and replaces itself (`exec`) by
@@ -246,22 +246,22 @@ numbers are never turned into a pass or a fail, since they would become targets.
 Two agents can drive two issues at once: [ADR 0003](adr/0003-one-worktree-per-issue.md),
 [ADR 0008](adr/0008-issue-worktrees-nest-under-claude-worktrees.md),
 [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md), spec
-[`specs/parallel-issues.md`](../specs/parallel-issues.md). `issue_worktree.rs` (`just start-issue`,
+[`specs/parallel-issues.md`](../specs/parallel-issues.md). `harness run issue-worktree` (`just start-issue`,
 `just finish-issue`) gives an issue the worktree `.claude/worktrees/<stem>` on a branch `<stem>`: separate working tree and
 index, shared object store, so one agent's uncommitted files and commits never reach the other. Claude Code enters a
 worktree there without asking for an approval; `start-issue` adds `/.claude/worktrees/` to `.git/info/exclude`, and the
-scripts that scan the tree, `close_issue.rs` and `check_specs.rs`, take their files from git (`repo_files.rs`,
-shared by `#[path]` include as in ADR 0006, `git ls-files -co --exclude-standard`), which never lists a nested
-worktree, ignored or not, so the main worktree never sees the nested ones. `close_issue.rs` then drops `.git`,
+tools that scan the tree, `close-issue` and `check_specs.rs`, take their files from git (`repo_files.rs`: a module of
+the crate, and a copy `check_specs.rs` includes by `#[path]` until it is ported, `git ls-files -co --exclude-standard`),
+which never lists a nested worktree, ignored or not, so the main worktree never sees the nested ones. `close-issue` then drops `.git`,
 `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by directory name; `check_specs.rs`
 walks the disk only outside a git repository. A project's own tools run on `.` may still read the nested
 worktrees (measured in ADR 0009); the README says how to keep them out. `finish-issue` still removes a
 worktree left at the former sibling path `../<repo>-<stem>`. Each worktree has its
 own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a cold build in 4 s; a larger
 project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:
-`next_issue.rs` reads `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and no file
+`next-issue` reads `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and no file
 needs cleaning. A leftover branch with neither is listed `Stale:` and `just finish-issue` cleans it (merged by
-ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close_issue.rs` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. An agent
+ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close-issue` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. An agent
 handed an issue in the main worktree starts it itself (`issue-workflow`, step 0): `just start-issue`, then Claude
 Code's `EnterWorktree` with the path, since a shell `cd` out of the launch directory does not last; the session's
 `cwd`, and the `cwd` of the hook events, become the worktree. The hooks act on the work tree of that `cwd`

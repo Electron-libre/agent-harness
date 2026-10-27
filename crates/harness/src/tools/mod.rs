@@ -6,8 +6,12 @@ use std::process::Command;
 
 mod check_commits;
 mod clippy_gate;
+mod close_issue;
 mod commit_check;
 mod format_rust;
+mod issue_worktree;
+mod next_issue;
+mod repo_files;
 mod review_gate;
 
 /// A tool: its name on the command line, a summary, and its entry point.
@@ -30,6 +34,11 @@ pub const TOOLS: &[Tool] = &[
         main: clippy_gate::main,
     },
     Tool {
+        name: "close-issue",
+        about: "move a finished issue to issues/done/ and repoint the documents that cite it",
+        main: close_issue::main,
+    },
+    Tool {
         name: "commit-check",
         about: "validate a commit message read from stdin against AGENTS.md",
         main: commit_check::main,
@@ -38,6 +47,16 @@ pub const TOOLS: &[Tool] = &[
         name: "format-rust",
         about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
         main: format_rust::main,
+    },
+    Tool {
+        name: "issue-worktree",
+        about: "start <issue> | finish <stem> [--force]: the worktree and branch of an issue",
+        main: issue_worktree::main,
+    },
+    Tool {
+        name: "next-issue",
+        about: "the next issue of issues/queue.md no branch or worktree has taken",
+        main: next_issue::main,
     },
     Tool {
         name: "review-gate",
