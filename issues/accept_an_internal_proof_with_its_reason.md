@@ -61,6 +61,9 @@ requirement out of the TRC-1 warning, fails on a blank reason, and the reason ne
 - TRC goes `draft` while TRC-6 to TRC-8 are untraced, back to `accepted` in deliverable 1.
 - The boundary warning names the reason syntax.
 - Deliverable 3 gives reasons to this repo's internal-only citations, each from what its test does.
+- Deliverable 3 reverted after the `high` review (user, 2026-10-28): its reasons said a binary test would be cheap,
+  against the rule of deliverable 2, and silenced the warnings `prove_the_gate_specs_through_the_binary` works from;
+  that issue decides proof by proof.
 
 ## Deliverable 1
 - done: `citation()` in `check_specs.rs` splits ids and reason, shared with `delivered-quality`; the boundary warning
@@ -136,4 +139,4 @@ requirement out of the TRC-1 warning, fails on a blank reason, and the reason ne
   the user (they say a binary test would be cheap, and they silence the warnings `prove_the_gate_specs_through_the_binary`
   works from).
 - not verified: none
-- decisions needed: keep or revert deliverable 3
+- decisions needed: none (deliverable 3 reverted, see below)

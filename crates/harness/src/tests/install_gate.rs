@@ -72,7 +72,7 @@ fn run_hook(root: &TempDir, path: &Path, args: &[&str]) -> Output {
         .unwrap()
 }
 
-// spec: SYN-18 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-18
 #[test]
 fn installs_an_executable_hook_that_runs_the_review_in_native_mode() {
     let (_source, root) = gated();
@@ -87,7 +87,7 @@ fn installs_an_executable_hook_that_runs_the_review_in_native_mode() {
     assert_eq!(report.outcome(gate::GATE), Some(Outcome::Added));
 }
 
-// spec: SYN-18 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-18
 #[test]
 fn the_hook_runs_the_review_from_the_work_tree_and_fails_with_its_exit_code() {
     let (_source, root) = gated();
@@ -101,7 +101,7 @@ fn the_hook_runs_the_review_from_the_work_tree_and_fails_with_its_exit_code() {
     }
 }
 
-// spec: SYN-18, BIN-14 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-18, BIN-14
 #[test]
 fn the_hook_lets_the_commit_through_when_the_launcher_cannot_run_the_review() {
     let (_source, root) = gated();
@@ -115,7 +115,7 @@ fn the_hook_lets_the_commit_through_when_the_launcher_cannot_run_the_review() {
 /// The review hook script of the revisions before the tools moved into `harness`.
 const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
 
-// spec: SYN-18 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-18
 #[test]
 fn the_hook_runs_the_review_script_of_an_older_revision() {
     let (_source, root) = gated();
@@ -132,7 +132,7 @@ fn the_hook_runs_the_review_script_of_an_older_revision() {
     assert_eq!(calls.trim(), format!("{LEGACY_HOOK} native"));
 }
 
-// spec: SYN-22, SYN-23 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-22, SYN-23
 #[test]
 fn a_source_of_an_older_revision_still_gets_and_checks_the_gate() {
     let (source, root) = setup();
@@ -153,7 +153,7 @@ fn a_source_of_an_older_revision_still_gets_and_checks_the_gate() {
     );
 }
 
-// spec: SYN-18, BIN-9 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-18, BIN-9
 #[test]
 fn the_hook_warns_and_lets_the_commit_through_without_the_harness() {
     let (_source, root) = gated();
@@ -193,7 +193,7 @@ fn user_hook(root: &TempDir, code: i32) {
     set_executable(&path, true).unwrap();
 }
 
-// spec: SYN-19 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-19
 #[test]
 fn moves_a_hook_of_the_user_aside_and_runs_it_after_the_gate() {
     let (_source, root) = gated();
@@ -221,7 +221,7 @@ fn moves_a_hook_of_the_user_aside_and_runs_it_after_the_gate() {
     );
 }
 
-// spec: SYN-19 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-19
 #[test]
 fn a_refusal_of_the_gate_stops_the_commit_before_the_hook_of_the_user() {
     let (_source, root) = gated();
@@ -233,7 +233,7 @@ fn a_refusal_of_the_gate_stops_the_commit_before_the_hook_of_the_user() {
     assert!(get(root.path(), "ran").is_none());
 }
 
-// spec: SYN-19 (internal: runs the installed hook as git does; installing it by the binary adds nothing)
+// spec: SYN-19
 #[test]
 fn a_failure_of_the_hook_of_the_user_fails_the_commit() {
     let (_source, root) = gated();
@@ -243,7 +243,7 @@ fn a_failure_of_the_hook_of_the_user_fails_the_commit() {
     assert_eq!(run_hook(&root, bin.path(), &[]).status.code(), Some(7));
 }
 
-// spec: SYN-19 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-19
 #[test]
 fn never_replaces_a_chained_hook_and_fails_changing_nothing() {
     let (_source, root) = gated();
@@ -264,7 +264,7 @@ fn never_replaces_a_chained_hook_and_fails_changing_nothing() {
     assert!(get(root.path(), LOCK).is_none());
 }
 
-// spec: SYN-20 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-20
 #[test]
 fn reinstalls_a_missing_modified_or_non_executable_hook_and_is_idempotent() {
     let (_source, root) = gated();
@@ -291,7 +291,7 @@ fn reinstalls_a_missing_modified_or_non_executable_hook_and_is_idempotent() {
     assert!(get(root.path(), ".git/hooks/pre-commit.user").is_none());
 }
 
-// spec: SYN-19 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-19
 #[test]
 fn a_hook_that_only_quotes_the_mark_is_the_users_and_a_symlinked_one_keeps_its_target() {
     let (_source, root) = gated();
@@ -323,7 +323,7 @@ fn a_hook_that_only_quotes_the_mark_is_the_users_and_a_symlinked_one_keeps_its_t
     assert!(fs::symlink_metadata(pre_commit(&root)).unwrap().is_file());
 }
 
-// spec: SYN-20 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-20
 #[test]
 fn a_dry_run_reports_the_installation_and_writes_nothing() {
     let (_source, root) = gated();
@@ -360,7 +360,7 @@ fn point_at_source(root: &TempDir, dir: &Path) {
     put(dir, CONFIG, &get(root.path(), CONFIG).unwrap());
 }
 
-// spec: SYN-21 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-21
 #[test]
 fn a_linked_worktree_gets_the_gate_in_the_hooks_of_the_common_git_directory() {
     let (_source, root) = gated();
@@ -403,7 +403,7 @@ fn a_linked_worktree_gets_the_gate_in_the_hooks_of_the_common_git_directory() {
     );
 }
 
-// spec: SYN-22 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-22
 #[test]
 fn installs_nothing_when_core_hooks_path_is_set_and_says_why() {
     let (_source, root) = gated();
@@ -436,7 +436,7 @@ fn installs_nothing_when_core_hooks_path_is_set_and_says_why() {
     assert!(!pre_commit(&root).exists());
 }
 
-// spec: SYN-22 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-22
 #[test]
 fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
     let (source, root) = setup();
@@ -463,7 +463,7 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
     assert!(!outer.path().join(".git/hooks/pre-commit").exists());
 }
 
-// spec: SYN-23 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-23
 #[test]
 fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     let (_source, root) = gated();
@@ -556,7 +556,7 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
         .is_empty());
 }
 
-// spec: REV-19 (internal: a property of the shipped `entries/.claude/settings.json`, no command to run)
+// spec: REV-19
 #[test]
 fn the_managed_settings_entries_deny_the_waiver_to_the_agent() {
     let fragment =
@@ -577,7 +577,7 @@ fn the_managed_settings_entries_deny_the_waiver_to_the_agent() {
     }
 }
 
-// spec: SYN-24 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-24
 #[test]
 fn check_warns_of_each_deny_rule_the_settings_lack() {
     let (_source, root) = gated();
@@ -651,7 +651,7 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     assert!(deny_warnings(plain.path()).is_empty());
 }
 
-// spec: SYN-24, SYN-25, SYN-26 (internal: public `sync()`, `check_with()` on a real git repo; the binary only prints)
+// spec: SYN-24, SYN-25, SYN-26
 #[test]
 fn unparsable_settings_get_one_warning_without_the_review_hook() {
     let (_source, plain) = setup();
