@@ -34,7 +34,8 @@ fn is_id_prefix(s: &str) -> bool {
     s.len() == 3 && s.chars().all(|c| c.is_ascii_uppercase())
 }
 
-fn is_req_id(s: &str) -> bool {
+/// Whether `s` is a requirement id (`ABC-3`); `delivered-quality` reads the citations with it.
+pub(super) fn is_req_id(s: &str) -> bool {
     s.split_once('-').is_some_and(|(p, n)| {
         is_id_prefix(p) && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())
     })

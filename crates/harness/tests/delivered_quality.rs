@@ -335,7 +335,8 @@ fn review_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
-/// A repository where `eps` adds three citations and records the red run of two, and `zeta` only renames a test.
+/// A repository where `eps` adds three citations and records the red run of two, `zeta` only renames a test and
+/// `eta` extends its citation.
 fn traced_fixture(tmp: &Path) -> PathBuf {
     let repo = tmp.join("proj");
     std::fs::create_dir_all(&repo).unwrap();
@@ -352,13 +353,14 @@ fn traced_fixture(tmp: &Path) -> PathBuf {
             ("issues/zeta.md", Some("# zeta\n")),
         ],
     );
-    let eps = "# eps\n\n# Tracking\n\n## Plan\n1. [x] one\n\n## Deliverable 1\n- red: ABC-1, ABC-3: assertion failed\n- red: none\n\n# Notes\nred: ABC-2\n";
+    let eps = "# eps\n\n# Tracking\n\n## Plan\n1. [x] one\n\n## Deliverable 1\n- red: ABC-1,\n  ABC-3: assertion failed, see ABC-2\n- Not covered: ABC-2\n- red: none\n\n# Notes\nred: ABC-2\n";
     commit_at(
         &repo,
         "2026-01-02T00:00:00Z",
         "feat(files): eps",
         &[
-            ("tests/a.rs", Some("// spec: ABC-1, ABC-2\nfn a() {}\n// spec: ABC-3\nfn b() {}\n// spec: ABC-1\nfn c() {}\n")),
+            ("tests/a.rs", Some("// spec: ABC-1, ABC-2\nfn a() {}\n    // spec: ABC-3\nfn b() {}\n// spec: ABC-1\nfn c() {}\nconst T: &str = \"// spec: ABC-9 in a string\";\n")),
+            ("specs/a.md", Some("Cite with // spec: ABC-8 above a test.\n")),
             ("docs/a.md", Some("// spec: ABC-4\n")),
             ("issues/eps.md", Some(eps)),
         ],
@@ -389,6 +391,38 @@ fn traced_fixture(tmp: &Path) -> PathBuf {
             ("issues/done/zeta.md", Some(zeta)),
         ],
     );
+    let eta = "# eta\n\n# Tracking\n\n## Plan\n1. [x] one\n- red: none (OLD-5 not covered: OLD-6)\n- Not covered: OLD-5\n";
+    commit_at(
+        &repo,
+        "2026-01-06T00:00:00Z",
+        "feat(files): extend the citation",
+        &[
+            (
+                "tests/moved.rs",
+                Some("// spec: OLD-1, OLD-5\nfn old() {}\n"),
+            ),
+            ("issues/eta.md", Some(eta)),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-06T12:00:00Z",
+        "refactor(files): move and reorder the extended citation",
+        &[
+            ("tests/moved.rs", None),
+            (
+                "tests/again.rs",
+                Some("fn other() {}\n// spec: OLD-5, OLD-1\nfn old() {}\n"),
+            ),
+            ("issues/eta.md", Some(&format!("{eta}x\n"))),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-07T00:00:00Z",
+        "docs: close eta",
+        &[("issues/eta.md", None), ("issues/done/eta.md", Some(eta))],
+    );
     repo
 }
 
@@ -399,16 +433,21 @@ fn traced_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let r = rows(&out);
     vec![
         (
-            "the distinct ids of the added citations are traced, docs excluded".to_string(),
+            "the distinct ids of the added citation lines are traced, docs, prose and strings excluded".to_string(),
             has(&r, "eps", "traced", "3"),
         ),
         (
-            "the traced ids no red line of the Tracking names have no red run".to_string(),
+            "the traced ids missing from the id list of every red item of the Tracking have no red run".to_string(),
             has(&r, "eps", "traced_without_red", "1"),
         ),
         (
             "a renamed test traces nothing".to_string(),
             has(&r, "zeta", "traced", "0") && has(&r, "zeta", "traced_without_red", "0"),
+        ),
+        (
+            "an extended citation traces its new id, kept when a later commit rewrites it; a red none or a not covered line names none"
+                .to_string(),
+            has(&r, "eta", "traced", "1") && has(&r, "eta", "traced_without_red", "1"),
         ),
     ]
 }

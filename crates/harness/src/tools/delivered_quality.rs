@@ -7,6 +7,7 @@
 //! Usage: `harness run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the current
 //! directory, `~/.claude/projects` and 30 days).
 
+use super::check_specs::is_req_id;
 use super::transcripts;
 
 use chrono::{DateTime, Duration, FixedOffset};
@@ -223,19 +224,17 @@ fn reviews(text: &str) -> (usize, Option<usize>) {
     (lines.len(), sum)
 }
 
-/// Whether `word` has the shape of a requirement id: capitals, `-`, digits (`ABC-3`).
-fn is_id(word: &str) -> bool {
-    word.split_once('-').is_some_and(|(prefix, number)| {
-        !prefix.is_empty()
-            && prefix.chars().all(|c| c.is_ascii_uppercase())
-            && !number.is_empty()
-            && number.chars().all(|c| c.is_ascii_digit())
-    })
+/// The requirement ids of a `// spec: A-1, B-2` list, read as `check-specs` reads them.
+fn cited(list: &str) -> impl Iterator<Item = String> + '_ {
+    list.split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|w| is_req_id(w))
+        .map(str::to_string)
 }
 
-/// The requirement ids the commits `own` cite on the `// spec: ` lines they add to the files of the issue (QUA-11),
-/// renames detected so a moved test traces nothing.
-fn traced(repo: &Path, own: &[&Commit]) -> BTreeSet<String> {
+/// The requirement ids the commits `own` cite on the citation lines (`// spec:` opening the trimmed line) they add
+/// to the files of the issue, less, in each commit, those cited on the citation lines it removes, renames detected (QUA-11): a moved
+/// or extended citation traces only its new ids. `None` when git cannot show the diffs.
+fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
     let mut args = vec![
         "-c",
         "core.quotePath=false",
@@ -243,7 +242,8 @@ fn traced(repo: &Path, own: &[&Commit]) -> BTreeSet<String> {
         "-M",
         "-U0",
         "--no-color",
-        "--format=",
+        "--format=%x1e",
+        "-G// spec:",
     ];
     args.extend(own.iter().map(|c| c.hash.as_str()));
     args.extend(["--", "."]);
@@ -253,26 +253,64 @@ fn traced(repo: &Path, own: &[&Commit]) -> BTreeSet<String> {
         .map(|p| format!(":(exclude){}", p.trim_end_matches('/')))
         .collect();
     args.extend(excluded.iter().map(String::as_str));
-    git(repo, &args)
-        .unwrap_or_default()
-        .lines()
-        .filter(|l| l.starts_with('+') && !l.starts_with("+++"))
-        .filter_map(|l| l.split_once("// spec: ").map(|(_, list)| list))
-        .flat_map(|list| list.split(|c: char| c == ',' || c.is_whitespace()))
-        .filter(|w| is_id(w))
-        .map(str::to_string)
-        .collect()
+    let diffs = git(repo, &args)?;
+    let mut traced = BTreeSet::new();
+    for diff in diffs.split('\x1e') {
+        let citations = |sign: char| -> BTreeSet<String> {
+            diff.lines()
+                .filter_map(|l| l.strip_prefix(sign))
+                .filter_map(|l| l.trim().strip_prefix("// spec:"))
+                .flat_map(cited)
+                .collect()
+        };
+        let removed = citations('-');
+        traced.extend(citations('+').difference(&removed).cloned());
+    }
+    Some(traced)
 }
 
-/// The requirement ids named on the lines of the `# Tracking` section of an issue file that hold `red:` (QUA-11).
+/// The requirement ids recorded as seen failing in an issue file (QUA-11): the list that opens each `red:` item of
+/// its `# Tracking` section, an item running over its indented continuation lines, the list ending at the first
+/// word that is not an id (`red: ABC-3, ABC-4: <failure>` names ABC-3 and ABC-4, `red: none (ABC-3)` none).
 fn red_ids(text: &str) -> BTreeSet<String> {
-    section(text, "# Tracking", |l| l.starts_with("# "))
-        .into_iter()
-        .filter(|l| l.contains("red:"))
-        .flat_map(|l| l.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-')))
-        .filter(|w| is_id(w))
-        .map(str::to_string)
-        .collect()
+    let tracking = section(text, "# Tracking", |l| l.starts_with("# "));
+    let unmarked = |line: &str| {
+        let line = line.trim();
+        let line = line.trim_start_matches(['-', '*', '+']);
+        let numbered = line.trim_start_matches(|c: char| c.is_ascii_digit());
+        let line = match numbered.strip_prefix('.') {
+            Some(rest) if numbered.len() < line.len() => rest,
+            _ => line,
+        };
+        line.trim_start().to_string()
+    };
+    let mut ids = BTreeSet::new();
+    for (i, line) in tracking.iter().enumerate() {
+        let Some(head) = unmarked(line).strip_prefix("red:").map(str::to_string) else {
+            continue;
+        };
+        let continued = tracking[i + 1..].iter().take_while(|l| {
+            l.starts_with(char::is_whitespace) && !l.trim().is_empty() && unmarked(l) == l.trim()
+        });
+        let item: Vec<String> = std::iter::once(head)
+            .chain(continued.map(|l| l.trim().to_string()))
+            .collect();
+        for word in item
+            .join(" ")
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .filter(|w| !w.is_empty())
+        {
+            let id = word.strip_suffix(':').unwrap_or(word);
+            if !is_req_id(id) {
+                break;
+            }
+            ids.insert(id.to_string());
+            if id.len() < word.len() {
+                break;
+            }
+        }
+    }
+    ids
 }
 
 /// Whether `commit` reverts the work of the issue (QUA-4): a `revert` type or a `Revert "` subject changing one of
@@ -483,7 +521,9 @@ fn issue_row(
         .count();
     let (review_count, findings) = reviews(&text);
     let traced = traced(repo, &mine);
-    let red = red_ids(&text);
+    let without_red = traced
+        .as_ref()
+        .map(|t| t.difference(&red_ids(&text)).count());
     let transcript = sessions.map(|s| session_cells(log, &own, &stem, s));
     let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
@@ -495,8 +535,8 @@ fn issue_row(
         reverts_after.to_string(),
         review_count.to_string(),
         findings.map(|n| n.to_string()).unwrap_or_default(),
-        traced.len().to_string(),
-        traced.difference(&red).count().to_string(),
+        traced.map(|t| t.len().to_string()).unwrap_or_default(),
+        without_red.map(|n| n.to_string()).unwrap_or_default(),
     ];
     cells.extend((0..4).map(|k| transcript.map(|t| t[k].to_string()).unwrap_or_default()));
     Some(Row {

@@ -40,6 +40,9 @@ hold no `red:` line, 11 hold at least one `red: none` or `not observed`, and no 
 2. [x] `issue-workflow` step 3.6: the `red:` line opens with the ids its test traces
    (`red: ABC-3, ABC-4: <failure>`), `none` only for a deliverable that traces none; verified by `tests/skills.rs`
    and `just check-harness` after `just sync`.
+3. [x] Fixes of the `high` review: citation lines read as `check-specs` reads them, net of the removed ones, red ids
+   only from the list that opens a `red:` item (continuation lines included), empty cells when git fails; verified by
+   `tests/delivered_quality.rs`; makes true QUA-11 (amended).
 
 ## Decisions
 - Mode: autonomous
@@ -82,4 +85,31 @@ hold no `red:` line, 11 hold at least one `red: none` or `not observed`, and no 
 - red: none (no requirement traced): `FAIL - issue-workflow: missing '`red: ABC-3, ABC-4: <failure>`'`.
 - Code review: no findings
 - not verified: none
+- decisions needed: none
+
+## Deliverable 3 (fixes of the high review)
+
+- done: QUA-11 amended and met: a citation is a line opening with `// spec:` (no string, no prose); the ids removed
+  by the issue's diffs are subtracted (moved, split or extended citations); a red id is one of the list opening a
+  `red:` item, continuation lines included (`covered:`, `red: none (ABC-3)` and the failure text name none); the
+  columns are empty when git cannot show the diffs; `-G// spec:` narrows the diff; `is_req_id` shared with
+  `check-specs` (three capitals). On this repository no done issue has a traced id with a red run (the old
+  `install_a_git_pre_commit_review_gate` 10/9 was the `covered:` match).
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy clean |
+| specs | QUA-11 amended, traced |
+| docs | `docs/architecture.md` |
+| code review | low, see below |
+
+- red: QUA-11: `eps.traced: expected "3", got Some("5")`, `eps.traced_without_red: expected "1", got Some("3")`,
+  `eta.traced: expected "1", got Some("2")`.
+- High review: 9 findings, 8 fixed here; the 9th (QUA-6 says its section ends "as in QUA-3", which would stop at
+  `## Plan`, while the code ends it at `# `) is outside this issue: filed as
+  `issues/align_the_tracking_section_end_of_qua_6.md`, queued second.
+- Code review: 1 finding, then no findings on the fix: the removed citations were pooled over the issue, so a citation one commit adds and a later
+  one rewrites traced nothing; fixed, subtracted commit by commit (red: `eta.traced: expected "1", got Some("0")`).
+- not verified: the empty cells when `git show` fails (no fixture makes it fail).
 - decisions needed: none
