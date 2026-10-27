@@ -57,23 +57,49 @@ fn without_code_spans(line: &str) -> String {
 
 const MARKER: &str = "[NEEDS CLARIFICATION:";
 
+/// The fence a line opens or closes (its character and length): three or more backticks or tildes.
+fn fence(line: &str) -> Option<(char, usize)> {
+    let line = line.trim_start();
+    let c = line.chars().next().filter(|c| *c == '`' || *c == '~')?;
+    let len = line.len() - line.trim_start_matches(c).len();
+    (len >= 3).then_some((c, len))
+}
+
+/// The text of a marker up to its closing bracket, brackets inside it included.
+fn question(after: &str) -> &str {
+    let mut depth = 1;
+    for (i, c) in after.char_indices() {
+        depth += match c {
+            '[' => 1,
+            ']' => -1,
+            _ => 0,
+        };
+        if depth == 0 {
+            return after[..i].trim();
+        }
+    }
+    after.trim()
+}
+
 /// An open question left in the spec: a problem once `accepted`, a warning while `draft`. A marker cited in a code
 /// span or a fenced code block is an example, not a question.
 fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<String>) {
-    let mut fenced = false;
+    // the open fence: only a line of the same character, at least as long and with nothing after, closes it
+    let mut open: Option<(char, usize)> = None;
     for (i, line) in lines.iter().enumerate() {
-        if line.trim_start().starts_with("```") || line.trim_start().starts_with("~~~") {
-            fenced = !fenced;
-            continue;
+        match (open, fence(line)) {
+            (None, Some(f)) => open = Some(f),
+            (Some((c, len)), Some((d, n))) if c == d && n >= len && line.trim().trim_start_matches(c).is_empty() => open = None,
+            _ => {}
         }
-        if fenced {
+        if open.is_some() || fence(line).is_some() {
             continue;
         }
         let text = without_code_spans(line);
         let mut rest = text.as_str();
         while let Some(start) = rest.find(MARKER) {
             let after = &rest[start + MARKER.len()..];
-            let question = after.split(']').next().unwrap_or("").trim();
+            let question = question(after);
             if accepted {
                 out.push(format!("{file}:{}: `{MARKER} ...]` left in an accepted spec: settle it", i + 1));
             } else {
@@ -87,25 +113,33 @@ fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<Strin
 /// Words that leave the obligation of a requirement open (`etc` stands for `etc.`).
 const VAGUE: [&str; 5] = ["should", "may", "etc", "appropriate", "fast"];
 
-/// `text` without its double-quoted parts, straight or curly: a quoted message is not the requirement's wording.
+/// `text` without its double-quoted parts, straight or curly: a quoted message is not the requirement's wording. A
+/// quote with no closing one (an inch mark) is kept, so the text after it is still checked.
 fn without_quotes(text: &str) -> String {
-    let mut quoted = false;
-    text.chars()
-        .filter(|&c| {
-            if matches!(c, '"' | '\u{201c}' | '\u{201d}') {
-                quoted = !quoted;
-                return false;
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some((start, open)) = rest.char_indices().find(|(_, c)| matches!(c, '"' | '\u{201c}')) {
+        let after = &rest[start + open.len_utf8()..];
+        let close = if open == '"' { '"' } else { '\u{201d}' };
+        out.push_str(&rest[..start]);
+        match after.find(close) {
+            Some(end) => rest = &after[end + close.len_utf8()..],
+            None => {
+                out.push(open);
+                rest = after;
             }
-            !quoted
-        })
-        .collect()
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Warns of a `draft` requirement whose wording is vague: a word of `VAGUE`, or not exactly one `must`. Warnings
 /// only: the word list has false positives.
 fn check_wording(file: &str, id: &str, statement: &str) {
-    let text = without_quotes(&without_code_spans(statement)).to_lowercase();
-    let words: Vec<&str> = text.split(|c: char| !c.is_alphanumeric() && c != '\'').filter(|w| !w.is_empty()).collect();
+    // `shouldn't` holds `should` and `mustn't` a `must`
+    let text = without_quotes(&without_code_spans(statement)).to_lowercase().replace("n't", " not").replace("n\u{2019}t", " not");
+    let words: Vec<&str> = text.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
     let mut warned = BTreeSet::new();
     for word in words.iter().filter(|w| VAGUE.contains(w)) {
         if warned.insert(*word) {
@@ -195,7 +229,8 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         } else if kind != "deterministic" && kind != "quality" {
             problem(format!("requirement {id}: kind must be `(deterministic)`, got `({kind})`"));
         }
-        if spec.status == "draft" && !withdrawn {
+        // with no `(kind)`, the statement was not found: the format problem is enough
+        if spec.status == "draft" && !withdrawn && !kind.is_empty() {
             check_wording(file, id, statement);
         }
         spec.requirements.push(Requirement { id: id.to_string(), exempt: withdrawn || kind == "quality" });

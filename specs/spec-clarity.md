@@ -28,6 +28,10 @@ marks instead of guessing, and the wording of a requirement that leaves its obli
 - (CLR-4) Given a `draft` requirement "The hook must exit 0 and must not print", when the checker runs, then it warns that the requirement holds 2 `must`.
 - (CLR-5) Given a `draft` requirement citing `` `[NEEDS CLARIFICATION: x]` `` or `` `may_fail` ``, when the checker runs, then neither is reported.
 - (CLR-6) Given a `draft` requirement "The hook must print \"you may retry\"", when the checker runs, then `may` is not reported.
+- (CLR-5) Given a fenced block opened by four backticks that holds a line of three, when the checker runs, then the
+  block ends only at the next line of four or more backticks.
+- (CLR-6) Given a `draft` requirement with an unclosed quote (an inch mark), when the checker runs, then the text after
+  it is still checked; `shouldn't` holds `should` and `mustn't` counts as one `must`.
 
 ## Non-goals
 

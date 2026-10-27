@@ -45,6 +45,7 @@ tell the model to write the marker instead of guessing. Out of scope: a spec of 
 1. [x] Clarification marker: `check_specs.rs` fails on a marker in an `accepted` spec, warns in a `draft`, ignores code spans; verified by new cases of `test_check_specs.rs`; makes true CLR-1, CLR-2, CLR-5 (markers).
 2. [x] Wording warnings: forbidden words and the single `must` on `draft` requirements, outside code spans and quotes, none on `accepted`; verified by new cases of `test_check_specs.rs`; makes true CLR-3, CLR-4, CLR-5, CLR-6, CLR-7; sets `specs/spec-clarity.md` `accepted`.
 3. [x] Skills and format doc: `write-spec` (marker rule, completeness checklist), `issue-workflow` step 2 (one question row per marker), `specs/README.md` (marker and warnings); verified by `just check-harness` and a reread.
+4. [x] Fixes of the `high` review of the issue; verified by new cases of `test_check_specs.rs`.
 
 ## Decisions
 - Mode: autonomous
@@ -93,4 +94,20 @@ tell the model to write the marker instead of guessing. Out of scope: a spec of 
 - red: none (skill and doc text, no test)
 - Code review: no findings
 - not verified: how a model follows the new `write-spec` steps (only a real session shows it)
+- decisions needed: none
+
+## Deliverable 4 (fixes of the `high` review)
+- done: nested and mixed fences close only on a matching fence; a question keeps its inner brackets; an unclosed quote no longer hides the rest of a statement; `shouldn't` / `mustn't` are read as `should not` / `must not`; a requirement with no `(kind)` gets no wording warning; the skills write the marker with its colon; `write-spec` sets an amended spec back to `draft` and leaves the wording warnings of untouched requirements.
+
+| check | result |
+|---|---|
+| tests (`just check`, `just test-harness`) | pass |
+| specs | pass (`--strict` too); two scenarios added to `spec-clarity` |
+| copies (`just check-harness`) | pass |
+
+- red: `FAIL - a marker after a fence holding a shorter fence is flagged`, `FAIL - a question with brackets is warned of in full`, `FAIL - the text after an unbalanced quote is still checked`, `FAIL - a contracted vague word is warned of`, `FAIL - mustn't counts as a must`, `FAIL - a requirement with no kind gets no wording warning`
+- `high` review: 10 findings; 8 fixed here; not fixed: a marker wrapped over two lines (a non-goal of the spec, `specs/README.md` asks for one line), a code span wrapped over two lines (rare in a spec, a false problem the writer sees at once)
+- Code review: 1 finding
+  - the new scenarios reuse `(CLR-5)` and `(CLR-6)`: not fixed, a scenario names the requirement it refines (`specs/README.md`), several per requirement is the format (e.g. `clippy-gate.md`, CLG-5).
+- not verified: none
 - decisions needed: none

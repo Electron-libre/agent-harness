@@ -32,7 +32,8 @@ the console only shows the link and the questions.
 - Read the issue, plus the resources it names (docs, `git log`, the `roadmap` documents of `.claude/harness.toml`, memory).
 - **Spec**, when the issue changes what a capability does (skip it for docs, harness, pure refactor, a measure): run
   `skill:write-spec` up to its format check (requirements with stable ids, `deterministic`, left `draft`, a
-  `[NEEDS CLARIFICATION]` marker where you would guess); don't do its validation stop: step 2 replaces it. The tests of step 3 come from these requirements, not the other way round.
+  `[NEEDS CLARIFICATION: ...]` marker where you would guess); don't do its validation stop: step 2 replaces it. The
+  tests of step 3 come from these requirements, not the other way round.
 - **Write `# Tracking`** at the end of the issue:
 
   ```markdown

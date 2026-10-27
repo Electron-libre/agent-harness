@@ -132,6 +132,13 @@ fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     report("a clarification marker in a code span is not warned of", !stderr.contains("needs clarification"));
     let fenced = SPEC.replace("- None.\n", "- None.\n\n```markdown\n[NEEDS CLARIFICATION: x]\n```\n");
     case("a clarification marker in a fenced block of an accepted spec passes", &fenced, TESTS, &[], None);
+    let nested = SPEC.replace("- None.\n", "- None.\n\n````markdown\n```\n````\n\n[NEEDS CLARIFICATION: hidden?]\n");
+    case("a marker after a fence holding a shorter fence is flagged", &nested, TESTS, &[], Some("NEEDS CLARIFICATION"));
+    let mixed = SPEC.replace("- None.\n", "- None.\n\n~~~\n```\n~~~\n\n[NEEDS CLARIFICATION: hidden?]\n");
+    case("a marker after a tilde fence holding a backtick fence is flagged", &mixed, TESTS, &[], Some("NEEDS CLARIFICATION"));
+    let bracketed = draft.replace("which exit code?", "keep the [ADR 5] limit?");
+    let stderr = case("a question with brackets passes in a draft", &bracketed, "", &[], None);
+    report("a question with brackets is warned of in full", stderr.contains("needs clarification: keep the [ADR 5] limit?"));
 }
 
 // spec: CLR-3, CLR-4, CLR-5, CLR-6, CLR-7
@@ -154,6 +161,16 @@ fn wording_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     let quiet = draft.replace("A run must resume.", "A run must print `may_fail`, \"you may retry, must you\" and `must`.");
     let stderr = case("words in code spans and quotes pass", &quiet, "", &[], None);
     report("words in code spans and quotes are not warned of", !stderr.contains("warning"));
+    let inch = draft.replace("A run must resume.", "A run must print a 12\" banner, then may stop.");
+    let stderr = case("an unbalanced quote passes", &inch, "", &[], None);
+    report("the text after an unbalanced quote is still checked", stderr.contains("vague word `may`") && !stderr.contains("`must`, expected 1"));
+    let contracted = draft.replace("A run must resume.", "A run shouldn't stop and mustn't print.");
+    let stderr = case("contractions pass", &contracted, "", &[], None);
+    report("a contracted vague word is warned of", stderr.contains("vague word `should`"));
+    report("mustn't counts as a must", !stderr.contains("`must`, expected 1"));
+    let kindless = draft.replace("(deterministic) A run must resume.", "A run must resume.");
+    let stderr = case("a requirement with no kind is flagged", &kindless, "", &[], Some("kind"));
+    report("a requirement with no kind gets no wording warning", !stderr.contains("`must`, expected 1"));
     let withdrawn = draft.replace("A run must resume.", "withdrawn: A run may resume.");
     let stderr = case("a withdrawn vague requirement passes", &withdrawn, "", &[], None);
     report("a withdrawn requirement is not warned of", !stderr.contains("warning"));
