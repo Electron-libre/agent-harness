@@ -8,7 +8,6 @@ use super::*;
 mod install_gate;
 mod launcher;
 mod retention;
-mod run;
 
 fn put(dir: &Path, rel: &str, text: &str) {
     let path = dir.join(rel);

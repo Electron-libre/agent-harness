@@ -1,13 +1,14 @@
 //! Helpers of the tests that run the `harness` binary on temp dirs, offline. The cache, the user settings, a failing
-//! `cargo` and a `harness` that knows every subcommand live in a temp home: the prefetch of the tools binary (BIN-13),
+//! `curl` and `cargo` and a `harness` that knows every subcommand live in a temp home: the prefetch of the tools binary (BIN-13),
 //! the retention warning (SYN-28), the hooks `check` judges (BIN-15) and git never reach outside it. The fakes are
 //! shell scripts: these tests run on Unix.
 #![allow(dead_code)]
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use tempfile::{tempdir, TempDir};
 
@@ -61,42 +62,52 @@ impl Home {
             "config/settings.json",
             r#"{"cleanupPeriodDays": 365}"#,
         );
-        // the prefetch of a git source would build the tools binary with `cargo install`: it fails at once here;
-        // the `harness` on the path knows every subcommand, so `check` refuses no hook whatever is installed (BIN-15)
-        for (program, code) in [("cargo", 1), ("harness", 0)] {
-            let rel = format!("bin/{program}");
-            put(dir.path(), &rel, &format!("#!/bin/sh\nexit {code}\n"));
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mode = fs::Permissions::from_mode(0o755);
-                fs::set_permissions(dir.path().join(rel), mode).unwrap();
-            }
-        }
-        Self { dir }
+        let home = Self { dir };
+        // no network: `curl` fails as on a missing asset, and the prefetch of a git source would build the tools
+        // binary with `cargo install`: it fails at once here; the `harness` on the path knows every subcommand, so
+        // `check` refuses no hook whatever is installed (BIN-15)
+        home.program("curl", "exit 22\n");
+        home.program("cargo", "exit 1\n");
+        home.program("harness", "exit 0\n");
+        home
     }
 
-    /// `harness <args> --root <root>`.
-    pub fn harness(&self, root: &Path, args: &[&str]) -> Run {
+    /// The temp home itself.
+    pub fn path(&self) -> &Path {
+        self.dir.path()
+    }
+
+    /// The cache of the binary (`XDG_CACHE_HOME`).
+    pub fn cache(&self) -> PathBuf {
+        self.dir.path().join("cache")
+    }
+
+    /// Put an `sh` script running `body` as `program`, first on the `PATH` of the binary.
+    pub fn program(&self, program: &str, body: &str) {
+        script(&self.dir.path().join("bin").join(program), body);
+    }
+
+    /// The binary, with this home: its cache, its user settings, its `PATH`, outside CI and any session.
+    pub fn command(&self) -> Command {
         let mut path = vec![self.dir.path().join("bin")];
         path.extend(std::env::split_paths(
             &std::env::var_os("PATH").unwrap_or_default(),
         ));
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_harness"));
-        cmd.args(args)
-            .arg("--root")
-            .arg(root)
-            .env("PATH", std::env::join_paths(path).unwrap())
-            .env("XDG_CACHE_HOME", self.dir.path().join("cache"))
+        cmd.env("PATH", std::env::join_paths(path).unwrap())
+            .env("XDG_CACHE_HOME", self.cache())
             .env("CLAUDE_CONFIG_DIR", self.dir.path().join("config"))
             .env_remove("CI")
             .env_remove("CLAUDE_PROJECT_DIR");
-        let out = self.isolated(&mut cmd).output().unwrap();
-        Run {
-            code: out.status.code(),
-            stdout: String::from_utf8(out.stdout).unwrap(),
-            stderr: String::from_utf8(out.stderr).unwrap(),
-        }
+        self.isolated(&mut cmd);
+        cmd
+    }
+
+    /// `harness <args> --root <root>`.
+    pub fn harness(&self, root: &Path, args: &[&str]) -> Run {
+        let mut cmd = self.command();
+        cmd.args(args).arg("--root").arg(root);
+        output(cmd, "")
     }
 
     /// `git <args>` in `dir` with a test identity, which must succeed; its trimmed stdout.
@@ -136,6 +147,40 @@ impl Home {
         let run = self.harness(root, args);
         assert_eq!(run.code, Some(0), "{args:?}: {run:?}");
         run
+    }
+}
+
+/// Run `cmd` with `stdin`.
+pub fn output(mut cmd: Command, stdin: &str) -> Run {
+    let mut child = cmd
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // a tool that does not read its input closes the pipe first
+    let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
+    let out = child.wait_with_output().unwrap();
+    Run {
+        code: out.status.code(),
+        stdout: String::from_utf8(out.stdout).unwrap(),
+        stderr: String::from_utf8(out.stderr).unwrap(),
+    }
+}
+
+/// Write an executable `sh` script running `body`. A child process writes it, so that no write descriptor of this
+/// process, which another test thread's fork could inherit, keeps it busy when it is executed (`ETXTBSY`).
+pub fn script(path: &Path, body: &str) {
+    let draft = path.with_extension("draft");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&draft, format!("#!/bin/sh\n{body}")).unwrap();
+    let copied = Command::new("cp").arg(&draft).arg(path).status().unwrap();
+    assert!(copied.success());
+    fs::remove_file(draft).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
     }
 }
 

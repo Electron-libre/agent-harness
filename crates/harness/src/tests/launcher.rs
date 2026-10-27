@@ -4,8 +4,18 @@
 
 use std::ffi::OsString;
 
-use super::run::script;
 use super::*;
+
+/// Write an executable `sh` script. A child process writes it, so that no write descriptor of this process, which
+/// another test thread's fork could inherit, keeps it busy when it is executed (`ETXTBSY`).
+fn script(path: &Path, body: &str) -> OsString {
+    let draft = path.with_extension("draft");
+    fs::write(&draft, format!("#!/bin/sh\n{body}")).unwrap();
+    let copied = Command::new("cp").arg(&draft).arg(path).status().unwrap();
+    assert!(copied.success());
+    set_executable(path, true).unwrap();
+    path.as_os_str().to_owned()
+}
 
 /// A `harness` that knows only the subcommand `run`, logging each call to `log`.
 fn harness_with_run(dir: &Path, log: &Path) -> OsString {
