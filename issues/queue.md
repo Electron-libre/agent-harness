@@ -7,5 +7,6 @@ re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why he
 - [create_issue_worktrees_under_claude_worktrees](create_issue_worktrees_under_claude_worktrees.md) - small, and removes one approval from every issue started after it
 - [ship_the_harness_scripts_as_prebuilt_binaries](ship_the_harness_scripts_as_prebuilt_binaries.md) - after the propagation of the hook declarations, which it needs to change every hook command
 - [check_the_red_run_of_traced_tests](check_the_red_run_of_traced_tests.md) - makes the spec traceability prove more than a citation; independent of the above
+- [prove_the_specs_with_black_box_tests](prove_the_specs_with_black_box_tests.md) - after the red-run evidence, the other half of making a spec citation a real proof
 - [make_the_architecture_doc_skimmable](make_the_architecture_doc_skimmable.md) - after the binaries, which rewrite several of its sections
 - [bootstrap_specs_for_an_existing_capability](bootstrap_specs_for_an_existing_capability.md) - widest scope, benefits from the spec clarity checks first
