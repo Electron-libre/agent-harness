@@ -6,6 +6,10 @@
 //! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
 //! `must`) is a warning.
 
+// repo_files.rs sha256: f4e77dcfa83c4aa2a444404b5974da83152921cce31f101a72da76435c30dabf
+#[path = "../repo_files.rs"]
+mod repo_files;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -239,17 +243,14 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
     spec
 }
 
-/// Every `.rs` file under `dir`, except under the `skipped` directories (build output and agent worktrees, which hold
-/// no tests of their own): matched by full path, so a module named `target` or `worktrees` is still scanned.
-fn rust_files(dir: &Path, skipped: &[PathBuf], found: &mut Vec<PathBuf>) {
+/// Every file under `dir` (outside a git repository, where no worktree can nest).
+fn all_files(dir: &Path, found: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            if !skipped.contains(&path) {
-                rust_files(&path, skipped, found);
-            }
-        } else if path.extension().is_some_and(|e| e == "rs") {
+            all_files(&path, found);
+        } else {
             found.push(path);
         }
     }
@@ -258,12 +259,18 @@ fn rust_files(dir: &Path, skipped: &[PathBuf], found: &mut Vec<PathBuf>) {
 /// Ids cited by `// spec: A-1, B-2` comments, with the file that cites them. A citation sits right above a
 /// test: only attributes and other comments may come between it and the `fn`; any other place is a problem.
 fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, String> {
-    let mut files = Vec::new();
-    // the tests of the crates, and those of the harness scripts, hooks and skills
-    let skipped = [root.join("target"), root.join(".claude/worktrees")];
-    for dir in ["crates", ".claude"] {
-        rust_files(&root.join(dir), &skipped, &mut files);
-    }
+    // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
+    // lists, so never those of a nested worktree (ADR 0008) nor the build output
+    let dirs = [root.join("crates"), root.join(".claude")];
+    let files: Vec<PathBuf> = match repo_files::repo_files(root) {
+        Some(files) => files,
+        None => {
+            let mut files = Vec::new();
+            dirs.iter().for_each(|dir| all_files(dir, &mut files));
+            files
+        }
+    };
+    let files = files.into_iter().filter(|f| f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d)));
     let mut cited = BTreeMap::new();
     for file in files {
         let Ok(text) = std::fs::read_to_string(&file) else { continue };

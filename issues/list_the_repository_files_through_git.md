@@ -55,7 +55,7 @@ walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `s
    a git repository. `close_issue.rs` uses it, keeping `.git`, `target`, `node_modules` and `skipped_dirs` as a
    filter by directory name on the listed paths; verified by `test_close_issue.rs` (nested worktree ignored and not
    ignored, untracked document rewritten); makes true PAR-14.
-2. [ ] `check_specs.rs` uses the module, and falls back to the walk skipping `target/` outside a git repository;
+2. [x] `check_specs.rs` uses the module, and falls back to the walk skipping `target/` outside a git repository;
    verified by `test_check_specs.rs` (cases in a git repo with a nested worktree with and without the exclude
    line, an untracked test still traced, the existing cases outside git); makes true PAR-14, PAR-16; spec back to
    `accepted`.
@@ -74,6 +74,17 @@ walks of fixed directories (`.claude/hooks`, `.claude/skills`, `issues/done`, `s
 - Code review: 1 finding: a failed `git ls-files` relinked nothing silently; fixed, `relink` now warns (it only
   runs once `git rev-parse --show-toplevel` succeeded, so the case is rare).
 - not verified: a consumer with submodules (dropped, not tested).
+
+## Deliverable 2
+- done: `check_specs.rs` scans the `.rs` files git lists under `crates/` and `.claude/`, all of them outside git;
+  PAR-16 restated without `target/` (the root's `target/` is never under `crates/` nor `.claude/`, so that skip was
+  dead); spec back to `accepted`.
+- checks: `just check` ok, `just test-harness` ok, `just check-specs` ok; docs: `docs/architecture.md`.
+- red: `crates/y/crates/a/src/bad.rs: cites RER-9, which no spec defines` (worktree nested outside
+  `.claude/worktrees`), `FAIL - outside git, a test under .claude/worktrees is traced`.
+- Code review: no findings (one doubt, paths relative to `root`, ruled out: `repo_files` joins them to `root`, and
+  the `in_git` test traces RER-2 only through an untracked file).
+- not verified: nothing.
 
 ## Decisions
 - Mode: autonomous

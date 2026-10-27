@@ -1,6 +1,10 @@
 #!/usr/bin/env rust-script
 //! Behavior test for `check_specs.rs`: accepts good specs, flags each violation of `specs/README.md`.
 //! Usage: `just test-harness`.
+//! ```cargo
+//! [dependencies]
+//! sha2 = "0.10"
+//! ```
 
 use std::cell::Cell;
 use std::path::Path;
@@ -75,7 +79,7 @@ fn main() {
     case("a test under a module directory named worktrees is traced", SPEC, "// spec: RER-1\nfn t() {}\n", &[("crates/a/src/worktrees/t.rs", "// spec: RER-2\nfn t() {}\n")], None);
     case("a test under tests/target is traced", SPEC, "// spec: RER-1\nfn t() {}\n", &[("crates/a/tests/target/t.rs", "// spec: RER-2\nfn t() {}\n")], None);
     case("a citation under src/worktrees is checked", SPEC, TESTS, &[("crates/a/src/worktrees/t.rs", "// spec: RER-9\nfn t() {}\n")], Some("RER-9"));
-    case("agent worktrees under .claude/worktrees are skipped", SPEC, TESTS, &[(".claude/worktrees/x/crates/a/t.rs", "// spec: RER-9\nfn t() {}\n")], None);
+    outside_git(&case);
 
     case("a test of a harness script under .claude traces a requirement", SPEC, "", &[(".claude/hooks/test_h.rs", TESTS)], None);
     case("a citation under .claude not above a fn is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: RER-1\nlet x = 1;\n")], Some("right above"));
@@ -110,6 +114,9 @@ fn main() {
     let ok = !first.status.success() && String::from_utf8_lossy(&first.stdout).contains("RER-9");
     report("--strict may come before the root", ok);
 
+    in_git(&script, &report);
+    includes_repo_files(&script, &report);
+
     let _ = std::fs::remove_dir_all(&tmp);
     if failed.get() {
         std::process::exit(1);
@@ -118,6 +125,72 @@ fn main() {
 
 /// Runs one checker case: name, spec, crate tests, other files, expected stdout text (`None`: passes); returns stderr.
 type Case<'a> = dyn Fn(&str, &str, &str, &[(&str, &str)], Option<&str>) -> String + 'a;
+
+// spec: PAR-16
+/// The cases above run outside a git repository: every `.rs` file of `crates/` and `.claude/` is scanned there.
+fn outside_git(case: &Case) {
+    case("outside git, a test under .claude/worktrees is traced", SPEC, "// spec: RER-1\nfn t() {}\n", &[(".claude/worktrees/x/t.rs", "// spec: RER-2\nfn t() {}\n")], None);
+    case("outside git, a citation under .claude/worktrees is checked", SPEC, TESTS, &[(".claude/worktrees/x/t.rs", "// spec: RER-9\nfn t() {}\n")], Some("RER-9"));
+}
+
+// spec: PAR-14
+/// In a git repository the files come from git: a worktree nested in the scanned one is never read, ignored by
+/// `info/exclude` or seen as an embedded repository, while an untracked test is still traced.
+fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
+    let root = std::env::temp_dir().join(format!("check_specs_git_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let write = |path: &str, body: &str| {
+        std::fs::create_dir_all(root.join(path).parent().unwrap()).unwrap();
+        std::fs::write(root.join(path), body).unwrap();
+    };
+    write("docs/adr/0005-incremental.md", "x");
+    write("specs/rerun.md", SPEC);
+    write("crates/a/src/t.rs", "// spec: RER-1\nfn t() {}\n");
+    write("crates/a/src/worktrees/w.rs", "fn w() {}\n");
+    let git = |args: &[&str]| {
+        let ok = Command::new("git")
+            .args(["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(&root)
+            .output()
+            .is_ok_and(|o| o.status.success());
+        assert!(ok, "git {args:?} failed");
+    };
+    git(&["init", "-q", "-b", "trunk", "."]);
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "init", "--no-verify"]);
+    git(&["worktree", "add", "-q", "-b", "x", ".claude/worktrees/x"]);
+    git(&["worktree", "add", "-q", "-b", "y", "crates/y"]);
+    write("crates/a/src/untracked.rs", "// spec: RER-2\nfn t() {}\n");
+    for nested in [".claude/worktrees/x", "crates/y"] {
+        write(&format!("{nested}/crates/a/src/bad.rs"), "// spec: RER-9\nfn t() {}\n");
+    }
+    let run = || {
+        let out = Command::new("rust-script").arg(script).arg(&root).output().expect("rust-script must be installed");
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        if !out.status.success() {
+            println!("{stdout}");
+        }
+        out.status.success() && stdout.is_empty()
+    };
+    report("in git, the nested worktrees git does not ignore are not read, an untracked test is traced", run());
+    write(".git/info/exclude", "/.claude/worktrees/\n");
+    report("in git, the nested worktree git ignores is not read", run());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// `rust-script` rebuilds a script only when its own text changes (ADR 0006): it carries the hash of the module.
+fn includes_repo_files(script: &Path, report: &dyn Fn(&str, bool)) {
+    use sha2::Digest;
+    let text = std::fs::read_to_string(script).unwrap_or_default();
+    let module = script.parent().unwrap().join("../repo_files.rs");
+    let stamp = format!("// repo_files.rs sha256: {:x}", sha2::Sha256::digest(std::fs::read(module).unwrap_or_default()));
+    if !text.contains(&stamp) {
+        println!("check_specs.rs: write the line `{stamp}` so rust-script rebuilds it with the current repo_files.rs");
+    }
+    report("check_specs.rs includes the shared module", text.contains("#[path = \"../repo_files.rs\"]"));
+    report("check_specs.rs carries the SHA-256 of the current repo_files.rs", text.contains(&stamp));
+}
 
 // spec: CLR-1, CLR-2, CLR-5
 fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
