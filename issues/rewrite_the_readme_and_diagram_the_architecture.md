@@ -73,6 +73,8 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
    overview with the pipeline diagram (transcripts and git history, readers, TSV, `harness-report`,
    `evaluate-harness`), edge cases linked to `specs/evaluation.md`, `specs/rule-breaches.md`,
    `specs/delivered-quality.md`, `specs/harness-report.md`; same check; ~200 lines.
+6. [x] Fixes of the `high` review of the whole issue: the ten findings; verified by `just check`, a `low` review; ~40
+   lines.
 
 ## Decisions
 - Mode: autonomous
@@ -155,6 +157,31 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 |---|---|
 | tests, lint, specs | `just check` passes |
 | docs | dropped statements spot-checked in the four specs (medians, `self:`, the 20-word language rule, commits in no session, sub-agents, `--window-days`, `--anonymous`); links resolve |
+| code review | see below |
+
+- red: none (docs only, no test)
+- Code review: no findings
+- not verified: the mermaid rendering
+- decisions needed: none
+
+## Deliverable 6
+- Code review: 10 findings (the `high` review of `0235194..HEAD`), each fixed:
+  1. `--archive` edge label quoted in the evaluation diagram.
+  2. Launcher diagram: the digest mismatch fails (BIN-10), cargo covers any other download failure.
+  3. The exit 2 of old binaries and launchers names its cases again.
+  4. `workflow.md`: the fixes after the `high` review go back to step 3.2, not 3.1.
+  5. `update-docs-map.md`: rows for the README "What a project gets" table and for `docs/workflow.md`.
+  6. Evaluation diagram: `session-metrics` reads the git history for the revision in force.
+  7. README: `update --force`, and `check` failing on a hook that needs a newer `harness`.
+  8. README diagram: `harness sync` installs the gate, in each clone.
+  9. `workflow.md`: the size limits and the autonomous mode rules no longer copied, the skill named instead; the
+     launcher paragraph of `usage.md` and the architecture's say different things (what to do, how it works) and stay.
+  10. Sync diagram: SYN-4 out of the managed range; the prose names the lock and the gate.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| docs | links resolve |
 | code review | see below |
 
 - red: none (docs only, no test)

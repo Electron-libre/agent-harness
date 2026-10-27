@@ -21,16 +21,18 @@ flowchart LR
     seed["seed/<br/>project-owned"]
     entries["entries/<br/>hooks and deny rules"]
   end
+  sync(["harness sync"])
   subgraph project["your project"]
     copies["same paths,<br/>checked by harness check"]
     owned["copied once,<br/>then yours"]
     settings[".claude/settings.json"]
     gate[".git/hooks/pre-commit<br/>review gate"]
   end
-  files -->|harness sync| copies
-  seed -->|if missing| owned
-  entries -->|merged| settings
-  source -.->|installs| gate
+  source --> sync
+  sync -->|managed| copies
+  sync -->|if missing| owned
+  sync -->|entries merged| settings
+  sync -->|"installed, in each clone"| gate
 ```
 
 ## Install
@@ -50,8 +52,8 @@ Then keep the Claude Code transcripts a year, the evaluation reads them:
 | Command | Does |
 |---|---|
 | `harness sync [--dry-run] [--force]` | brings the project in step with its source |
-| `harness update [--rev <rev>] [--dry-run]` | moves a git source to a revision, syncs, pins the commit |
-| `harness check` | fails when a copy drifted or the review gate is missing |
+| `harness update [--rev <rev>] [--dry-run] [--force]` | moves a git source to a revision, syncs, pins the commit |
+| `harness check` | fails when a copy drifted, the review gate is missing or a hook needs a newer `harness` |
 | `harness run [<tool>]` | runs a tool of the pinned revision (hooks, checks, transcript readers); alone, lists them |
 
 ## Daily flow

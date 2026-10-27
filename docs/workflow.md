@@ -42,18 +42,16 @@ flowchart TD
   track --> commit["3.8 Commit: commit-message"]
   commit -->|next deliverable| gather
   commit -->|last one| high["/code-review high<br/>on base..HEAD"]
-  high -->|"findings: one more deliverable"| gather
+  high -->|"findings: one more deliverable,<br/>from 3.2"| red
   high -->|clean| ask[["Ask: close the issue?"]]
 ```
 
 - **One validation stop** (step 2): the plan, the questions as a numbered table (`1 a, 2 c`, or `ok` for the
   recommendations) and the mode. Every answer goes to `## Decisions` of the issue.
-- **Autonomous mode** (the default) lifts the stop of step 3.6: the summary of each deliverable (`done`,
-  `check | result`, `red:`, `Code review:`, `not verified`) is written in the issue instead, and the agent chains
-  into the next deliverable. It never lifts the review, the `high` review of the whole issue or the stop of step 2.
-  A blocking question, an unsettled finding or a red check stops the chain.
-- **Size limit**: ~1,000 changed lines per deliverable, ~3,000 and 6 deliverables per issue; a larger issue is split
-  at step 2.
+- **Autonomous mode** (the default) lifts the stop of step 3.6: the summary of each deliverable is written in the
+  issue instead and the agent chains into the next one, until a question, a finding or a check it cannot settle.
+  What it never lifts is in the skill, section "Autonomous mode".
+- **Size limit**: an issue too large for one session is split at step 2 (the limits are in step 1 of the skill).
 - **Specs**: when the issue changes what a capability does, `skill:write-spec` writes its requirements at step 1
   and the tests of step 3.2 carry their `// spec: ID` ([specs/README.md](../specs/README.md)).
 - **Gates**: a commit fails while its diff holds a file the last review never saw; only the user can waive it, with

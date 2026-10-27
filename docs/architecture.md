@@ -3,8 +3,8 @@
 ## What is shared, and how
 
 A consumer project holds a `.claude/harness.toml`: the `[harness]` table (`source`, and `rev` for a git source) and
-its own values (`[project]`, read by the tools and the skills). `harness sync` reads the source and writes three kinds
-of things ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)):
+its own values (`[project]`, read by the tools and the skills). `harness sync` reads the source, writes three kinds of
+files, records them in the lock and installs the review gate ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)):
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
   files --> sync
   seed --> sync
   entries --> sync
-  sync -->|"copied, same path<br/>(SYN-1 to SYN-8)"| managed["managed files"]
+  sync -->|"copied, same path<br/>(SYN-1 to SYN-3, SYN-5 to SYN-8)"| managed["managed files"]
   sync -->|"copied once, if missing<br/>(SYN-4)"| owned["project-owned files"]
   sync -->|"entries merged<br/>(SYN-29 to SYN-36)"| settings[".claude/settings.json"]
   sync -->|"installed<br/>(SYN-18 to SYN-23)"| gate[".git/hooks/pre-commit"]
@@ -69,7 +69,8 @@ flowchart TD
   cached -->|yes| exec["exec the binary:<br/>tool TOOL args"]
   cached -->|no| download["release asset<br/>and its .sha256 (curl)"]
   download -->|digest matches| exec
-  download -->|no release| cargo["cargo install --git<br/>--rev COMMIT"]
+  download -->|"digest differs (BIN-10)"| fail["fails,<br/>installs nothing"]
+  download -->|"any other failure:<br/>no release, not GitHub, no network"| cargo["cargo install --git<br/>--rev COMMIT"]
   cargo -->|built| exec
   find -->|local directory| build["cargo build -p harness<br/>(last good build if it fails)"]
   build --> exec
@@ -84,7 +85,8 @@ flowchart TD
 | 2 | a hook refuses (Claude Code blocks on it) |
 | 3 | the launcher could not run the tool, or `init`, `sync`, `update`, `check` failed (BIN-7, BIN-14, BIN-17, SYN-37) |
 
-A binary pinned before BIN-7, or a launcher installed before BIN-17, exits 2 instead of 3 there, and the hook refuses.
+A binary pinned before BIN-7 exits 2 instead of 3 on a tool it does not know, and a launcher installed before BIN-17
+on a subcommand it does not know: the hook then refuses, and with an old launcher every hook does.
 
 The binaries live in `<cache>/harness/bin/<commit>/<target>/harness`, or `<cache>/harness/bin/local-<hash of the
 path>/harness` for a local source, written next to their place and renamed (BIN-4). A `rev` that is no commit hash (a
@@ -199,13 +201,14 @@ flowchart LR
   transcripts --> context["fixed-context"]
   git[("git history<br/>issues/done/")] --> quality["delivered-quality"]
   transcripts --> quality
+  git -->|revision in force| metrics
   git --> breaches
   git --> context
   metrics -->|TSV| report["harness-report"]
   breaches -->|TSV| report
   quality -->|TSV| report
   context -->|TSV| report
-  metrics -.->|--archive| archive[("archive file,<br/>outside the repos")]
+  metrics -.->|"--archive"| archive[("archive file,<br/>outside the repos")]
   report -->|markdown| skill["evaluate-harness"]
 ```
 
