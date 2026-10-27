@@ -71,7 +71,7 @@ scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they reso
    in `git worktree list`; recipe comment, `details.md`, `docs/architecture.md`, ADR 0008; verified by
    `test_issue_worktree.rs` (and a check that cargo in the main worktree ignores the nested crates); makes true
    PAR-1, PAR-13, PAR-15.
-2. [ ] Scanners: `close_issue.rs` skips `.claude/worktrees/` of the root it walks (by path, not by name), the
+2. [x] Scanners: `close_issue.rs` skips `.claude/worktrees/` of the root it walks (by path, not by name), the
    existing `check_specs.rs` skip gets its citation; verified by `test_close_issue.rs`, `test_check_specs.rs`;
    makes true PAR-14.
 3. [ ] Transcripts: `repository()` of `transcripts.rs` maps a removed `<repo>/.claude/worktrees/<x>` cwd to
@@ -90,3 +90,10 @@ scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they reso
 - red: the test panicked writing `.claude/worktrees/x/work.txt` (NotFound): `start` still made the sibling.
 - Cargo: with a nested copy of the workspace, `cargo metadata` in the main worktree lists only its own crate, and in
   the copy only the copy's (each stops at its own workspace root).
+
+## Deliverable 2
+- done: `close_issue.rs` skips `.claude/worktrees/` of the root it walks (full path, so `docs/worktrees/` is still
+  scanned), for a close and for `--relink`.
+- red: `FAIL - the files of a worktree under .claude/worktrees are untouched` (and the same for `--relink`).
+- Deviation: the citation of PAR-14 is in `test_close_issue.rs` only; the `check_specs.rs` half is proven by the
+  existing cases of `test_check_specs.rs`, which sit in its `main` and carry no citation, like the rest of that file.

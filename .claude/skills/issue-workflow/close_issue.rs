@@ -2,7 +2,8 @@
 //! Move a finished issue file into `issues/done/` (only run after the user agreed).
 //! Uses `git mv` when the file is tracked, a plain rename otherwise. Refuses to overwrite.
 //! Then rewrites every `issues/foo.md` mentioned in the other text files of the repo to
-//! `issues/done/foo.md`, so no document keeps pointing at the old path.
+//! `issues/done/foo.md`, so no document keeps pointing at the old path; the issue worktrees nested under
+//! `.claude/worktrees/` keep their own files.
 //! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: the
 //! queue is edited at merge time, on the main worktree.
 //! Usage: `just close-issue issues/foo.md`; `just close-issue --relink` fixes the references to
@@ -36,13 +37,15 @@ fn is_text_file(path: &Path) -> bool {
             .is_some_and(|e| ["md", "rs", "toml", "yaml", "yml", "txt", "json"].contains(&e))
 }
 
-fn text_files(dir: &Path, out: &mut Vec<std::path::PathBuf>, skipped: &[String]) {
+/// The text files under `dir`, except in the `skipped` directory names and the `worktrees` directory (the issue
+/// worktrees nested in the main one, ADR 0008), matched by full path.
+fn text_files(dir: &Path, out: &mut Vec<std::path::PathBuf>, skipped: &[String], worktrees: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            if !path.file_name().and_then(|n| n.to_str()).is_some_and(|n| skipped.iter().any(|s| s == n)) {
-                text_files(&path, out, skipped);
+            if path != worktrees && !path.file_name().and_then(|n| n.to_str()).is_some_and(|n| skipped.iter().any(|s| s == n)) {
+                text_files(&path, out, skipped, worktrees);
             }
         } else if is_text_file(&path) {
             out.push(path);
@@ -77,7 +80,7 @@ fn relink(root: &Path, stems: &HashSet<String>) {
     let mut files = Vec::new();
     let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
     skipped.extend(config_list(root, "skipped_dirs"));
-    text_files(root, &mut files, &skipped);
+    text_files(root, &mut files, &skipped, &root.join(".claude/worktrees"));
     for file in files {
         let Ok(text) = std::fs::read_to_string(&file) else { continue };
         let updated = relink_text(&text, stems);

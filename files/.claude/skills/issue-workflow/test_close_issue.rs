@@ -55,6 +55,47 @@ fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: PAR-14
+/// The issue worktrees nest in the main one (ADR 0008): closing an issue there must not rewrite their files.
+fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
+    let main = std::fs::canonicalize(std::env::temp_dir()).unwrap().join(format!("close_issue_nested_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&main);
+    let nested = main.join(".claude/worktrees/bar");
+    std::fs::create_dir_all(main.join("issues")).unwrap();
+    std::fs::create_dir_all(main.join("docs/worktrees")).unwrap();
+    std::fs::write(main.join("issues/foo.md"), "x").unwrap();
+    std::fs::write(main.join("issues/bar.md"), "x").unwrap();
+    std::fs::write(main.join("NOTES.md"), "see issues/foo.md\n").unwrap();
+    std::fs::write(main.join("docs/worktrees/w.md"), "see issues/foo.md\n").unwrap();
+    let git = |args: &[&str]| {
+        let ok = Command::new("git")
+            .args(["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(&main)
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?} failed");
+    };
+    git(&["init", "-q", "-b", "trunk", "."]);
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "init", "--no-verify"]);
+    git(&["worktree", "add", "-q", "-b", "bar", nested.to_str().unwrap()]);
+    let read = |p: &Path| std::fs::read_to_string(p).unwrap();
+    let (closed, _) = run(script, &main, "issues/foo.md");
+    let nested_kept = read(&nested.join("NOTES.md")) == "see issues/foo.md\n" && read(&nested.join("docs/worktrees/w.md")) == "see issues/foo.md\n";
+    let (relinked, _) = run(script, &main, "--relink");
+    let out = vec![
+        ("closing an issue rewrites the main worktree's references", closed && read(&main.join("NOTES.md")) == "see issues/done/foo.md\n"),
+        ("a directory named worktrees elsewhere is still scanned", read(&main.join("docs/worktrees/w.md")) == "see issues/done/foo.md\n"),
+        ("the files of a worktree under .claude/worktrees are untouched", nested_kept),
+        ("--relink leaves them untouched too", relinked && read(&nested.join("NOTES.md")) == "see issues/foo.md\n"),
+    ];
+    let _ = std::fs::remove_dir_all(&main);
+    out
+}
+
 fn main() {
     let script = std::fs::canonicalize(Path::new(file!()).parent().unwrap().join("close_issue.rs")).unwrap();
     let tmp = std::env::temp_dir().join(format!("close_issue_test_{}", std::process::id()));
@@ -120,7 +161,7 @@ fn main() {
     let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
     check("closing the last entry leaves the header ending with one newline", ok && queue == header);
 
-    for (name, ok) in refuses_a_linked_worktree(&script) {
+    for (name, ok) in refuses_a_linked_worktree(&script).into_iter().chain(skips_the_nested_worktrees(&script)) {
         check(name, ok);
     }
 
