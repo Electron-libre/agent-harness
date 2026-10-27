@@ -58,7 +58,7 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
    retention, the transcript readers, the worktree ignore settings) to a new `docs/usage.md`; point the README rows of
    `.claude/update-docs-map.md` at it too; verified by `skill:update-docs` (nothing lost) and the mermaid blocks parsing
    (`mmdc` if available, else a GitHub preview); ~250 lines.
-2. [ ] Architecture, what is shared and the binary: restructure "What is shared, and how", "Making files identical",
+2. [x] Architecture, what is shared and the binary: restructure "What is shared, and how", "Making files identical",
    "Tools and their binary" and "Sources" as overviews with a `sync` flowchart and a `harness run` launcher diagram,
    duplicated edge cases replaced by links to `specs/sync.md`, `specs/tool-binaries.md` and the ADRs; verified by a
    statement-by-statement check that each dropped one lives in a spec, an ADR or a doc comment; ~250 lines.
@@ -97,4 +97,19 @@ and doc comments that already hold them. Out of scope: any change of behaviour, 
 - Code review: no findings
 - not verified: the mermaid rendering (no mermaid CLI allowed here); the links to `docs/workflow.md` wait for
   deliverable 4.
+- decisions needed: none
+
+## Deliverable 2
+- done: "What is shared" (sync flowchart, kinds table, values), "Sources" moved up next to it, "Tools and their
+  binary" (launcher flowchart, exit code table); edge cases replaced by the SYN and BIN ids that hold them.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| docs | each dropped statement found in `specs/sync.md` or `specs/tool-binaries.md`; the two found nowhere (a branch `rev` resolved without fetch, exit 2 before BIN-7 and BIN-17) kept; links resolve |
+| code review | see below |
+
+- red: none (docs only, no test)
+- Code review: no findings
+- not verified: the mermaid rendering
 - decisions needed: none

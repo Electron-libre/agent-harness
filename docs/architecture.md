@@ -2,73 +2,104 @@
 
 ## What is shared, and how
 
-A consumer project holds a `.claude/harness.toml` with the `[harness]` table (`source`, and `rev` for a git
-source) and its own values (`[project]`, read by the scripts and the skills). `harness sync` reads the source and:
+A consumer project holds a `.claude/harness.toml`: the `[harness]` table (`source`, and `rev` for a git source) and
+its own values (`[project]`, read by the tools and the skills). `harness sync` reads the source and writes three kinds
+of things ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)):
 
-- copies every file under `files/` to the same relative path (managed: scripts, tests, hooks, skills, `harness.just`,
-  `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_harness.sh`);
-- copies every file under `seed/` once, when the project lacks it (project-owned: `.claude/harness.toml`
-  defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`);
-- merges the entries of `entries/.claude/settings.json` (the deny rules and hooks of the harness) into the
-  project's `.claude/settings.json`, leaving its other keys and entries alone (see "Hooks and their declaration").
+```mermaid
+flowchart LR
+  toml[".claude/harness.toml<br/>source, rev"] --> sync["harness sync"]
+  subgraph source
+    files["files/"]
+    seed["seed/"]
+    entries["entries/.claude/settings.json"]
+  end
+  files --> sync
+  seed --> sync
+  entries --> sync
+  sync -->|"copied, same path<br/>(SYN-1 to SYN-8)"| managed["managed files"]
+  sync -->|"copied once, if missing<br/>(SYN-4)"| owned["project-owned files"]
+  sync -->|"entries merged<br/>(SYN-29 to SYN-36)"| settings[".claude/settings.json"]
+  sync -->|"installed<br/>(SYN-18 to SYN-23)"| gate[".git/hooks/pre-commit"]
+  sync --> lock[".claude/harness.lock"]
+  lock -.->|hashes compared| check["harness check"]
+```
 
-`.claude/harness.lock` holds the hash of each managed file as written, then the managed settings entries. A managed file whose hash differs from the
-lock was edited locally: `sync` reports a conflict instead of overwriting it, and `harness check` fails. The fix
-belongs in this repository, then `sync` everywhere. There is deliberately no merge.
+| Kind | From | Examples | Owner |
+|---|---|---|---|
+| Managed | `files/` | skills, `harness.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_harness.sh` | the source: an edit in a project is a conflict |
+| Seeded | `seed/` | `.claude/harness.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md` | the project, from the first copy |
+| Entries | `entries/.claude/settings.json` | the hooks and the deny rules of the review waiver | the source, inside a file the project owns ("Hooks and their declaration") |
 
-## Making files identical
+`.claude/harness.lock` records the hash of each managed file and each managed entry as written. A managed file whose
+hash differs from the lock was edited locally: `sync` reports a conflict instead of overwriting it and `check` fails.
+The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
-Everything that differs between projects is a value, not code. Scripts read lists from `.claude/harness.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`) with a std-only reader; skills tell the agent which key to read
-(`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`). The change-to-documents table of
-`update-docs` lives in the project's `.claude/update-docs-map.md`. Anything else that is project-specific
-(quality benchmark, smoke test, the language-specific recipes of the `justfile`) stays in the project.
+Everything that differs between projects is a value, not code. The tools read lists from `.claude/harness.toml`
+(`commit_scopes`, `root_docs`, `skipped_dirs`); the skills tell the agent which key to read (`roadmap`,
+`architecture`, `test_conventions`, `confidential`, `user_language`); the change-to-documents table of `update-docs`
+is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
+language-specific recipes of the `justfile`) stays in the project.
+
+## Sources
+
+A source is a directory (relative to the project) or a git URL. A git source is cloned in `$XDG_CACHE_HOME/harness`
+and checked out at `rev` (default: the remote's default branch), which pins a commit, not a moving name
+([ADR 0002](adr/0002-rev-pins-the-resolved-commit.md)). `harness update [--rev <name>]` resolves a name to a commit,
+previews the sync, and only then syncs and writes the commit to `rev` (SYN-11 to SYN-17); a local directory has no
+revision. `check` compares the project with its lock and never reads the source.
 
 ## Tools and their binary
 
-The tools of the harness are modules of the `harness` crate, no longer `rust-script` files
-([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md)):
-the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-commits`, the issue tools
-(`next-issue`, `issue-worktree`, `close-issue`), `check-specs`, `check-issue`, the transcript readers and
-`audit-sources`; `harness run` alone lists them. A consumer needs `harness` and `just`, Rust only for a commit with no
-published binary. Their tests, and those of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`), are
-`cargo test` of this repository; consumers run none, and a test fails when anything the source ships still names
-`rust-script`. A hook, a recipe or a skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
-the nearest `.claude/harness.toml` from the current directory (else from `CLAUDE_PROJECT_DIR`, when the agent left the
-project) and replaces itself (`exec`) by `<binary> tool <tool> [args]`, so input, output and exit code are the tool's
-(`crates/harness/src/tools/`, one module per tool, listed in `TOOLS`). When it cannot get the binary it exits 3, not 2:
-Claude Code reads 2 as the refusal of a hook, and a hook that cannot run must not block the agent (BIN-14). A tool
-the pinned binary does not know exits 3 as well, listing the tools (BIN-7); a binary pinned before BIN-7 exits 2
-there, and the hook refuses. An error of `init`, `sync`, `update` or `check` exits 3 too (SYN-37); 1 stays a drift or
-a conflict.
-The launcher itself is not of the pinned revision: a hook command `harness <subcommand>` it does not know fails in
-its argument parser, which exits 3 like a tool it cannot get (BIN-17), so the hook does not block the agent but does
-not run either; a launcher installed before BIN-17 exits 2 there, and every hook refuses. `harness check` asks the
-`harness` on the path `harness help <subcommand>` for each subcommand the hooks of `.claude/settings.json` name, and
-fails on those it refuses, naming the `cargo install` of the pinned revision (`crates/harness/src/launcher.rs`,
-BIN-15). `harness update` asks the same of the hooks of the target revision and
-writes nothing while one is refused, naming the `cargo install --git <source> --rev <commit> --locked` to run first
-(a warning under `--dry-run`, BIN-16).
+The tools of the harness (hooks, checks, issue tools, transcript readers) are modules of the `harness` crate, one per
+tool under `crates/harness/src/tools/`, listed in `TOOLS`
+([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec
+[`specs/tool-binaries.md`](../specs/tool-binaries.md)). A hook, a recipe or a skill calls `harness run <tool> [args]`.
+A consumer needs `harness` and `just`, and Rust only for a commit with no published binary. The tests of the tools and
+of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`) are the `cargo test` of this repository;
+consumers run none.
 
-- Git source: the binary of the pinned commit and the platform, `<cache>/harness/bin/<commit>/<target>/harness`. A
-  `rev` that is no commit hash (a branch, from `init --rev`) resolves in the clone `sync` left, without a fetch. When
-  missing, `curl` downloads the asset `harness-<target>` of the release `harness-<commit>` of a GitHub source and its
-  `.sha256`; a digest mismatch fails and installs nothing. Any other failure falls back to
-  `cargo install --git <source> --rev <commit> --locked` (a `git@host:path` source given as `ssh://`). The file is
-  written next to its place and renamed, so a concurrent hook never runs half a binary. `sync` and `update` fetch it
-  ahead (a failure is a warning).
-- Local directory source (this repository): `cargo build -p harness` of the source on each call (about 40 ms when
-  nothing changed), whose binary also goes to `<cache>/harness/bin/local-<hash of the path>/harness`; when the working
-  tree does not compile, that last good build runs, with a warning, so the hooks keep working.
+The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds the pinned revision and replaces
+itself (`exec`) by that revision's binary, so input, output and exit code are the tool's.
 
-This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): on each push to the
-main branch it builds `harness` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run
-whatever the glibc: a cached binary is never fetched again) and `aarch64-apple-darwin` and creates (or, on a re-run,
-completes) the release `harness-<commit>` with each binary and its `.sha256`. A commit pinned before its release
-exists (`harness update` right after a push) is built with `cargo` until it does. The CI of a consumer
-(`.github/install_harness.sh`) puts that asset, or the binary `cargo install` built when there is none, where
-`harness run` looks for it and on the path, so its jobs need no Rust when the source publishes the commit and build it
-once otherwise; a digest mismatch fails the job, as it fails `harness run`.
+```mermaid
+flowchart TD
+  hook["hook, recipe or skill:<br/>harness run TOOL"] --> find["nearest .claude/harness.toml<br/>(else CLAUDE_PROJECT_DIR)"]
+  find -->|git source| cached{"binary of the<br/>commit cached?"}
+  cached -->|yes| exec["exec the binary:<br/>tool TOOL args"]
+  cached -->|no| download["release asset<br/>and its .sha256 (curl)"]
+  download -->|digest matches| exec
+  download -->|no release| cargo["cargo install --git<br/>--rev COMMIT"]
+  cargo -->|built| exec
+  find -->|local directory| build["cargo build -p harness<br/>(last good build if it fails)"]
+  build --> exec
+  find -->|none found| exit3["exit 3:<br/>never blocks the agent"]
+  cargo -->|fails| exit3
+```
+
+| Exit | Meaning |
+|---|---|
+| the tool's | the tool ran |
+| 1 | a drift or a conflict of `sync` and `check` |
+| 2 | a hook refuses (Claude Code blocks on it) |
+| 3 | the launcher could not run the tool, or `init`, `sync`, `update`, `check` failed (BIN-7, BIN-14, BIN-17, SYN-37) |
+
+A binary pinned before BIN-7, or a launcher installed before BIN-17, exits 2 instead of 3 there, and the hook refuses.
+
+The binaries live in `<cache>/harness/bin/<commit>/<target>/harness`, or `<cache>/harness/bin/local-<hash of the
+path>/harness` for a local source, written next to their place and renamed (BIN-4). A `rev` that is no commit hash (a
+branch, from `init --rev`) resolves in the clone `sync` left, without a fetch. `sync` and `update` fetch the binary
+ahead.
+
+The launcher itself is not of the pinned revision: a hook running a subcommand the installed `harness` does not know
+cannot run. `check` names the `cargo install` to run (BIN-15) and `update` refuses such a revision (BIN-16);
+`crates/harness/src/launcher.rs`.
+
+This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): each push to the main
+branch builds `harness` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever the
+glibc) and `aarch64-apple-darwin`, and creates the release `harness-<commit>` with each binary and its `.sha256`. The CI
+of a consumer (`.github/install_harness.sh`) installs that asset, or builds it with `cargo` when there is none, so its
+jobs need no Rust when the source publishes the commit.
 
 ## Hooks and their declaration
 
@@ -311,20 +342,3 @@ code, docs, the `low` review, the commit). Switch with `/model` after the plan i
 does not fit, since plan mode is read-only and step 1 writes the issue. Forked
 skills and sub-agents follow the session model unless the user sets `CLAUDE_CODE_SUBAGENT_MODEL` in their own
 settings.
-
-## Sources
-
-A directory (relative to the project) or a git URL; a git source is cloned in `$XDG_CACHE_HOME/harness` and
-checked out at `rev` (default: the remote's default branch). `rev` pins a commit, not a moving name:
-see [ADR 0002](adr/0002-rev-pins-the-resolved-commit.md). `harness update [--rev <name>]` resolves a name
-(default: the default branch head) to a commit, previews the sync against it (`--dry-run` stops there), and only
-without conflict (or with `--force`) syncs and writes the commit to `rev`; a conflict, an unknown revision or an unreadable source leave the
-project as it was. A local directory has no revision and is refused.
-A pinned commit that a force-push or a deleted branch left without any ref is fetched by its hash (`git fetch
-origin <hash>`); when the source no longer serves it, `sync` and `update` fail naming the commit and `harness
-update`. `check` compares the project with its lock and never reads the source; besides, it reports
-`missing: native review gate` (or `modified:`) when a project that manages the review hook lacks the managed git hook,
-unless `CI` is set, since a fresh clone has no git hooks. The CI jobs install the tool with
-`.github/install_harness.sh`: the release asset of the pinned commit (see "Tools and their binary"), else
-`cargo install --git --rev <hash>`, which depends on the same host behaviour: it can fail the same way, and the
-fix is the same `harness update`.
