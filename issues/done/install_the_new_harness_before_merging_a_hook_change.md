@@ -142,7 +142,7 @@ High review: 10 findings
 - 2 (`sync` does not probe): not fixed, `sync` was left out at validation.
 - 3 (a leading global flag such as `harness --root . x` is skipped): not fixed, no hook of the harness has one.
 - 5 (exit 3 on a parse error of the launcher): out of the requirements, opened as
-  `issues/exit_3_when_the_launcher_cannot_parse_its_arguments.md`.
+  `issues/done/exit_3_when_the_launcher_cannot_parse_its_arguments.md`.
 
 Code review: no findings
 

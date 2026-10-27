@@ -27,7 +27,7 @@ the user without locking the agent out. The same holds for the runtime errors of
 
 # Resources
 * `crates/harness/src/tools/mod.rs`, `crates/harness/src/main.rs`, `specs/tool-binaries.md` (BIN-7, BIN-14, BIN-17)
-* `issues/exit_3_when_the_launcher_cannot_parse_its_arguments.md`
+* `issues/done/exit_3_when_the_launcher_cannot_parse_its_arguments.md`
 
 # Hints
 * Claude Code blocks on exit 2 only; any other non-zero code is a non-blocking error shown to the user.
