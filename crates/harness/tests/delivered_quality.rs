@@ -440,6 +440,66 @@ fn start_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     )]
 }
 
+/// An issue file whose Goal fence is left open before its Tracking, and one with no Tracking nor Plan.
+const THETA: &str = "# theta\n\n# Goal\n```md\n# Tracking\n\n## Plan\n1. [x] one\n- Code review: 2 findings\n- red: ABC-1: failed\n";
+const IOTA: &str = "# iota\n\n# Goal\nClosed with no plan.\n";
+
+// spec: QUA-12
+fn unread_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let repo = tmp.join("unread");
+    std::fs::create_dir_all(&repo).unwrap();
+    sh(&repo, &["init", "-q", "-b", "main"]);
+    commit_at(
+        &repo,
+        "2026-01-01T00:00:00Z",
+        "chore: sync",
+        &[(".claude/harness.toml", Some(&toml("r1")))],
+    );
+    commit_at(
+        &repo,
+        "2026-01-02T00:00:00Z",
+        "docs: close theta",
+        &[
+            ("issues/done/theta.md", Some(THETA)),
+            ("tests/t.rs", Some("// spec: ABC-1\nfn t() {}\n")),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-03T00:00:00Z",
+        "docs: close iota",
+        &[("issues/done/iota.md", Some(IOTA))],
+    );
+    let (_, out) = run(dir, &repo, &[]);
+    let r = rows(&out);
+    vec![
+        (
+            "a section whose heading stands only inside a fence leaves its columns empty"
+                .to_string(),
+            [
+                "deliverables",
+                "reviews",
+                "review_findings",
+                "traced_without_red",
+            ]
+            .iter()
+            .all(|c| has(&r, "theta", c, ""))
+                && has(&r, "theta", "traced", "1"),
+        ),
+        (
+            "a section the file does not hold reads as empty".to_string(),
+            [
+                "deliverables",
+                "reviews",
+                "review_findings",
+                "traced_without_red",
+            ]
+            .iter()
+            .all(|c| has(&r, "iota", c, "0")),
+        ),
+    ]
+}
+
 /// A repository where `eps` adds three citations and records the red run of two, `zeta` only renames a test and
 /// `eta` extends its citation.
 fn traced_fixture(tmp: &Path) -> PathBuf {
@@ -716,6 +776,7 @@ fn delivered_quality() {
         .chain(review_checks(&dir, &tmp))
         .chain(fence_checks(&dir, &tmp))
         .chain(start_checks(&dir, &tmp))
+        .chain(unread_checks(&dir, &tmp))
         .chain(traced_checks(&dir, &tmp))
         .chain(session_checks(&dir, &tmp))
         .chain(summary_checks(&dir, &tmp))

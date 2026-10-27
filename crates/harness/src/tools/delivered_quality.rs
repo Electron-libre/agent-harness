@@ -162,27 +162,40 @@ fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Opt
     )
 }
 
+/// Whether `text` holds the line `heading` (trailing spaces ignored), fenced or not.
+fn holds(text: &str, heading: &str) -> bool {
+    text.lines().any(|l| l.trim_end() == heading)
+}
+
+/// The section `heading` as QUA-12 reads it: empty when the file does not hold its heading, `None` when the heading
+/// stands only inside a fenced code block (unread).
+fn readable<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Option<Vec<&'a str>> {
+    section(text, heading, ends).or_else(|| (!holds(text, heading)).then(Vec::new))
+}
+
 /// The number of plan lines of an issue file (QUA-3): `<n>. [x]` or `<n>. [ ]` at the start of a line of `## Plan`,
-/// else of `# Tracking` before its first sub-heading (the older issues).
-fn deliverables(text: &str) -> usize {
+/// else of `# Tracking` before its first sub-heading (the older issues); `None` when neither heading stands outside a
+/// fence and one stands inside (QUA-12).
+fn deliverables(text: &str) -> Option<usize> {
     let is_item = |line: &&str| {
         let rest = line.trim_start_matches(|c: char| c.is_ascii_digit());
         rest.len() < line.len() && (rest.starts_with(". [x]") || rest.starts_with(". [ ]"))
     };
     let ends = |l: &str| l.starts_with('#');
-    section(text, "## Plan", ends)
+    let plan = section(text, "## Plan", ends)
         .or_else(|| section(text, "# Tracking", ends))
-        .unwrap_or_default()
-        .into_iter()
-        .filter(is_item)
-        .count()
+        .or_else(|| (!holds(text, "## Plan") && !holds(text, "# Tracking")).then(Vec::new))?;
+    Some(plan.into_iter().filter(is_item).count())
 }
 
 /// The reviews recorded in the `# Tracking` section of an issue file and the sum of their findings (QUA-6): a line
 /// holding `Code review` is one review, unless it is a row of the `check | result` table, its findings the `<n>` of its first `<n> finding(s)` (0 for `no findings`),
-/// since what follows may count the fixed ones; `None` for the sum when a line gives no count.
-fn reviews(text: &str) -> (usize, Option<usize>) {
-    let tracking = section(text, "# Tracking", |l| l.starts_with("# ")).unwrap_or_default();
+/// since what follows may count the fixed ones; `None` for the sum when a line gives no count, and for both when the
+/// section is unread (QUA-12).
+fn reviews(text: &str) -> (Option<usize>, Option<usize>) {
+    let Some(tracking) = readable(text, "# Tracking", |l| l.starts_with("# ")) else {
+        return (None, None);
+    };
     let lines: Vec<String> = tracking
         .iter()
         .filter(|l| !l.trim_start().starts_with('|'))
@@ -208,7 +221,7 @@ fn reviews(text: &str) -> (usize, Option<usize>) {
     let sum = counts
         .collect::<Option<Vec<usize>>>()
         .map(|c| c.iter().sum());
-    (lines.len(), sum)
+    (Some(lines.len()), sum)
 }
 
 /// The requirement ids of a `// spec: A-1, B-2` list, read as `check-specs` reads them.
@@ -258,9 +271,10 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
 
 /// The requirement ids recorded as seen failing in an issue file (QUA-11): the list that opens each `red:` item of
 /// its `# Tracking` section, an item running over its indented continuation lines, the list ending at the first
-/// word that is not an id (`red: ABC-3, ABC-4: <failure>` names ABC-3 and ABC-4, `red: none (ABC-3)` none).
-fn red_ids(text: &str) -> BTreeSet<String> {
-    let tracking = section(text, "# Tracking", |l| l.starts_with("# ")).unwrap_or_default();
+/// word that is not an id (`red: ABC-3, ABC-4: <failure>` names ABC-3 and ABC-4, `red: none (ABC-3)` none); `None`
+/// when the section is unread (QUA-12).
+fn red_ids(text: &str) -> Option<BTreeSet<String>> {
+    let tracking = readable(text, "# Tracking", |l| l.starts_with("# "))?;
     let unmarked = |line: &str| {
         let line = line.trim();
         let line = line.trim_start_matches(['-', '*', '+']);
@@ -297,7 +311,7 @@ fn red_ids(text: &str) -> BTreeSet<String> {
             }
         }
     }
-    ids
+    Some(ids)
 }
 
 /// Whether `commit` reverts the work of the issue (QUA-4): a `revert` type or a `Revert "` subject changing one of
@@ -476,6 +490,11 @@ struct Row {
     cells: Vec<String>,
 }
 
+/// A count, empty when unknown.
+fn cell(value: Option<usize>) -> String {
+    value.map(|n| n.to_string()).unwrap_or_default()
+}
+
 fn issue_row(
     repo: &Path,
     log: &[Commit],
@@ -510,22 +529,23 @@ fn issue_row(
     let traced = traced(repo, &mine);
     let without_red = traced
         .as_ref()
-        .map(|t| t.difference(&red_ids(&text)).count());
+        .zip(red_ids(&text))
+        .map(|(t, red)| t.difference(&red).count());
     let transcript = sessions.map(|s| session_cells(log, &own, &stem, s));
     let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
         log[close].date.to_rfc3339(),
-        deliverables(&text).to_string(),
+        cell(deliverables(&text)),
         own.len().to_string(),
         fixes_in.to_string(),
         fixes_after.to_string(),
         reverts_after.to_string(),
-        review_count.to_string(),
-        findings.map(|n| n.to_string()).unwrap_or_default(),
-        traced.map(|t| t.len().to_string()).unwrap_or_default(),
-        without_red.map(|n| n.to_string()).unwrap_or_default(),
+        cell(review_count),
+        cell(findings),
+        cell(traced.map(|t| t.len())),
+        cell(without_red),
     ];
-    cells.extend((0..4).map(|k| transcript.map(|t| t[k].to_string()).unwrap_or_default()));
+    cells.extend((0..4).map(|k| cell(transcript.map(|t| t[k]))));
     Some(Row {
         issue: stem,
         first: log[first].date,

@@ -46,7 +46,7 @@ keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 
 1. [x] Fence-aware start of an issue: read each version of the issue file touched by its candidate commits (`git
    show`) with `section` until one holds `# Tracking`; verified by a fixture issue opened with `# Tracking` quoted in
    a Goal fence (`commits` 3); makes true QUA-2. ~70 lines.
-2. [ ] Unread sections: `section` tells a heading found only inside a fence from an absent one, and `deliverables`,
+2. [x] Unread sections: `section` tells a heading found only inside a fence from an absent one, and `deliverables`,
    `reviews` and `red_ids` turn the first into empty cells; verified by a fixture issue whose Goal fence stays open
    before `# Tracking`, and one with no `# Tracking` keeping 0; makes true QUA-12 (as amended). ~80 lines.
 3. [ ] BRE-10 reads fences with the shared `fenced` of `tools/mod.rs`; verified by an English text block in a `~~~`
@@ -61,6 +61,15 @@ keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 
 - done: `issue_commits` reads each version of the issue file (`git show`) with the fence-aware `section` and starts
   at the oldest holding `# Tracking` outside a fence, instead of `git log -G`.
 - red: QUA-2: `kappa.commits: expected "3", got Some("4")` (the creation commit quoting `# Tracking` in a fence counted).
+- Code review: no findings (low).
+- not verified: none.
+- decisions needed: none.
+
+## Deliverable 2
+- done: `readable` reads a section as empty when the file does not hold its heading and as unread (`None`) when the
+  heading stands only inside a fence; `deliverables`, `reviews` and `red_ids` print empty cells for an unread one.
+  The rows of this repository are unchanged.
+- red: QUA-12: `theta.deliverables: expected "", got Some("0")` (a Goal fence left open before `# Tracking`).
 - Code review: no findings (low).
 - not verified: none.
 - decisions needed: none.
