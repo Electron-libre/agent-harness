@@ -282,7 +282,7 @@ Code's `EnterWorktree` with the path, since a shell `cd` out of the launch direc
 `cwd`, and the `cwd` of the hook events, become the worktree. The hooks act on the work tree of that `cwd`
 (their declarations still come from the main worktree, `CLAUDE_PROJECT_DIR`, but `harness run` takes the revision of
 the `harness.toml` it finds from the `cwd`): `review-gate` keeps its marker and waiver in the git directory of each
-worktree (`git rev-parse --git-path`), `format-rust` and `clippy-gate` run cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, leaves the worktree (`ExitWorktree`), fast-forwards the main branch, closes the issue and runs `just finish-issue`.
+worktree (`git rev-parse --git-path`), `format-rust` and `clippy-gate` run cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, runs `just check-harness` there (and installs the `harness` of the branch when the installed one refuses a hook of it, BIN-15), leaves the worktree (`ExitWorktree`), fast-forwards the main branch, closes the issue and runs `just finish-issue`.
 
 ## The cost of a turn
 

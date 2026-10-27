@@ -25,6 +25,11 @@ harness run <tool> [args]          # run a tool of the harness (`commit-check`, 
 With a local directory source (this repository), `harness run` builds the source's crate with `cargo`, so a hook runs
 the tools of the working tree, or of the last build that compiled.
 
+The installed `harness` is the launcher of every project of the machine, not a binary of the pinned revision: a
+revision whose hooks call a subcommand it does not know needs its `harness` installed first, or every hook refuses and
+the agent can run nothing, the install included. `harness update` refuses such a revision and prints the install to run;
+in this repository, `just check-harness` says so before an issue branch is merged (`issue-workflow`, "Merge back").
+
 The harness is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes
 them after 30 days by default, for every project at once: keep them a year in your user settings
 (`~/.claude/settings.json`, or `settings.json` in `CLAUDE_CONFIG_DIR`), which `harness` never writes:

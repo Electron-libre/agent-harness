@@ -49,7 +49,7 @@ issue, the check being `harness help <subcommand>` run against the `harness` on 
    `harness` on the path refuses fails `check`; verified by tests with a fake `harness`; makes true BIN-15.
 2. [x] `update` refuses such a target, naming `cargo install --git <source> --rev <commit> --locked`, and warns under
    `--dry-run`; verified by tests with a fake `harness`; makes true BIN-16.
-3. [ ] Procedure and docs: `issue-workflow` "Merge back" runs `just check-harness` in the worktree before the
+3. [x] Procedure and docs: `issue-workflow` "Merge back" runs `just check-harness` in the worktree before the
    fast-forward and installs the branch's `harness` (`just install` from the worktree) when it fails; the README says a
    consumer installs the matching `harness` when `update` refuses; verified by `just check-harness` and a reread.
 
@@ -96,3 +96,24 @@ Code review: 1 finding
   dry-run sync on it before anything is written; a comment says so.
 
 not verified: a real `harness update` from GitHub (network); the tests use a `file://` source and a fake `harness`.
+
+## Deliverable 3
+done: `issue-workflow` "Merge back" step 1 runs `just check-harness` in the worktree after the rebase and installs the
+branch's `harness` before leaving it when a hook is refused; the README explains the launcher and the refusal of
+`update`; `docs/architecture.md` names the step.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | README, `docs/architecture.md`, `details.md` (synced) |
+| code review | low, see below |
+
+red: none (docs and procedure only)
+
+Code review: 1 finding
+- The shared "Merge back" step named `cargo install --path crates/harness`, which only this repository has: fixed, the
+  step names that install for the local source `.` and `cargo install --git <source> --rev <rev> --locked` elsewhere.
+
+not verified: a real merge of a branch that adds a hook subcommand (no such branch here).
