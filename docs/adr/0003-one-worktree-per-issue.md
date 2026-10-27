@@ -1,6 +1,6 @@
 # 0003. One worktree per issue
 
-Status: Accepted
+Status: Superseded by 0008
 Date: 2026-10-25
 
 ## Context

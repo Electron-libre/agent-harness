@@ -18,11 +18,12 @@ Reports to the user (stops, summaries, final report) are read at a glance:
 
 ## 0. Resume or start
 
-**Work in the issue's own worktree** (ADR 0003), so that another session's files, index and `target/` never mix
+**Work in the issue's own worktree** (ADR 0003, 0008), so that another session's files, index and `target/` never mix
 with yours. In a linked worktree on the branch `<stem>` of the issue, go on. In the main worktree (`git rev-parse
 --path-format=absolute --git-dir --git-common-dir` prints the same path twice):
 
-- The worktree `../<repo>-<stem>` exists: enter it with Claude Code's `EnterWorktree` tool, `path` set to it.
+- `git worktree list` shows a worktree on the branch `<stem>` (`.claude/worktrees/<stem>`, or `../<repo>-<stem>`
+  for an issue started before): enter it with Claude Code's `EnterWorktree` tool, `path` set to it.
 - The branch `<stem>` exists without its worktree: stop and ask the user.
 - Otherwise: when `issues/<stem>.md` is untracked or modified, commit it first with its queue line and nothing
   else staged (`git add issues/<stem>.md issues/queue.md`, then `git commit -m <message> -- issues/<stem>.md

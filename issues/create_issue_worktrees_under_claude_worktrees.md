@@ -54,3 +54,39 @@ instead, so that starting or resuming an issue needs no interaction.
 * The hooks receive `CLAUDE_PROJECT_DIR` of the main worktree and the `cwd` of the event (see PAR-12): with the
   worktree nested in the main one, a check "is this path under the project dir" no longer tells the two apart.
 * Do not reach for `bypassPermissions`: it removes every prompt, not only this one.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+`start-issue` nests the issue worktree at `.claude/worktrees/<stem>`, so `EnterWorktree` needs no approval; git
+ignores it through `info/exclude`, the tree scanners skip it, `finish-issue` still removes the old siblings. Out of
+scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they resolve the work tree from the event's
+`cwd` (`git rev-parse --show-toplevel`), which a nested worktree answers by itself, so they need no change.
+
+## Plan
+1. [x] Nested worktree: `issue_worktree.rs start` creates `.claude/worktrees/<stem>` and writes the exclude line,
+   `finish` accepts the new path and the legacy sibling; step 0 of `issue-workflow` finds the worktree of the branch
+   in `git worktree list`; recipe comment, `details.md`, `docs/architecture.md`, ADR 0008; verified by
+   `test_issue_worktree.rs` (and a check that cargo in the main worktree ignores the nested crates); makes true
+   PAR-1, PAR-13, PAR-15.
+2. [ ] Scanners: `close_issue.rs` skips `.claude/worktrees/` of the root it walks (by path, not by name), the
+   existing `check_specs.rs` skip gets its citation; verified by `test_close_issue.rs`, `test_check_specs.rs`;
+   makes true PAR-14.
+3. [ ] Transcripts: `repository()` of `transcripts.rs` maps a removed `<repo>/.claude/worktrees/<x>` cwd to
+   `<repo>`; verified by `test_session_metrics.rs`; makes true EVA-7 (amended).
+
+## Decisions
+- Mode: autonomous
+- Base commit: bd97fda99253dbce610398148e1d580b2ab9be90
+- Ignore rule: `info/exclude` of the git common directory, written by `start-issue` (ADR 0008), not a `.gitignore`
+  line shipped or checked by the harness.
+- ADR 0008 supersedes ADR 0003 for the location only.
+
+## Deliverable 1
+- done: `start-issue` creates `.claude/worktrees/<stem>` and adds `/.claude/worktrees/` to `info/exclude` once;
+  `finish-issue` also removes a worktree left at `../<repo>-<stem>`; step 0 finds the worktree by its branch.
+- red: the test panicked writing `.claude/worktrees/x/work.txt` (NotFound): `start` still made the sibling.
+- Cargo: with a nested copy of the workspace, `cargo metadata` in the main worktree lists only its own crate, and in
+  the copy only the copy's (each stops at its own workspace root).

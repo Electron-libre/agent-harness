@@ -42,7 +42,16 @@ impl Ctx {
     }
 
     fn wt(&self, stem: &str) -> PathBuf {
+        self.repo.join(".claude/worktrees").join(stem)
+    }
+
+    /// Where `start` put the worktrees before PAR-1 nested them.
+    fn sibling(&self, stem: &str) -> PathBuf {
         self.root.join(format!("repo-{stem}"))
+    }
+
+    fn entries(&self) -> usize {
+        std::fs::read_dir(&self.root).unwrap().count() + std::fs::read_dir(self.repo.join(".claude/worktrees")).map_or(0, Iterator::count)
     }
 }
 
@@ -52,15 +61,27 @@ fn start_creates_the_worktree(c: &Ctx) -> Checks {
     let created = ok && c.wt("x").join("issues/x.md").is_file() && branch_exists(&c.repo, "x");
     let (linked_ok, _) = c.run(&c.wt("x"), &["start", "issues/y.md"]);
     vec![
-        ("start creates the sibling worktree on a branch named after the stem", created),
-        ("start prints the worktree path", out.contains(c.wt("x").to_str().unwrap())),
-        ("start works from a linked worktree and names the sibling of the main one", linked_ok && c.wt("y").is_dir()),
+        ("start creates the worktree under .claude/worktrees on a branch named after the stem", created),
+        ("start prints the worktree path", out.trim() == c.wt("x").to_str().unwrap()),
+        ("start works from a linked worktree and nests the new one in the main one", linked_ok && c.wt("y").is_dir() && !c.wt("x").join(".claude/worktrees/y").exists()),
+    ]
+}
+
+// spec: PAR-13
+fn start_makes_git_ignore_the_worktrees(c: &Ctx) -> Checks {
+    let exclude = std::fs::read_to_string(c.repo.join(".git/info/exclude")).unwrap_or_default();
+    let status = Command::new("git").args(["status", "--porcelain", "--untracked-files=all"]).current_dir(&c.repo).output().unwrap();
+    let status = String::from_utf8_lossy(&status.stdout).into_owned();
+    vec![
+        ("the main worktree's status lists no issue worktree despite `!.claude/`", !status.contains(".claude/worktrees")),
+        ("info/exclude holds the line once after two starts", exclude.lines().filter(|l| *l == "/.claude/worktrees/").count() == 1),
+        ("info/exclude keeps its earlier lines", exclude.lines().any(|l| l == "*.log")),
     ]
 }
 
 // spec: PAR-2
 fn start_refuses_and_changes_nothing(c: &Ctx) -> Checks {
-    let before = std::fs::read_dir(&c.root).unwrap().count();
+    let before = c.entries();
     let (taken, _) = c.run(&c.repo, &["start", "issues/x.md"]);
     let (missing, _) = c.run(&c.repo, &["start", "issues/missing.md"]);
     let (uncommitted, _) = c.run(&c.repo, &["start", "issues/new.md"]);
@@ -77,7 +98,7 @@ fn start_refuses_and_changes_nothing(c: &Ctx) -> Checks {
         ("start refuses a missing issue file", !missing && !branch_exists(&c.repo, "missing")),
         ("start refuses an issue file the main branch does not hold", !uncommitted && !branch_exists(&c.repo, "new")),
         ("start refuses an existing directory", !occupied && !branch_exists(&c.repo, "z")),
-        ("a refusal changes nothing", std::fs::read_dir(&c.root).unwrap().count() == before),
+        ("a refusal changes nothing", c.entries() == before),
     ]
 }
 
@@ -105,7 +126,24 @@ fn finish_removes_only_a_clean_sibling(c: &Ctx) -> Checks {
     let (stranger, _) = c.run(&c.repo, &["finish", "w"]);
     vec![
         ("finish refuses a worktree with uncommitted changes", !dirty && c.wt("y").is_dir() && branch_exists(&c.repo, "y")),
-        ("finish does not remove a worktree that is not the sibling of the stem", !stranger && elsewhere.is_dir() && branch_exists(&c.repo, "w")),
+        ("finish does not remove a worktree that is not the one of the stem", !stranger && elsewhere.is_dir() && branch_exists(&c.repo, "w")),
+    ]
+}
+
+// spec: PAR-15
+fn finish_removes_a_legacy_sibling(c: &Ctx) -> Checks {
+    git_ok(&c.repo, &["worktree", "add", "-q", "-b", "l", c.sibling("l").to_str().unwrap()]);
+    let (merged, _) = c.run(&c.repo, &["finish", "l"]);
+    git_ok(&c.repo, &["worktree", "add", "-q", "-b", "k", c.sibling("k").to_str().unwrap()]);
+    commit_file(&c.sibling("k"), "k.txt");
+    let (unmerged, _) = c.run(&c.repo, &["finish", "k"]);
+    let (inside, _) = c.run(&c.sibling("k"), &["finish", "k", "--force"]);
+    let kept = c.sibling("k").is_dir() && branch_exists(&c.repo, "k");
+    let (forced, _) = c.run(&c.repo, &["finish", "k", "--force"]);
+    vec![
+        ("finish removes a merged worktree left at <repo>-<stem>", merged && !c.sibling("l").exists() && !branch_exists(&c.repo, "l")),
+        ("finish refuses an unmerged one, and from inside it, keeping both", !unmerged && !inside && kept),
+        ("finish --force removes it", forced && !c.sibling("k").exists() && !branch_exists(&c.repo, "k")),
     ]
 }
 
@@ -206,14 +244,18 @@ fn main() {
     for s in ["x", "y", "z", "w", "r", "m", "s", "t", "u", "c"] {
         std::fs::write(repo.join(format!("issues/{s}.md")), format!("# {s}\n")).unwrap();
     }
+    // a project that tracks `.claude/` against a global gitignore un-ignores it
+    std::fs::write(repo.join(".gitignore"), "!.claude/\n").unwrap();
     git_ok(&repo, &["init", "-q", "-b", "trunk", "."]);
     git_ok(&repo, &["add", "-A"]);
     git_ok(&repo, &["commit", "-qm", "init", "--no-verify"]);
     std::fs::write(repo.join("issues/new.md"), "# new\n").unwrap();
+    std::fs::create_dir_all(repo.join(".git/info")).unwrap();
+    std::fs::write(repo.join(".git/info/exclude"), "*.log").unwrap();
 
     let c = Ctx { root: root.clone(), repo, script };
     let mut failed = false;
-    for checks in [start_creates_the_worktree(&c), start_refuses_and_changes_nothing(&c), finish_needs_a_merged_branch(&c), finish_removes_only_a_clean_sibling(&c), finish_accepts_a_patch_equivalent_branch(&c), finish_accepts_a_squash_of_several_commits(&c), finish_forces_work_that_is_not_on_trunk(&c), finish_refuses_from_inside_the_worktree(&c)] {
+    for checks in [start_creates_the_worktree(&c), start_makes_git_ignore_the_worktrees(&c), start_refuses_and_changes_nothing(&c), finish_needs_a_merged_branch(&c), finish_removes_only_a_clean_sibling(&c), finish_removes_a_legacy_sibling(&c), finish_accepts_a_patch_equivalent_branch(&c), finish_accepts_a_squash_of_several_commits(&c), finish_forces_work_that_is_not_on_trunk(&c), finish_refuses_from_inside_the_worktree(&c)] {
         for (name, ok) in checks {
             println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
             failed |= !ok;

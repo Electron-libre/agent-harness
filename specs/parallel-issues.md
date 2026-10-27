@@ -1,7 +1,7 @@
 ---
 id: PAR
-status: accepted
-adrs: [0003]
+status: draft
+adrs: [0003, 0008]
 ---
 
 # Parallel issue isolation
@@ -14,7 +14,7 @@ deliberate step run from the main branch.
 
 ## Requirements
 
-- **PAR-1** (deterministic) `start-issue` must create a worktree outside the repository, in the sibling directory `<repo>-<stem>`, on a new branch named after the issue stem, and must print its path.
+- **PAR-1** (deterministic) `start-issue` must create the worktree `<main worktree>/.claude/worktrees/<stem>` (creating its missing parent directories), on a new branch named after the issue stem, and print its path.
 - **PAR-2** (deterministic) `start-issue` must fail, changing nothing, when the issue file is not committed on the main branch (missing, or with uncommitted edits), when the main worktree is detached, when the branch `<stem>` already exists or when the worktree directory already exists.
 - **PAR-3** (deterministic) An issue must count as taken when a worktree has a branch named after its stem checked out, or when such a branch exists with at least one commit that is not on the main branch (a branch whose content is already on the main branch counts as merged, see PAR-6, and takes nothing); a branch named like the main branch must never take an issue; the mark must be derived from git alone, so it is seen from every worktree and needs no file to clean up.
 - **PAR-4** (deterministic) `next-issue` must skip the taken issues, print the first free entry of the queue, and list the taken ones with the worktree path when there is one; when every entry is taken it must say so. A branch named after a queue entry that takes no issue (no worktree, nothing off the main branch) must be listed on a `Stale:` line that names `finish-issue`, so that nothing hides an issue without a visible reason.
@@ -25,6 +25,9 @@ deliberate step run from the main branch.
 - **PAR-7** (deterministic) `finish-issue` must refuse a worktree with uncommitted changes, and must not remove a worktree other than the one named after the issue stem.
 - **PAR-8** (deterministic) `close-issue` (with or without `--relink`) must refuse to run in a worktree other than the main one, and must refuse to close an issue whose `issues/` directory is in such a worktree, whatever directory it runs from, so that the queue is edited at merge time on the main branch and never on an issue branch.
 - **PAR-9** (deterministic) The hooks that use the git directory (the code review gate and its marker and waiver) must resolve it per worktree, so a review recorded in one worktree is not seen by another.
+- **PAR-13** (deterministic) `start-issue` must make git ignore `/.claude/worktrees/` in every worktree of the repository, through the `info/exclude` file of the git common directory, adding the line only when it is missing, so that `git status` in the main worktree never lists an issue worktree, even when the project's `.gitignore` un-ignores `.claude/`.
+- **PAR-14** (deterministic) `close-issue` (with or without `--relink`) and the spec traceability check must not read or rewrite any file under `.claude/worktrees/` of the repository root they scan, while a directory named `worktrees` anywhere else is still scanned.
+- **PAR-15** (deterministic) `finish-issue` must also remove the worktree of an issue started before PAR-1 placed it under `.claude/worktrees/`, at `<repo>-<stem>` next to the main worktree, under the same conditions as PAR-6, PAR-7, PAR-10 and PAR-11.
 - **PAR-12** (deterministic) `format_rust.rs` must run `cargo fmt` from the directory of the edited file, so that cargo formats the project holding that file (the main worktree, an issue worktree, a crate in a subdirectory) and not the one of `CLAUDE_PROJECT_DIR`.
 
 ## Scenarios
@@ -41,6 +44,9 @@ deliberate step run from the main branch.
 - (PAR-3) Given a branch `foo` with no worktree and no commit off the main branch, when `next-issue` runs, then `foo` is not taken and is reported as `Stale:`.
 - (PAR-8) Given the shell in the main worktree, when `close-issue ../repo-foo/issues/foo.md` names the issue of the linked worktree `repo-foo`, then it fails and the issue and the queue of `repo-foo` are untouched.
 - (PAR-8) Given the shell in the linked worktree `repo-foo`, when `close-issue ../repo/issues/foo.md` names the issue of the main worktree, then it fails and the issue and the queue of the main worktree are untouched.
+- (PAR-13) Given a `.gitignore` holding `!.claude/` and an `info/exclude` that already holds `/.claude/worktrees/`, when `start-issue` runs, then `git status` of the main worktree lists nothing under `.claude/worktrees/` and `info/exclude` holds the line once.
+- (PAR-14) Given an issue worktree under `.claude/worktrees/` whose documents cite `issues/foo.md`, when `close-issue issues/foo.md` runs in the main worktree, then the files of the issue worktree are untouched.
+- (PAR-15) Given an issue worktree `<repo>-foo` made by an earlier `start-issue` and a merged branch `foo`, when `finish-issue foo` runs, then the worktree and the branch are removed.
 
 - (PAR-12) Given a session opened in the main worktree that entered the issue worktree, when the agent edits a Rust file there, then `cargo fmt` runs in the issue worktree and the main worktree is untouched.
 

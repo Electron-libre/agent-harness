@@ -12,7 +12,9 @@ message, `grep`) is fine.
 ## Worktree of an issue
 
 Step 0 of `SKILL.md` puts each issue in its own worktree: `just start-issue issues/<name>.md` creates
-`../<repo>-<name>` on a branch `<name>`, and the session enters it with `EnterWorktree` (`path`). A shell `cd` is no
+`.claude/worktrees/<name>` on a branch `<name>`, and the session enters it with `EnterWorktree` (`path`), which asks no
+approval there, unlike for a path outside `.claude/worktrees/` (an issue started before ADR 0008 at
+`../<repo>-<name>`). `start-issue` also adds `/.claude/worktrees/` to `.git/info/exclude`. A shell `cd` is no
 substitute: the Bash tool resets the directory after a command that left the launch directory. Once entered, the
 `cwd` of the hook events is the worktree, and the hooks act on it (`clippy_gate.rs`, `require_code_review.rs`; `format_rust.rs` formats
 the project of the edited file); their scripts still come from the main worktree's `.claude/` (`CLAUDE_PROJECT_DIR`),

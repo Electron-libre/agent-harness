@@ -1,7 +1,8 @@
 #!/usr/bin/env rust-script
 //! Give an issue its own git worktree and branch, so that two agents can work on two issues at once.
-//! `start issues/<stem>.md` creates the worktree `<main worktree>-<stem>` next to the main one, on a new branch
-//! `<stem>` cut from the branch of the main worktree. `finish <stem> [--force]` removes that worktree and branch once the
+//! `start issues/<stem>.md` creates the worktree `<main worktree>/.claude/worktrees/<stem>`, on a new branch
+//! `<stem>` cut from the branch of the main worktree, and makes git ignore `/.claude/worktrees/` (`info/exclude`).
+//! `finish` also removes a worktree left at `<main worktree>-<stem>`, where `start` put it before ADR 0008. `finish <stem> [--force]` removes that worktree and branch once the
 //! branch is merged into the branch of the main worktree (ancestor, or every commit has a patch-equivalent there,
 //! or a merge into it would change no file, which covers a rebase and a squash of any number of commits); `--force` also
 //! accepts a branch whose work is not on it, after the user agreed, and still refuses a worktree with uncommitted
@@ -45,9 +46,31 @@ fn worktree_of(cwd: &Path, branch: &str) -> Option<PathBuf> {
     })
 }
 
-fn sibling(main: &Path, stem: &str) -> Result<PathBuf, String> {
-    let name = main.file_name().ok_or("the main worktree has no name")?.to_string_lossy();
-    Ok(main.with_file_name(format!("{name}-{stem}")))
+/// The worktree of an issue: under `.claude/worktrees/`, the only place Claude Code enters without asking (ADR 0008).
+fn nested(main: &Path, stem: &str) -> PathBuf {
+    main.join(WORKTREES).join(stem)
+}
+
+/// Where `start` put the worktree of an issue before ADR 0008, still accepted by `finish`.
+fn sibling(main: &Path, stem: &str) -> Option<PathBuf> {
+    let name = main.file_name()?.to_string_lossy();
+    Some(main.with_file_name(format!("{name}-{stem}")))
+}
+
+const WORKTREES: &str = ".claude/worktrees";
+
+/// Make git ignore the nested worktrees in every worktree, through the `info/exclude` of the common directory: a
+/// `.gitignore` belongs to the project, and this one may un-ignore `.claude/`.
+fn exclude_worktrees(main: &Path) -> Result<(), String> {
+    let common = PathBuf::from(git(main, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?);
+    let exclude = common.join("info/exclude");
+    let line = format!("/{WORKTREES}/");
+    let text = std::fs::read_to_string(&exclude).unwrap_or_default();
+    if text.lines().any(|l| l == line) {
+        return Ok(());
+    }
+    let separator = if text.is_empty() || text.ends_with('\n') { "" } else { "\n" };
+    std::fs::create_dir_all(common.join("info")).and_then(|()| std::fs::write(&exclude, format!("{text}{separator}{line}\n"))).map_err(|e| format!("cannot write {}: {e}", exclude.display()))
 }
 
 fn valid_stem(stem: &str) -> bool {
@@ -71,10 +94,11 @@ fn start(cwd: &Path, issue: &str) -> Result<String, String> {
     if !git(&main, &["status", "--porcelain", "--", &format!("issues/{stem}.md")])?.is_empty() {
         return Err(format!("{issue} has uncommitted changes in the main worktree: commit them first, the worktree would not hold them"));
     }
-    let dir = sibling(&main, stem)?;
+    let dir = nested(&main, stem);
     if dir.exists() {
         return Err(format!("{} already exists", dir.display()));
     }
+    exclude_worktrees(&main)?;
     git(&main, &["worktree", "add", "-q", "-b", stem, &dir.to_string_lossy(), &base])?;
     Ok(dir.display().to_string())
 }
@@ -88,7 +112,8 @@ fn finish(cwd: &Path, stem: &str, force: bool) -> Result<String, String> {
     if !git_ok(&main, &["rev-parse", "--verify", "-q", &format!("refs/heads/{stem}")]) {
         return Err(format!("no branch {stem}"));
     }
-    let dir = sibling(&main, stem)?;
+    let found = worktree_of(&main, stem);
+    let dir = found.clone().filter(|f| sibling(&main, stem).as_ref() == Some(f)).unwrap_or_else(|| nested(&main, stem));
     // Removing the directory the caller stands in breaks its shell: refuse, whatever `--force` says.
     let inside = std::fs::canonicalize(cwd).ok().zip(std::fs::canonicalize(&dir).ok()).is_some_and(|(here, target)| here.starts_with(target));
     if inside {
@@ -106,7 +131,7 @@ fn finish(cwd: &Path, stem: &str, force: bool) -> Result<String, String> {
     if !merged && !force {
         return Err(format!("the branch {stem} is not merged into {trunk}: merge it first, or pass --force to drop it (it deletes work that is not on {trunk}; squash detection needs git 2.38); nothing was removed"));
     }
-    match worktree_of(&main, stem) {
+    match found {
         Some(found) if found != dir => {
             return Err(format!("the branch {stem} is checked out in {}, not in {}: nothing was removed", found.display(), dir.display()));
         }

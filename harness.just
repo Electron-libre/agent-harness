@@ -33,7 +33,7 @@ close-issue issue:
 next-issue:
     rust-script .claude/skills/issue-workflow/next_issue.rs
 
-# Give an issue its own worktree `../<repo>-<stem>` and branch `<stem>`, so two agents can work in parallel.
+# Give an issue its own worktree `.claude/worktrees/<stem>` and branch `<stem>`, so two agents can work in parallel.
 start-issue issue:
     rust-script .claude/skills/issue-workflow/issue_worktree.rs start {{issue}}
 
