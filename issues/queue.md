@@ -6,6 +6,7 @@ re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why he
 
 - [install_the_new_harness_before_merging_a_hook_change](install_the_new_harness_before_merging_a_hook_change.md) - first: a merge that changes the hook commands locks the agent out, and the next ones may
 - [work_in_an_issue_worktree_without_tripping_the_isolation_guard](work_in_an_issue_worktree_without_tripping_the_isolation_guard.md) - every issue runs in a worktree: each one after it pays the refused commands until this lands
+- [exit_3_when_the_launcher_cannot_parse_its_arguments](exit_3_when_the_launcher_cannot_parse_its_arguments.md) - small; after the probes of the hooks (BIN-15, BIN-16), it closes the lockout for the paths they miss
 - [split_an_issue_too_large_for_one_session](split_an_issue_too_large_for_one_session.md) - before the larger issues of the queue, which it may split
 - [share_the_hash_stamp_check_of_the_shared_modules](share_the_hash_stamp_check_of_the_shared_modules.md) - after the binaries, which may remove the stamp it checks; a small cleanup before the spec proofs
 - [check_the_red_run_of_traced_tests](check_the_red_run_of_traced_tests.md) - makes the spec traceability prove more than a citation; independent of the above
