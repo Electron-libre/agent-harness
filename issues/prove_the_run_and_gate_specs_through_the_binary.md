@@ -46,7 +46,7 @@ boundary); the gate and the settings warnings (`prove_the_gate_specs_through_the
    makes true BIN-1 to BIN-6, BIN-10 to BIN-13 (~900 lines).
 2. [x] Installed harness: `tests/launcher_cli.rs` proves `check` and `update` against a fake `harness` that knows
    only `run`; `src/tests/launcher.rs` dropped; makes true BIN-15, BIN-16 (~350 lines).
-3. [ ] Retention: `tests/retention_cli.rs` gains each warning (user settings in `CLAUDE_CONFIG_DIR` or `HOME`,
+3. [x] Retention: `tests/retention_cli.rs` gains each warning (user settings in `CLAUDE_CONFIG_DIR` or `HOME`,
    unreadable, unlocatable, project files, `CI`); `src/tests/retention.rs` dropped; makes true SYN-28 (~250 lines).
 
 ## Decisions
@@ -73,5 +73,16 @@ boundary); the gate and the settings warnings (`prove_the_gate_specs_through_the
 - red: none (the behaviour exists: the proofs move); mutation checked: `launcher::refused` returning nothing fails
   the 3 proofs that expect a refusal.
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3
+- done: `tests/retention_cli.rs` proves SYN-28 through `init`, `sync`, `update` and `check`: each user-settings
+  value, `CLAUDE_CONFIG_DIR` else `HOME` (unset or empty), unparsable, unlocatable, the project files, `CI`;
+  `src/tests/retention.rs` dropped (`user_settings` is proven through the environment of the binary).
+- red: none (the behaviour exists: the proofs move); mutation checked: an empty `CLAUDE_CONFIG_DIR` or `HOME` read as
+  set fails 2 proofs.
+- Code review: 1 findings; the removal of `config/settings.json` assumes it exists: it does, `Home::new` writes
+  it, and the test passes.
 - not verified: none
 - decisions needed: none
