@@ -47,7 +47,7 @@ requirement out of the TRC-1 warning, fails on a blank reason, and the reason ne
    boundary warning skips reasoned requirements and names the syntax; blank reason is a problem; verified by
    `tests/check_specs.rs` and a `delivered-quality` test; makes true TRC-1, TRC-6, TRC-7, TRC-8 (and the new QUA-11
    scenario). ~250 lines.
-2. [ ] Wording: `specs/README.md`, `files/.claude/skills/write-spec/SKILL.md`, the "test first" step of
+2. [x] Wording: `specs/README.md`, `files/.claude/skills/write-spec/SKILL.md`, the "test first" step of
    `files/.claude/skills/issue-workflow/SKILL.md`, then `just sync`; verified by `just check-harness`. ~40 lines.
 3. [ ] Reasons on this repo's internal-only citations (SYN-18 to SYN-24, REV-19, BIN-9), so `just check-specs` warns
    of nothing; verified by `just check-specs`. ~20 lines.
@@ -73,5 +73,23 @@ requirement out of the TRC-1 warning, fails on a blank reason, and the reason ne
 
 - red: TRC-6, TRC-7, TRC-8: `crates/a/src/t.rs: cites \`(internal:\`, which no spec defines`; QUA-11: `traced` 4, not 3
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `specs/README.md`, `skill:write-spec` (step "Trace") and `skill:issue-workflow` (step "Test first") say a
+  binary test is preferred when cheap and stable, else an internal one with its reason; synced.
+
+| check | result |
+|---|---|
+| tests | ok |
+| lint | ok |
+| specs | ok |
+| docs | no other doc states the old rule |
+| code review | low: 1 finding, fixed |
+
+- red: none
+- Code review: 1 finding: "when one of those citations gives no reason" read either way; reworded "as long as one
+  of those citations at least gives no reason".
 - not verified: none
 - decisions needed: none

@@ -3,16 +3,16 @@
 9e47d720de527cc71aa3b0a6a56cf6dbb49c817226134473654487c082c38dcb  .claude/skills/commit-message/SKILL.md
 fe5eafac04a3bac9f735b206b0f196c17131a6384bd2a054462ade8e6427e697  .claude/skills/create-issue/SKILL.md
 847082eacffd8a8a0b69abbdf6a8eb9820a8c2706ae38b41aceb60d8701f413c  .claude/skills/evaluate-harness/SKILL.md
-8326e1310db2351a0f75965c69aea5e6b3cc599c0ce4c6031c78733d6fe23d10  .claude/skills/issue-workflow/SKILL.md
+7651489b64c5b0b7d1b1ac3cd60127ab5706e58588b2c8b00547bb04a5c7223e  .claude/skills/issue-workflow/SKILL.md
 9c33f0c0a6e861d889aabab43f2d76f65d515e03098582b935b4b25f2db2851b  .claude/skills/issue-workflow/details.md
 a4a97bcd508675dab0db8578c011312a9af3cc19b080a42cb50e764534e81b85  .claude/skills/prioritize-issues/SKILL.md
 fb2d21c5484dbad2bd0639f2a326a6385731bee3a4143fb8778807e1169d5e14  .claude/skills/update-docs/SKILL.md
-f6afc4738c3e69f5dd0d747a1646cfc46ceea123e7b57078fe3e8eb12f23c347  .claude/skills/write-spec/SKILL.md
+19b921c0340062795a785ba16df4942ae1468bb7e391cd0fbe90e24b09b0d010  .claude/skills/write-spec/SKILL.md
 069c16cd72dfa2c1973363f9229d4a4d0ce2af94ab5d7539e016cf269cf70c99+x  .github/install_harness.sh
 2b97d7a8180410864f346bb576e743cabc626aeeb14de7b4d9023a00c0e9ae4f  .github/workflows/harness.yml
 2cab19ded8c81cdd2d52e207c210f42f2addcfe91ae5c5c353276a7a53e68dc5  AGENTS.md
 de7bf22e311216feb9a3746a263de6c5db5b2e9e631da1fe8d5fa1477c4af52b  harness.just
-634f372dd0f43d4eeeabc186f135dbe839b47a9b8835f4d78a9089871ac2c6e1  specs/README.md
+028c99861d3c08eed01842327bd0e50f3bed4a8f3dbb7cdfc675d1811298e817  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}

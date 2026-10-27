@@ -42,7 +42,9 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    question per `[NEEDS CLARIFICATION: ...]` marker; replace each marker by the settled text once answered. The
    spec stays `draft`.
 6. **Trace**: write the tests from the requirements; each carries `// spec: ID` placed as `specs/README.md`
-   says. When every requirement is traced, set `accepted`; `just check-specs` then enforces it.
+   says. Prove a requirement through the binary when that test is cheap and stable; otherwise an internal test is
+   the proof, its citation giving the reason (`// spec: ID (internal: <reason>)`): never write a long or fragile
+   end-to-end test only to silence the boundary warning. When every requirement is traced, set `accepted`; `just check-specs` then enforces it.
 
 ## Rules
 
