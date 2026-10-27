@@ -57,8 +57,8 @@ skills, fixed context), a row per group of consecutive revisions with enough ses
 model, version and project mix next to the numbers (`--anonymous` keeps only the count of projects).
 The skill `evaluate-harness` runs them all and reports the trend per axis.
 
-`just start-issue` puts the worktree of an issue under `.claude/worktrees/`, inside the main one, and makes git ignore
-it. The tools that run on `.` without git's `info/exclude` then read every issue in progress: measured, prettier and
+`just start-issue`, for an issue run in parallel (then a plain `claude` launched in it), puts the worktree of an
+issue under `.claude/worktrees/`, inside the main one, and makes git ignore it. The tools that run on `.` without git's `info/exclude` then read every issue in progress: measured, prettier and
 black (add `/.claude/worktrees/` to `.gitignore`), eslint 9 (`{ ignores: [".claude/worktrees/"] }` in
 `eslint.config.js`), vitest (`exclude: [...configDefaults.exclude, ".claude/worktrees/**"]`) and jest
 (`testPathIgnorePatterns` and `modulePathIgnorePatterns` with `"<rootDir>/.claude/worktrees/"`); rg, tsc, pytest,

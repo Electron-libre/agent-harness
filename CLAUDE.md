@@ -18,8 +18,8 @@ The shared agent harness (skills, hooks, scripts, recipes, CI) of the user's pro
 - `specs/`: what the tool and its shared hooks must do (one file per capability, see `specs/README.md`), traced to
   its tests by `// spec: ID`.
 - `issues/`: open issues, ordered in `issues/queue.md` (`just next-issue`); `docs/adr/`: decisions.
-- Parallel agents: one git worktree per issue, started by `issue-workflow` (`just start-issue`, `just finish-issue`), see
-  `docs/architecture.md`.
+- Parallel agents: the user opens a git worktree per parallel issue (`just start-issue`, then `claude` in it; `just
+  finish-issue`); the agent never creates or enters one, see `docs/architecture.md`.
 - `AGENTS.md`: commit message format (Conventional Commits, enforced by `just check-commit`) and the output rule for
   the reports to the user (section "Reports to the user").
 

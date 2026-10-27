@@ -18,20 +18,9 @@ Reports to the user (stops, summaries, final report) are read at a glance:
 
 ## 0. Resume or start
 
-**Work in the issue's own worktree** (ADR 0003, 0008), so that another session's files, index and `target/` never mix
-with yours. In a linked worktree on the branch `<stem>` of the issue, go on. In the main worktree (`git rev-parse
---path-format=absolute --git-dir --git-common-dir` prints the same path twice):
-
-- `git worktree list` shows a worktree on the branch `<stem>` (`.claude/worktrees/<stem>`, or `../<repo>-<stem>`
-  for an issue started before): enter it with Claude Code's `EnterWorktree` tool, `path` set to it.
-- The branch `<stem>` exists without its worktree: stop and ask the user.
-- Otherwise: when `issues/<stem>.md` is untracked or modified, commit it first with its queue line and nothing
-  else staged (`git add issues/<stem>.md issues/queue.md`, then `git commit -m <message> -- issues/<stem>.md
-  issues/queue.md`, the message `docs: open the issue ...` through `skill:commit-message`); run
-  `just start-issue issues/<stem>.md`, then `EnterWorktree` with the path it prints.
-
-From then on every command and edit happens in the worktree: a `cd` out of the launch directory does not last
-past its command, and never redirect to the main worktree (`git -C`, its paths). Details: [details.md](details.md).
+**Work where the session was started** (ADR 0011): the main worktree, or the issue worktree the user opened for
+parallel work. Never create, enter or leave a worktree yourself (no `just start-issue`, no `EnterWorktree`). In a
+linked worktree, never redirect to the main one (`git -C`, its paths). Details: [details.md](details.md).
 
 Read the issue file. No `# Tracking` section: start at step 1. If `# Tracking` says `Plan: proposed`, the plan was never
 validated: redo the stop of step 2. Otherwise (`Plan: validated`, or no marker: planned before it existed) show where it stands in two `next` / `left` lines (the next unchecked
@@ -145,9 +134,9 @@ can switch it at any time.
 
 ## Merge back
 
-The issue is closed at the merge, from the main worktree (`close-issue` refuses in a linked one): on the user's
-agreement to close, follow [details.md](details.md), "Merge back" (rebase, `ExitWorktree`, fast-forward,
-`just close-issue`, `just finish-issue`).
+In the main worktree, the issue is closed as the Rules below say (`just close-issue`). In a linked worktree the issue is closed at the merge, which is
+the user's: on their agreement to close, follow [details.md](details.md), "Merge back" (rebase, then stop and print
+the commands left to the user).
 
 ## Rules
 

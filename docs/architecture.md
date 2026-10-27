@@ -276,13 +276,14 @@ own `target/` (measured once, on this repository and a 24-core machine: 239 MB a
 project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice). The mark "taken" is the worktree itself, or a branch holding commits that are not on the main branch:
 `next-issue` reads `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and no file
 needs cleaning. A leftover branch with neither is listed `Stale:` and `just finish-issue` cleans it (merged by
-ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close-issue` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. An agent
-handed an issue in the main worktree starts it itself (`issue-workflow`, step 0): `just start-issue`, then Claude
-Code's `EnterWorktree` with the path, since a shell `cd` out of the launch directory does not last; the session's
-`cwd`, and the `cwd` of the hook events, become the worktree. The hooks act on the work tree of that `cwd`
+ancestry, patch equivalence, or a merge that would change no file, which covers a squash of any number of commits; `--force` for work that is not on the main branch). `just finish-issue` also refuses, `--force` or not, when run from inside the worktree it would remove. The queue is edited only at merge time: `close-issue` refuses in a linked worktree and refuses an issue of one, whatever directory it runs from. The worktree is the user's choice, for parallel work
+([ADR 0011](adr/0011-the-user-opens-the-issue-worktree.md)): an agent works where its session was started and never
+creates or enters one, since Claude Code isolates a session entered with `EnterWorktree` and refuses every command it
+cannot prove stays there. The user runs `just start-issue` and launches a plain `claude` in the worktree; the
+session's `cwd`, and the `cwd` of the hook events, are the worktree. The hooks act on the work tree of that `cwd`
 (their declarations still come from the main worktree, `CLAUDE_PROJECT_DIR`, but `harness run` takes the revision of
 the `harness.toml` it finds from the `cwd`): `review-gate` keeps its marker and waiver in the git directory of each
-worktree (`git rev-parse --git-path`), `format-rust` and `clippy-gate` run cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, runs `just check-harness` there (and installs the `harness` of the branch when the installed one refuses a hook of it, BIN-15), leaves the worktree (`ExitWorktree`), fast-forwards the main branch, closes the issue and runs `just finish-issue`.
+worktree (`git rev-parse --git-path`), `format-rust` and `clippy-gate` run cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, runs `just check-harness` there (and installs the `harness` of the branch when the installed one refuses a hook of it, BIN-15), then prints the commands left to the user in the main worktree: fast-forward the main branch, `just close-issue`, `just finish-issue`.
 
 ## The cost of a turn
 

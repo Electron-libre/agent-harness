@@ -46,3 +46,33 @@ started, the main worktree or a linked one the user opened for parallel work, an
 * `start-issue` and `finish-issue` stay, as the user's tools; `just next-issue` keeps skipping an issue whose branch
   or worktree exists.
 * `close-issue` refuses in a linked worktree on purpose (the queue is never edited on an issue branch): keep it.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The agent works where the session runs and never creates, enters or leaves a worktree; the user opens one
+(`just start-issue`, then `claude` launched in it) only for parallel work, and merges it. Out of scope: the
+`issue-worktree` tool and its spec, which stay as they are. Claude Code docs (page "worktrees", "How Claude Code
+enforces isolation"): the guard applies to a session started with `--worktree`, entered with `EnterWorktree`, or
+resumed in one; a plain `claude` launched in a worktree made by `git worktree add` is not listed.
+
+## Plan
+1. [x] Optional worktree: `issue-workflow` step 0, "Merge back" and Rules, `details.md`, ADR 0011 (supersedes the
+   "each issue gets a worktree" of 0003/0008), `docs/architecture.md`, `CLAUDE.md`; verified by `just sync`,
+   `just check-harness`, `just check` and a reread.
+
+## Decisions
+- Mode: autonomous
+- Base commit: f9c188ed424a9b94acca7f75cb588e9afef4fb1d
+
+## Summary of deliverable 1
+- done: `issue-workflow` works where the session runs (no `start-issue`, `EnterWorktree` nor `ExitWorktree`); in a
+  linked worktree the close ends with a rebase and the commands printed for the user; ADR 0011; `details.md`,
+  `docs/architecture.md`, `CLAUDE.md`, `README.md` and the `adrs` of `specs/parallel-issues.md` follow.
+- red: none (docs and skill text, no test).
+- Code review: 1 finding, fixed (the "Merge back" pointer named the last Rule, which is not the closing one).
+- checks: `just check` ok, `just check-harness` ok, `just sync` done.
+- not verified: that a plain `claude` launched in an issue worktree has no isolation refusal (taken from the Claude
+  Code docs); to see at the next parallel issue.
