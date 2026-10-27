@@ -47,7 +47,7 @@ rules the spec names (no binary involved, but no code either).
 1. [x] Gate install: `tests/gate_cli.rs` runs `sync` then the installed `pre-commit` with fake `harness` or
    `rust-script` alone on its `PATH`, plus the move and chaining of a user's hook; the matching internal tests
    dropped; verified by the new tests; makes true SYN-18, SYN-19, BIN-9, BIN-14 (~600 lines).
-2. [ ] Gate upkeep: reinstall, idempotence, dry run, linked worktree, `core.hooksPath`, no repository, `check` of the
+2. [x] Gate upkeep: reinstall, idempotence, dry run, linked worktree, `core.hooksPath`, no repository, `check` of the
    gate (with and without `CI`); the matching internal tests dropped; makes true SYN-20 to SYN-23 (~650 lines).
 3. [ ] Settings warnings: deny rules, missing hooks, attribution through `check`, `sync`, `update` and their dry
    runs; REV-19 on the shipped entries; `src/tests/install_gate.rs` and the helpers of `src/tests.rs` left unused
@@ -64,5 +64,16 @@ rules the spec names (no binary involved, but no code either).
 - red: none (the behaviour exists: the proofs move); mutation checked: the hook ignoring the exit code of the review
   and not passing its arguments to the user's hook fails 3 proofs.
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `tests/gate_cli.rs` proves SYN-20 to SYN-23 through `sync`, `sync --dry-run` (tree snapshot unchanged) and
+  `check` (with and without `CI`): reinstall, linked worktree, `core.hooksPath`, no repository, nested project, a
+  source of an older revision; the 7 matching internal tests and their helpers dropped.
+- red: none (the behaviour exists: the proofs move); mutations checked: `core.hooksPath` ignored or a modified gate
+  not reported fails 3 proofs.
+- Code review: no findings; the `low` review read only the non-test files (the diff is all tests), so the test files
+  were reread by hand: nothing found.
 - not verified: none
 - decisions needed: none

@@ -1,5 +1,5 @@
 //! The native review gate `sync` installs, run as the binary on temp dirs, and the `pre-commit` it writes, run with
-//! `/bin/sh` (SYN-18, SYN-19, BIN-9, BIN-14).
+//! `/bin/sh` (SYN-18 to SYN-23, BIN-9, BIN-14).
 #![cfg(unix)]
 
 mod common;
@@ -270,4 +270,241 @@ fn a_symlinked_hook_of_the_user_still_reaches_its_target_once_moved() {
     let bin = fake_harness(0);
     assert_eq!(run_hook(&home, &root, bin.path(), &[]).code, Some(0));
     assert_eq!(get(root.path(), "ran").as_deref(), Some("linked\n"));
+}
+
+fn set_mode(path: &Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+}
+
+// spec: SYN-20
+#[test]
+fn sync_reinstalls_a_missing_modified_or_non_executable_hook_and_is_idempotent() {
+    let home = Home::new();
+    let (_source, root) = synced(&home);
+    let managed = get(root.path(), ".git/hooks/pre-commit").unwrap();
+    assert_eq!(home.ok(root.path(), &["sync"]).outcome(GATE), None);
+
+    fs::remove_file(pre_commit(&root)).unwrap();
+    assert_eq!(home.ok(root.path(), &["sync"]).outcome(GATE), Some("added"));
+
+    fs::write(pre_commit(&root), format!("{managed}# edited\n")).unwrap();
+    assert_eq!(
+        home.ok(root.path(), &["sync"]).outcome(GATE),
+        Some("updated")
+    );
+    assert_eq!(
+        get(root.path(), ".git/hooks/pre-commit").as_deref(),
+        Some(managed.as_str())
+    );
+
+    set_mode(&pre_commit(&root), 0o644);
+    assert_eq!(
+        home.ok(root.path(), &["sync"]).outcome(GATE),
+        Some("updated")
+    );
+    assert!(executable(&pre_commit(&root)));
+
+    assert_eq!(home.ok(root.path(), &["sync"]).outcome(GATE), None);
+    assert!(!root.path().join(".git/hooks/pre-commit.user").exists());
+}
+
+// spec: SYN-20
+#[test]
+fn a_dry_run_reports_the_installation_and_writes_nothing() {
+    let home = Home::new();
+    let (_source, root) = gated(&home);
+    let before = snapshot(root.path());
+    let dry = home.ok(root.path(), &["sync", "--dry-run"]);
+    assert_eq!(dry.outcome(GATE), Some("added"), "{dry:?}");
+    assert_eq!(snapshot(root.path()), before);
+
+    user_hook(&root, 0);
+    let before = snapshot(root.path());
+    let dry = home.ok(root.path(), &["sync", "--dry-run"]);
+    assert_eq!(dry.outcome(MOVED), Some("moved"), "{dry:?}");
+    assert_eq!(dry.outcome(GATE), Some("added"), "{dry:?}");
+    assert_eq!(snapshot(root.path()), before);
+}
+
+// spec: SYN-21
+#[test]
+fn a_linked_worktree_gets_the_gate_in_the_hooks_of_the_common_git_directory() {
+    let home = Home::new();
+    let (_source, root) = gated(&home);
+    home.git(root.path(), &["add", CONFIG]);
+    home.git(root.path(), &["commit", "--quiet", "-m", "init"]);
+    let linked = tempdir().unwrap();
+    let wt = linked.path().join("wt");
+    home.git(
+        root.path(),
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "other",
+            wt.to_str().unwrap(),
+        ],
+    );
+
+    let sync = home.ok(&wt, &["sync"]);
+    assert_eq!(sync.outcome(GATE), Some("added"), "{sync:?}");
+    assert!(get(root.path(), ".git/hooks/pre-commit").is_some_and(|t| t.contains(GATE)));
+    let private = home.git(&wt, &["rev-parse", "--absolute-git-dir"]);
+    assert!(!Path::new(&private).join("hooks").exists(), "{private}");
+    // once for all the worktrees
+    assert_eq!(home.ok(&wt, &["sync"]).outcome(GATE), None);
+    assert_eq!(home.ok(root.path(), &["sync"]).outcome(GATE), None);
+}
+
+// spec: SYN-22
+#[test]
+fn sync_installs_nothing_when_core_hooks_path_is_set_and_says_why() {
+    let home = Home::new();
+    for hooks_path in [None, Some(".githooks")] {
+        let (_source, root) = gated(&home);
+        let elsewhere = tempdir().unwrap();
+        let value = hooks_path.map_or(elsewhere.path().to_str().unwrap(), |p| p);
+        home.git(root.path(), &["config", "core.hooksPath", value]);
+        let sync = home.ok(root.path(), &["sync"]);
+        assert_eq!(sync.outcome(GATE), Some("skipped"), "{sync:?}");
+        assert!(sync.stdout.contains("core.hooksPath"), "{sync:?}");
+        assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+        assert!(!pre_commit(&root).exists());
+        assert!(fs::read_dir(elsewhere.path()).unwrap().next().is_none());
+        assert!(!root.path().join(".githooks").exists());
+    }
+}
+
+// spec: SYN-22
+#[test]
+fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
+    let home = Home::new();
+    // not a repository
+    let (_source, root) = gated(&home);
+    fs::remove_dir_all(root.path().join(".git")).unwrap();
+    let sync = home.ok(root.path(), &["sync"]);
+    assert_eq!(sync.outcome(GATE), None, "{sync:?}");
+    assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
+
+    // a source that manages no hook of the review gate
+    let (source, root) = gated(&home);
+    fs::remove_file(source.path().join("entries/.claude/settings.json")).unwrap();
+    let sync = home.ok(root.path(), &["sync"]);
+    assert_eq!(sync.outcome(GATE), None, "{sync:?}");
+    assert!(!pre_commit(&root).exists());
+
+    // a project inside another repository is not the top of one
+    let (_source, root) = gated(&home);
+    let outer = tempdir().unwrap();
+    home.git(outer.path(), &["init", "--quiet", "-b", "main"]);
+    let inner = outer.path().join("project");
+    put(&inner, CONFIG, &get(root.path(), CONFIG).unwrap());
+    let sync = home.ok(&inner, &["sync"]);
+    assert_eq!(sync.outcome(GATE), None, "{sync:?}");
+    assert!(!outer.path().join(".git/hooks/pre-commit").exists());
+}
+
+/// `harness check` on `root`, with the `CI` environment variable set when `ci`.
+fn check(home: &Home, root: &TempDir, ci: bool) -> Run {
+    let mut cmd = home.command();
+    cmd.args(["check", "--root"]).arg(root.path());
+    if ci {
+        cmd.env("CI", "true");
+    }
+    output(cmd, "")
+}
+
+/// Assert `check` exits 0 with no problem when `problems` is empty, else exits 1 printing exactly `problems`.
+fn assert_problems(run: &Run, problems: &[&str]) {
+    let code = if problems.is_empty() { 0 } else { 1 };
+    assert_eq!(run.code, Some(code), "{run:?}");
+    assert_eq!(run.lines(), problems, "{run:?}");
+}
+
+const MISSING: &str = "missing: native review gate";
+const MODIFIED: &str = "modified: native review gate";
+
+// spec: SYN-23
+#[test]
+fn check_reports_a_missing_or_modified_gate() {
+    let home = Home::new();
+    let (_source, root) = synced(&home);
+    assert_problems(&check(&home, &root, false), &[]);
+
+    let managed = get(root.path(), ".git/hooks/pre-commit").unwrap();
+    fs::write(pre_commit(&root), format!("{managed}# edited\n")).unwrap();
+    assert_problems(&check(&home, &root, false), &[MODIFIED]);
+
+    fs::write(pre_commit(&root), &managed).unwrap();
+    set_mode(&pre_commit(&root), 0o644);
+    assert_problems(&check(&home, &root, false), &[MODIFIED]);
+
+    fs::remove_file(pre_commit(&root)).unwrap();
+    assert_problems(&check(&home, &root, false), &[MISSING]);
+    // a fresh clone of a CI run has no git hooks
+    assert_problems(&check(&home, &root, true), &[]);
+
+    // a hook of the user without ours is a missing gate too
+    user_hook(&root, 0);
+    assert_problems(&check(&home, &root, false), &[MISSING]);
+}
+
+// spec: SYN-23
+#[test]
+fn check_expects_the_gate_the_lock_records_even_once_out_of_the_settings() {
+    let home = Home::new();
+    let (_source, root) = synced(&home);
+    fs::remove_file(pre_commit(&root)).unwrap();
+    put(root.path(), ".claude/settings.json", "{}");
+    let run = check(&home, &root, false);
+    assert_eq!(run.code, Some(1), "{run:?}");
+    assert!(run.lines().contains(&MISSING), "{run:?}");
+}
+
+// spec: SYN-23
+#[test]
+fn check_expects_no_gate_it_cannot_or_need_not_install() {
+    let home = Home::new();
+    // core.hooksPath set
+    let (_source, root) = synced(&home);
+    fs::remove_file(pre_commit(&root)).unwrap();
+    home.git(root.path(), &["config", "core.hooksPath", ".githooks"]);
+    assert_problems(&check(&home, &root, false), &[]);
+
+    // a source that manages no hook of the review gate
+    let (source, root) = gated(&home);
+    fs::remove_file(source.path().join("entries/.claude/settings.json")).unwrap();
+    home.ok(root.path(), &["sync"]);
+    assert_problems(&check(&home, &root, false), &[]);
+
+    // not a repository
+    let (_source, root) = gated(&home);
+    fs::remove_dir_all(root.path().join(".git")).unwrap();
+    home.ok(root.path(), &["sync"]);
+    assert_problems(&check(&home, &root, false), &[]);
+}
+
+// spec: SYN-22, SYN-23
+#[test]
+fn a_source_of_an_older_revision_still_gets_and_checks_the_gate() {
+    let home = Home::new();
+    let (source, root) = gated(&home);
+    fs::remove_file(source.path().join("entries/.claude/settings.json")).unwrap();
+    put(
+        source.path(),
+        &format!("files/{LEGACY_HOOK}"),
+        "// the review hook",
+    );
+    let sync = home.ok(root.path(), &["sync"]);
+    assert_eq!(sync.outcome(GATE), Some("added"), "{sync:?}");
+    fs::remove_file(pre_commit(&root)).unwrap();
+    assert_problems(&check(&home, &root, false), &[MISSING]);
+    // even with its hook script deleted since
+    fs::remove_file(root.path().join(LEGACY_HOOK)).unwrap();
+    assert_problems(
+        &check(&home, &root, false),
+        &[&format!("missing: {LEGACY_HOOK}"), MISSING],
+    );
 }
