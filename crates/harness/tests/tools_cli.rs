@@ -246,6 +246,21 @@ fn check_commits_validates_every_non_merge_commit_of_the_range() {
     assert!(stderr.contains("usage"), "{stderr}");
 }
 
+// spec: BIN-14
+#[test]
+fn run_exits_3_when_it_cannot_get_the_tool() {
+    let dir = tempdir().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+        .args(["run", "commit-check"])
+        .current_dir(dir.path())
+        .env_remove("CLAUDE_PROJECT_DIR")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("harness.toml"), "{stderr}");
+}
+
 /// Every file of `dir`, recursively.
 fn files_under(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();

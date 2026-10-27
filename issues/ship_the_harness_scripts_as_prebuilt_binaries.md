@@ -58,13 +58,21 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 7. [x] No `rust-script` left: recipes, skills, seed allow rule, CI, `test-harness` (the content tests `test_skills`,
    `test_recipes`, `test_settings` become cargo tests of this repository), README and architecture; a test fails on
    any `rust-script` in `files/`, `entries/`, `seed/`; makes true BIN-8, spec `accepted`.
+8. [x] Fixes of the `high` review of the issue: the launcher exits 3 (no block) when it cannot run a tool, finds the
+   project from `CLAUDE_PROJECT_DIR` when the working directory has none, resolves a non-hash `rev` in the cached
+   clone without fetching, builds a scp-style source as `ssh://`; Linux assets are `musl`; the gate recognizes and
+   runs the review hook of an older revision too; `install_harness.sh` installs into the cache and reads a missing
+   digest as no asset; the CI steps are guarded; the ported tests use `tempfile`; verified by tests (BIN-1, BIN-12,
+   BIN-14, SYN-18, SYN-22) and an offline run of the install script.
 
 ## Decisions
 - Mode: autonomous
 - Base commit: 95113afff8717c5944eee5964c10c04acdbddbc0
 - The tools are subcommands of `harness` (one artifact per commit), not a second binary.
 - A binary is published for every push to the main branch, in a release named after the commit.
-- Platforms: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin`.
+- Platforms: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin`. Changed by deliverable
+  8 to the `musl` targets on Linux (same platforms): a `gnu` binary built on a recent runner does not run on an older
+  glibc, and a cached binary is never fetched again.
 - The script tests become `cargo test` of this repository; consumers lose `just test-harness`.
 - Release asset naming: release `harness-<commit>`, assets `harness-<target>` and `harness-<target>.sha256` (raw
   binary, no archive: nothing to unpack). A source not on GitHub is built with `cargo install`.
@@ -216,3 +224,35 @@ Means differ from the issue: no `rust-script` fallback, this repository builds i
 - Code review: no findings.
 - not verified: the shared CI on GitHub (first push).
 - decisions needed: none.
+
+## Deliverable 8
+- done: the 10 findings of the `high` review of `95113af..1948b5b`:
+  1. `harness run` exits 3 when it cannot get the tool (BIN-14, BIN-12 now 3): a hook that cannot run no longer
+     blocks the agent, and the gate lets the commit through with a warning on 3;
+  2. a `rev` that is no hash resolves in the cached clone, with no fetch per hook;
+  3. the launcher falls back to `CLAUDE_PROJECT_DIR` when the working directory is outside any project (BIN-1);
+  4. a `git@host:path` source is built from `ssh://git@host/path` (launcher and CI script);
+  5. Linux assets are `musl`, static (decision amended);
+  6. `install_harness.sh` builds into the cache `harness run` reads, so a job builds once;
+  7. a missing `.sha256` reads as no asset (CI script), as in the launcher; a source off GitHub ending in `.git` was
+     taken for GitHub (found by the offline run), fixed;
+  8. the gate recognizes and runs the review hook script of an older revision (SYN-18, 22, 23), and skips with a
+     warning a `harness` without `run`: a new binary keeps gating a project pinned before this issue, and the shared
+     gate no longer needs restoring by hand in this repository;
+  9. the CI steps that need `harness` are skipped like `harness check` when it is not installed;
+  10. the ported tests take a `tempfile::tempdir()` each.
+
+| check | result |
+|---|---|
+| tests, lint, specs (`just check`) | pass |
+| install script, offline (fake `curl`, `cargo`) | asset, bad digest (exit 1), no asset, no digest, scp source off GitHub: as expected |
+| workflows | parsed as YAML |
+| docs | architecture (Tools, gate), specs BIN (back to accepted) and SYN |
+
+- red: the launcher tests did not compile against the old `command` signature; the three new gate tests failed
+  (legacy script not run, exit 3 not let through, legacy source not gated).
+- Code review: 1 finding, fixed: a name the cached clone did not know (pushed after it, a short hash) failed every hook; the launcher now fetches once then. A branch moved since the last `sync` still resolves to the commit of that sync, on purpose: the revision of the synced files.
+- not verified: the `musl` builds and the CI on GitHub (first push).
+- decisions needed: none.
+- Merge, updated: the gate `sync` installs now works with the main branch as it is, so no hand restore; `just install`
+  is still needed once merged, before `just close-issue` and `just finish-issue`, which call `harness run`.

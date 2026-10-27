@@ -405,9 +405,7 @@ fn finish_refuses_from_inside_the_worktree(c: &Ctx) -> Checks {
 #[test]
 fn issue_worktree() {
     let script = std::path::PathBuf::from("/tools").join("issue_worktree.rs");
-    let root = std::fs::canonicalize(std::env::temp_dir())
-        .unwrap()
-        .join(format!("issue_worktree_{}", std::process::id()));
+    let root = std::fs::canonicalize(tempfile::tempdir().unwrap().keep()).unwrap();
     let _ = std::fs::remove_dir_all(&root);
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join("issues")).unwrap();

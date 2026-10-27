@@ -35,14 +35,24 @@ fn pre_commit(root: &TempDir) -> PathBuf {
     root.path().join(".git/hooks/pre-commit")
 }
 
-/// A directory holding a fake `harness` that records its arguments in `calls` and exits with `code`.
+/// A directory holding a fake `harness` with `run` that records its arguments in `calls` and exits with `code`.
 fn fake_harness(code: i32) -> TempDir {
+    fake_with("harness", code, "[ \"$1\" = help ] && exit 0\n")
+}
+
+/// A directory holding a fake `program` that records its arguments in `calls` and exits with `code`.
+fn fake(program: &str, code: i32) -> TempDir {
+    fake_with(program, code, "")
+}
+
+/// `fake`, running `prelude` first.
+fn fake_with(program: &str, code: i32, prelude: &str) -> TempDir {
     let bin = tempdir().unwrap();
-    let script = bin.path().join("harness");
+    let script = bin.path().join(program);
     fs::write(
         &script,
         format!(
-            "#!/bin/sh\necho \"$@\" >> \"{}/calls\"\nexit {code}\n",
+            "#!/bin/sh\n{prelude}echo \"$@\" >> \"{}/calls\"\nexit {code}\n",
             bin.path().display()
         ),
     )
@@ -82,13 +92,63 @@ fn installs_an_executable_hook_that_runs_the_review_in_native_mode() {
 fn the_hook_runs_the_review_from_the_work_tree_and_fails_with_its_exit_code() {
     let (_source, root) = gated();
     run(&root);
-    for code in [0, 3] {
+    for code in [0, 1, 2] {
         let bin = fake_harness(code);
         let out = run_hook(&root, bin.path(), &[]);
         assert_eq!(out.status.code(), Some(code));
         let calls = fs::read_to_string(bin.path().join("calls")).unwrap();
         assert_eq!(calls.trim(), "run review-gate native");
     }
+}
+
+// spec: SYN-18, BIN-14
+#[test]
+fn the_hook_lets_the_commit_through_when_the_launcher_cannot_run_the_review() {
+    let (_source, root) = gated();
+    run(&root);
+    let bin = fake_harness(3);
+    let out = run_hook(&root, bin.path(), &[]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("review gate skipped"));
+}
+
+/// The review hook script of the revisions before the tools moved into `harness`.
+const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
+
+// spec: SYN-18
+#[test]
+fn the_hook_runs_the_review_script_of_an_older_revision() {
+    let (_source, root) = gated();
+    run(&root);
+    put(
+        root.path(),
+        LEGACY_HOOK,
+        "// the review hook of an older revision",
+    );
+    let bin = fake("rust-script", 2);
+    let out = run_hook(&root, bin.path(), &[]);
+    assert_eq!(out.status.code(), Some(2));
+    let calls = fs::read_to_string(bin.path().join("calls")).unwrap();
+    assert_eq!(calls.trim(), format!("{LEGACY_HOOK} native"));
+}
+
+// spec: SYN-22, SYN-23
+#[test]
+fn a_source_of_an_older_revision_still_gets_and_checks_the_gate() {
+    let (source, root) = setup();
+    put(
+        source.path(),
+        &format!("files/{LEGACY_HOOK}"),
+        "// the review hook",
+    );
+    git_in(root.path(), &["init", "--quiet", "-b", "main"]);
+    let report = run(&root);
+    assert_eq!(report.outcome(gate::GATE), Some(Outcome::Added));
+    fs::remove_file(pre_commit(&root)).unwrap();
+    assert_eq!(
+        check_with(root.path(), false).unwrap().problems,
+        vec!["missing: native review gate"]
+    );
 }
 
 // spec: SYN-18, BIN-9
@@ -110,6 +170,13 @@ fn the_hook_warns_and_lets_the_commit_through_without_the_harness() {
     let out = run_hook(&root, empty.path(), &[]);
     assert_eq!(out.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&out.stderr).contains("review gate skipped"));
+    // a harness that predates `run`: its `help run` fails, as any unknown subcommand
+    let old = fake("harness", 2);
+    let out = run_hook(&root, old.path(), &[]);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("review gate skipped"));
+    let calls = fs::read_to_string(old.path().join("calls")).unwrap();
+    assert_eq!(calls.trim(), "help run");
 }
 
 /// A user's `pre-commit` that records its arguments in `ran` and exits with `code`.

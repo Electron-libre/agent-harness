@@ -441,7 +441,7 @@ fn rust_hooks() {
     let format_hook = PathBuf::from("format-rust");
     let gate = PathBuf::from("clippy-gate");
 
-    let project: PathBuf = std::env::temp_dir().join(format!("hooktest-{}", std::process::id()));
+    let project: PathBuf = tempfile::tempdir().unwrap().keep();
     fs::create_dir_all(&project).unwrap();
     sh(&project, "git", &["init", "-q", "."]);
     sh(

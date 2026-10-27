@@ -16,8 +16,11 @@ use crate::{is_executable, set_executable, write, Outcome};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 
-/// The command of the hooks that run the review gate: the gate exists only where the harness manages such a hook.
+/// The command of the hooks that run the review gate: the gate exists only where the harness manages such a hook, or
+/// the review hook script of an older revision (`LEGACY_HOOK`).
 pub const REVIEW_TOOL: &str = "harness run review-gate";
+/// The review hook of the revisions before the tools moved into `harness`, among their managed files.
+pub const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
 /// The line that tells the installed hook from one of the user.
@@ -25,14 +28,25 @@ const MARK: &str = "# harness: native review gate";
 /// Where a `pre-commit` of the user goes, and is run from.
 const CHAINED: &str = "pre-commit.user";
 
-/// The managed hook. Git runs it from the top of the work tree; a work tree without `harness.toml` or a machine without
-/// `harness` is a warning, not a refusal, so a branch or a machine without the harness can still commit (BIN-9).
+/// The managed hook. Git runs it from the top of the work tree, which may be of an older revision whose review gate
+/// is still the `rust-script` hook. A work tree without either, a machine without the program it needs, or a launcher
+/// that cannot run the tool (exit 3, BIN-14) is a warning, not a refusal, so a branch or a machine without the harness
+/// can still commit (BIN-9).
 const SCRIPT: &str = r#"#!/bin/sh
 # harness: native review gate (installed by `harness sync`, do not edit)
-if [ -f .claude/harness.toml ] && command -v harness >/dev/null 2>&1; then
-    harness run review-gate native || exit $?
+legacy=.claude/hooks/require_code_review.rs
+if [ -f "$legacy" ] && command -v rust-script >/dev/null 2>&1; then
+    rust-script "$legacy" native || exit $?
+elif [ ! -f "$legacy" ] && [ -f .claude/harness.toml ] && harness help run >/dev/null 2>&1; then
+    harness run review-gate native
+    code=$?
+    if [ "$code" -eq 3 ]; then
+        echo "harness: review gate skipped, harness could not run it" >&2
+    elif [ "$code" -ne 0 ]; then
+        exit "$code"
+    fi
 else
-    echo "harness: review gate skipped, .claude/harness.toml or harness is missing" >&2
+    echo "harness: review gate skipped, its hook or the program to run it (rust-script, or a harness with \`run\`) is missing" >&2
 fi
 case "$0" in */*) dir="${0%/*}" ;; *) dir=. ;; esac
 user="$dir/pre-commit.user"
@@ -118,10 +132,11 @@ pub fn state(hooks: &Path) -> State {
     }
 }
 
-/// Whether the managed `entries` hold a hook that runs the review gate.
+/// Whether the harness manages the review gate: a managed hook of `entries` runs it, or the managed `files` hold the
+/// review hook of an older revision.
 #[must_use]
-pub fn manages(entries: &[Entry]) -> bool {
-    entries.iter().any(|e| e.label().contains(REVIEW_TOOL))
+pub fn manages<'a>(entries: &[Entry], mut files: impl Iterator<Item = &'a String>) -> bool {
+    entries.iter().any(|e| e.label().contains(REVIEW_TOOL)) || files.any(|f| f == LEGACY_HOOK)
 }
 
 /// The hooks directory of the project and what its `pre-commit` is, `None` when the project is not expected to have the

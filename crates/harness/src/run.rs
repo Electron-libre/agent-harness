@@ -15,8 +15,8 @@ use std::process::{Command, Stdio};
 use anyhow::{bail, Context, Result};
 
 use crate::{
-    cache_dir, fetch, hash, is_full_hash, is_git_url, resolve_in, set_executable, source_and_rev,
-    CONFIG,
+    cache_dir, clone_dir, fetch, hash, is_full_hash, is_git_url, resolve_in, set_executable,
+    source_and_rev, CONFIG,
 };
 
 /// The external programs the launcher runs, replaced by fakes in the tests.
@@ -35,24 +35,28 @@ impl Default for Programs {
     }
 }
 
-/// The platform the release assets are named after.
+/// The platform the release assets are named after. Linux builds are static (`musl`), so they run whatever the glibc.
 #[must_use]
 pub fn target() -> String {
     let os = match std::env::consts::OS {
-        "linux" => "unknown-linux-gnu",
+        "linux" => "unknown-linux-musl",
         "macos" => "apple-darwin",
         other => other,
     };
     format!("{}-{os}", std::env::consts::ARCH)
 }
 
-/// The nearest directory from `start` up that holds `.claude/harness.toml`.
-fn project_root(start: &Path) -> Result<PathBuf> {
-    let start = fs::canonicalize(start).with_context(|| format!("reading {}", start.display()))?;
-    start
-        .ancestors()
-        .find(|dir| dir.join(CONFIG).is_file())
-        .map(Path::to_path_buf)
+/// The nearest directory from `start` up that holds `.claude/harness.toml`, else from `fallback` up (the project of the
+/// session, when the agent left it).
+fn project_root(start: &Path, fallback: Option<&Path>) -> Result<PathBuf> {
+    let nearest = |from: &Path| {
+        let from = fs::canonicalize(from).ok()?;
+        from.ancestors()
+            .find(|dir| dir.join(CONFIG).is_file())
+            .map(Path::to_path_buf)
+    };
+    nearest(start)
+        .or_else(|| fallback.and_then(nearest))
         .with_context(|| {
             format!(
                 "no {CONFIG} in {} or above: run `harness init <source>`",
@@ -61,18 +65,19 @@ fn project_root(start: &Path) -> Result<PathBuf> {
         })
 }
 
-/// The command that runs `tool` with `args` for the project holding `start`: the binary of the pinned revision,
-/// fetched or built first when needed (BIN-1).
+/// The command that runs `tool` with `args` for the project holding `start` (else `fallback`): the binary of the
+/// pinned revision, fetched or built first when needed (BIN-1).
 ///
 /// # Errors
 /// When the project has no configuration, or the binary can be neither fetched nor built.
 pub fn command(
     start: &Path,
+    fallback: Option<&Path>,
     cache: Option<&Path>,
     programs: &Programs,
     tool: &[OsString],
 ) -> Result<Command> {
-    let root = project_root(start)?;
+    let root = project_root(start, fallback)?;
     let cache = match cache {
         Some(cache) => cache.to_path_buf(),
         None => cache_dir()?,
@@ -81,7 +86,20 @@ pub fn command(
     let binary = if is_git_url(&source) {
         let commit = match rev {
             Some(rev) if is_full_hash(&rev) => rev,
-            rev => resolve_in(&fetch(&cache, &source)?, &source, rev.as_deref())?,
+            // in the clone the last `sync` fetched, so the revision of the synced files: a hook does not fetch at each
+            // run; a clone that is missing or does not know the name is fetched once
+            rev => {
+                let clone = clone_dir(&cache, &source);
+                let cached = clone
+                    .join(".git")
+                    .exists()
+                    .then(|| resolve_in(&clone, &source, rev.as_deref()).ok())
+                    .flatten();
+                match cached {
+                    Some(commit) => commit,
+                    None => resolve_in(&fetch(&cache, &source)?, &source, rev.as_deref())?,
+                }
+            }
         };
         binary_of(&cache, &source, &commit, programs)?
     } else {
@@ -166,12 +184,23 @@ fn download(programs: &Programs, url: &str, to: &Path) -> Result<Option<String>>
     }))
 }
 
+/// The URL cargo reads for a git source: a scp-style `git@host:path` becomes `ssh://git@host/path`.
+fn cargo_url(source: &str) -> String {
+    match source.split_once(':') {
+        Some((host, path)) if !source.contains("://") && host.contains('@') => {
+            format!("ssh://{host}/{}", path.trim_start_matches('/'))
+        }
+        _ => source.to_string(),
+    }
+}
+
 /// Build `harness` of `commit` with `cargo install` and put it at `to`; false when cargo is missing or fails.
 fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> Result<bool> {
     let root = to.with_extension("root");
+    let url = cargo_url(source);
     let built = Command::new(&programs.cargo)
         .args([
-            "install", "--quiet", "--locked", "--git", source, "--rev", commit, "--root",
+            "install", "--quiet", "--locked", "--git", &url, "--rev", commit, "--root",
         ])
         .arg(&root)
         .arg("harness")

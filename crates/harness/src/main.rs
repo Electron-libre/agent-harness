@@ -64,28 +64,39 @@ enum Command {
     },
 }
 
+/// The exit code of `run` when it cannot get the tool: not 2, which Claude Code reads as the refusal of a hook (BIN-14).
+const CANNOT_RUN: u8 = 3;
+
 /// Replace this process by the tool of the pinned revision, so its input, output and exit code are the tool's (BIN-1).
 fn run(root: &Path, tool: &[OsString]) -> ExitCode {
-    let mut cmd = match run::command(root, None, &run::Programs::default(), tool) {
+    let project = std::env::var_os("CLAUDE_PROJECT_DIR").map(PathBuf::from);
+    let found = run::command(
+        root,
+        project.as_deref(),
+        None,
+        &run::Programs::default(),
+        tool,
+    );
+    let mut cmd = match found {
         Ok(cmd) => cmd,
         Err(e) => {
-            eprintln!("error: {e:#}");
-            return ExitCode::from(2);
+            eprintln!("harness run: {e:#}");
+            return ExitCode::from(CANNOT_RUN);
         }
     };
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         let e = cmd.exec();
-        eprintln!("error: running the harness binary: {e}");
-        ExitCode::from(2)
+        eprintln!("harness run: cannot run the harness binary: {e}");
+        ExitCode::from(CANNOT_RUN)
     }
     #[cfg(not(unix))]
     match cmd.status() {
-        Ok(status) => ExitCode::from(status.code().map_or(2, |c| c as u8)),
+        Ok(status) => ExitCode::from(status.code().map_or(CANNOT_RUN, |c| c as u8)),
         Err(e) => {
-            eprintln!("error: running the harness binary: {e}");
-            ExitCode::from(2)
+            eprintln!("harness run: cannot run the harness binary: {e}");
+            ExitCode::from(CANNOT_RUN)
         }
     }
 }

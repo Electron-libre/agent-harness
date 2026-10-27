@@ -20,7 +20,9 @@ jobs:
           tool: just
       - name: Install harness (the release of the pinned revision, else built with the runner's cargo)
         run: sh .github/install_harness.sh
-      - run: just check-specs
+      - name: Check the specs
+        run: |
+          if command -v harness >/dev/null; then just check-specs; else echo "harness not installed: check-specs skipped"; fi
       - name: Check that no synced file was edited
         run: |
           if command -v harness >/dev/null; then harness check; else echo "harness not installed: check-harness skipped"; fi
@@ -39,4 +41,9 @@ jobs:
       - name: Install harness (the release of the pinned revision, else built with the runner's cargo)
         run: sh .github/install_harness.sh
       - name: Check every commit of the PR
-        run: just check-commits ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
+        run: |
+          if command -v harness >/dev/null; then
+            just check-commits ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
+          else
+            echo "harness not installed: check-commits skipped"
+          fi

@@ -173,6 +173,7 @@ fn run_executes_the_cached_binary_of_the_pinned_commit_with_no_fetch() {
 
     let cmd = command(
         &root.join(".claude/sub"),
+        None,
         Some(&f.cache),
         &f.programs,
         &["my-tool".into(), "3".into(), "--flag".into()],
@@ -299,6 +300,7 @@ fn local_command(f: &Fixture, cargo: &OsString) -> Result<Command> {
     };
     command(
         &f.dir.path().join("project"),
+        None,
         Some(&f.cache),
         &programs,
         &["t".into(), "0".into()],
@@ -369,4 +371,83 @@ fn a_failed_prefetch_is_a_warning() {
     );
     f.publish(&format!("#!/bin/sh\n{TOOL}"), None);
     assert_eq!(prefetch(&f.cache, SOURCE, COMMIT, &f.programs), None);
+}
+
+// spec: BIN-1
+#[test]
+fn a_working_directory_outside_any_project_falls_back_to_the_project_dir() {
+    let f = Fixture::new();
+    let cached = f.cached();
+    fs::create_dir_all(cached.parent().unwrap()).unwrap();
+    script(&cached, TOOL);
+    let root = f.project();
+    let elsewhere = tempdir().unwrap();
+
+    let cmd = command(
+        elsewhere.path(),
+        Some(&root),
+        Some(&f.cache),
+        &f.programs,
+        &["t".into(), "0".into()],
+    )
+    .unwrap();
+
+    assert_eq!(Path::new(cmd.get_program()), cached);
+    assert!(command(elsewhere.path(), None, Some(&f.cache), &f.programs, &[]).is_err());
+}
+
+/// Run `git args` in `dir`, as a test user.
+fn git_ok(dir: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .args(["-c", "user.email=t@t", "-c", "user.name=t"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}");
+}
+
+// spec: BIN-2
+#[test]
+fn a_rev_that_is_no_hash_resolves_in_the_cached_clone_without_fetching() {
+    let f = Fixture::new();
+    // a source with one commit on `main`, cloned into the cache as `sync` leaves it
+    let origin = tempdir().unwrap();
+    git_ok(origin.path(), &["init", "-q", "-b", "main"]);
+    git_ok(origin.path(), &["commit", "-q", "--allow-empty", "-m", "x"]);
+    let url = format!("file://{}", origin.path().display());
+    let clone = fetch(&f.cache, &url).unwrap();
+    let commit = git_output(&clone, &["rev-parse", "origin/main"]).unwrap();
+    let cached = f
+        .cache
+        .join("harness/bin")
+        .join(&commit)
+        .join(target())
+        .join("harness");
+    fs::create_dir_all(cached.parent().unwrap()).unwrap();
+    script(&cached, TOOL);
+    let root = f.dir.path().join("project");
+    fs::create_dir_all(root.join(".claude")).unwrap();
+    let config = format!("[harness]\nsource = \"{url}\"\nrev = \"main\"\n");
+    fs::write(root.join(CONFIG), config).unwrap();
+    // the source is gone: a fetch would fail
+    fs::remove_dir_all(origin.path()).unwrap();
+
+    let cmd = command(&root, None, Some(&f.cache), &f.programs, &[]).unwrap();
+
+    assert_eq!(Path::new(cmd.get_program()), cached);
+}
+
+// spec: BIN-5
+#[test]
+fn a_scp_style_source_is_built_from_its_ssh_url() {
+    let f = Fixture::new().with_cargo();
+
+    binary_of(&f.cache, "git@gitlab.com:o/r.git", COMMIT, &f.programs).unwrap();
+
+    assert!(
+        f.log().contains("--git ssh://git@gitlab.com/o/r.git --rev"),
+        "{}",
+        f.log()
+    );
 }

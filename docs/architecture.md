@@ -34,25 +34,30 @@ the hooks (`review-gate`, `clippy-gate`, `format-rust`), `commit-check`, `check-
 published binary. Their tests, and those of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`), are
 `cargo test` of this repository; consumers run none, and a test fails when anything the source ships still names
 `rust-script`. A hook, a recipe or a skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
-the nearest `.claude/harness.toml` from the current directory and replaces itself (`exec`) by
-`<binary> tool <tool> [args]`, so input, output and exit code are the tool's (`crates/harness/src/tools/`, one module
-per tool, listed in `TOOLS`).
+the nearest `.claude/harness.toml` from the current directory (else from `CLAUDE_PROJECT_DIR`, when the agent left the
+project) and replaces itself (`exec`) by `<binary> tool <tool> [args]`, so input, output and exit code are the tool's
+(`crates/harness/src/tools/`, one module per tool, listed in `TOOLS`). When it cannot get the binary it exits 3, not 2:
+Claude Code reads 2 as the refusal of a hook, and a hook that cannot run must not block the agent (BIN-14).
 
-- Git source: the binary of the pinned commit and the platform, `<cache>/harness/bin/<commit>/<target>/harness`. When
+- Git source: the binary of the pinned commit and the platform, `<cache>/harness/bin/<commit>/<target>/harness`. A
+  `rev` that is no commit hash (a branch, from `init --rev`) resolves in the clone `sync` left, without a fetch. When
   missing, `curl` downloads the asset `harness-<target>` of the release `harness-<commit>` of a GitHub source and its
   `.sha256`; a digest mismatch fails and installs nothing. Any other failure falls back to
-  `cargo install --git <source> --rev <commit> --locked`. The file is written next to its place and renamed, so a
-  concurrent hook never runs half a binary. `sync` and `update` fetch it ahead (a failure is a warning).
+  `cargo install --git <source> --rev <commit> --locked` (a `git@host:path` source given as `ssh://`). The file is
+  written next to its place and renamed, so a concurrent hook never runs half a binary. `sync` and `update` fetch it
+  ahead (a failure is a warning).
 - Local directory source (this repository): `cargo build -p harness` of the source on each call (about 40 ms when
   nothing changed), whose binary also goes to `<cache>/harness/bin/local-<hash of the path>/harness`; when the working
   tree does not compile, that last good build runs, with a warning, so the hooks keep working.
 
 This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): on each push to the
-main branch it builds `harness` for `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` and `aarch64-apple-darwin`
-and creates the release `harness-<commit>` with each binary and its `.sha256`. A commit pinned before its release
+main branch it builds `harness` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run
+whatever the glibc: a cached binary is never fetched again) and `aarch64-apple-darwin` and creates (or, on a re-run,
+completes) the release `harness-<commit>` with each binary and its `.sha256`. A commit pinned before its release
 exists (`harness update` right after a push) is built with `cargo` until it does. The CI of a consumer
-(`.github/install_harness.sh`) puts that asset where `harness run` looks for it and on the path, so its jobs need no
-Rust when the source publishes the commit; a digest mismatch fails the job, as it fails `harness run`.
+(`.github/install_harness.sh`) puts that asset, or the binary `cargo install` built when there is none, where
+`harness run` looks for it and on the path, so its jobs need no Rust when the source publishes the commit and build it
+once otherwise; a digest mismatch fails the job, as it fails `harness run`.
 
 ## Hooks and their declaration
 
@@ -130,12 +135,15 @@ A third mode, `native`, is run by a git `pre-commit` hook that `harness sync` in
 ([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md), `crates/harness/src/gate.rs`;
 `.git/hooks` is neither versioned nor cloned, so each clone needs its own `sync`). The installed file is a small `sh`
 script, marked by its second line, that starts `harness run review-gate native` from the
-work tree and then the `pre-commit` the user already had, which `sync` moved to `pre-commit.user` (it never overwrites a
-hook that is not its own, and stops before writing anything when `pre-commit.user` exists too). A work tree without
-`.claude/harness.toml` (a branch that predates the harness) or a machine without `harness` is a warning on stderr, not a
-refusal. `sync` installs the gate when the source manages a hook running `harness run review-gate` (`check` expects it
-when the lock records one), reinstalls the script when it is missing, edited or no longer executable, and `--dry-run`
-only reports. `init` writes `harness.toml` only: the gate is not there until the first `sync`.
+work tree (or `rust-script .claude/hooks/require_code_review.rs native` in a work tree of a revision from before the
+tools moved into `harness`: the gate is shared by every worktree of the repository) and then the `pre-commit` the user
+already had, which `sync` moved to `pre-commit.user` (it never overwrites a hook that is not its own, and stops before
+writing anything when `pre-commit.user` exists too). A work tree with neither the hook script nor
+`.claude/harness.toml` (a branch that predates the harness), a machine without the program it needs or with a `harness`
+older than `run`, and a launcher that cannot run the tool (exit 3) are a warning on stderr, not a refusal. `sync`
+installs the gate when the source manages a hook running `harness run review-gate` or ships the old hook script
+(`check` expects it when the lock records either), reinstalls the script when it is missing, edited or no longer
+executable, and `--dry-run` only reports. `init` writes `harness.toml` only: the gate is not there until the first `sync`.
 
 The gate goes to the hooks directory of the repository whose top is the project, so a linked worktree (or a `.git` that
 is a file) installs it once in the hooks of the common git directory, for all its worktrees; a project nested in another

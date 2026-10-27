@@ -10,7 +10,7 @@ const TESTS: &str = "// spec: RER-1, RER-2\n#[test]\nfn reuses() {}\n";
 #[test]
 fn check_specs() {
     let script = std::path::PathBuf::from("/tools/check_specs.rs");
-    let tmp = std::env::temp_dir().join(format!("check_specs_test_{}", std::process::id()));
+    let tmp = tempfile::tempdir().unwrap().keep();
     let failed = Cell::new(false);
     let report = |name: &str, ok: bool| {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
@@ -350,7 +350,7 @@ fn outside_git(case: &Case) {
 /// In a git repository the files come from git: a worktree nested in the scanned one is never read, ignored by
 /// `info/exclude` or seen as an embedded repository, while an untracked test is still traced.
 fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
-    let root = std::env::temp_dir().join(format!("check_specs_git_{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&root);
     let write = |path: &str, body: &str| {
         std::fs::create_dir_all(root.join(path).parent().unwrap()).unwrap();

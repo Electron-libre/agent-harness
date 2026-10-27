@@ -68,7 +68,7 @@ fn git_dir_of(dir: &Path) -> std::path::PathBuf {
 
 // spec: REV-15
 fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::env::temp_dir().join(format!("reviewtest-wt-{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     let main = root.join("main");
     let linked = root.join("linked");
@@ -156,7 +156,7 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 /// `just waive-review` creates the waiver of the worktree it runs in, prints its path and changes nothing else.
 fn recipe_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let recipes = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../files/harness.just");
-    let root = std::env::temp_dir().join(format!("reviewtest-rc-{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     let (main, linked) = (root.join("main"), root.join("linked"));
     fs::create_dir_all(main.join("sub")).unwrap();
@@ -241,8 +241,8 @@ fn recipe_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 
 /// Two repositories side by side: `current` reviewed and unchanged, `other` with a change nobody reviewed.
 /// Returns the shell directory (`current`).
-fn target_fixture(hook: &Path, name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
-    let root = std::env::temp_dir().join(format!("reviewtest-{name}-{}", std::process::id()));
+fn target_fixture(hook: &Path, _name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     let (current, other) = (root.join("current"), root.join("other"));
     for repo in [&current, &other] {
@@ -450,7 +450,7 @@ fn native_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 
 // spec: REV-11
 fn native_worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::env::temp_dir().join(format!("reviewtest-rev11-{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     let (main, linked) = (root.join("main"), root.join("linked"));
     fs::create_dir_all(&main).unwrap();
@@ -555,7 +555,7 @@ fn skipped_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 /// Runs `mode` for `event` with a `git` that only logs its arguments, and returns the logged calls (`None` when the
 /// hook itself failed, so that "no call" never means "did not run").
 fn git_calls(hook: &Path, mode: &str, event: &serde_json::Value) -> Option<Vec<String>> {
-    let root = std::env::temp_dir().join(format!("reviewtest-calls-{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     let bin = root.join("bin");
     fs::create_dir_all(&bin).unwrap();
@@ -635,7 +635,7 @@ fn cheap_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 
 /// Untracked files are hashed by `git` itself (their paths on its stdin), never read by the hook and piped to it.
 fn streaming_checks(hook: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::env::temp_dir().join(format!("reviewtest-stream-{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     let bin = root.join("bin");
     fs::create_dir_all(&bin).unwrap();
@@ -687,7 +687,7 @@ fn streaming_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 
 /// The marker still follows the content of an untracked file, and only that.
 fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::env::temp_dir().join(format!("reviewtest-untracked-{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("sub")).unwrap();
     sh(&root, &["init", "-q", "."]);
@@ -739,7 +739,7 @@ fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 #[test]
 fn review_gate() {
     let hook = Path::new(env!("CARGO_BIN_EXE_harness")).to_path_buf();
-    let project = std::env::temp_dir().join(format!("reviewtest-{}", std::process::id()));
+    let project = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&project);
     fs::create_dir_all(&project).unwrap();
     sh(&project, &["init", "-q", "."]);

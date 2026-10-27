@@ -18,9 +18,7 @@ fn run(script: &Path, cwd: &Path, arg: &str) -> (bool, String) {
 // spec: PAR-8
 /// `close_issue.rs` edits the queue, so it must run on the main worktree, never on an issue's worktree.
 fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::fs::canonicalize(std::env::temp_dir())
-        .unwrap()
-        .join(format!("close_issue_wt_{}", std::process::id()));
+    let root = std::fs::canonicalize(tempfile::tempdir().unwrap().keep()).unwrap();
     let _ = std::fs::remove_dir_all(&root);
     let main = root.join("repo");
     let linked = root.join("repo-foo");
@@ -106,9 +104,7 @@ fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
 /// The issue worktrees nest in the main one (ADR 0008): closing an issue there must not rewrite their files, ignored
 /// by git (`info/exclude`) or listed as an embedded repository (a clone that never ran `start-issue`), wherever they are.
 fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
-    let main = std::fs::canonicalize(std::env::temp_dir())
-        .unwrap()
-        .join(format!("close_issue_nested_{}", std::process::id()));
+    let main = std::fs::canonicalize(tempfile::tempdir().unwrap().keep()).unwrap();
     let _ = std::fs::remove_dir_all(&main);
     let nested = main.join(".claude/worktrees/bar");
     let elsewhere = main.join("docs/baz");
@@ -218,7 +214,7 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
 #[test]
 fn close_issue() {
     let script = std::path::PathBuf::from("/tools/close_issue.rs");
-    let tmp = std::env::temp_dir().join(format!("close_issue_test_{}", std::process::id()));
+    let tmp = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(tmp.join("issues")).unwrap();
     let git = |args: &[&str]| {

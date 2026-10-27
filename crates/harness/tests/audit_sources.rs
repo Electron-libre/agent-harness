@@ -3,7 +3,7 @@
 #[test]
 fn audit_sources() {
     let dir = std::path::PathBuf::from("/tools");
-    let tmp = std::env::temp_dir().join(format!("audit_sources_test_{}", std::process::id()));
+    let tmp = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&tmp);
     let repo = tmp.join("repo");
     let proj = tmp.join("projects/-tmp-repo");

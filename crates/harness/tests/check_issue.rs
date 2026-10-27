@@ -5,7 +5,7 @@ const GOOD: &str = "# Fix the thing\n\n# Goal\n\nMake it work.\n\n# Approach\n\n
 #[test]
 fn check_issue() {
     let script = std::path::PathBuf::from("/tools/check_issue.rs");
-    let tmp = std::env::temp_dir().join(format!("check_issue_test_{}", std::process::id()));
+    let tmp = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(tmp.join("issues/done")).unwrap();
     std::fs::write(tmp.join("issues/done/old.md"), "x").unwrap();

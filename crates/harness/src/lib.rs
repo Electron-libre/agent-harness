@@ -304,9 +304,14 @@ fn cache_or_default(cache: Option<&Path>) -> Result<PathBuf> {
     cache.map_or_else(cache_dir, |c| Ok(c.to_path_buf()))
 }
 
+/// Where the clone of the git source `url` lives in `cache`.
+fn clone_dir(cache: &Path, url: &str) -> PathBuf {
+    cache.join("harness").join(&hash(url.as_bytes())[..12])
+}
+
 /// Clone (first time) or fetch the git source in `cache`, and return its local directory.
 fn fetch(cache: &Path, url: &str) -> Result<PathBuf> {
-    let dir = cache.join("harness").join(&hash(url.as_bytes())[..12]);
+    let dir = clone_dir(cache, url);
     if dir.join(".git").exists() {
         git(Some(&dir), &["fetch", "--quiet", "--tags", "origin"])?;
         // `fetch` leaves `origin/HEAD` alone: follow a default branch the remote renamed (best effort).
@@ -522,7 +527,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let wanted = entries::of_source(source)?;
     // decided first: a hook of the user that cannot be chained stops the sync before it writes anything
     let files = list(&managed)?;
-    let gate = gate::plan(root, gate::manages(&wanted))?;
+    let gate = gate::plan(root, gate::manages(&wanted, files.iter()))?;
     // installed before the managed files are written, so a failure leaves the project as it was
     if let (Some(gate), false) = (&gate, options.dry_run) {
         gate.install()?;
@@ -620,7 +625,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let present = |path: &str| {
         done(path, Outcome::Added) || (root.join(path).is_file() && !done(path, Outcome::Removed))
     };
-    let gated = gate::manages(&new_lock.entries);
+    let gated = gate::manages(&new_lock.entries, new_lock.files.keys());
     report.warnings = match &merge.settings {
         Some(settings) => settings::warnings_of(settings, gated, &present),
         None => settings::warnings(base, gated, &present),
@@ -763,7 +768,7 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
         bail!("no {LOCK}: run `harness sync` first");
     };
-    let gated = gate::manages(&lock.entries);
+    let gated = gate::manages(&lock.entries, lock.files.keys());
     let problems = lock
         .files
         .iter()

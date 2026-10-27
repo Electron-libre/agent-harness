@@ -35,7 +35,7 @@ fn branch_with_commit(repo: &Path, name: &str) {
 /// An issue is taken when a worktree has its branch checked out or the branch holds commits that are not on the main
 /// branch; `next_issue.rs` skips it, names it, and behaves as before when nothing is taken.
 fn taken_checks(script: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::env::temp_dir().join(format!("next_issue_taken_{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&root);
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join("issues")).unwrap();
@@ -136,7 +136,7 @@ fn taken_checks(script: &Path) -> Vec<(&'static str, bool)> {
 /// A branch with no worktree and nothing off the main branch (left over, empty, or merged by rebase or squash of any number of commits) does not
 /// take its issue: it is reported as stale, with the command that removes it.
 fn stale_checks(script: &Path) -> Vec<(&'static str, bool)> {
-    let root = std::env::temp_dir().join(format!("next_issue_stale_{}", std::process::id()));
+    let root = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&root);
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join("issues")).unwrap();
@@ -210,7 +210,7 @@ fn stale_checks(script: &Path) -> Vec<(&'static str, bool)> {
 #[test]
 fn next_issue() {
     let dir = std::path::PathBuf::from("/tools");
-    let tmp = std::env::temp_dir().join(format!("next_issue_test_{}", std::process::id()));
+    let tmp = tempfile::tempdir().unwrap().keep();
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(tmp.join("issues")).unwrap();
     let w = |f: &str, t: &str| std::fs::write(tmp.join("issues").join(f), t).unwrap();
