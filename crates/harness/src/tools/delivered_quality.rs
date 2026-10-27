@@ -125,29 +125,17 @@ fn issue_commits(repo: &Path, log: &[Commit], stem: &str) -> Vec<usize> {
     let candidates: Vec<usize> = (0..=close)
         .filter(|&i| log[i].touches(&open) || log[i].touches(&done))
         .collect();
-    // The commits whose diff of the file adds or removes the heading: the oldest of them added it.
-    let branch = default_branch(repo).unwrap_or("HEAD");
-    let tracked = git(
-        repo,
-        &[
-            "-c",
-            "core.quotePath=false",
-            "log",
-            "--no-renames",
-            "--format=%H",
-            "-G^# Tracking$",
-            branch,
-            "--",
-            &open,
-            &done,
-        ],
-    )
-    .unwrap_or_default();
-    let tracked: BTreeSet<&str> = tracked.lines().collect();
+    // The oldest version of the file holding the heading outside a fence (QUA-12) started the work.
+    let tracked = |c: &Commit| {
+        [&open, &done].iter().any(|path| {
+            git(repo, &["show", &format!("{}:{path}", c.hash)])
+                .is_some_and(|text| section(&text, "# Tracking", |_| true).is_some())
+        })
+    };
     let start = candidates
         .iter()
         .copied()
-        .find(|&i| tracked.contains(log[i].hash.as_str()))
+        .find(|&i| tracked(&log[i]))
         .unwrap_or(close);
     let closes_another = |c: &Commit| {
         c.added

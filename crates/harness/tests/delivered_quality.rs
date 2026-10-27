@@ -386,6 +386,60 @@ fn fence_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+/// The Goal of an issue quoting the template in a fence, and the Tracking added once its plan is written.
+const KAPPA_GOAL: &str = "# kappa\n\n# Goal\nThe template:\n```md\n# Tracking\n```\n";
+const KAPPA_TRACKING: &str = "\n# Tracking\n\n## Plan\n1. [x] one\n";
+
+// spec: QUA-2
+fn start_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let repo = tmp.join("start");
+    std::fs::create_dir_all(&repo).unwrap();
+    sh(&repo, &["init", "-q", "-b", "main"]);
+    commit_at(
+        &repo,
+        "2026-01-01T00:00:00Z",
+        "chore: sync",
+        &[(".claude/harness.toml", Some(&toml("r1")))],
+    );
+    commit_at(
+        &repo,
+        "2026-01-02T00:00:00Z",
+        "docs: open kappa",
+        &[("issues/kappa.md", Some(KAPPA_GOAL))],
+    );
+    let planned = format!("{KAPPA_GOAL}{KAPPA_TRACKING}");
+    commit_at(
+        &repo,
+        "2026-01-03T00:00:00Z",
+        "docs: plan kappa",
+        &[("issues/kappa.md", Some(&planned))],
+    );
+    commit_at(
+        &repo,
+        "2026-01-04T00:00:00Z",
+        "feat: kappa",
+        &[
+            ("src/k.rs", Some("k")),
+            ("issues/kappa.md", Some(&format!("{planned}done\n"))),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-05T00:00:00Z",
+        "docs: close kappa",
+        &[
+            ("issues/kappa.md", None),
+            ("issues/done/kappa.md", Some(&planned)),
+        ],
+    );
+    let (_, out) = run(dir, &repo, &[]);
+    let r = rows(&out);
+    vec![(
+        "a Tracking quoted in a fence does not start the commits of the issue".to_string(),
+        has(&r, "kappa", "commits", "3"),
+    )]
+}
+
 /// A repository where `eps` adds three citations and records the red run of two, `zeta` only renames a test and
 /// `eta` extends its citation.
 fn traced_fixture(tmp: &Path) -> PathBuf {
@@ -661,6 +715,7 @@ fn delivered_quality() {
         .into_iter()
         .chain(review_checks(&dir, &tmp))
         .chain(fence_checks(&dir, &tmp))
+        .chain(start_checks(&dir, &tmp))
         .chain(traced_checks(&dir, &tmp))
         .chain(session_checks(&dir, &tmp))
         .chain(summary_checks(&dir, &tmp))

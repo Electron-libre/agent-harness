@@ -32,3 +32,35 @@ quoted in a fence, and a section that cannot be found gives empty columns, not z
 # Resources
 * `specs/delivered-quality.md` (QUA-12), `crates/harness/src/tools/delivered_quality.rs` (`issue_commits`,
   `section`), `crates/harness/src/tools/mod.rs` (`fence`, `fenced`), `crates/harness/tests/delivered_quality.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+QUA-2 starts the commits of an issue at the oldest version of its file holding `# Tracking` outside a fence; a
+section whose heading stands only inside a fence (unread) prints empty columns, while a heading absent from the file
+keeps its real zeros (the five done issues closed with no `# Tracking`). BRE-10 removes fences with the shared reader.
+
+## Plan
+1. [x] Fence-aware start of an issue: read each version of the issue file touched by its candidate commits (`git
+   show`) with `section` until one holds `# Tracking`; verified by a fixture issue opened with `# Tracking` quoted in
+   a Goal fence (`commits` 3); makes true QUA-2. ~70 lines.
+2. [ ] Unread sections: `section` tells a heading found only inside a fence from an absent one, and `deliverables`,
+   `reviews` and `red_ids` turn the first into empty cells; verified by a fixture issue whose Goal fence stays open
+   before `# Tracking`, and one with no `# Tracking` keeping 0; makes true QUA-12 (as amended). ~80 lines.
+3. [ ] BRE-10 reads fences with the shared `fenced` of `tools/mod.rs`; verified by an English text block in a `~~~`
+   fence of a French session giving no breach; makes true BRE-10. ~40 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 687d50cac9dd03efb0ff1071c4caaa10ad598bde
+- Unread vs absent section (question 1 a): empty only when the heading stands only inside a fence.
+
+## Deliverable 1
+- done: `issue_commits` reads each version of the issue file (`git show`) with the fence-aware `section` and starts
+  at the oldest holding `# Tracking` outside a fence, instead of `git log -G`.
+- red: QUA-2: `kappa.commits: expected "3", got Some("4")` (the creation commit quoting `# Tracking` in a fence counted).
+- Code review: no findings (low).
+- not verified: none.
+- decisions needed: none.
