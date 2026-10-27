@@ -4,7 +4,7 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [make_the_architecture_doc_skimmable](make_the_architecture_doc_skimmable.md) - after the spec proofs, which move edge cases into the specs; unblocked by the binaries
+- [rewrite_the_readme_and_diagram_the_architecture](rewrite_the_readme_and_diagram_the_architecture.md) - first: asked now by the user; the binaries and the spec proofs it waited on have landed
 - [bootstrap_specs_for_an_existing_capability](bootstrap_specs_for_an_existing_capability.md) - widest scope, benefits from the spec clarity checks and the proof rule first
 - [weigh_the_form_and_the_evidence_of_harness_proposals](weigh_the_form_and_the_evidence_of_harness_proposals.md) - low priority, skill text only; sets the evidence rules the verdict issue applies
 - [budget_the_fixed_context_of_a_project](budget_the_fixed_context_of_a_project.md) - low priority, independent; makes the cost of the always-on text visible before it grows
