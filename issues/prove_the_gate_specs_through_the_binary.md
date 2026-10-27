@@ -52,6 +52,7 @@ rules the spec names (no binary involved, but no code either).
 3. [x] Settings warnings: deny rules, missing hooks, attribution through `check`, `sync`, `update` and their dry
    runs; REV-19 on the shipped entries; `src/tests/install_gate.rs` and the helpers of `src/tests.rs` left unused
    dropped; makes true SYN-24 to SYN-27, REV-19 (~600 lines).
+4. [x] Fixes of the `high` review: the proofs fail when the behaviour breaks, one fixture of the review gate.
 
 ## Decisions
 - Mode: autonomous
@@ -89,3 +90,19 @@ rules the spec names (no binary involved, but no code either).
   were reread by hand: nothing found.
 - not verified: none
 - decisions needed: none
+
+## Deliverable 4 (fixes of the `high` review)
+- done: 7 of the 9 findings fixed: the REV-19 `check` half seeds the settings, so a shipped deny rule missing fails
+  it; the gate expected once out of the settings asserts the exact problems, with and without `CI`; SYN-24 also
+  covers settings with no `deny` list; the `core.hooksPath` reason is asserted on the gate's own line; `gated`,
+  `RECORD`, `record_hook`, `set_mode` and `Home::harness_env` moved to `tests/common/mod.rs`.
+- not fixed: (4) an up-to-date gate is asserted as no line, not `unchanged`: SYN-20 says `sync` reports nothing then,
+  and the same tests prove the gate still considered by its reinstall right after; (8) the deny rules of the REV-19
+  proof are the spec's literal ones, not `settings::DENY_RULES`: a boundary test states what the spec promises, and
+  its `check` half now catches a drift between the code and the shipped entries.
+- red: none (the fixes harden the proofs); mutation checked: a rule removed from the shipped entries, the literal
+  loop disabled, fails the `check` half of REV-19.
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+- Status: every deliverable done; closing left to the user.

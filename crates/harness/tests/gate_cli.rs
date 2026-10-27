@@ -8,31 +8,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{executable, get, output, put, script, snapshot, Home, Run, CONFIG};
+use common::{
+    executable, gated, get, output, put, script, set_mode, snapshot, Home, Run, CONFIG, RECORD,
+};
 use tempfile::{tempdir, TempDir};
 
 const GATE: &str = "native review gate";
 const MOVED: &str = "pre-commit -> pre-commit.user";
 const SKIPPED: &str = "review gate skipped";
-
-/// A source managing the hook of the review gate, and a git project initialised on it, not synced yet.
-fn gated(home: &Home) -> (TempDir, TempDir) {
-    let source = tempdir().unwrap();
-    put(source.path(), "files/a.txt", "a1");
-    let hook = serde_json::json!({"type": "command", "command": "harness run review-gate record"});
-    let fragment =
-        serde_json::json!({"hooks": {"PostToolUse": [{"matcher": "Skill", "hooks": [hook]}]}});
-    put(
-        source.path(),
-        "entries/.claude/settings.json",
-        &fragment.to_string(),
-    );
-    put(source.path(), "seed/.claude/settings.json", "{}");
-    let root = tempdir().unwrap();
-    home.git(root.path(), &["init", "--quiet", "-b", "main"]);
-    home.ok(root.path(), &["init", source.path().to_str().unwrap()]);
-    (source, root)
-}
 
 /// `gated`, synced.
 fn synced(home: &Home) -> (TempDir, TempDir) {
@@ -272,11 +255,6 @@ fn a_symlinked_hook_of_the_user_still_reaches_its_target_once_moved() {
     assert_eq!(get(root.path(), "ran").as_deref(), Some("linked\n"));
 }
 
-fn set_mode(path: &Path, mode: u32) {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
-}
-
 // spec: SYN-20
 #[test]
 fn sync_reinstalls_a_missing_modified_or_non_executable_hook_and_is_idempotent() {
@@ -369,7 +347,14 @@ fn sync_installs_nothing_when_core_hooks_path_is_set_and_says_why() {
         home.git(root.path(), &["config", "core.hooksPath", value]);
         let sync = home.ok(root.path(), &["sync"]);
         assert_eq!(sync.outcome(GATE), Some("skipped"), "{sync:?}");
-        assert!(sync.stdout.contains("core.hooksPath"), "{sync:?}");
+        let why = sync
+            .lines()
+            .into_iter()
+            .find(|l| l.ends_with(&format!(": {GATE}")));
+        assert!(
+            why.is_some_and(|l| l.contains("core.hooksPath")),
+            "{sync:?}"
+        );
         assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
         assert!(!pre_commit(&root).exists());
         assert!(fs::read_dir(elsewhere.path()).unwrap().next().is_none());
@@ -408,12 +393,8 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
 
 /// `harness check` on `root`, with the `CI` environment variable set when `ci`.
 fn check(home: &Home, root: &TempDir, ci: bool) -> Run {
-    let mut cmd = home.command();
-    cmd.args(["check", "--root"]).arg(root.path());
-    if ci {
-        cmd.env("CI", "true");
-    }
-    output(cmd, "")
+    let env: &[(&str, &str)] = if ci { &[("CI", "true")] } else { &[] };
+    home.harness_env(root.path(), &["check"], env)
 }
 
 /// Assert `check` exits 0 with no problem when `problems` is empty, else exits 1 printing exactly `problems`.
@@ -458,9 +439,11 @@ fn check_expects_the_gate_the_lock_records_even_once_out_of_the_settings() {
     let (_source, root) = synced(&home);
     fs::remove_file(pre_commit(&root)).unwrap();
     put(root.path(), ".claude/settings.json", "{}");
-    let run = check(&home, &root, false);
-    assert_eq!(run.code, Some(1), "{run:?}");
-    assert!(run.lines().contains(&MISSING), "{run:?}");
+    let entry = format!(".claude/settings.json hook PostToolUse Skill {RECORD}");
+    let missing_entry = format!("missing: {entry}");
+    assert_problems(&check(&home, &root, false), &[&missing_entry, MISSING]);
+    // a fresh clone of a CI run has no git hooks
+    assert_problems(&check(&home, &root, true), &[&missing_entry]);
 }
 
 // spec: SYN-23

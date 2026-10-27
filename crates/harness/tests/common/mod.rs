@@ -123,8 +123,16 @@ impl Home {
 
     /// `harness <args> --root <root>`.
     pub fn harness(&self, root: &Path, args: &[&str]) -> Run {
+        self.harness_env(root, args, &[])
+    }
+
+    /// `harness <args> --root <root>` with the environment variables `env` set.
+    pub fn harness_env(&self, root: &Path, args: &[&str], env: &[(&str, &str)]) -> Run {
         let mut cmd = self.command();
-        cmd.args(args).arg("--root").arg(root);
+        cmd.args(args)
+            .arg("--root")
+            .arg(root)
+            .envs(env.iter().copied());
         output(cmd, "")
     }
 
@@ -239,6 +247,12 @@ pub fn executable(path: &Path) -> bool {
     fs::metadata(path).unwrap().permissions().mode() & 0o111 != 0
 }
 
+#[cfg(unix)]
+pub fn set_mode(path: &Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+}
+
 #[cfg(not(unix))]
 pub fn executable(_path: &Path) -> bool {
     false
@@ -252,5 +266,28 @@ pub fn project(home: &Home) -> (TempDir, TempDir) {
     put(source.path(), "seed/s.txt", "seed1");
     let root = tempdir().unwrap();
     home.ok(root.path(), &["init", source.path().to_str().unwrap()]);
+    (source, root)
+}
+
+/// The managed hook of the review gate.
+pub const RECORD: &str = "harness run review-gate record";
+
+/// The `hooks` table running `RECORD` after `Skill`.
+pub fn record_hook() -> serde_json::Value {
+    serde_json::json!({"PostToolUse": [{"matcher": "Skill", "hooks": [{"type": "command", "command": RECORD}]}]})
+}
+
+/// The project of `project`, made a git repository, whose source manages `RECORD` and seeds empty settings for it:
+/// `sync` installs the review gate in it.
+pub fn gated(home: &Home) -> (TempDir, TempDir) {
+    let (source, root) = project(home);
+    let fragment = serde_json::json!({"hooks": record_hook()});
+    put(
+        source.path(),
+        "entries/.claude/settings.json",
+        &fragment.to_string(),
+    );
+    put(source.path(), "seed/.claude/settings.json", "{}");
+    home.git(root.path(), &["init", "--quiet", "-b", "main"]);
     (source, root)
 }

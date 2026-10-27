@@ -7,13 +7,12 @@ mod common;
 use std::fs;
 use std::path::Path;
 
-use common::{get, project, put, snapshot, Home, Run, CONFIG, LOCK};
+use common::{gated, get, project, put, record_hook, snapshot, Home, Run, CONFIG, LOCK};
 use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
 
 const SETTINGS: &str = ".claude/settings.json";
 const FRAGMENT: &str = "entries/.claude/settings.json";
-const RECORD: &str = "harness run review-gate record";
 /// The deny rules of REV-19.
 const DENY_RULES: [&str; 3] = [
     "Bash(just waive-review)",
@@ -22,11 +21,6 @@ const DENY_RULES: [&str; 3] = [
 ];
 const ATTRIBUTION_ON: &str = "warning: .claude/settings.json does not turn off the attribution";
 const GONE: &str = "warning: .claude/settings.json runs the missing hook .claude/hooks/gone.rs";
-
-/// The hook of the review gate, after `Skill`.
-fn record() -> Value {
-    json!({"PostToolUse": [{"matcher": "Skill", "hooks": [{"type": "command", "command": RECORD}]}]})
-}
 
 /// Settings running `hooks`, the attribution turned off, with `deny`.
 fn settings(hooks: &Value, deny: &[&str]) -> String {
@@ -45,16 +39,9 @@ fn synced(home: &Home) -> (TempDir, TempDir) {
     (source, root)
 }
 
-/// A git project synced from a source managing the hook of the review gate.
-fn gated(home: &Home) -> (TempDir, TempDir) {
-    let (source, root) = project(home);
-    put(
-        source.path(),
-        FRAGMENT,
-        &json!({"hooks": record()}).to_string(),
-    );
-    put(source.path(), "seed/.claude/settings.json", "{}");
-    home.git(root.path(), &["init", "--quiet", "-b", "main"]);
+/// The project of `common::gated`, synced.
+fn gated_and_synced(home: &Home) -> (TempDir, TempDir) {
+    let (source, root) = gated(home);
     home.ok(root.path(), &["sync"]);
     (source, root)
 }
@@ -80,8 +67,16 @@ fn check(home: &Home, root: &TempDir) -> Run {
 #[test]
 fn check_warns_of_each_deny_rule_the_settings_lack() {
     let home = Home::new();
-    let (_source, root) = gated(&home);
-    put(root.path(), SETTINGS, &settings(&record(), &[]));
+    let (_source, root) = gated_and_synced(&home);
+    // no deny list at all
+    let mut no_deny: Value = serde_json::from_str(&settings(&record_hook(), &[])).unwrap();
+    no_deny["permissions"] = json!({"allow": ["Bash(just waive-review)"]});
+    put(root.path(), SETTINGS, &no_deny.to_string());
+    assert_eq!(
+        warnings(&check(&home, &root)),
+        DENY_RULES.map(deny_warning).to_vec()
+    );
+    put(root.path(), SETTINGS, &settings(&record_hook(), &[]));
     assert_eq!(
         warnings(&check(&home, &root)),
         DENY_RULES.map(deny_warning).to_vec()
@@ -89,13 +84,17 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
     put(
         root.path(),
         SETTINGS,
-        &settings(&record(), &DENY_RULES[..2]),
+        &settings(&record_hook(), &DENY_RULES[..2]),
     );
     assert_eq!(
         warnings(&check(&home, &root)),
         vec![deny_warning(DENY_RULES[2])]
     );
-    put(root.path(), SETTINGS, &settings(&record(), &DENY_RULES));
+    put(
+        root.path(),
+        SETTINGS,
+        &settings(&record_hook(), &DENY_RULES),
+    );
     assert!(warnings(&check(&home, &root)).is_empty());
     // no settings file: nothing to warn about
     fs::remove_file(root.path().join(SETTINGS)).unwrap();
@@ -127,7 +126,7 @@ fn unparsable_settings_get_one_warning() {
         "{run:?}"
     );
     // with the review gate too: not reported as lacking every rule
-    let (_source, root) = gated(&home);
+    let (_source, root) = gated_and_synced(&home);
     put(root.path(), SETTINGS, "{,}");
     let run = home.harness(root.path(), &["check"]);
     let said = warnings(&run);
@@ -299,6 +298,7 @@ fn the_shipped_settings_entries_deny_the_waiver_to_the_agent() {
     let home = Home::new();
     let (source, root) = project(&home);
     put(source.path(), FRAGMENT, &shipped_entries());
+    put(source.path(), "seed/.claude/settings.json", "{}");
     home.git(root.path(), &["init", "--quiet", "-b", "main"]);
     home.ok(root.path(), &["sync"]);
     let run = home.harness(root.path(), &["check"]);
