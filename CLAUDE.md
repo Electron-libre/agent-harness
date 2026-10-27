@@ -12,6 +12,8 @@ The shared agent harness (skills, hooks, scripts, recipes, CI) of the user's pro
 - `files/`: the managed content, copied to the same path of every consumer. Never edit the copies in a
   consumer: fix them here.
 - `seed/`: project-owned starting points, copied once.
+- `entries/.claude/settings.json`: the hooks and deny rules `sync` keeps in each project's `.claude/settings.json`
+  (declare a new hook here).
 - `crates/harness/`: the `harness` binary (`init`, `sync`, `check`).
 - `specs/`: what the tool and its shared hooks must do (one file per capability, see `specs/README.md`), traced to
   its tests by `// spec: ID`.

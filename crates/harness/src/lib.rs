@@ -1,8 +1,9 @@
 //! Copy the managed files of a harness source into a project, and detect drift.
 //!
 //! A source holds `files/` (managed: overwritten on every sync while untouched locally) and `seed/`
-//! (project-owned: copied once, never again). `.claude/harness.lock` records the hash of each managed file as
-//! written, so a later sync tells a local edit from a source change.
+//! (project-owned: copied once, never again), and may hold `entries/.claude/settings.json`, the entries of the
+//! project's settings it manages (`entries.rs`). `.claude/harness.lock` records the hash of each managed file as
+//! written and the managed entries, so a later sync tells a local edit from a source change.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;

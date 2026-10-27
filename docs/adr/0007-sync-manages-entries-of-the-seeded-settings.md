@@ -1,6 +1,6 @@
 # 0007. Sync manages entries of the seeded settings
 
-Status: Proposed
+Status: Accepted
 Date: 2026-10-27
 
 ## Context

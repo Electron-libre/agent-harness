@@ -1,5 +1,5 @@
-//! The warnings of `check` and `sync` on the project's `.claude/settings.json` (`specs/sync.md`, SYN-24 to SYN-27). Seeded once,
-//! the file is never rewritten by `sync`, so a project learns this way of what a later harness expects of it. Also the
+//! The warnings of `check` and `sync` on the project's `.claude/settings.json` (`specs/sync.md`, SYN-24 to SYN-27):
+//! what a harness expects of the file beyond the entries `sync` manages (`entries.rs`). Also the
 //! retention of the transcripts in the user settings, which the harness never writes (SYN-28).
 
 use std::fs;

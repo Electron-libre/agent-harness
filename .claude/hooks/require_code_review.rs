@@ -14,7 +14,7 @@
 //! review of the next commit by creating `claude-review-waived` in the git directory (`just waive-review`); the hook
 //! stamps it with `HEAD` when it lets a commit through and removes it, without using it, at the first check after
 //! `HEAD` moved (a command that does not commit, such as `--dry-run`, leaves it usable; after a commit the user
-//! creates it again). The deny rules of the seeded `.claude/settings.json` keep the recipe and the file from the agent.
+//! creates it again). The deny rules `harness sync` manages in `.claude/settings.json` keep the recipe and the file from the agent.
 //!
 //! `native` judges the repository git resolved (`GIT_DIR`, `GIT_WORK_TREE`, the current directory), whatever the text
 //! of the command was, and reads no event. A native hook does not run under `--no-verify` / `-n` or a moved

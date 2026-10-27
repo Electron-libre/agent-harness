@@ -86,8 +86,25 @@ project, so approach 3 is out (ADR 0007).
    Code review: no findings
    not verified: none.
    decisions needed: none.
-3. [ ] Docs: `docs/architecture.md` ("Hooks and their declaration"), README, the hint of `test_settings.rs` naming
+3. [x] Docs: `docs/architecture.md` ("Hooks and their declaration"), README, the hint of `test_settings.rs` naming
    the fragment, ADR 0007 accepted, spec accepted; verified by `just check`, `just test-harness`.
+
+   done: architecture (sync steps, lock, hooks section, deny rules), README, CLAUDE.md index, update-docs map row,
+   module docs of `lib.rs` and `settings.rs`, the header of `require_code_review.rs` and the message of
+   `test_settings.rs` (in `files/`, synced); ADR 0007 and `specs/sync.md` accepted.
+
+   | check | result |
+   |---|---|
+   | tests | `just check` ok |
+   | lint | clippy clean |
+   | specs | `specs/sync.md` accepted, all traced |
+   | docs | updated (this deliverable) |
+   | harness | `just test-harness` ok, `harness check` clean |
+
+   red: none (docs only).
+   Code review: no findings
+   not verified: none.
+   decisions needed: none.
 
 ## Decisions
 - Mode: autonomous

@@ -62,8 +62,8 @@ fn main() {
         }
     }
 
-    // every hook script is declared: `settings.json` is seeded once, so a hook added by a later sync is not
-    // wired until someone adds its declaration (the `Declare:` line of its header says where)
+    // every hook script is declared: `harness sync` adds the declarations of `entries/.claude/settings.json` in the
+    // source, so a hook missing from it is not wired (the `Declare:` line of its header says where)
     let declared: Vec<String> = shared["hooks"]
         .as_object()
         .into_iter()
@@ -86,7 +86,7 @@ fn main() {
         let header = fs::read_to_string(root.join(".claude/hooks").join(&script)).unwrap_or_default();
         let wanted = header.lines().find_map(|l| l.strip_prefix("//! Declare: ")).unwrap_or("see its header");
         failures.push(format!(
-            "hook `{script}` is not declared in .claude/settings.json: add under `hooks` the event and matcher `{wanted}` with the command `rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/{script}` (see docs/architecture.md, Hooks and their declaration)"
+            "hook `{script}` is not declared in .claude/settings.json: in the harness source, add to `hooks` of entries/.claude/settings.json the event and matcher `{wanted}` with the command `rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/{script}`, then run `harness sync` (see docs/architecture.md of the source, Hooks and their declaration)"
         ));
     }
 
