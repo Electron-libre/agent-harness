@@ -160,17 +160,52 @@ fn issue_commits(repo: &Path, log: &[Commit], stem: &str) -> Vec<usize> {
         .collect()
 }
 
-/// The lines of `text` after the line `heading`, up to the next line that `ends` accepts outside a fenced code block.
-fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Vec<&'a str> {
-    let mut fenced = false;
-    text.lines()
-        .skip_while(|l| l.trim_end() != heading)
-        .skip(1)
-        .take_while(|l| {
-            fenced ^= l.starts_with("```");
-            fenced || !ends(l)
-        })
-        .collect()
+/// The fenced code block open after `line` (QUA-12), given the one `open` before it (its character and length): a line
+/// starting, indent allowed, with three or more backticks or tildes opens one; a line of only its character, at
+/// least as many, closes it.
+fn fence(open: Option<(char, usize)>, line: &str) -> Option<(char, usize)> {
+    match open {
+        Some((c, n)) => {
+            let line = line.trim();
+            let closes = line.len() >= n && line.chars().all(|x| x == c);
+            if closes {
+                None
+            } else {
+                open
+            }
+        }
+        None => {
+            let line = line.trim_start();
+            ['`', '~'].into_iter().find_map(|c| {
+                let n = line.chars().take_while(|&x| x == c).count();
+                (n >= 3).then_some((c, n))
+            })
+        }
+    }
+}
+
+/// The lines of `text`, each with whether it belongs to a fenced code block, its fence lines included (QUA-12).
+fn fenced_lines(text: &str) -> impl Iterator<Item = (&str, bool)> {
+    let mut open = None;
+    text.lines().map(move |line| {
+        let before = open;
+        open = fence(open, line);
+        (line, before.is_some() || open.is_some())
+    })
+}
+
+/// The lines of `text` after the line `heading`, up to the next line that `ends` accepts, both outside a fenced code
+/// block (QUA-12); `None` when no such heading.
+fn section<'a>(text: &'a str, heading: &str, ends: impl Fn(&str) -> bool) -> Option<Vec<&'a str>> {
+    let mut lines =
+        fenced_lines(text).skip_while(|&(line, fenced)| fenced || line.trim_end() != heading);
+    lines.next()?;
+    Some(
+        lines
+            .take_while(|&(line, fenced)| fenced || !ends(line))
+            .map(|(line, _)| line)
+            .collect(),
+    )
 }
 
 /// The number of plan lines of an issue file (QUA-3): `<n>. [x]` or `<n>. [ ]` at the start of a line of `## Plan`,
@@ -180,12 +215,10 @@ fn deliverables(text: &str) -> usize {
         let rest = line.trim_start_matches(|c: char| c.is_ascii_digit());
         rest.len() < line.len() && (rest.starts_with(". [x]") || rest.starts_with(". [ ]"))
     };
-    let heading = if text.lines().any(|l| l.trim_end() == "## Plan") {
-        "## Plan"
-    } else {
-        "# Tracking"
-    };
-    section(text, heading, |l| l.starts_with('#'))
+    let ends = |l: &str| l.starts_with('#');
+    section(text, "## Plan", ends)
+        .or_else(|| section(text, "# Tracking", ends))
+        .unwrap_or_default()
         .into_iter()
         .filter(is_item)
         .count()
@@ -195,7 +228,7 @@ fn deliverables(text: &str) -> usize {
 /// holding `Code review` is one review, unless it is a row of the `check | result` table, its findings the `<n>` of its first `<n> finding(s)` (0 for `no findings`),
 /// since what follows may count the fixed ones; `None` for the sum when a line gives no count.
 fn reviews(text: &str) -> (usize, Option<usize>) {
-    let tracking = section(text, "# Tracking", |l| l.starts_with("# "));
+    let tracking = section(text, "# Tracking", |l| l.starts_with("# ")).unwrap_or_default();
     let lines: Vec<String> = tracking
         .iter()
         .filter(|l| !l.trim_start().starts_with('|'))
@@ -273,7 +306,7 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
 /// its `# Tracking` section, an item running over its indented continuation lines, the list ending at the first
 /// word that is not an id (`red: ABC-3, ABC-4: <failure>` names ABC-3 and ABC-4, `red: none (ABC-3)` none).
 fn red_ids(text: &str) -> BTreeSet<String> {
-    let tracking = section(text, "# Tracking", |l| l.starts_with("# "));
+    let tracking = section(text, "# Tracking", |l| l.starts_with("# ")).unwrap_or_default();
     let unmarked = |line: &str| {
         let line = line.trim();
         let line = line.trim_start_matches(['-', '*', '+']);

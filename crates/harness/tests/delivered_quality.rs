@@ -335,6 +335,47 @@ fn review_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+/// An issue file whose Goal quotes the template in a backtick fence and whose old-layout Tracking holds an indented
+/// `~~~` fence and a longer backtick fence, each with a line that would be a heading outside it.
+const DELTA: &str = "# delta\n\n# Goal\nThe template:\n```md\n# Tracking\n\n## Plan\n1. [x] a\n2. [x] b\n- Code review: 9 findings\n```\n\n# Tracking\n\n1. [x] one\n   ~~~sh\n# build\n   ```\n   ~~~\n````md\n```\n# not a heading\n````\n2. [x] two\n- Code review: 2 findings\n\n# Notes\n- Code review: 4 findings\n";
+
+// spec: QUA-12
+fn fence_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let repo = tmp.join("fences");
+    std::fs::create_dir_all(&repo).unwrap();
+    sh(&repo, &["init", "-q", "-b", "main"]);
+    commit_at(
+        &repo,
+        "2026-01-01T00:00:00Z",
+        "chore: sync",
+        &[(".claude/harness.toml", Some(&toml("r1")))],
+    );
+    commit_at(
+        &repo,
+        "2026-01-02T00:00:00Z",
+        "feat: delta",
+        &[("issues/delta.md", Some(DELTA))],
+    );
+    commit_at(
+        &repo,
+        "2026-01-03T00:00:00Z",
+        "docs: close delta",
+        &[
+            ("issues/delta.md", None),
+            ("issues/done/delta.md", Some(DELTA)),
+        ],
+    );
+    let (_, out) = run(dir, &repo, &[]);
+    let r = rows(&out);
+    vec![(
+        "a heading inside a fence neither starts nor ends a section, whatever the fence"
+            .to_string(),
+        has(&r, "delta", "deliverables", "2")
+            && has(&r, "delta", "reviews", "1")
+            && has(&r, "delta", "review_findings", "2"),
+    )]
+}
+
 /// A repository where `eps` adds three citations and records the red run of two, `zeta` only renames a test and
 /// `eta` extends its citation.
 fn traced_fixture(tmp: &Path) -> PathBuf {
@@ -609,6 +650,7 @@ fn delivered_quality() {
     let checks: Vec<_> = git_checks(&dir, &tmp)
         .into_iter()
         .chain(review_checks(&dir, &tmp))
+        .chain(fence_checks(&dir, &tmp))
         .chain(traced_checks(&dir, &tmp))
         .chain(session_checks(&dir, &tmp))
         .chain(summary_checks(&dir, &tmp))

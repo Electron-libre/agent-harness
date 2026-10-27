@@ -29,3 +29,31 @@ does, and a heading search that skips fenced lines.
 # Resources
 * `specs/delivered-quality.md`, `crates/harness/src/tools/delivered_quality.rs` (`section`, `deliverables`,
   `reviews`, the red-run reader), `crates/harness/tests/delivered_quality.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+One fence rule, QUA-12, shared by QUA-3, QUA-6 and QUA-11: a fence opens on a line starting (indent allowed) with
+three or more backticks or tildes and closes on a line of only the same character, at least as many; headings are
+found and ended outside fences only. The code is widened to it (option "widen" of the Approach), not the wording narrowed.
+
+## Plan
+1. [x] Fence-aware sections: `section` tracks fences from the first line (heading search included) with the QUA-12
+   rule, and `deliverables` picks `## Plan` only outside a fence; verified by a fixture issue whose Goal quotes
+   `# Tracking` in a backtick fence and whose Tracking holds an indented `~~~` fence with `# build`; makes true QUA-12
+   (and QUA-3, QUA-6, QUA-11 as amended). ~80 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 11740bfd2394a8f416481ee1067298465e39449a
+- Fence indentation: any (question 1 a), fences sit under list items in the issues.
+
+## Deliverable 1
+- done: `fence`/`fenced_lines` read the QUA-12 fences; `section` finds and ends its heading outside them and returns
+  `None` without one, so `deliverables` falls back to `# Tracking` only when no `## Plan` stands outside a fence.
+- red: QUA-12: `delta.deliverables: expected "2", got Some("4")` (the `## Plan` quoted in the Goal fence was read).
+- Code review: no findings (low).
+- not verified: none.
+- decisions needed: none.
