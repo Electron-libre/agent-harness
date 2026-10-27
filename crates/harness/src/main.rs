@@ -1,10 +1,13 @@
 //! `harness`: copy the shared agent harness into a project and tell when a managed file drifted.
 
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use harness::{check, init, retention_warnings, sync, update, Outcome, Report, SyncOptions};
+use harness::{
+    check, init, retention_warnings, run, sync, tools, update, Outcome, Report, SyncOptions,
+};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -48,6 +51,43 @@ enum Command {
     },
     /// Fail when a managed file was modified or deleted since the last sync, or the git review gate is missing or edited (not looked at when `CI` is set); warn when the settings lack a deny rule of the review waiver, run a missing hook or leave the attribution on, or Claude Code keeps the transcripts less than a year.
     Check,
+    /// Run a tool of the harness (hook, check, transcript reader) with the `harness` binary of the pinned revision; with no tool, list them.
+    Run {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        tool: Vec<OsString>,
+    },
+    /// Run a tool of this binary (what `run` executes once it picked the binary).
+    #[command(hide = true)]
+    Tool {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        tool: Vec<String>,
+    },
+}
+
+/// Replace this process by the tool of the pinned revision, so its input, output and exit code are the tool's (BIN-1).
+fn run(root: &Path, tool: &[OsString]) -> ExitCode {
+    let mut cmd = match run::command(root, None, &run::Programs::default(), tool) {
+        Ok(cmd) => cmd,
+        Err(e) => {
+            eprintln!("error: {e:#}");
+            return ExitCode::from(2);
+        }
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let e = cmd.exec();
+        eprintln!("error: running the harness binary: {e}");
+        ExitCode::from(2)
+    }
+    #[cfg(not(unix))]
+    match cmd.status() {
+        Ok(status) => ExitCode::from(status.code().map_or(2, |c| c as u8)),
+        Err(e) => {
+            eprintln!("error: running the harness binary: {e}");
+            ExitCode::from(2)
+        }
+    }
 }
 
 /// Print what changed, and the warnings on the settings to stderr; true when nothing is in conflict.
@@ -89,6 +129,8 @@ fn main() -> ExitCode {
             }
             clean
         }),
+        Command::Run { tool } => return run(&cli.root, &tool),
+        Command::Tool { tool } => return ExitCode::from(tools::run(&tool)),
         Command::Check => check(&cli.root).map(|checked| {
             for problem in &checked.problems {
                 println!("{problem}");

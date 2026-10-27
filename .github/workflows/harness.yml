@@ -55,6 +55,15 @@ jobs:
           fi
       - uses: taiki-e/install-action@v2
         with:
-          tool: just,rust-script
+          tool: just
+      - name: Install harness (the pinned revision, or the crate of a source in this repository)
+        run: |
+          value() { sed -n "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" .claude/harness.toml | head -n 1; }
+          source=$(value source)
+          rev=$(value rev)
+          case "$source" in
+            *://*|git@*) cargo install --git "$source" ${rev:+--rev "$rev"} harness --locked ;;
+            *) cargo install --path "$source/crates/harness" --locked ;;
+          esac
       - name: Check every commit of the PR
         run: just check-commits ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}

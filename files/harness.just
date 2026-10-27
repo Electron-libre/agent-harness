@@ -19,11 +19,11 @@ waive-review:
 
 # Validate a commit message against AGENTS.md (default: HEAD).
 check-commit rev="HEAD":
-    git log -1 --format=%B {{rev}} | rust-script .claude/skills/commit-message/commit_check.rs
+    git log -1 --format=%B {{rev}} | harness run commit-check
 
 # Validate every non-merge commit of base..head (used by CI on pull requests).
 check-commits base head:
-    rust-script script/check_commits.rs {{base}} {{head}}
+    harness run check-commits {{base}} {{head}}
 
 # Move a finished issue to issues/done/ and repoint the documents that cite it (only after the user agreed). `--relink` repairs old references.
 close-issue issue:

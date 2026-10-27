@@ -1,0 +1,247 @@
+//! The tools of `harness tool <name>`, run as a hook or a recipe runs them: the registry, `commit-check` and
+//! `check-commits`.
+
+use std::fs;
+use std::io::Write;
+use std::path::Path;
+use std::process::{Command, Stdio};
+
+use tempfile::{tempdir, TempDir};
+
+/// Exit code, stdout and stderr of `harness tool <args>` run in `cwd` with `stdin`.
+fn tool(cwd: &Path, args: &[&str], stdin: &str) -> (i32, String, String) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_harness"))
+        .arg("tool")
+        .args(args)
+        .current_dir(cwd)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    (
+        out.status.code().unwrap(),
+        String::from_utf8(out.stdout).unwrap(),
+        String::from_utf8(out.stderr).unwrap(),
+    )
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .env("GIT_AUTHOR_NAME", "t")
+        .env("GIT_AUTHOR_EMAIL", "t@t")
+        .env("GIT_COMMITTER_NAME", "t")
+        .env("GIT_COMMITTER_EMAIL", "t@t")
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?}");
+}
+
+/// A git repository whose `.claude/harness.toml` is `toml` (none when `None`).
+fn project(toml: Option<&str>) -> TempDir {
+    let dir = tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    if let Some(toml) = toml {
+        fs::create_dir_all(dir.path().join(".claude")).unwrap();
+        fs::write(dir.path().join(".claude/harness.toml"), toml).unwrap();
+    }
+    dir
+}
+
+// spec: BIN-7
+#[test]
+fn no_tool_or_an_unknown_one_exits_2_listing_the_tools() {
+    let dir = tempdir().unwrap();
+    for args in [&[][..], &["no-such-tool"][..]] {
+        let (code, stdout, stderr) = tool(dir.path(), args, "");
+        assert_eq!(code, 2, "{args:?}");
+        assert_eq!(stdout, "");
+        assert!(
+            stderr.contains("commit-check") && stderr.contains("check-commits"),
+            "{stderr}"
+        );
+    }
+}
+
+#[test]
+fn commit_check_enforces_each_rule_of_agents_md() {
+    let repo = project(Some("[project]\ncommit_scopes = [\"sync\"]\n"));
+    let long_line = "word ".repeat(16);
+    let cases: Vec<(&str, String, &str)> = vec![
+        (
+            "valid subject only",
+            "fix(sync): retry on 429 with backoff\n".into(),
+            "",
+        ),
+        (
+            "valid without scope",
+            "fix: handle empty repository\n".into(),
+            "",
+        ),
+        (
+            "built-in scope",
+            "docs(harness): describe the hooks\n".into(),
+            "",
+        ),
+        (
+            "body and footer",
+            "feat(sync): add progress\n\nLog one line per unit.\n\nRefs: #12\n".into(),
+            "",
+        ),
+        (
+            "Claude Code as the subject matter",
+            "docs: describe the Claude Code hooks\n\nThe Anthropic CLI runs them.\n".into(),
+            "",
+        ),
+        (
+            "subject of exactly 72 chars",
+            format!("feat(docs): {}\n", "a".repeat(72 - 12)),
+            "",
+        ),
+        (
+            "subject too long",
+            format!("feat(docs): {}\n", "a".repeat(73 - 12)),
+            "72",
+        ),
+        ("unknown type", "feature(docs): add flag\n".into(), "type"),
+        (
+            "unknown scope",
+            "feat(frontend): add flag\n".into(),
+            "scope",
+        ),
+        (
+            "capitalized description",
+            "feat(docs): Add flag\n".into(),
+            "lowercase",
+        ),
+        (
+            "trailing period",
+            "feat(docs): add flag.\n".into(),
+            "period",
+        ),
+        (
+            "missing colon format",
+            "feat(cli) add flag\n".into(),
+            "format",
+        ),
+        (
+            "no blank line before body",
+            "feat(docs): add flag\nbody here\n".into(),
+            "blank",
+        ),
+        (
+            "body line too long",
+            format!("feat(docs): add flag\n\n{long_line}\n"),
+            "72",
+        ),
+        (
+            "co-authored-by trailer",
+            "feat(docs): add flag\n\nCo-Authored-By: Someone <a@b.c>\n".into(),
+            "attribution",
+        ),
+        (
+            "generated-with line",
+            "feat(docs): add flag\n\nGenerated with Claude Code\n".into(),
+            "attribution",
+        ),
+        (
+            "markdown heading",
+            "feat(docs): add flag\n\n# Why\n".into(),
+            "markdown",
+        ),
+        (
+            "code fence",
+            "feat(docs): add flag\n\n```\nx\n```\n".into(),
+            "markdown",
+        ),
+        ("emoji", "feat(docs): add flag \u{1F680}\n".into(), "emoji"),
+    ];
+    for (name, message, hint) in cases {
+        let (code, stdout, _) = tool(repo.path(), &["commit-check"], &message);
+        if hint.is_empty() {
+            assert_eq!((code, stdout.as_str()), (0, ""), "{name}");
+        } else {
+            assert_eq!(code, 1, "{name}: {stdout}");
+            assert!(stdout.contains(hint), "{name}: {stdout}");
+        }
+    }
+}
+
+#[test]
+fn commit_check_reads_the_scopes_of_the_repository_root() {
+    let lookalike = project(Some(
+        "[project]\ncommit_scopes_extra = [\"wrong\"]\ncommit_scopes = [\"right\"]\n",
+    ));
+    let commented = project(Some(
+        "[project]\ncommit_scopes = [\n  \"a\", # a \"quote\" and a ]\n  \"b\",\n]\n",
+    ));
+    let nested = project(Some("[project]\ncommit_scopes = [\"deep\"]\n"));
+    fs::create_dir_all(nested.path().join("a/b")).unwrap();
+    let cases = [
+        (lookalike.path().to_path_buf(), "feat(right): add flag\n", 0),
+        (lookalike.path().to_path_buf(), "feat(wrong): add flag\n", 1),
+        (commented.path().to_path_buf(), "feat(b): add flag\n", 0),
+        (nested.path().join("a/b"), "feat(deep): add flag\n", 0),
+    ];
+    for (cwd, message, expected) in cases {
+        let (code, stdout, stderr) = tool(&cwd, &["commit-check"], message);
+        assert_eq!(code, expected, "{message}: {stdout}{stderr}");
+    }
+}
+
+#[test]
+fn commit_check_exits_2_when_the_configuration_cannot_be_read() {
+    let missing = project(None);
+    let invalid = project(Some("[project\ncommit_scopes = \n"));
+    let not_a_repo = tempdir().unwrap();
+    for (dir, hint) in [
+        (missing.path(), "harness.toml"),
+        (invalid.path(), "harness.toml"),
+        (not_a_repo.path(), "git"),
+    ] {
+        let (code, _, stderr) = tool(dir, &["commit-check"], "feat(docs): add flag\n");
+        assert_eq!(code, 2, "{stderr}");
+        assert!(
+            stderr.starts_with("error: ") && stderr.contains(hint),
+            "{stderr}"
+        );
+    }
+}
+
+#[test]
+fn check_commits_validates_every_non_merge_commit_of_the_range() {
+    let repo = project(Some("[project]\ncommit_scopes = []\n"));
+    let commit = |message: &str| {
+        git(
+            repo.path(),
+            &["commit", "-q", "--allow-empty", "-m", message],
+        );
+    };
+    commit("chore: start");
+    git(repo.path(), &["tag", "base"]);
+    commit("feat: add a thing");
+    let (code, stdout, _) = tool(repo.path(), &["check-commits", "base", "HEAD"], "");
+    assert_eq!(code, 0, "{stdout}");
+
+    commit("Bad subject.");
+    let (code, stdout, _) = tool(repo.path(), &["check-commits", "base", "HEAD"], "");
+    assert_eq!(code, 1);
+    assert_eq!(stdout.matches("== ").count(), 2, "{stdout}");
+    assert!(stdout.contains("format must be"), "{stdout}");
+
+    let (code, _, stderr) = tool(repo.path(), &["check-commits", "base"], "");
+    assert_eq!(code, 2);
+    assert!(stderr.contains("usage"), "{stderr}");
+}

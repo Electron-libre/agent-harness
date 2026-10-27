@@ -27,3 +27,68 @@ binaries downloaded by `harness`, so the only prerequisites are the `harness` bi
 # Hints
 * Depends on `propagate_new_hook_declarations_on_sync`: the hook commands change in every project's settings.
 * The pinned `rev` must select the binary too, or a project runs hooks of another revision than its files.
+
+# Specs
+* [`specs/tool-binaries.md`](../specs/tool-binaries.md) (BIN); the ported tools keep their specs (REV, CLG, PAR, CLR,
+  EVA, RER, QUA, REP, BRE), whose traces move to cargo tests.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The scripts become modules of the `harness` crate, run as `harness run <tool>`, which executes the binary of the pinned
+commit from a cache, fetched from a release (SHA-256 checked) or built with `cargo` when none exists. Measured: start
+time is not the cost (warm 3-6 ms vs 1 ms, cold 2-3.5 s once per script, 0.4 s per new worktree); the prerequisites are.
+Means differ from the issue: no `rust-script` fallback, this repository builds its own crate (`source = "."`, BIN-6).
+
+## Plan
+1. [x] Launcher: `harness run` (registry, local build, cache, curl fetch with digest, atomic install, cargo fallback),
+   prefetch in `sync`/`update`, first tool ported (`commit-check`, `check-commits`); verified by cargo tests with fake
+   `curl`/`cargo` on `PATH`; makes true BIN-1 to BIN-7, BIN-10, BIN-11.
+2. [ ] Release workflow: build `harness` for each platform on each push to the main branch, publish the asset and its
+   SHA-256 in the release of the commit; the CI of `files/` installs `harness` from it; verified by its first run
+   after a push (not testable offline).
+3. [ ] Hooks: `require_code_review`, `clippy_gate`, `format_rust` ported with their tests (REV, CLG traces), entries
+   commands and the `pre-commit` gate on `harness run`; makes true BIN-9 and part of BIN-8.
+4. [ ] Issue workflow: `next_issue`, `issue_worktree`, `close_issue`, `repo_files` ported with their tests (PAR).
+5. [ ] Checks: `check_specs`, `check_issue` ported with their tests (CLR); this repository's `check-specs` keeps working.
+6. [ ] Transcript readers and `audit_sources` ported with their tests (EVA, RER, QUA, REP, BRE); stamps removed;
+   ADR 0006 marked superseded.
+7. [ ] No `rust-script` left: recipes, skills, seed allow rule, CI, `test-harness` (the content tests `test_skills`,
+   `test_recipes`, `test_settings` become cargo tests of this repository), README and architecture; a test fails on
+   any `rust-script` in `files/`, `entries/`, `seed/`; makes true BIN-8, spec `accepted`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 95113afff8717c5944eee5964c10c04acdbddbc0
+- The tools are subcommands of `harness` (one artifact per commit), not a second binary.
+- A binary is published for every push to the main branch, in a release named after the commit.
+- Platforms: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin`.
+- The script tests become `cargo test` of this repository; consumers lose `just test-harness`.
+- Release asset naming: release `harness-<commit>`, assets `harness-<target>` and `harness-<target>.sha256` (raw
+  binary, no archive: nothing to unpack). A source not on GitHub is built with `cargo install`.
+- Spec amended while designing the launcher: BIN-5 builds with `cargo install --git`, BIN-12 (a local source that
+  does not compile runs its last good build, else the hooks would all block), BIN-13 (a failed prefetch of
+  `sync`/`update` is a warning).
+- This machine's `harness` (`~/.cargo/bin`) predates `run`: `just check-commit` needs `just install` once the
+  deliverable is merged (before that, `cargo run -q -p harness -- run commit-check`).
+
+## Deliverable 1
+- done: `harness run`/`harness tool`, launcher with cache, download + digest, `cargo install` fallback, local build
+  with last good copy, prefetch in `sync`/`update`; `commit-check` and `check-commits` ported, their scripts removed,
+  recipes, skill and CI job switched.
+
+| check | result |
+|---|---|
+| tests (`just check`) | pass |
+| lint | pass |
+| specs | pass (BIN draft, BIN-1 to 7, 10 to 13 traced) |
+| `just test-harness` | pass |
+| docs | README, architecture (Tools and their binary), CLAUDE.md, update-docs map, ADR 0010 accepted |
+
+- red: none obtained before the code (the code was written first); the first run of the launcher tests failed on the
+  fixture (fake tool exit argument, then `ETXTBSY` on a script written in-process), not on the code.
+- Code review: no findings (its one doubt, a prefetch under `update --dry-run`, cannot happen: `applied` is false then).
+- not verified: a real download from GitHub (no release yet, deliverable 2); the CI commits job.
+- decisions needed: none.

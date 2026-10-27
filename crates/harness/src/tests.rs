@@ -7,6 +7,7 @@ use super::*;
 
 mod install_gate;
 mod retention;
+mod run;
 mod settings_entries;
 
 fn put(dir: &Path, rel: &str, text: &str) {

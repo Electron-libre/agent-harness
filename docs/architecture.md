@@ -24,6 +24,25 @@ Everything that differs between projects is a value, not code. Scripts read list
 `update-docs` lives in the project's `.claude/update-docs-map.md`. Anything else that is project-specific
 (quality benchmark, smoke test, the language-specific recipes of the `justfile`) stays in the project.
 
+## Tools and their binary
+
+The tools of the harness move from `rust-script` files to modules of the `harness` crate
+([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec [`specs/tool-binaries.md`](../specs/tool-binaries.md));
+`commit-check` and `check-commits` are ported, the other scripts still run under `rust-script`. A hook, a recipe or a
+skill calls `harness run <tool> [args]`. The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds
+the nearest `.claude/harness.toml` from the current directory and replaces itself (`exec`) by
+`<binary> tool <tool> [args]`, so input, output and exit code are the tool's (`crates/harness/src/tools/`, one module
+per tool, listed in `TOOLS`).
+
+- Git source: the binary of the pinned commit and the platform, `<cache>/harness/bin/<commit>/<target>/harness`. When
+  missing, `curl` downloads the asset `harness-<target>` of the release `harness-<commit>` of a GitHub source and its
+  `.sha256`; a digest mismatch fails and installs nothing. Any other failure falls back to
+  `cargo install --git <source> --rev <commit> --locked`. The file is written next to its place and renamed, so a
+  concurrent hook never runs half a binary. `sync` and `update` fetch it ahead (a failure is a warning).
+- Local directory source (this repository): `cargo build -p harness` of the source on each call (about 40 ms when
+  nothing changed), whose binary also goes to `<cache>/harness/bin/local-<hash of the path>/harness`; when the working
+  tree does not compile, that last good build runs, with a warning, so the hooks keep working.
+
 ## Hooks and their declaration
 
 The hooks are managed (`files/.claude/hooks/`) but Claude Code runs them only once declared in
@@ -48,7 +67,7 @@ gives the event, the matcher (the `Declare:` line of the hook's header) and the 
 `entries/.claude/settings.json` in the source.
 
 No hook guards the attribution: the seeded settings turn it off at the source (`"attribution": {"commit": "", "pr": "",
-"sessionUrl": false}`), `commit_check.rs` rejects a credit line in a message (run by `skill:commit-message` and by CI
+"sessionUrl": false}`), `harness run commit-check` rejects a credit line in a message (run by `skill:commit-message` and by CI
 through `just check-commits`), and `harness check` warns of settings that leave it on.
 
 The transcripts of the sessions are what the harness is evaluated from, across several of its revisions, and Claude

@@ -23,7 +23,9 @@ pub const LOCK: &str = ".claude/harness.lock";
 
 mod entries;
 mod gate;
+pub mod run;
 mod settings;
+pub mod tools;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SyncOptions {
@@ -482,7 +484,26 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
 /// # Errors
 /// When the configuration or the source cannot be read, or a file cannot be written.
 pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
-    sync_from(root, &source_dir(None, root, None)?, options)
+    let dir = source_dir(None, root, None)?;
+    let mut report = sync_from(root, &dir, options)?;
+    let (source, _) = source_and_rev(root)?;
+    if is_git_url(&source) && !options.dry_run {
+        let commit = git_output(&dir, &["rev-parse", "HEAD"])?;
+        report.warnings.extend(prefetch(
+            &cache_dir()?,
+            &source,
+            &commit,
+            &run::Programs::default(),
+        ));
+    }
+    Ok(report)
+}
+
+/// Fetch the tools binary of `commit` into the cache, as `harness run` would: a warning when it fails (BIN-13).
+fn prefetch(cache: &Path, source: &str, commit: &str, programs: &run::Programs) -> Option<String> {
+    run::binary_of(cache, source, commit, programs)
+        .err()
+        .map(|e| format!("warning: {e:#} (`harness run` will try again)"))
 }
 
 fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report> {
@@ -627,7 +648,17 @@ pub struct UpdateReport {
 /// # Errors
 /// When the source is a local directory, the revision is unknown, or the configuration or sync fails.
 pub fn update(root: &Path, rev: Option<&str>, options: &SyncOptions) -> Result<UpdateReport> {
-    update_in(None, root, rev, options)
+    let mut done = update_in(None, root, rev, options)?;
+    if done.applied {
+        let (source, _) = source_and_rev(root)?;
+        done.sync.warnings.extend(prefetch(
+            &cache_dir()?,
+            &source,
+            &done.rev,
+            &run::Programs::default(),
+        ));
+    }
+    Ok(done)
 }
 
 fn update_in(

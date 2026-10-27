@@ -1,0 +1,279 @@
+//! `harness run <tool>`: run a tool of the harness with the `harness` binary of the revision the project pins
+//! (spec `specs/tool-binaries.md`, ADR 0010).
+//!
+//! The installed `harness` is only a launcher. With a git source it executes the binary cached for the pinned commit and
+//! the platform, `<cache>/harness/bin/<commit>/<target>/harness`, fetched once: the release asset of the commit
+//! (GitHub sources, SHA-256 checked), else built by `cargo install`. With a local directory source (the repository
+//! that develops the tools) it builds that directory's crate with `cargo build`, and keeps a copy of the last good build
+//! so that a working tree that does not compile does not block every hook. The binary then runs `harness tool <name>`.
+
+use std::ffi::OsString;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use anyhow::{bail, Context, Result};
+
+use crate::{
+    cache_dir, fetch, hash, is_full_hash, is_git_url, resolve_in, set_executable, source_and_rev,
+    CONFIG,
+};
+
+/// The external programs the launcher runs, replaced by fakes in the tests.
+#[derive(Clone, Debug)]
+pub struct Programs {
+    pub curl: OsString,
+    pub cargo: OsString,
+}
+
+impl Default for Programs {
+    fn default() -> Self {
+        Self {
+            curl: "curl".into(),
+            cargo: "cargo".into(),
+        }
+    }
+}
+
+/// The platform the release assets are named after.
+#[must_use]
+pub fn target() -> String {
+    let os = match std::env::consts::OS {
+        "linux" => "unknown-linux-gnu",
+        "macos" => "apple-darwin",
+        other => other,
+    };
+    format!("{}-{os}", std::env::consts::ARCH)
+}
+
+/// The nearest directory from `start` up that holds `.claude/harness.toml`.
+fn project_root(start: &Path) -> Result<PathBuf> {
+    let start = fs::canonicalize(start).with_context(|| format!("reading {}", start.display()))?;
+    start
+        .ancestors()
+        .find(|dir| dir.join(CONFIG).is_file())
+        .map(Path::to_path_buf)
+        .with_context(|| {
+            format!(
+                "no {CONFIG} in {} or above: run `harness init <source>`",
+                start.display()
+            )
+        })
+}
+
+/// The command that runs `tool` with `args` for the project holding `start`: the binary of the pinned revision,
+/// fetched or built first when needed (BIN-1).
+///
+/// # Errors
+/// When the project has no configuration, or the binary can be neither fetched nor built.
+pub fn command(
+    start: &Path,
+    cache: Option<&Path>,
+    programs: &Programs,
+    tool: &[OsString],
+) -> Result<Command> {
+    let root = project_root(start)?;
+    let cache = match cache {
+        Some(cache) => cache.to_path_buf(),
+        None => cache_dir()?,
+    };
+    let (source, rev) = source_and_rev(&root)?;
+    let binary = if is_git_url(&source) {
+        let commit = match rev {
+            Some(rev) if is_full_hash(&rev) => rev,
+            rev => resolve_in(&fetch(&cache, &source)?, &source, rev.as_deref())?,
+        };
+        binary_of(&cache, &source, &commit, programs)?
+    } else {
+        local_binary(&root.join(&source), &cache, programs)?
+    };
+    let mut cmd = Command::new(binary);
+    cmd.arg("tool").args(tool);
+    Ok(cmd)
+}
+
+/// Where the binary of `commit` for this platform is cached.
+fn cached(cache: &Path, commit: &str) -> PathBuf {
+    cache
+        .join("harness")
+        .join("bin")
+        .join(commit)
+        .join(target())
+        .join("harness")
+}
+
+/// The cached binary of `commit`, downloaded or built first when missing (BIN-2 to BIN-5, BIN-10, BIN-11).
+///
+/// # Errors
+/// When the downloaded asset does not match its digest, or it cannot be downloaded nor built.
+pub fn binary_of(cache: &Path, source: &str, commit: &str, programs: &Programs) -> Result<PathBuf> {
+    let binary = cached(cache, commit);
+    if binary.is_file() {
+        return Ok(binary);
+    }
+    let dir = binary.parent().expect("a cached binary has a directory");
+    fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    let staging = Staging::new(dir)?;
+    let target = target();
+    if let Some(url) = asset_url(source, commit, &target) {
+        if let Some(digest) = download(programs, &url, &staging.path)? {
+            let actual = hash(&fs::read(&staging.path)?);
+            if digest != actual {
+                bail!("the harness binary of {commit} for {target} does not match its published SHA-256 ({actual} instead of {digest}): not installed");
+            }
+            return staging.install(&binary);
+        }
+    }
+    if build(programs, source, commit, &staging.path)? {
+        return staging.install(&binary);
+    }
+    bail!("no harness binary for {commit} on {target}: no release asset, and `cargo` is missing or failed to build it; run `harness update` to pin a published revision, or install Rust")
+}
+
+/// `https://github.com/<owner>/<repo>/releases/download/harness-<commit>/harness-<target>` for a GitHub source.
+fn asset_url(source: &str, commit: &str, target: &str) -> Option<String> {
+    let path = source
+        .strip_prefix("https://github.com/")
+        .or_else(|| source.strip_prefix("git@github.com:"))
+        .or_else(|| source.strip_prefix("ssh://git@github.com/"))?;
+    let path = path.trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    Some(format!(
+        "https://github.com/{path}/releases/download/harness-{commit}/harness-{target}"
+    ))
+}
+
+/// Download `url` to `to` and its digest from `<url>.sha256`; `None` when either cannot be downloaded.
+fn download(programs: &Programs, url: &str, to: &Path) -> Result<Option<String>> {
+    let curl = |extra: &[&std::ffi::OsStr], url: &str| {
+        Command::new(&programs.curl)
+            .args(["--fail", "--silent", "--location"])
+            .args(extra)
+            .arg(url)
+            .stderr(Stdio::null())
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+    };
+    if curl(&["--output".as_ref(), to.as_os_str()], url).is_none() {
+        return Ok(None);
+    }
+    Ok(curl(&[], &format!("{url}.sha256")).and_then(|out| {
+        String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .next()
+            .map(str::to_ascii_lowercase)
+    }))
+}
+
+/// Build `harness` of `commit` with `cargo install` and put it at `to`; false when cargo is missing or fails.
+fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> Result<bool> {
+    let root = to.with_extension("root");
+    let built = Command::new(&programs.cargo)
+        .args([
+            "install", "--quiet", "--locked", "--git", source, "--rev", commit, "--root",
+        ])
+        .arg(&root)
+        .arg("harness")
+        .stdout(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+        && fs::rename(root.join("bin").join("harness"), to).is_ok();
+    let _ = fs::remove_dir_all(&root);
+    Ok(built)
+}
+
+/// A file being written next to its final place, removed unless installed.
+struct Staging {
+    path: PathBuf,
+}
+
+impl Staging {
+    fn new(dir: &Path) -> Result<Self> {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        Ok(Self {
+            path: dir.join(format!(".partial-{}-{nanos}", std::process::id())),
+        })
+    }
+
+    /// Make the staged file executable and rename it to `to`, so no reader sees it partly written (BIN-4).
+    fn install(self, to: &Path) -> Result<PathBuf> {
+        set_executable(&self.path, true)?;
+        fs::rename(&self.path, to).with_context(|| format!("installing {}", to.display()))?;
+        Ok(to.to_path_buf())
+    }
+}
+
+impl Drop for Staging {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+        let _ = fs::remove_dir_all(self.path.with_extension("root"));
+    }
+}
+
+/// The binary of the crate of a local source: built now, else the last good build (BIN-6, BIN-12).
+fn local_binary(source: &Path, cache: &Path, programs: &Programs) -> Result<PathBuf> {
+    let source = fs::canonicalize(source)
+        .with_context(|| format!("reading the source {}", source.display()))?;
+    let dir = cache.join("harness").join("bin").join(format!(
+        "local-{}",
+        &hash(source.as_os_str().as_encoded_bytes())[..12]
+    ));
+    let last_good = dir.join("harness");
+    let out = Command::new(&programs.cargo)
+        .args([
+            "build",
+            "--quiet",
+            "--message-format=json-render-diagnostics",
+            "-p",
+            "harness",
+            "--manifest-path",
+        ])
+        .arg(source.join("Cargo.toml"))
+        .stdin(Stdio::null())
+        .output();
+    let built = out
+        .as_ref()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+                .filter(|m| m["target"]["name"] == "harness")
+                .find_map(|m| m["executable"].as_str().map(PathBuf::from))
+        });
+    if let Some(built) = built {
+        keep(&built, &dir, &last_good)?;
+        return Ok(built);
+    }
+    let errors = match &out {
+        Ok(o) => String::from_utf8_lossy(&o.stderr).into_owned(),
+        Err(e) => format!("cannot run cargo: {e}\n"),
+    };
+    if last_good.is_file() {
+        eprintln!(
+            "harness: the build of {} failed, running its last good build",
+            source.display()
+        );
+        return Ok(last_good);
+    }
+    bail!(
+        "{errors}the build of {} failed and it has no earlier build",
+        source.display()
+    )
+}
+
+/// Copy `built` to `last_good` when it is newer, through a rename.
+fn keep(built: &Path, dir: &Path, last_good: &Path) -> Result<()> {
+    let modified = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
+    if last_good.is_file() && modified(last_good) >= modified(built) {
+        return Ok(());
+    }
+    fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    let staging = Staging::new(dir)?;
+    fs::copy(built, &staging.path).with_context(|| format!("copying {}", built.display()))?;
+    staging.install(last_good).map(drop)
+}

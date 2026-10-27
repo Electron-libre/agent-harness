@@ -14,7 +14,13 @@ harness check                      # fails if a managed file was modified or del
                                    # warns when .claude/settings.json lacks a deny rule of the review waiver,
                                    # runs a missing hook or leaves the attribution on (sync and update warn too),
                                    # and when Claude Code keeps the transcripts less than a year
+harness run <tool> [args]          # run a tool of the harness (`commit-check`, `check-commits`) with the harness
+                                   # binary of the pinned revision, fetched (release) or built once into the cache;
+                                   # `harness run` alone lists the tools
 ```
+
+With a local directory source (this repository), `harness run` builds the source's crate with `cargo`, so a hook runs
+the tools of the working tree, or of the last build that compiled.
 
 The harness is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes
 them after 30 days by default, for every project at once: keep them a year in your user settings
