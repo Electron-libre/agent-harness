@@ -31,21 +31,25 @@ const PROJECT_PREFIXES: [&str; 4] = ["", "./", "$CLAUDE_PROJECT_DIR/", "${CLAUDE
 /// has the review hook), the hooks they run that the project lacks (`present` says whether it has a path relative to
 /// its root), and an attribution left on. One warning saying why when they cannot be read or parsed.
 pub fn warnings(root: &Path, gated: bool, present: &dyn Fn(&str) -> bool) -> Vec<String> {
-    let settings = match fs::read_to_string(root.join(SETTINGS)) {
-        Err(e) if e.kind() == ErrorKind::NotFound => return Vec::new(),
-        Err(e) => return vec![format!("warning: {SETTINGS} cannot be read: {e}")],
+    match fs::read_to_string(root.join(SETTINGS)) {
+        Err(e) if e.kind() == ErrorKind::NotFound => Vec::new(),
+        Err(e) => vec![format!("warning: {SETTINGS} cannot be read: {e}")],
         Ok(text) => match serde_json::from_str::<Value>(&text) {
-            Err(e) => return vec![format!("warning: {SETTINGS} is not valid JSON: {e}")],
-            Ok(settings) => settings,
+            Err(e) => vec![format!("warning: {SETTINGS} is not valid JSON: {e}")],
+            Ok(settings) => warnings_of(&settings, gated, present),
         },
-    };
+    }
+}
+
+/// The warnings of `warnings` on the parsed `settings`, the settings as a sync leaves them (SYN-27).
+pub fn warnings_of(settings: &Value, gated: bool, present: &dyn Fn(&str) -> bool) -> Vec<String> {
     let mut warnings = if gated {
-        missing_deny_rules(&settings)
+        missing_deny_rules(settings)
     } else {
         Vec::new()
     };
-    warnings.extend(missing_hooks(&settings, present));
-    if !attribution_off(&settings) {
+    warnings.extend(missing_hooks(settings, present));
+    if !attribution_off(settings) {
         warnings.push(format!(
             "warning: {SETTINGS} does not turn off the attribution"
         ));

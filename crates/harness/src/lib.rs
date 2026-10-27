@@ -20,6 +20,7 @@ pub const CONFIG: &str = ".claude/harness.toml";
 /// Hashes of the managed files as last written, relative to the project root.
 pub const LOCK: &str = ".claude/harness.lock";
 
+mod entries;
 mod gate;
 mod settings;
 
@@ -150,32 +151,52 @@ fn is_inside(rel: &str) -> bool {
         .all(|c| matches!(c, Component::Normal(_)))
 }
 
+/// What the lock records: the fingerprint of each managed file, and the managed entries of the settings.
+#[derive(Debug, Default)]
+struct Lock {
+    files: BTreeMap<String, String>,
+    entries: Vec<entries::Entry>,
+}
+
+/// The mark of a lock line that holds a managed entry of the settings instead of a file.
+const ENTRY: &str = "entry";
+
 /// The lock of the project, `None` when it has none yet.
-fn read_lock(root: &Path) -> Result<Option<BTreeMap<String, String>>> {
+fn read_lock(root: &Path) -> Result<Option<Lock>> {
     let path = root.join(LOCK);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
     };
-    let mut lock = BTreeMap::new();
+    let mut lock = Lock::default();
     for line in text.lines().filter(|l| !l.starts_with('#')) {
         let Some((h, rel)) = line.split_once("  ") else {
             continue;
         };
+        if h == ENTRY {
+            let entry = entries::Entry::from_lock(rel)
+                .with_context(|| format!("reading {}", path.display()))?;
+            lock.entries.push(entry);
+            continue;
+        }
         if !is_inside(rel) {
             bail!("{}: path outside the project: {rel}", path.display());
         }
-        lock.insert(rel.to_string(), h.to_string());
+        lock.files.insert(rel.to_string(), h.to_string());
     }
     Ok(Some(lock))
 }
 
-fn write_lock(root: &Path, lock: &BTreeMap<String, String>) -> Result<()> {
-    let mut text =
-        String::from("# Written by `harness sync`: hashes of the managed files. Do not edit.\n");
-    for (path, h) in lock {
+fn write_lock(root: &Path, lock: &Lock) -> Result<()> {
+    let mut text = String::from(
+        "# Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
+    );
+    for (path, h) in &lock.files {
         text.push_str(&format!("{h}  {path}\n"));
+    }
+    for entry in &lock.entries {
+        text.push_str(&format!("{ENTRY}  {}\n", entry.to_lock()));
     }
     write(&root.join(LOCK), text.as_bytes())
 }
@@ -472,7 +493,11 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
             source.display()
         );
     }
-    let lock = read_lock(root)?.unwrap_or_default();
+    let Lock {
+        files: lock,
+        entries: recorded,
+    } = read_lock(root)?.unwrap_or_default();
+    let wanted = entries::of_source(source)?;
     // decided first: a hook of the user that cannot be chained stops the sync before it writes anything
     let files = list(&managed)?;
     let gate = gate::plan(root, files.iter().any(|f| f == gate::REVIEW_HOOK))?;
@@ -545,10 +570,24 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
         report.entries.push((rel, Outcome::Seeded));
     }
 
+    // after the seeds: a first sync merges into the settings it was just seeded with, written or not
+    let seeded = report.outcome(entries::SETTINGS) == Some(Outcome::Seeded);
+    let base = if seeded { &seeds } else { root };
+    let text = fs::read_to_string(base.join(entries::SETTINGS)).ok();
+    let merge = entries::merge(text.as_deref(), &wanted, &recorded);
+    if let (Some(text), false) = (&merge.write, options.dry_run) {
+        write(&root.join(entries::SETTINGS), text.as_bytes())?;
+    }
+    report.entries.extend(merge.outcomes);
+
     if let Some(gate) = gate {
         report.entries.extend(gate.outcomes());
     }
 
+    let new_lock = Lock {
+        files: new_lock,
+        entries: merge.lock,
+    };
     if !options.dry_run {
         write_lock(root, &new_lock)?;
     }
@@ -557,7 +596,12 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let present = |path: &str| {
         done(path, Outcome::Added) || (root.join(path).is_file() && !done(path, Outcome::Removed))
     };
-    report.warnings = settings::warnings(root, new_lock.contains_key(gate::REVIEW_HOOK), &present);
+    let gated = new_lock.files.contains_key(gate::REVIEW_HOOK);
+    report.warnings = match &merge.settings {
+        Some(settings) => settings::warnings_of(settings, gated, &present),
+        None => settings::warnings(base, gated, &present),
+    };
+    report.warnings.extend(merge.warning);
     Ok(report)
 }
 
@@ -685,8 +729,9 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
         bail!("no {LOCK}: run `harness sync` first");
     };
-    let gated = lock.contains_key(gate::REVIEW_HOOK);
+    let gated = lock.files.contains_key(gate::REVIEW_HOOK);
     let problems = lock
+        .files
         .iter()
         .filter_map(|(rel, locked)| match fingerprint_of(&root.join(rel)) {
             None => Some(format!("missing: {rel}")),

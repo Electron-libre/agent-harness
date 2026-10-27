@@ -468,10 +468,11 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
 
 // spec: REV-19
 #[test]
-fn the_seeded_settings_deny_the_waiver_to_the_agent() {
-    let seed = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../seed/.claude/settings.json");
+fn the_managed_settings_entries_deny_the_waiver_to_the_agent() {
+    let fragment =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../entries/.claude/settings.json");
     let settings: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(seed).unwrap()).unwrap();
+        serde_json::from_str(&fs::read_to_string(fragment).unwrap()).unwrap();
     let deny: Vec<&str> = settings["permissions"]["deny"]
         .as_array()
         .into_iter()
@@ -625,33 +626,6 @@ fn check_warns_when_the_settings_leave_the_attribution_on() {
         warnings(r#"{"attribution": {"commit": "", "pr": "", "sessionUrl": false}}"#).is_empty()
     );
     assert!(check_with(root.path(), false).unwrap().problems.is_empty());
-}
-
-// spec: SYN-25, SYN-26
-#[test]
-fn the_seeded_settings_give_check_nothing_to_warn_of() {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let root = tempdir().unwrap();
-    fs::create_dir_all(root.path().join(".claude/hooks")).unwrap();
-    fs::copy(
-        repo.join("seed/.claude/settings.json"),
-        root.path().join(".claude/settings.json"),
-    )
-    .unwrap();
-    for entry in fs::read_dir(repo.join("files/.claude/hooks")).unwrap() {
-        let entry = entry.unwrap();
-        if entry.file_type().unwrap().is_file() {
-            fs::copy(
-                entry.path(),
-                root.path().join(".claude/hooks").join(entry.file_name()),
-            )
-            .unwrap();
-        }
-    }
-    assert_eq!(
-        settings::warnings(root.path(), true, &|path| root.path().join(path).is_file()),
-        Vec::<String>::new()
-    );
 }
 
 const GONE: &str = "warning: .claude/settings.json runs the missing hook .claude/hooks/gone.rs";

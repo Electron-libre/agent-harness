@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(just waive-review)",
+      "Bash(just waive-review *)",
+      "Edit(//**/claude-review-waived)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs check"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs record"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_rust.rs"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/clippy_gate.rs",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

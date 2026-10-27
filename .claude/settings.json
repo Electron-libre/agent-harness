@@ -1,5 +1,9 @@
 {
-  "attribution": { "commit": "", "pr": "", "sessionUrl": false },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
   "permissions": {
     "allow": [
       "Bash(cargo build *)",
@@ -38,7 +42,10 @@
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs check" }
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs check"
+          }
         ]
       }
     ],
@@ -46,20 +53,30 @@
       {
         "matcher": "Skill",
         "hooks": [
-          { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs record" }
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs record"
+          }
         ]
       },
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_rust.rs" }
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_rust.rs"
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/clippy_gate.rs", "timeout": 600 }
+          {
+            "type": "command",
+            "command": "rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/clippy_gate.rs",
+            "timeout": 600
+          }
         ]
       }
     ]

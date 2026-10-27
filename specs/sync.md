@@ -1,7 +1,7 @@
 ---
 id: SYN
-status: accepted
-adrs: [0002, 0004, 0005]
+status: draft
+adrs: [0002, 0004, 0005, 0007]
 ---
 
 # Harness synchronisation
@@ -16,7 +16,7 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-1** (deterministic) `sync` must copy every file under the source's `files/` to the same relative path of the project, executable bit included, and `check` must report a changed executable bit as a modification.
 - **SYN-2** (deterministic) `sync` must overwrite a managed file that was not modified locally since the last sync when the source changed.
 - **SYN-3** (deterministic) `sync` must not overwrite a managed file modified locally, must report it as a conflict and must fail, unless `--force` is given.
-- **SYN-4** (deterministic) `sync` must copy a file under the source's `seed/` only when the project does not have it yet, and must never touch it afterwards.
+- **SYN-4** (deterministic) `sync` must copy a file under the source's `seed/` only when the project does not have it yet, and must never touch it afterwards, except the managed entries of `.claude/settings.json` (SYN-29).
 - **SYN-5** (deterministic) `sync` must delete a managed file the source dropped when it was not modified locally, and must keep it, no longer managed, when it was.
 - **SYN-6** (deterministic) `sync` must be idempotent: a second run reports nothing and leaves the project byte-identical.
 - **SYN-7** (deterministic) `sync --dry-run` must report what it would do and must not write anything, lock included.
@@ -37,11 +37,19 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-21** (deterministic) For a linked worktree, or a project whose `.git` is a file, the gate must be installed in the `hooks` directory of the common git directory.
 - **SYN-22** (deterministic) When `core.hooksPath` is set for the project, `sync` must install nothing, report that the native gate is not installed and why, and succeed; a project that is not a git repository, or has no `.claude/hooks/require_code_review.rs`, gets no gate and no error.
 - **SYN-23** (deterministic) `check` must report `missing: native review gate` when the project is a git repository that has the review hook among its managed files (even deleted since), whose hooks directory lacks the managed gate and where `core.hooksPath` is unset, and `modified: native review gate` when it differs; it must not report it otherwise, nor when the `CI` environment variable is set (a fresh clone of a CI run has no git hooks and nobody commits there).
-- **SYN-24** (deterministic) `check` must print `warning: .claude/settings.json lacks the deny rule <rule>` for each rule of REV-19 (`specs/review-gate.md`) that the `permissions.deny` list of the project's `.claude/settings.json` lacks, when the project has the review hook among its managed files and that settings file exists; the warning goes to stderr and must not make `check` fail. Seeded once, the settings file is never rewritten by `sync`, so this is how an existing project learns of a rule added later.
+- **SYN-24** (deterministic) `check` must print `warning: .claude/settings.json lacks the deny rule <rule>` for each rule of REV-19 (`specs/review-gate.md`) that the `permissions.deny` list of the project's `.claude/settings.json` lacks, when the project has the review hook among its managed files and that settings file exists; the warning goes to stderr and must not make `check` fail. `sync` adds the rules the source manages (SYN-29); this is how a project whose rule was removed by hand, or whose source does not manage it, learns of it.
 - **SYN-25** (deterministic) `check` must print `warning: .claude/settings.json runs the missing hook <path>` for each hook command of the `hooks` table of the project's `.claude/settings.json` that names a file under `.claude/hooks/` the project does not have, when that settings file exists; the warning goes to stderr and must not make `check` fail. A hook the source dropped is deleted by `sync` (SYN-5), but the seeded settings keep running it.
 - **SYN-26** (deterministic) `check` must print `warning: .claude/settings.json does not turn off the attribution` when the project's `.claude/settings.json` exists and its `attribution` is neither `false` nor an object whose `commit` and `pr` are both empty strings; the warning goes to stderr and must not make `check` fail.
 - **SYN-27** (deterministic) `sync` and `update` must print the warnings of SYN-24 to SYN-26 to stderr, once, judged on the project as the sync leaves it, and must not fail because of them: a hook the sync removed is missing, one it added is present. Under `--dry-run` they must judge the project as the sync would leave it, writing nothing. The deleting `sync` is how a project loses a hook its settings still run (SYN-5): it must say so at once, not at the next `check`.
 - **SYN-28** (deterministic) `check`, `sync` and `update` must print `warning: the transcripts are deleted after <n> days (cleanupPeriodDays); set it to at least 365 in <user settings>` when the `cleanupPeriodDays` of the user settings (`settings.json` in `CLAUDE_CONFIG_DIR`, or else in `~/.claude`) is missing, not a number or below 365 (`<n>` is 30, the default, when it is missing or not a number), and `warning: <file> sets cleanupPeriodDays to <n> days, below 365` for each of the project's `.claude/settings.json` and `.claude/settings.local.json` that sets a number below 365; the warning goes to stderr, comes out once, must not make them fail, and is not printed when the `CI` environment variable is set. Claude Code deletes the transcripts of every project after this period, with the value of whichever session sweeps: the evaluation of the harness reads them over several revisions.
+- **SYN-29** (deterministic) When the source has `entries/.claude/settings.json`, `sync` must add to the project's `.claude/settings.json` each managed entry it lacks: each string of the fragment's `permissions.deny`, appended to the project's list, and each hook object of the fragment's `hooks` table, appended to the `hooks` of the first group of the same event with the same `matcher` (none counting as one value), or else to a new group appended to the event; the keys that are missing are created.
+- **SYN-30** (deterministic) The lock must record each managed entry of the source as `sync` leaves it, so that `check` and the next `sync` know which entries of the settings are the harness's.
+- **SYN-31** (deterministic) `sync` must remove from the project's settings each entry the lock recorded that the source no longer manages, when the settings still hold it unchanged (JSON equality, key order ignored); a group left with no hook is removed, and so is an event left with no group. A hook whose command or options changed in the source is the removal of the old entry and the addition of the new one.
+- **SYN-32** (deterministic) `sync` must leave every other key, value and entry of the settings as the project wrote it, key order included, and must not write the file when it adds and removes nothing (SYN-6); when it writes it, the file is JSON indented by two spaces, one key or element per line, ending with a newline.
+- **SYN-33** (deterministic) An entry the lock recorded that the settings no longer hold unchanged (removed or edited by the project) and that the source still manages must be reported as a conflict on `.claude/settings.json <entry>` and make `sync` fail like a conflicting file (SYN-3), the entry not added back, unless `--force` is given, which adds it back.
+- **SYN-34** (deterministic) `sync` must print each entry it adds or removes as `<outcome>: .claude/settings.json <entry>` (`<entry>` is `deny <rule>` or `hook <event> <matcher> <command>`, the matcher left out when the group has none), and `--dry-run` must print the same lines and write nothing.
+- **SYN-35** (deterministic) When the project's `.claude/settings.json` is missing (once the seeds are copied), cannot be read, is not valid JSON or does not have the shape of SYN-29, `sync` must not touch it, must keep the entries the lock recorded and must not fail because of it; a warning on stderr says why when the file exists.
+- **SYN-36** (deterministic) `check` must print `missing: .claude/settings.json <entry>` for each entry the lock recorded that the settings no longer hold unchanged, and nothing for the other entries of the settings.
 
 ## Scenarios
 
@@ -60,6 +68,9 @@ by hand, and learns at once when a managed file drifted from it.
 - (SYN-22) Given `core.hooksPath` set to a versioned directory, then `sync` leaves it untouched and says the gate is not installed there.
 - (SYN-28) Given user settings that exist but cannot be read or are not valid JSON, then the warning is `warning: <user settings> cannot be read or is not valid JSON; Claude Code pauses the cleanup of the transcripts until it is fixed`, not the retention one: the value in force is unknown.
 - (SYN-28) Given neither `CLAUDE_CONFIG_DIR` nor `HOME` set (or both empty), then the warning is `warning: the user settings cannot be located (set HOME or CLAUDE_CONFIG_DIR); the retention of the transcripts is not checked`.
+- (SYN-29) Given a project whose settings already hold a managed hook in a group with other hooks of its own, when `sync` runs, then nothing is added and the file is not written.
+- (SYN-29) Given a fragment hook whose matcher matches no group of the project, then it is appended in a new group `{"matcher": ..., "hooks": [hook]}` at the end of its event.
+- (SYN-31) Given a source that switches a hook from `rust-script` to a prebuilt binary, when `sync` runs on a project that kept the old declaration unchanged, then the old hook object is replaced by the new one in the same group, one removal and one addition reported.
 
 ## Non-goals
 
@@ -70,3 +81,5 @@ by hand, and learns at once when a managed file drifted from it.
 - Rewriting the user settings: `harness` warns of the retention, the user raises it.
 - Reading the managed settings of an organisation, which can override the retention.
 - Guaranteeing that a host serves an unreferenced commit: it depends on the host.
+- Managing the keys of the settings other than `permissions.deny` and `hooks` (the attribution stays a warning, SYN-26).
+- A separate settings file read by Claude Code: it reads one shared file per project (`.claude/settings.json`) besides the personal `settings.local.json`.

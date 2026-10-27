@@ -1,4 +1,4 @@
-# Written by `harness sync`: hashes of the managed files. Do not edit.
+# Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.
 afca83926df442802f261aa7cce6f59a6b5d4313dca2233fe672b4cad5da8a40+x  .claude/hooks/clippy_gate.rs
 e19f15963cdaf97eb3fa24ce34463f9d1269627671ecccbc91799754ee4645a6+x  .claude/hooks/format_rust.rs
 d976e44da867bb4223883f010040400c451c8ad753d1b8e6e5e976a63cbe42c4  .claude/hooks/require_code_review.rs
@@ -47,3 +47,10 @@ e328be09319efaad812bfa96c5077095cd70df3916430daa4e9983818f167135  .github/workfl
 99d4b18124a2209d5cb602633ed413db0f04c6a95e0c4a72563d7f92ee9f9e5d+x  script/check_commits.rs
 3f1ee7781182c25b631f1fb493e71dc4e5eb8199572c5daf8e1359fc17be70c0  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
+entry  {"deny":"Bash(just waive-review)"}
+entry  {"deny":"Bash(just waive-review *)"}
+entry  {"deny":"Edit(//**/claude-review-waived)"}
+entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs check"}}
+entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs record"}}
+entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_rust.rs"}}
+entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/clippy_gate.rs","timeout":600}}
