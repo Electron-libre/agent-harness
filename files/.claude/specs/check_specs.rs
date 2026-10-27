@@ -2,7 +2,8 @@
 //! Validate `specs/*.md` against `specs/README.md` and trace them to the tests (`// spec: ID`).
 //! Usage: `just check-specs` (from the repo root; an optional argument is another root; `--strict` also flags the
 //! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
-//! Prints one line per problem, exit 1 if any.
+//! Prints one line per problem, exit 1 if any; a `[NEEDS CLARIFICATION: ...]` marker is a problem in an `accepted`
+//! spec and a warning on stderr in a `draft` one.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -29,6 +30,57 @@ fn is_id_prefix(s: &str) -> bool {
 fn is_req_id(s: &str) -> bool {
     s.split_once('-')
         .is_some_and(|(p, n)| is_id_prefix(p) && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+}
+
+/// `line` with the content of its inline code spans (a run of backticks up to the next run of the same length)
+/// blanked out, so a cited marker or word is not read as the spec's own.
+fn without_code_spans(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(start) = rest.find('`') {
+        out.push_str(&rest[..start]);
+        let run = rest[start..].len() - rest[start..].trim_start_matches('`').len();
+        let after = &rest[start + run..];
+        let fence = "`".repeat(run);
+        let close = after.match_indices(&fence).find(|(i, _)| !after[i + run..].starts_with('`') && !after[..*i].ends_with('`'));
+        let Some((end, _)) = close else {
+            out.push_str(&rest[start..]);
+            return out;
+        };
+        out.push(' ');
+        rest = &after[end + run..];
+    }
+    out.push_str(rest);
+    out
+}
+
+const MARKER: &str = "[NEEDS CLARIFICATION:";
+
+/// An open question left in the spec: a problem once `accepted`, a warning while `draft`. A marker cited in a code
+/// span or a fenced code block is an example, not a question.
+fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<String>) {
+    let mut fenced = false;
+    for (i, line) in lines.iter().enumerate() {
+        if line.trim_start().starts_with("```") || line.trim_start().starts_with("~~~") {
+            fenced = !fenced;
+            continue;
+        }
+        if fenced {
+            continue;
+        }
+        let text = without_code_spans(line);
+        let mut rest = text.as_str();
+        while let Some(start) = rest.find(MARKER) {
+            let after = &rest[start + MARKER.len()..];
+            let question = after.split(']').next().unwrap_or("").trim();
+            if accepted {
+                out.push(format!("{file}:{}: `{MARKER} ...]` left in an accepted spec: settle it", i + 1));
+            } else {
+                eprintln!("warning: {file}:{}: needs clarification: {question}", i + 1);
+            }
+            rest = after;
+        }
+    }
 }
 
 fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
@@ -109,6 +161,7 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         }
         spec.requirements.push(Requirement { id: id.to_string(), exempt: withdrawn || kind == "quality" });
     }
+    check_markers(file, &lines, spec.status == "accepted", out);
     spec
 }
 

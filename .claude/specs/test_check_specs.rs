@@ -92,6 +92,8 @@ fn main() {
     let stderr = case("an implemented spec passes as accepted", &implemented, TESTS, &[], None);
     report("an implemented spec is warned of", stderr.contains("warning: specs/rerun.md: status `implemented` is deprecated, use `accepted`"));
 
+    marker_checks(&case, &report);
+
     strict.set(true);
     case("strict: a managed test citing a spec the project lacks is flagged", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: PAR-1\nfn t() {}\n")], Some("PAR-1"));
     case("strict: a managed test citing a defined requirement passes", SPEC, TESTS, &[(".claude/hooks/test_h.rs", "// spec: RER-1\nfn t() {}\n")], None);
@@ -111,4 +113,22 @@ fn main() {
     if failed.get() {
         std::process::exit(1);
     }
+}
+
+/// Runs one checker case: name, spec, crate tests, other files, expected stdout text (`None`: passes); returns stderr.
+type Case<'a> = dyn Fn(&str, &str, &str, &[(&str, &str)], Option<&str>) -> String + 'a;
+
+// spec: CLR-1, CLR-2, CLR-5
+fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
+    let marked = SPEC.replace("then c.", "then c. [NEEDS CLARIFICATION: which exit code?]");
+    case("a clarification marker in an accepted spec is flagged with its line", &marked, TESTS, &[], Some("specs/rerun.md:20:"));
+    let draft = marked.replace("status: accepted", "status: draft");
+    let stderr = case("a clarification marker in a draft spec passes", &draft, "", &[], None);
+    report("a clarification marker in a draft spec is warned of with its question", stderr.contains("warning: specs/rerun.md:20: needs clarification: which exit code?"));
+    let spanned = SPEC.replace("then c.", "then c. `[NEEDS CLARIFICATION: x]` and ``a ` [NEEDS CLARIFICATION: y]``");
+    case("a clarification marker in a code span of an accepted spec passes", &spanned, TESTS, &[], None);
+    let stderr = case("a clarification marker in a code span of a draft spec passes", &spanned.replace("status: accepted", "status: draft"), "", &[], None);
+    report("a clarification marker in a code span is not warned of", !stderr.contains("needs clarification"));
+    let fenced = SPEC.replace("- None.\n", "- None.\n\n```markdown\n[NEEDS CLARIFICATION: x]\n```\n");
+    case("a clarification marker in a fenced block of an accepted spec passes", &fenced, TESTS, &[], None);
 }
