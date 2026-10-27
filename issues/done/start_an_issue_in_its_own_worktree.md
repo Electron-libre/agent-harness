@@ -52,6 +52,8 @@ directory or only creates its own.
 
 Plan: validated
 
+Status: done (2026-10-27)
+
 ## Understanding
 An agent handed an issue in the main worktree starts it in its own worktree (`just start-issue`, then Claude Code's
 `EnterWorktree` with `path`), and the hooks that run cargo act on the worktree of the event's `cwd`. Out of scope:
