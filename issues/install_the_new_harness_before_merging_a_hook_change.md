@@ -147,3 +147,5 @@ High review: 10 findings
 Code review: no findings
 
 not verified: an scp-style source (`git@host:path`) printed by `check`; `cargo_url` converts it and has its own tests.
+
+Status: done (4 deliverables, `3e35fc8`, `7ef83e8`, `f3a7882`, `d6df29e`).
