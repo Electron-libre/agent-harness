@@ -65,7 +65,7 @@ fn toml(rev: &str) -> String {
     format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"\n")
 }
 
-const ALPHA: &str = "# SECRET alpha\n\nRun the code review.\n\n# Tracking\n\n## Plan\n1. [x] SECRET one\n2. [x] two\n   3. [ ] not a plan line\n\n## Decisions\n1. [x] not in the plan\n\n## Deliverable 1\n```sh\n# a comment, not a heading\n```\n| code review | low |\n- Code review: 6 findings, 1 finding dismissed.\n- code review (low): 1 finding; second review: no findings\n- Code review: no findings.\n";
+const ALPHA: &str = "# SECRET alpha\n\nRun the code review.\n\n# Tracking\n\n## Plan\n1. [x] SECRET one\n2. [x] two\n   3. [ ] not a plan line\n\n## Decisions\n1. [x] not in the plan\n\n## Deliverable 1\n```sh\n# a comment, not a heading\n```\n| code review | low |\n- Code review: 6 findings, 1 finding dismissed.\n- code review (low): 1 finding; second review: no findings\n- Code review: no findings.\n\n# Notes\n- Code review: 4 findings, after the Tracking section.\n";
 
 /// The fixture repository: `alpha` (three commits, one fix inside, fixes and reverts after), `beta` (closed in one
 /// commit that also rewrites a citation in `alpha`), `gamma` (done in the work tree only).

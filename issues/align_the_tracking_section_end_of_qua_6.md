@@ -32,6 +32,8 @@ QUA-11 do), not at any `#` line. Out of scope: any change of the code. The exist
 ## Plan
 1. [x] Amend QUA-6: end the section at the next `# ` line outside a fence; verified by `just check` and the
    existing QUA-6 test (fixture `ALPHA` has its `Code review` lines under `## Deliverable 1`); makes true QUA-6.
+2. [x] Fixes of the `high` review: the fixture `ALPHA` gets a `Code review` line under a `# ` heading after the
+   Tracking section; verified by the QUA-6 test; makes true QUA-6.
 
 ## Decisions
 - Mode: autonomous
@@ -49,6 +51,33 @@ QUA-11 do), not at any `#` line. Out of scope: any change of the code. The exist
 | code review | low, see below |
 
 - red: none (wording only; the existing QUA-6 test already passes against the code)
+- Code review: 0 findings
+- not verified: nothing
+- decisions needed: none
+
+## High review
+`high` review of `2abdb79..7807790`: 6 findings.
+1. No test of the `# ` end of the section: fixed in deliverable 2.
+2. `~~~` and indented fences are not read as fences; 3. QUA-11 has no fence clause; 4. the heading search ignores
+   fences: outside the requirements of this issue, opened as
+   `issues/read_the_fences_of_the_issue_sections_as_the_specs_say.md`.
+5. QUA-3 and QUA-6 end their sections differently: dismissed, on purpose (`## Plan` ends at `## Decisions`, the
+   Tracking reviews span its `##` sub-headings).
+6. The issue is not closed yet: dismissed, closing is the user's call.
+
+## Deliverable 2
+- done: `ALPHA` ends with `# Notes` holding `Code review: 4 findings`, which QUA-6 must not count.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | no change needed |
+| code review | low, see below |
+
+- red: QUA-6: FAIL - each Code review line of the Tracking counts a review; FAIL - the findings of the reviews are
+  summed (against `reviews` with the `# ` end removed; the code already ends there)
 - Code review: 0 findings
 - not verified: nothing
 - decisions needed: none
