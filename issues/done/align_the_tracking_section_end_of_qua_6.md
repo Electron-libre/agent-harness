@@ -60,7 +60,7 @@ QUA-11 do), not at any `#` line. Out of scope: any change of the code. The exist
 1. No test of the `# ` end of the section: fixed in deliverable 2.
 2. `~~~` and indented fences are not read as fences; 3. QUA-11 has no fence clause; 4. the heading search ignores
    fences: outside the requirements of this issue, opened as
-   `issues/read_the_fences_of_the_issue_sections_as_the_specs_say.md`.
+   `issues/done/read_the_fences_of_the_issue_sections_as_the_specs_say.md`.
 5. QUA-3 and QUA-6 end their sections differently: dismissed, on purpose (`## Plan` ends at `## Decisions`, the
    Tracking reviews span its `##` sub-headings).
 6. The issue is not closed yet: dismissed, closing is the user's call.

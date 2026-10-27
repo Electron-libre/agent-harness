@@ -6,7 +6,7 @@ still give a wrong number instead of an honest one. Expected: the start of an is
 quoted in a fence, and a section that cannot be found gives empty columns, not zeros.
 
 # Findings
-* Found by the `high` review of `issues/read_the_fences_of_the_issue_sections_as_the_specs_say.md`.
+* Found by the `high` review of `issues/done/read_the_fences_of_the_issue_sections_as_the_specs_say.md`.
 * QUA-2 finds the oldest commit of an issue with `git log -G'^# Tracking$'` in
   `crates/harness/src/tools/delivered_quality.rs`, which does not know fences: an issue whose Goal quotes the
   template in a fence starts its commits at its creation, so `commits`, `fixes_in_issue` and `revision` count work
