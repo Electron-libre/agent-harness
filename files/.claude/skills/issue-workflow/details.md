@@ -9,6 +9,15 @@ worktree (also in a linked worktree, where the waiver is per worktree). Never cr
 yourself. Deny rules of `.claude/settings.json` refuse the recipe and an edit of the file; naming them (commit
 message, `grep`) is fine.
 
+## Split an issue
+
+An issue over the size limit of step 1 is cut where its parts can be delivered and closed alone (a launcher, then
+the tools moved to it, then the cleanup). The original file keeps the first cut: its Goal, Approach and plan are
+narrowed to it, its Findings stay. Each other cut is a new issue written with `skill:create-issue`, citing the
+original in `# Findings` and the issue it needs in `# Hints` (`after <stem>`), ranked in `issues/queue.md` right
+after the one it needs. A split at step 2 takes the deliverables of the other cuts out of the plan, and the
+new plan is validated again.
+
 ## Worktree of an issue
 
 An issue usually runs in the main worktree. For parallel work the user opens one, from the main

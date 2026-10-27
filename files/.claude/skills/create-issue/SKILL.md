@@ -43,6 +43,8 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    ```
 
    - No `# Tracking` section: the plan is written there by `issue-workflow`.
+   - Size: estimate the changed lines and deliverables the Approach implies. Over the size limit of
+     `skill:issue-workflow` step 1, write one issue per cut instead (its `details.md`, "Split an issue").
    - Confidentiality: follow the `confidential` note of `.claude/harness.toml` (what must not be named in an
      issue; describe it generically). No absolute or home paths.
 4. **Validate**, and fix the file until it prints nothing:

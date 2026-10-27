@@ -60,6 +60,11 @@ the console only shows the link and the questions.
   Small deliverables, each independently testable and committable, ordered by value and dependency. An issue that
   fits one deliverable has a one-line plan. A decision of architecture also gets its ADR draft in `docs/adr/` now. The spec and ADR drafts are
   committed with the first deliverable.
+- **Size limit**: estimate the changed lines of each deliverable (added + removed, outside `issues/` and lock
+  files). At most ~1,000 per deliverable (a `low` review reads it whole), ~3,000 and 6 deliverables per issue (the
+  `high` review reads `base..HEAD`, the context grows with each deliverable). A pure `git mv` counts as renames; a
+  move that also edits counts twice, so move in a deliverable of its own. A deliverable over the limit is cut in
+  two; an issue over it gets a split proposed at step 2 ([details.md](details.md), "Split an issue").
 
 ## 2. Validate (STOP)
 
@@ -73,6 +78,7 @@ Show, and nothing else:
   `[NEEDS CLARIFICATION: ...]` marker of the spec (warned of by `just check-specs`) is one row; the answer replaces
   the marker in the spec.
 - One line: the mode of step 3, **autonomous (default)** or a validation at each deliverable.
+- When the plan exceeds the size limit: the proposed cuts (issue, deliverables, estimated lines), as a question.
 
 **Wait for the user.** Apply their answers and corrections to the files (the answers go to `## Decisions`). When an
 answer changes the plan itself (deliverables, their order) rather than a detail, show the new plan lines and stop
