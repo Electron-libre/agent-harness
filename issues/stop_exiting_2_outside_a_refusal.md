@@ -44,7 +44,7 @@ refuses, `commit-check` on a broken setup) are out of scope: they are the tool's
 ## Plan
 1. [x] Unknown tool exits 3: `tools::run` returns 3, the list of the tools kept on stderr; verified by
    `no_tool_or_an_unknown_one_exits_3_listing_the_tools`; makes true BIN-7.
-2. [ ] Runtime error of `main` exits 3: the `Err` arm uses `CANNOT_RUN`; verified by a CLI test (`sync` with no
+2. [x] Runtime error of `main` exits 3: the `Err` arm uses `CANNOT_RUN`; verified by a CLI test (`sync` with no
    `harness.toml`, `check` with no lock source) asserting exit 3 and `error:` on stderr; makes true SYN-37.
 
 ## Decisions
@@ -68,6 +68,26 @@ untraced requirement).
 | code review | `/code-review low` |
 
 red: `assertion left == right failed: [] left: 2 right: 3`
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none
+
+### 2. Runtime error of `main` exits 3
+done: an error of `init`, `sync`, `update` or `check` prints `error: ...` and exits 3 (SYN-37, new); 1 stays a drift
+or a conflict; `docs/architecture.md` says so. No recipe or skill read exit 2 of an error.
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy clean |
+| specs | `just check-specs` green |
+| docs | `docs/architecture.md` |
+| code review | `/code-review low` |
+
+red: `["sync"]: error: no .claude/harness.toml ... left: Some(2) right: Some(3)`
 
 Code review: no findings
 

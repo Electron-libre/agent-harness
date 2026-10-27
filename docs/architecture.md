@@ -38,7 +38,8 @@ the nearest `.claude/harness.toml` from the current directory (else from `CLAUDE
 project) and replaces itself (`exec`) by `<binary> tool <tool> [args]`, so input, output and exit code are the tool's
 (`crates/harness/src/tools/`, one module per tool, listed in `TOOLS`). When it cannot get the binary it exits 3, not 2:
 Claude Code reads 2 as the refusal of a hook, and a hook that cannot run must not block the agent (BIN-14). A tool the pinned binary does not know exits 3 as well,
-listing the tools (BIN-7).
+listing the tools (BIN-7), and so does an error of `init`, `sync`, `update` or `check` (SYN-37); 1 stays a drift or a
+conflict.
 The launcher itself is not of the pinned revision: a hook command `harness <subcommand>` it does not know fails in
 its argument parser, which exits 3 like a tool it cannot get (BIN-17), so the hook does not block the agent but does
 not run either; a launcher installed before BIN-17 exits 2 there, and every hook refuses. `harness check` asks the

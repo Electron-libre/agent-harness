@@ -50,6 +50,7 @@ by hand, and learns at once when a managed file drifted from it.
 - **SYN-34** (deterministic) `sync` must print each entry it adds or removes as `<outcome>: .claude/settings.json <entry>` (`<entry>` is `deny <rule>` or `hook <event> <matcher> <command>`, the matcher left out when the group has none), and `--dry-run` must print the same lines and write nothing.
 - **SYN-35** (deterministic) When the project's `.claude/settings.json` is missing (once the seeds are copied), cannot be read, is not valid JSON or does not have the shape of SYN-29, `sync` must not touch it, must keep the entries the lock recorded and must not fail because of it; a warning on stderr says why when the file exists.
 - **SYN-36** (deterministic) `check` must print `missing: .claude/settings.json <entry>` for each entry the lock recorded that the settings no longer hold unchanged, and nothing for the other entries of the settings, nor when the settings are missing, cannot be read, are not valid JSON or are not in the shape of SYN-29.
+- **SYN-37** (deterministic) When `init`, `sync`, `update` or `check` fails with an error (not a conflict nor a drift, which exit 1), `harness` must print the error on stderr and exit 3, a code Claude Code does not read as a refusal (it blocks on 2, BIN-14), so that a hook running one of them never blocks the agent.
 
 ## Scenarios
 

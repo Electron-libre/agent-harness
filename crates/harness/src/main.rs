@@ -64,8 +64,8 @@ enum Command {
     },
 }
 
-/// The exit code of `run` when it cannot get the tool, and of the launcher when it cannot parse its arguments: not 2,
-/// which Claude Code reads as the refusal of a hook (BIN-14, BIN-17).
+/// The exit code of `run` when it cannot get the tool, of the launcher when it cannot parse its arguments, and of an
+/// error of the other subcommands: not 2, which Claude Code reads as the refusal of a hook (BIN-14, BIN-17, SYN-37).
 const CANNOT_RUN: u8 = 3;
 
 /// Replace this process by the tool of the pinned revision, so its input, output and exit code are the tool's (BIN-1).
@@ -170,7 +170,7 @@ fn main() -> ExitCode {
         Ok(false) => ExitCode::from(1),
         Err(e) => {
             eprintln!("error: {e:#}");
-            ExitCode::from(2)
+            ExitCode::from(CANNOT_RUN)
         }
     }
 }
