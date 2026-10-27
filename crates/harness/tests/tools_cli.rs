@@ -62,11 +62,11 @@ fn project(toml: Option<&str>) -> TempDir {
 
 // spec: BIN-7
 #[test]
-fn no_tool_or_an_unknown_one_exits_2_listing_the_tools() {
+fn no_tool_or_an_unknown_one_exits_3_listing_the_tools() {
     let dir = tempdir().unwrap();
     for args in [&[][..], &["no-such-tool"][..]] {
         let (code, stdout, stderr) = tool(dir.path(), args, "");
-        assert_eq!(code, 2, "{args:?}");
+        assert_eq!(code, 3, "{args:?}");
         assert_eq!(stdout, "");
         assert!(
             stderr.contains("commit-check") && stderr.contains("check-commits"),

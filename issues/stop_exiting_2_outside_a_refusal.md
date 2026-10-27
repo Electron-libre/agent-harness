@@ -31,3 +31,46 @@ the user without locking the agent out. The same holds for the runtime errors of
 
 # Hints
 * Claude Code blocks on exit 2 only; any other non-zero code is a non-blocking error shown to the user.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+`harness` exits 2 only where a hook means to refuse: an unknown or missing tool of `run` (BIN-7) and a runtime error
+of `init`, `sync`, `update` or `check` (SYN-37) exit 3 instead. The exit codes of the tools themselves (a gate that
+refuses, `commit-check` on a broken setup) are out of scope: they are the tool's own verdict.
+
+## Plan
+1. [x] Unknown tool exits 3: `tools::run` returns 3, the list of the tools kept on stderr; verified by
+   `no_tool_or_an_unknown_one_exits_3_listing_the_tools`; makes true BIN-7.
+2. [ ] Runtime error of `main` exits 3: the `Err` arm uses `CANNOT_RUN`; verified by a CLI test (`sync` with no
+   `harness.toml`, `check` with no lock source) asserting exit 3 and `error:` on stderr; makes true SYN-37.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 71e615bb229f467b7b10280a8b7604a4f5197024
+- Exit code of an error of `main`: 3 (1 stays drift or conflict).
+
+## Summaries
+
+### 1. Unknown tool exits 3
+done: `harness tool` with no tool or an unknown one exits 3, the list of the tools still on stderr; BIN-7 and
+`docs/architecture.md` say so. SYN-37 moves to deliverable 2, where its test is (`just check-specs` fails on an
+untraced requirement).
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy clean |
+| specs | `just check-specs` green |
+| docs | `docs/architecture.md` |
+| code review | `/code-review low` |
+
+red: `assertion left == right failed: [] left: 2 right: 3`
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none
