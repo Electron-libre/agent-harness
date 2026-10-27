@@ -48,11 +48,14 @@ fn main() {
     let shared: Value = serde_json::from_str(&fs::read_to_string(root.join(".claude/settings.json")).unwrap())
         .unwrap_or_else(|e| { failures.push(format!("settings.json is not valid JSON: {e}")); Value::Null });
 
-    // hooks reference scripts that exist
+    // hooks reference scripts that exist; a tool of `harness run` is checked by the tests of the harness source
     for event in shared["hooks"].as_object().into_iter().flatten() {
         for group in event.1.as_array().into_iter().flatten() {
             for hook in group["hooks"].as_array().into_iter().flatten() {
                 let cmd = hook["command"].as_str().unwrap_or("");
+                if cmd.starts_with("harness run ") {
+                    continue;
+                }
                 let script = cmd.split_whitespace().rev().find(|w| w.trim_matches('"').ends_with(".rs") && w.contains(".claude/")).or(cmd.split_whitespace().last()).unwrap_or("").replace("\"$CLAUDE_PROJECT_DIR\"", "");
                 let script = script.trim_matches('"').trim_start_matches('/');
                 if script.is_empty() || !root.join(script).exists() {

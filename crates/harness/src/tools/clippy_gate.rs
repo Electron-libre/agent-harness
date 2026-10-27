@@ -1,18 +1,10 @@
-#!/usr/bin/env rust-script
-//! Stop hook: if Rust files changed, clippy must be warning-free before the agent can finish.
+//! `clippy-gate`, the Stop hook: if Rust files changed, clippy must be warning-free before the agent can finish.
 //! Exit 2 sends clippy's diagnostics back to the agent so it fixes the code: one line each (file, line, column,
 //! message), at most `MAX_DIAGNOSTICS`, since every line is billed to the agent. A passing run stamps the Rust state
 //! in the git directory, and clippy does not run again until that state changes. When the agent already retried once
 //! (`stop_hook_active`), let go to avoid an endless loop. It checks the work tree of the event's `cwd` (an agent that
 //! entered an issue worktree is checked there), at the place `CLAUDE_PROJECT_DIR` has in its own. Spec:
 //! `specs/clippy-gate.md`.
-//!
-//! Declare: Stop
-//!
-//! ```cargo
-//! [dependencies]
-//! serde_json = "1"
-//! ```
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
@@ -49,18 +41,30 @@ fn git(dir: &str, args: &[&str]) -> String {
 /// `cwd` (an issue worktree the agent entered); `CLAUDE_PROJECT_DIR` itself when either is outside git.
 fn work_tree(event: &serde_json::Value) -> String {
     let project = std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
-    let Some(cwd) = event["cwd"].as_str() else { return project };
+    let Some(cwd) = event["cwd"].as_str() else {
+        return project;
+    };
     let root = git(cwd, &["rev-parse", "--show-toplevel"]);
     let prefix = git(&project, &["rev-parse", "--show-prefix"]);
-    if root.trim().is_empty() || git(&project, &["rev-parse", "--show-toplevel"]).trim().is_empty() {
+    if root.trim().is_empty()
+        || git(&project, &["rev-parse", "--show-toplevel"])
+            .trim()
+            .is_empty()
+    {
         return project;
     }
-    Path::new(root.trim()).join(prefix.trim()).to_string_lossy().into_owned()
+    Path::new(root.trim())
+        .join(prefix.trim())
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// The changed and untracked `.rs` files, outside the `.claude` directories whose scripts are not crate code.
 fn changed_rust_files(dir: &str) -> Vec<String> {
-    let status = git(dir, &["status", "--porcelain", "-z", "--untracked-files=all"]);
+    let status = git(
+        dir,
+        &["status", "--porcelain", "-z", "--untracked-files=all"],
+    );
     let mut entries = status.split('\0').filter(|e| !e.is_empty());
     let mut files = Vec::new();
     while let Some(entry) = entries.next() {
@@ -71,7 +75,10 @@ fn changed_rust_files(dir: &str) -> Vec<String> {
             paths.extend(entries.next());
         }
         files.extend(
-            paths.into_iter().filter(|p| p.ends_with(".rs") && !p.split('/').any(|c| c == ".claude")).map(String::from),
+            paths
+                .into_iter()
+                .filter(|p| p.ends_with(".rs") && !p.split('/').any(|c| c == ".claude"))
+                .map(String::from),
         );
     }
     files
@@ -83,7 +90,9 @@ fn rust_state(dir: &str, files: &[String]) -> String {
     git(dir, &["rev-parse", "HEAD"]).hash(&mut hasher);
     for file in files {
         file.hash(&mut hasher);
-        std::fs::read(Path::new(dir).join(file)).unwrap_or_default().hash(&mut hasher);
+        std::fs::read(Path::new(dir).join(file))
+            .unwrap_or_default()
+            .hash(&mut hasher);
     }
     format!("{:016x}", hasher.finish())
 }
@@ -92,8 +101,12 @@ fn rust_state(dir: &str, files: &[String]) -> String {
 fn is_diagnostic(line: &str) -> bool {
     let mut parts = line.splitn(4, ':');
     let (path, line_no, column) = (parts.next(), parts.next(), parts.next());
-    let number = |p: Option<&str>| p.is_some_and(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
-    path.is_some_and(|p| !p.trim().is_empty()) && number(line_no) && number(column) && parts.next().is_some()
+    let number =
+        |p: Option<&str>| p.is_some_and(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+    path.is_some_and(|p| !p.trim().is_empty())
+        && number(line_no)
+        && number(column)
+        && parts.next().is_some()
 }
 
 fn is_progress(line: &str) -> bool {
@@ -101,31 +114,47 @@ fn is_progress(line: &str) -> bool {
     PROGRESS.contains(&first) || line.contains("could not compile")
 }
 
-fn main() {
+pub(super) fn main(_args: &[String]) -> u8 {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).ok();
     let event: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
     if event["stop_hook_active"].as_bool().unwrap_or(false) {
-        return;
+        return 0;
     }
     let dir = work_tree(&event);
 
     if !Path::new(&dir).join("Cargo.toml").exists() {
-        return;
+        return 0;
     }
     let files = changed_rust_files(&dir);
     if files.is_empty() {
-        return;
+        return 0;
     }
-    let stamp = git(&dir, &["rev-parse", "--path-format=absolute", "--git-path", "claude-clippy-pass"]);
+    let stamp = git(
+        &dir,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "claude-clippy-pass",
+        ],
+    );
     let stamp = stamp.trim();
     let state = rust_state(&dir, &files);
     if !stamp.is_empty() && std::fs::read_to_string(stamp).is_ok_and(|s| s == state) {
-        return;
+        return 0;
     }
 
     let clippy = Command::new("cargo")
-        .args(["clippy", "--workspace", "--all-targets", "--message-format=short", "--", "-D", "warnings"])
+        .args([
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--message-format=short",
+            "--",
+            "-D",
+            "warnings",
+        ])
         .current_dir(&dir)
         .output()
         .expect("cargo must be installed");
@@ -133,7 +162,7 @@ fn main() {
         if !stamp.is_empty() {
             let _ = std::fs::write(stamp, state);
         }
-        return;
+        return 0;
     }
 
     let stderr = String::from_utf8_lossy(&clippy.stderr);
@@ -149,12 +178,26 @@ fn main() {
     if diagnostics.is_empty() {
         // nothing to point at: show the end of the output, without the build progress
         let lines: Vec<&str> = stderr.lines().filter(|l| !is_progress(l)).collect();
-        eprintln!("{}", lines[lines.len().saturating_sub(MAX_DIAGNOSTICS)..].join("\n"));
+        eprintln!(
+            "{}",
+            lines[lines.len().saturating_sub(MAX_DIAGNOSTICS)..].join("\n")
+        );
     } else {
-        eprintln!("{}", diagnostics.iter().take(MAX_DIAGNOSTICS).copied().collect::<Vec<_>>().join("\n"));
+        eprintln!(
+            "{}",
+            diagnostics
+                .iter()
+                .take(MAX_DIAGNOSTICS)
+                .copied()
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
         if diagnostics.len() > MAX_DIAGNOSTICS {
-            eprintln!("... {} more (run `cargo clippy` for the rest)", diagnostics.len() - MAX_DIAGNOSTICS);
+            eprintln!(
+                "... {} more (run `cargo clippy` for the rest)",
+                diagnostics.len() - MAX_DIAGNOSTICS
+            );
         }
     }
-    std::process::exit(2);
+    2
 }

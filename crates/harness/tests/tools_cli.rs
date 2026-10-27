@@ -245,3 +245,47 @@ fn check_commits_validates_every_non_merge_commit_of_the_range() {
     assert_eq!(code, 2);
     assert!(stderr.contains("usage"), "{stderr}");
 }
+
+/// Every file of `dir`, recursively.
+fn files_under(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            out.extend(files_under(&path));
+        } else {
+            out.push(path);
+        }
+    }
+    out
+}
+
+// spec: BIN-8
+#[test]
+fn every_tool_the_shared_harness_runs_exists() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut sources = files_under(&repo.join("files"));
+    sources.push(repo.join("entries/.claude/settings.json"));
+    let tools: Vec<&str> = harness::tools::TOOLS.iter().map(|t| t.name).collect();
+    let mut runs = 0;
+    for path in sources {
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for (at, _) in text.match_indices("harness run ") {
+            let rest = &text[at + "harness run ".len()..];
+            let name = rest.split_whitespace().next().unwrap_or("");
+            let name = name.trim_end_matches(['"', '`', ')', ',', ';']);
+            if name.is_empty() || name.starts_with('<') {
+                continue;
+            }
+            runs += 1;
+            assert!(
+                tools.contains(&name),
+                "{} runs the unknown tool `{name}`",
+                path.display()
+            );
+        }
+    }
+    assert!(runs > 0, "no `harness run` found: the scan is broken");
+}

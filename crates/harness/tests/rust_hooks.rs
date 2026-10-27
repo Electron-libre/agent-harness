@@ -1,6 +1,5 @@
-#!/usr/bin/env rust-script
-//! Behavior test for the Rust hooks: runs them against a throwaway Cargo project.
-//! Usage: `just test-harness` (or `rust-script .claude/hooks/test_hooks.rs`).
+//! Behavior test for the Rust hooks `harness tool clippy-gate` and `format-rust`: runs them against a throwaway Cargo
+//! project. A hook is named by a path holding its tool name.
 
 use std::fs;
 use std::io::Write;
@@ -17,7 +16,8 @@ fn run_hook(script: &Path, project: &Path, stdin: &str) -> Outcome {
 }
 
 fn run_hook_with(script: &Path, project: &Path, stdin: &str, env: &[(&str, String)]) -> Outcome {
-    let mut child = Command::new("rust-script")
+    let mut child = Command::new(env!("CARGO_BIN_EXE_harness"))
+        .arg("tool")
         .arg(script)
         .env("CLAUDE_PROJECT_DIR", project)
         .envs(env.iter().map(|(k, v)| (k, v)))
@@ -25,10 +25,18 @@ fn run_hook_with(script: &Path, project: &Path, stdin: &str, env: &[(&str, Strin
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("rust-script must be installed");
-    child.stdin.take().unwrap().write_all(stdin.as_bytes()).unwrap();
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin.as_bytes())
+        .unwrap();
     let out = child.wait_with_output().unwrap();
-    Outcome { code: out.status.code().unwrap_or(-1), stderr: String::from_utf8_lossy(&out.stderr).into_owned() }
+    Outcome {
+        code: out.status.code().unwrap_or(-1),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    }
 }
 
 fn sh(project: &Path, program: &str, args: &[&str]) {
@@ -45,7 +53,19 @@ fn sh(project: &Path, program: &str, args: &[&str]) {
 
 fn commit_all(project: &Path, msg: &str) {
     sh(project, "git", &["add", "-A"]);
-    sh(project, "git", &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", msg]);
+    sh(
+        project,
+        "git",
+        &[
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-qm",
+            msg,
+        ],
+    );
 }
 
 // spec: CLG-1, CLG-2, CLG-3, CLG-4, CLG-5, CLG-6
@@ -72,14 +92,26 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     )
     .unwrap();
     sh(project, "chmod", &["+x", fake_cargo.to_str().unwrap()]);
-    let fake_env = [("PATH", format!("{}:{}", fake_bin.display(), std::env::var("PATH").unwrap_or_default()))];
-    let fake_runs = || fs::read_to_string(&fake_log).map(|l| l.lines().count()).unwrap_or(0);
+    let fake_env = [(
+        "PATH",
+        format!(
+            "{}:{}",
+            fake_bin.display(),
+            std::env::var("PATH").unwrap_or_default()
+        ),
+    )];
+    let fake_runs = || {
+        fs::read_to_string(&fake_log)
+            .map(|l| l.lines().count())
+            .unwrap_or(0)
+    };
     fs::write(project.join(".gitignore"), "/target\n/fake-*\n").unwrap();
     commit_all(project, "ignore");
 
-    // rust-script builds the hook with cargo: build it with the real one before the fake shadows it.
-    run_hook(gate, project, "{\"stop_hook_active\":true}");
-    checks.push(("gate passes with no Rust change", run_hook_with(gate, project, "{}", &fake_env).code == 0));
+    checks.push((
+        "gate passes with no Rust change",
+        run_hook_with(gate, project, "{}", &fake_env).code == 0,
+    ));
     checks.push(("gate runs no clippy with no Rust change", fake_runs() == 0));
     fs::create_dir_all(project.join("tools/.claude/hooks")).unwrap();
     fs::write(project.join("tools/.claude/hooks/hook.rs"), "").unwrap();
@@ -105,22 +137,45 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
 
     checks.push((
         "gate lets go when stop_hook_active",
-        run_hook_with(gate, project, "{\"stop_hook_active\":true}", &fake_env).code == 0 && fake_runs() == 0,
+        run_hook_with(gate, project, "{\"stop_hook_active\":true}", &fake_env).code == 0
+            && fake_runs() == 0,
     ));
 
-    let many: String = (1..=45).map(|i| format!("src/main.rs:{i}:1: error: problem {i}\n")).collect();
-    fs::write(&fake_out, format!("    Checking hooktest v0.1.0\n{many}error: could not compile `hooktest`\n")).unwrap();
+    let many: String = (1..=45)
+        .map(|i| format!("src/main.rs:{i}:1: error: problem {i}\n"))
+        .collect();
+    fs::write(
+        &fake_out,
+        format!("    Checking hooktest v0.1.0\n{many}error: could not compile `hooktest`\n"),
+    )
+    .unwrap();
     let out = run_hook_with(gate, project, "{}", &fake_env);
-    let reported = out.stderr.lines().filter(|l| l.starts_with("src/main.rs:")).count();
-    checks.push(("gate reports at most 40 diagnostics", out.code == 2 && reported == 40));
-    checks.push(("gate says how many it left out", out.stderr.contains("5 more")));
+    let reported = out
+        .stderr
+        .lines()
+        .filter(|l| l.starts_with("src/main.rs:"))
+        .count();
+    checks.push((
+        "gate reports at most 40 diagnostics",
+        out.code == 2 && reported == 40,
+    ));
+    checks.push((
+        "gate says how many it left out",
+        out.stderr.contains("5 more"),
+    ));
 
     let before = fake_runs();
     run_hook_with(gate, project, "{}", &fake_env);
-    checks.push(("gate runs clippy again after a failure with nothing changed", fake_runs() == before + 1));
+    checks.push((
+        "gate runs clippy again after a failure with nothing changed",
+        fake_runs() == before + 1,
+    ));
 
     fs::write(&main_rs, "fn main() {}\n// edited\n").unwrap();
-    checks.push(("gate passes once fixed", run_hook(gate, project, "{}").code == 0));
+    checks.push((
+        "gate passes once fixed",
+        run_hook(gate, project, "{}").code == 0,
+    ));
     let before = fake_runs();
     fs::write(project.join("README.md"), "edited\n").unwrap();
     checks.push((
@@ -129,7 +184,10 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     ));
 
     fs::write(&main_rs, "fn main() {}\n// edited again\n").unwrap();
-    checks.push(("gate runs clippy again after a .rs edit", run_hook_with(gate, project, "{}", &fake_env).code == 2));
+    checks.push((
+        "gate runs clippy again after a .rs edit",
+        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+    ));
     fs::write(&main_rs, "fn main() {}\n// edited\n").unwrap();
     checks.push((
         "gate skips again once back to the passing state",
@@ -142,8 +200,23 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     ));
     fs::remove_file(project.join("src/extra.rs")).unwrap();
     sh(project, "git", &["add", "README.md"]);
-    sh(project, "git", &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "readme"]);
-    checks.push(("gate runs clippy again after HEAD moved", run_hook_with(gate, project, "{}", &fake_env).code == 2));
+    sh(
+        project,
+        "git",
+        &[
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-qm",
+            "readme",
+        ],
+    );
+    checks.push((
+        "gate runs clippy again after HEAD moved",
+        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+    ));
 
     fs::write(
         &fake_out,
@@ -154,17 +227,24 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     let out = run_hook_with(gate, project, "{}", &fake_env);
     checks.push((
         "gate reports the errors that have no location",
-        out.stderr.contains("src/main.rs:1:1: error: located") && out.stderr.contains("custom build command"),
+        out.stderr.contains("src/main.rs:1:1: error: located")
+            && out.stderr.contains("custom build command"),
     ));
     checks.push((
         "gate reports no build progress with an unlocated error",
         !out.stderr.contains("Compiling") && !out.stderr.contains("could not compile"),
     ));
-    fs::write(&fake_out, "   Compiling dep v1.0.0\n    Checking hooktest\nerror: failed to parse manifest\n").unwrap();
+    fs::write(
+        &fake_out,
+        "   Compiling dep v1.0.0\n    Checking hooktest\nerror: failed to parse manifest\n",
+    )
+    .unwrap();
     let out = run_hook_with(gate, project, "{}", &fake_env);
     checks.push((
         "gate reports no build progress without any located diagnostic",
-        out.code == 2 && out.stderr.contains("failed to parse manifest") && !out.stderr.contains("Compiling"),
+        out.code == 2
+            && out.stderr.contains("failed to parse manifest")
+            && !out.stderr.contains("Compiling"),
     ));
 
     // the stamp reads the content of the files, whatever their name or the diff settings
@@ -193,9 +273,26 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     // `CLAUDE_PROJECT_DIR`
     fs::write(&fake_pass, "").unwrap();
     run_hook_with(gate, project, "{}", &fake_env);
-    let worktree = project.with_file_name(format!("{}-gate", project.file_name().unwrap().to_string_lossy()));
-    sh(project, "git", &["worktree", "add", "-q", "--detach", worktree.to_str().unwrap()]);
-    fs::write(worktree.join("src/main.rs"), "fn main() {}\n// worktree edit\n").unwrap();
+    let worktree = project.with_file_name(format!(
+        "{}-gate",
+        project.file_name().unwrap().to_string_lossy()
+    ));
+    sh(
+        project,
+        "git",
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            worktree.to_str().unwrap(),
+        ],
+    );
+    fs::write(
+        worktree.join("src/main.rs"),
+        "fn main() {}\n// worktree edit\n",
+    )
+    .unwrap();
     fs::remove_file(&fake_pass).unwrap();
     let before = fake_runs();
     let event = format!("{{\"cwd\":\"{}\"}}", worktree.join("src").display());
@@ -203,7 +300,11 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         "gate checks the worktree of the event's cwd",
         run_hook_with(gate, project, &event, &fake_env).code == 2 && fake_runs() == before + 1,
     ));
-    sh(project, "git", &["worktree", "remove", "--force", worktree.to_str().unwrap()]);
+    sh(
+        project,
+        "git",
+        &["worktree", "remove", "--force", worktree.to_str().unwrap()],
+    );
 
     // the same with the crate in a subdirectory of the repository: the gate checks that subdirectory of the worktree
     let mono = project.join("fake-mono");
@@ -212,19 +313,44 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     fs::write(mono.join("backend/Cargo.toml"), "").unwrap();
     fs::write(mono.join("backend/src/main.rs"), "fn main() {}\n").unwrap();
     commit_all(&mono, "init");
-    let mono_tree = project.with_file_name(format!("{}-mono", project.file_name().unwrap().to_string_lossy()));
-    sh(&mono, "git", &["worktree", "add", "-q", "--detach", mono_tree.to_str().unwrap()]);
-    fs::write(mono_tree.join("backend/src/main.rs"), "fn main() {}\n// worktree edit\n").unwrap();
+    let mono_tree = project.with_file_name(format!(
+        "{}-mono",
+        project.file_name().unwrap().to_string_lossy()
+    ));
+    sh(
+        &mono,
+        "git",
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            mono_tree.to_str().unwrap(),
+        ],
+    );
+    fs::write(
+        mono_tree.join("backend/src/main.rs"),
+        "fn main() {}\n// worktree edit\n",
+    )
+    .unwrap();
     let before = fake_runs();
     let event = format!("{{\"cwd\":\"{}\"}}", mono_tree.display());
     checks.push((
         "gate checks the crate's subdirectory in the worktree of the event's cwd",
-        run_hook_with(gate, &mono.join("backend"), &event, &fake_env).code == 2 && fake_runs() == before + 1,
+        run_hook_with(gate, &mono.join("backend"), &event, &fake_env).code == 2
+            && fake_runs() == before + 1,
     ));
-    sh(&mono, "git", &["worktree", "remove", "--force", mono_tree.to_str().unwrap()]);
+    sh(
+        &mono,
+        "git",
+        &["worktree", "remove", "--force", mono_tree.to_str().unwrap()],
+    );
 
     // an event's cwd outside any git work tree: the gate checks CLAUDE_PROJECT_DIR
-    let outside = project.with_file_name(format!("{}-nogit", project.file_name().unwrap().to_string_lossy()));
+    let outside = project.with_file_name(format!(
+        "{}-nogit",
+        project.file_name().unwrap().to_string_lossy()
+    ));
     fs::create_dir_all(&outside).unwrap();
     fs::write(&main_rs, "fn main() {}\n// outside edit\n").unwrap();
     let before = fake_runs();
@@ -266,8 +392,21 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
 fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static str, bool)> {
     let main_rs = project.join("src/main.rs");
     let mut checks = Vec::new();
-    let worktree = project.with_file_name(format!("{}-wt", project.file_name().unwrap().to_string_lossy()));
-    sh(project, "git", &["worktree", "add", "-q", "--detach", worktree.to_str().unwrap()]);
+    let worktree = project.with_file_name(format!(
+        "{}-wt",
+        project.file_name().unwrap().to_string_lossy()
+    ));
+    sh(
+        project,
+        "git",
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            worktree.to_str().unwrap(),
+        ],
+    );
     let unformatted = "fn main(){let  a=1;println!(\"{a}\");}\n";
     fs::write(&main_rs, unformatted).unwrap();
     fs::write(worktree.join("src/main.rs"), unformatted).unwrap();
@@ -279,24 +418,37 @@ fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static 
     run_hook(format_hook, project, &json);
     checks.push((
         "format hook formats the worktree of the edited file",
-        fs::read_to_string(worktree.join("src/main.rs")).unwrap().contains("let a = 1;"),
+        fs::read_to_string(worktree.join("src/main.rs"))
+            .unwrap()
+            .contains("let a = 1;"),
     ));
     let untouched = fs::read_to_string(&main_rs).unwrap() == unformatted;
-    checks.push(("format hook leaves the project of the session alone", untouched));
-    sh(project, "git", &["worktree", "remove", "--force", worktree.to_str().unwrap()]);
+    checks.push((
+        "format hook leaves the project of the session alone",
+        untouched,
+    ));
+    sh(
+        project,
+        "git",
+        &["worktree", "remove", "--force", worktree.to_str().unwrap()],
+    );
     fs::write(&main_rs, "fn main() {}\n").unwrap();
     checks
 }
 
-fn main() {
-    let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
-    let format_hook = here.join("format_rust.rs");
-    let gate = here.join("clippy_gate.rs");
+#[test]
+fn rust_hooks() {
+    let format_hook = PathBuf::from("format-rust");
+    let gate = PathBuf::from("clippy-gate");
 
     let project: PathBuf = std::env::temp_dir().join(format!("hooktest-{}", std::process::id()));
     fs::create_dir_all(&project).unwrap();
     sh(&project, "git", &["init", "-q", "."]);
-    sh(&project, "cargo", &["init", "-q", "--name", "hooktest", "."]);
+    sh(
+        &project,
+        "cargo",
+        &["init", "-q", "--name", "hooktest", "."],
+    );
     commit_all(&project, "init");
 
     let main_rs = project.join("src/main.rs");
@@ -308,12 +460,27 @@ fn main() {
 
     // format hook: reformats an edited .rs file, ignores other files
     fs::write(&main_rs, "fn main(){let  a=1;println!(\"{a}\");}\n").unwrap();
-    let json = format!("{{\"tool_input\":{{\"file_path\":\"{}\"}}}}", main_rs.display());
-    check("format hook exits 0", run_hook(&format_hook, &project, &json).code == 0);
-    check("format hook reformatted the file", fs::read_to_string(&main_rs).unwrap().contains("let a = 1;"));
+    let json = format!(
+        "{{\"tool_input\":{{\"file_path\":\"{}\"}}}}",
+        main_rs.display()
+    );
+    check(
+        "format hook exits 0",
+        run_hook(&format_hook, &project, &json).code == 0,
+    );
+    check(
+        "format hook reformatted the file",
+        fs::read_to_string(&main_rs).unwrap().contains("let a = 1;"),
+    );
     fs::write(&main_rs, "fn main(){let  a=1;println!(\"{a}\");}\n").unwrap();
-    let json = format!("{{\"tool_input\":{{\"file_path\":\"{}/README.md\"}}}}", project.display());
-    check("format hook ignores non-Rust files", run_hook(&format_hook, &project, &json).code == 0);
+    let json = format!(
+        "{{\"tool_input\":{{\"file_path\":\"{}/README.md\"}}}}",
+        project.display()
+    );
+    check(
+        "format hook ignores non-Rust files",
+        run_hook(&format_hook, &project, &json).code == 0,
+    );
     check(
         "format hook left the .rs file alone for a non-Rust edit",
         fs::read_to_string(&main_rs).unwrap().contains("let  a=1;"),
@@ -330,5 +497,5 @@ fn main() {
     }
 
     let _ = fs::remove_dir_all(&project);
-    std::process::exit(i32::from(failed));
+    assert!(!failed, "a check failed: see the FAIL lines");
 }

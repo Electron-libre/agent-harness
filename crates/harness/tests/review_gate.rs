@@ -1,11 +1,5 @@
-#!/usr/bin/env rust-script
-//! Behavior test for `require_code_review.rs`: runs `record`, `check` and `native` against throwaway git repositories.
-//! Usage: `just test-harness` (or `rust-script .claude/hooks/test_require_code_review.rs`).
-//!
-//! ```cargo
-//! [dependencies]
-//! serde_json = "1"
-//! ```
+//! Behavior test for `harness tool review-gate`: runs `record`, `check` and `native` against throwaway git
+//! repositories. `hook` is the `harness` binary.
 
 use std::fs;
 use std::io::Write;
@@ -14,18 +8,25 @@ use std::process::{Command, Stdio};
 
 /// Exit code and stderr of the hook in `mode` for `event`, with `project` as the project directory.
 fn run(hook: &Path, mode: &str, project: &Path, event: &serde_json::Value) -> (i32, String) {
-    let mut child = Command::new("rust-script")
-        .arg(hook)
-        .arg(mode)
+    let mut child = Command::new(hook)
+        .args(["tool", "review-gate", mode])
         .env("CLAUDE_PROJECT_DIR", project)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("rust-script must be installed");
-    child.stdin.take().unwrap().write_all(event.to_string().as_bytes()).unwrap();
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(event.to_string().as_bytes())
+        .unwrap();
     let out = child.wait_with_output().unwrap();
-    (out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stderr).into_owned())
+    (
+        out.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
 }
 
 fn review_done(hook: &Path, project: &Path, skill: &str) {
@@ -57,7 +58,11 @@ fn sh(project: &Path, args: &[&str]) {
 /// A review recorded in one worktree must not cover another: the marker and the waiver live in the git directory
 /// of each worktree.
 fn git_dir_of(dir: &Path) -> std::path::PathBuf {
-    let out = Command::new("git").args(["rev-parse", "--absolute-git-dir"]).current_dir(dir).output().unwrap();
+    let out = Command::new("git")
+        .args(["rev-parse", "--absolute-git-dir"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
     Path::new(String::from_utf8_lossy(&out.stdout).trim()).to_path_buf()
 }
 
@@ -72,35 +77,77 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::write(main.join("a.txt"), "one\n").unwrap();
     sh(&main, &["add", "-A"]);
     sh(&main, &["commit", "-qm", "init"]);
-    sh(&main, &["worktree", "add", "-q", "-b", "other", linked.to_str().unwrap()]);
+    sh(
+        &main,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "other",
+            linked.to_str().unwrap(),
+        ],
+    );
     fs::write(main.join("a.txt"), "two\n").unwrap();
     fs::write(linked.join("a.txt"), "two\n").unwrap();
 
     review_done(hook, &main, "code-review");
     let mut out = vec![
-        ("a review in the main worktree covers it", native_run(hook, &main, &[]).0 == 0),
-        ("the same diff in a linked worktree is still unreviewed", native_run(hook, &linked, &[]).0 == 2),
+        (
+            "a review in the main worktree covers it",
+            native_run(hook, &main, &[]).0 == 0,
+        ),
+        (
+            "the same diff in a linked worktree is still unreviewed",
+            native_run(hook, &linked, &[]).0 == 2,
+        ),
     ];
     review_done(hook, &linked, "code-review");
-    out.push(("a review in a linked worktree covers it", native_run(hook, &linked, &[]).0 == 0));
+    out.push((
+        "a review in a linked worktree covers it",
+        native_run(hook, &linked, &[]).0 == 0,
+    ));
 
     // the path the instructions give the user, `git rev-parse --git-path`, is the one the hook reads from a linked worktree
     let name = ["claude-review", "waived"].join("-");
-    let given = Command::new("git").args(["rev-parse", "--git-path", &name]).current_dir(&linked).output().unwrap();
+    let given = Command::new("git")
+        .args(["rev-parse", "--git-path", &name])
+        .current_dir(&linked)
+        .output()
+        .unwrap();
     let given = linked.join(String::from_utf8_lossy(&given.stdout).trim());
-    out.push(("the given path is not the waiver of the main worktree", given != git_dir_of(&main).join(&name)));
+    out.push((
+        "the given path is not the waiver of the main worktree",
+        given != git_dir_of(&main).join(&name),
+    ));
     let waiver = git_dir_of(&linked).join("claude-review-waived");
-    out.push(("the given path is the waiver of the linked worktree", given.parent().unwrap().canonicalize().unwrap() == waiver.parent().unwrap().canonicalize().unwrap()));
+    out.push((
+        "the given path is the waiver of the linked worktree",
+        given.parent().unwrap().canonicalize().unwrap()
+            == waiver.parent().unwrap().canonicalize().unwrap(),
+    ));
     fs::write(&given, "").unwrap();
-    out.push(("a waiver of the linked worktree lets its commit through", native_run(hook, &linked, &[]).0 == 0));
+    out.push((
+        "a waiver of the linked worktree lets its commit through",
+        native_run(hook, &linked, &[]).0 == 0,
+    ));
     out.push(("the waiver stays while no commit happened", waiver.exists()));
     sh(&linked, &["commit", "-qam", "x"]);
     fs::write(linked.join("new.txt"), "x\n").unwrap();
     let main_waiver = git_dir_of(&main).join("claude-review-waived");
     fs::write(&main_waiver, "").unwrap();
-    out.push(("the waiver of the main worktree does not cover the linked one", native_run(hook, &linked, &[]).0 == 2));
-    out.push(("the commit made consumed the waiver of the linked worktree", !waiver.exists()));
-    out.push(("the linked worktree leaves the main waiver alone", main_waiver.exists()));
+    out.push((
+        "the waiver of the main worktree does not cover the linked one",
+        native_run(hook, &linked, &[]).0 == 2,
+    ));
+    out.push((
+        "the commit made consumed the waiver of the linked worktree",
+        !waiver.exists(),
+    ));
+    out.push((
+        "the linked worktree leaves the main waiver alone",
+        main_waiver.exists(),
+    ));
     let _ = fs::remove_dir_all(&root);
     out
 }
@@ -108,7 +155,7 @@ fn worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 // spec: REV-17
 /// `just waive-review` creates the waiver of the worktree it runs in, prints its path and changes nothing else.
 fn recipe_checks(hook: &Path) -> Vec<(&'static str, bool)> {
-    let recipes = hook.parent().unwrap().join("../../harness.just");
+    let recipes = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../files/harness.just");
     let root = std::env::temp_dir().join(format!("reviewtest-rc-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     let (main, linked) = (root.join("main"), root.join("linked"));
@@ -118,26 +165,76 @@ fn recipe_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::copy(&recipes, main.join("justfile")).unwrap();
     sh(&main, &["add", "-A"]);
     sh(&main, &["commit", "-qm", "init"]);
-    sh(&main, &["worktree", "add", "-q", "-b", "other", linked.to_str().unwrap()]);
+    sh(
+        &main,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "other",
+            linked.to_str().unwrap(),
+        ],
+    );
     let name = ["claude-review", "waived"].join("-");
-    let status = |dir: &Path| String::from_utf8_lossy(&Command::new("git").args(["status", "--porcelain"]).current_dir(dir).output().unwrap().stdout).to_string();
-    let recipe = |dir: &Path| Command::new("just").arg("waive-review").current_dir(dir).output().unwrap();
+    let status = |dir: &Path| {
+        String::from_utf8_lossy(
+            &Command::new("git")
+                .args(["status", "--porcelain"])
+                .current_dir(dir)
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .to_string()
+    };
+    let recipe = |dir: &Path| {
+        Command::new("just")
+            .arg("waive-review")
+            .current_dir(dir)
+            .output()
+            .unwrap()
+    };
     let mut out = Vec::new();
 
     let before = status(&main);
     let run = recipe(&main.join("sub"));
-    let (main_waiver, linked_waiver) = (git_dir_of(&main).join(&name), git_dir_of(&linked).join(&name));
+    let (main_waiver, linked_waiver) = (
+        git_dir_of(&main).join(&name),
+        git_dir_of(&linked).join(&name),
+    );
     out.push(("the recipe runs", run.status.success()));
-    out.push(("it creates the waiver of the main worktree, from a subdirectory", main_waiver.exists()));
-    out.push(("it prints that path", String::from_utf8_lossy(&run.stdout).contains(main_waiver.to_str().unwrap())));
-    out.push(("it changes nothing else in the repository", status(&main) == before));
-    out.push(("it leaves the linked worktree alone", !linked_waiver.exists()));
+    out.push((
+        "it creates the waiver of the main worktree, from a subdirectory",
+        main_waiver.exists(),
+    ));
+    out.push((
+        "it prints that path",
+        String::from_utf8_lossy(&run.stdout).contains(main_waiver.to_str().unwrap()),
+    ));
+    out.push((
+        "it changes nothing else in the repository",
+        status(&main) == before,
+    ));
+    out.push((
+        "it leaves the linked worktree alone",
+        !linked_waiver.exists(),
+    ));
 
     let run = recipe(&linked);
-    out.push(("it creates the waiver of a linked worktree", run.status.success() && linked_waiver.exists()));
-    out.push(("it prints the path of the linked worktree", String::from_utf8_lossy(&run.stdout).contains(linked_waiver.to_str().unwrap())));
+    out.push((
+        "it creates the waiver of a linked worktree",
+        run.status.success() && linked_waiver.exists(),
+    ));
+    out.push((
+        "it prints the path of the linked worktree",
+        String::from_utf8_lossy(&run.stdout).contains(linked_waiver.to_str().unwrap()),
+    ));
     fs::write(linked.join("a.txt"), "two\n").unwrap();
-    out.push(("the hook honours that waiver in the linked worktree", native_run(hook, &linked, &[]).0 == 0));
+    out.push((
+        "the hook honours that waiver in the linked worktree",
+        native_run(hook, &linked, &[]).0 == 0,
+    ));
     let _ = fs::remove_dir_all(&root);
     out
 }
@@ -162,9 +259,8 @@ fn target_fixture(hook: &Path, name: &str) -> (std::path::PathBuf, std::path::Pa
 
 /// Exit code and stderr of `native` run in `cwd` with `env` added, as git runs a `pre-commit` hook: no event on stdin.
 fn native_run(hook: &Path, cwd: &Path, env: &[(&str, &Path)]) -> (i32, String) {
-    let out = Command::new("rust-script")
-        .arg(hook)
-        .arg("native")
+    let out = Command::new(hook)
+        .args(["tool", "review-gate", "native"])
         .current_dir(cwd)
         .envs(env.iter().map(|(k, v)| (*k, *v)))
         .env_remove("CLAUDE_PROJECT_DIR")
@@ -172,8 +268,11 @@ fn native_run(hook: &Path, cwd: &Path, env: &[(&str, &Path)]) -> (i32, String) {
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .output()
-        .expect("rust-script must be installed");
-    (out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stderr).into_owned())
+        .unwrap();
+    (
+        out.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
 }
 
 // spec: REV-9, REV-10
@@ -186,14 +285,38 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     ];
     // git resolved the repository: the text of the command is not involved
     let (git_dir, tree) = (other.join(".git"), other.clone());
-    out.push(("native judges the repository named by GIT_DIR and GIT_WORK_TREE", native_run(hook, &current, &[("GIT_DIR", &git_dir), ("GIT_WORK_TREE", &tree)]).0 != 0));
+    out.push((
+        "native judges the repository named by GIT_DIR and GIT_WORK_TREE",
+        native_run(
+            hook,
+            &current,
+            &[("GIT_DIR", &git_dir), ("GIT_WORK_TREE", &tree)],
+        )
+        .0 != 0,
+    ));
     review_done(hook, &other, "code-review");
     fs::write(current.join("new.txt"), "x\n").unwrap();
-    out.push(("native lets through a reviewed GIT_DIR while the current directory is unreviewed", native_run(hook, &current, &[("GIT_DIR", &git_dir), ("GIT_WORK_TREE", &tree)]).0 == 0));
-    out.push(("native refuses the unreviewed current directory", native_run(hook, &current, &[]).0 != 0));
-    let waiver = current.join(".git").join(["claude-review", "waived"].join("-"));
+    out.push((
+        "native lets through a reviewed GIT_DIR while the current directory is unreviewed",
+        native_run(
+            hook,
+            &current,
+            &[("GIT_DIR", &git_dir), ("GIT_WORK_TREE", &tree)],
+        )
+        .0 == 0,
+    ));
+    out.push((
+        "native refuses the unreviewed current directory",
+        native_run(hook, &current, &[]).0 != 0,
+    ));
+    let waiver = current
+        .join(".git")
+        .join(["claude-review", "waived"].join("-"));
     fs::write(&waiver, "").unwrap();
-    out.push(("native honours the waiver", native_run(hook, &current, &[]).0 == 0));
+    out.push((
+        "native honours the waiver",
+        native_run(hook, &current, &[]).0 == 0,
+    ));
     fs::remove_file(&waiver).unwrap();
     // a waiver that cannot be read is ignored too: it is neither stamped nor dropped, and the user is told to fix it
     fs::write(&waiver, "").unwrap();
@@ -201,12 +324,21 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     // root reads a write-only file: the case cannot be built then
     if fs::File::open(&waiver).is_err() {
         let (code, stderr) = native_run(hook, &current, &[]);
-        out.push(("native refuses an unreviewed diff whose waiver it cannot read", code == 2 && stderr.contains("/code-review low")));
+        out.push((
+            "native refuses an unreviewed diff whose waiver it cannot read",
+            code == 2 && stderr.contains("/code-review low"),
+        ));
         let path = waiver.canonicalize().unwrap();
         out.push(("that refusal tells the agent to ask the user to fix the unreadable waiver, by its path", stderr.contains("could not be read") && stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
-        out.push(("native leaves the unreadable waiver unstamped", fs::metadata(&waiver).map(|m| m.len() == 0).unwrap_or(false)));
+        out.push((
+            "native leaves the unreadable waiver unstamped",
+            fs::metadata(&waiver).map(|m| m.len() == 0).unwrap_or(false),
+        ));
         review_done(hook, &current, "code-review");
-        out.push(("native lets through a reviewed diff whose waiver it cannot read", native_run(hook, &current, &[]).0 == 0));
+        out.push((
+            "native lets through a reviewed diff whose waiver it cannot read",
+            native_run(hook, &current, &[]).0 == 0,
+        ));
         // a file the review never saw, so the next cases judge an unreviewed diff again
         fs::write(current.join("unseen.txt"), "x\n").unwrap();
     }
@@ -215,7 +347,10 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     // content that is not UTF-8 is read, not unreadable: it is no stamp, so it is dropped like a stale one
     fs::write(&waiver, [0xff, 0xfe]).unwrap();
     let (code, stderr) = native_run(hook, &current, &[]);
-    out.push(("native drops a waiver whose content is not UTF-8 and is no stamp", code == 2 && !stderr.contains("could not be read") && !waiver.exists()));
+    out.push((
+        "native drops a waiver whose content is not UTF-8 and is no stamp",
+        code == 2 && !stderr.contains("could not be read") && !waiver.exists(),
+    ));
     // a waiver that cannot be stamped is ignored: the review alone judges the commit, and the user is told to fix it
     fs::write(&waiver, "").unwrap();
     let mut readonly = fs::metadata(&waiver).unwrap().permissions();
@@ -224,11 +359,20 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     // root writes a read-only file: the case cannot be built then
     if fs::OpenOptions::new().write(true).open(&waiver).is_err() {
         let (code, stderr) = native_run(hook, &current, &[]);
-        out.push(("native refuses an unreviewed diff whose waiver it cannot stamp", code == 2 && stderr.contains("/code-review low")));
+        out.push((
+            "native refuses an unreviewed diff whose waiver it cannot stamp",
+            code == 2 && stderr.contains("/code-review low"),
+        ));
         let path = waiver.canonicalize().unwrap();
-        out.push(("that refusal tells the agent to ask the user to fix the waiver, by its path", stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
+        out.push((
+            "that refusal tells the agent to ask the user to fix the waiver, by its path",
+            stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap()),
+        ));
         review_done(hook, &current, "code-review");
-        out.push(("native lets through a reviewed diff whose waiver it cannot stamp", native_run(hook, &current, &[]).0 == 0));
+        out.push((
+            "native lets through a reviewed diff whose waiver it cannot stamp",
+            native_run(hook, &current, &[]).0 == 0,
+        ));
     }
     #[allow(clippy::permissions_set_readonly_false)]
     readonly.set_readonly(false);
@@ -237,7 +381,10 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::remove_file(current.join("new.txt")).unwrap();
     let _ = fs::remove_file(current.join("unseen.txt"));
     fs::write(current.join("a.txt"), "one\n").unwrap();
-    out.push(("native lets through a repository with nothing to commit", native_run(hook, &current, &[]).0 == 0));
+    out.push((
+        "native lets through a repository with nothing to commit",
+        native_run(hook, &current, &[]).0 == 0,
+    ));
     let _ = fs::remove_dir_all(current.parent().unwrap());
     out
 }
@@ -248,7 +395,14 @@ fn native_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     use std::os::unix::fs::PermissionsExt;
     let (current, _other) = target_fixture(hook, "rev9git");
     let pre_commit = current.join(".git/hooks/pre-commit");
-    fs::write(&pre_commit, format!("#!/bin/sh\nexec rust-script '{}' native\n", hook.display())).unwrap();
+    fs::write(
+        &pre_commit,
+        format!(
+            "#!/bin/sh\nexec '{}' tool review-gate native\n",
+            hook.display()
+        ),
+    )
+    .unwrap();
     fs::set_permissions(&pre_commit, fs::Permissions::from_mode(0o755)).unwrap();
     let commit = |args: &[&str]| {
         Command::new("git")
@@ -262,17 +416,33 @@ fn native_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
             .success()
     };
     let commits = || {
-        let log = Command::new("git").args(["rev-list", "--count", "HEAD"]).current_dir(&current).output().unwrap();
-        String::from_utf8_lossy(&log.stdout).trim().parse::<u32>().unwrap()
+        let log = Command::new("git")
+            .args(["rev-list", "--count", "HEAD"])
+            .current_dir(&current)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&log.stdout)
+            .trim()
+            .parse::<u32>()
+            .unwrap()
     };
     let before = commits();
     let reviewed = commit(&["commit", "-qam", "x"]) && commits() == before + 1;
     fs::write(current.join("a.txt"), "three\n").unwrap();
     let refused = !commit(&["commit", "-qam", "y"]);
     let out = vec![
-        ("git runs the native hook and a reviewed commit -a passes", reviewed),
-        ("git refuses through the native hook a commit nobody reviewed", refused),
-        ("the refused commit left the history alone", commits() == before + 1),
+        (
+            "git runs the native hook and a reviewed commit -a passes",
+            reviewed,
+        ),
+        (
+            "git refuses through the native hook a commit nobody reviewed",
+            refused,
+        ),
+        (
+            "the refused commit left the history alone",
+            commits() == before + 1,
+        ),
     ];
     let _ = fs::remove_dir_all(current.parent().unwrap());
     out
@@ -288,14 +458,30 @@ fn native_worktree_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     fs::write(main.join("a.txt"), "one\n").unwrap();
     sh(&main, &["add", "-A"]);
     sh(&main, &["commit", "-qm", "init"]);
-    sh(&main, &["worktree", "add", "-q", "-b", "other", linked.to_str().unwrap()]);
+    sh(
+        &main,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "other",
+            linked.to_str().unwrap(),
+        ],
+    );
     fs::write(main.join("a.txt"), "two\n").unwrap();
     fs::write(linked.join("a.txt"), "two\n").unwrap();
     review_done(hook, &linked, "code-review");
     let linked_git = git_dir_of(&linked);
     let out = vec![
-        ("native lets through a reviewed linked worktree", native_run(hook, &linked, &[("GIT_DIR", &linked_git)]).0 == 0),
-        ("native refuses the unreviewed main worktree", native_run(hook, &main, &[]).0 != 0),
+        (
+            "native lets through a reviewed linked worktree",
+            native_run(hook, &linked, &[("GIT_DIR", &linked_git)]).0 == 0,
+        ),
+        (
+            "native refuses the unreviewed main worktree",
+            native_run(hook, &main, &[]).0 != 0,
+        ),
     ];
     let _ = fs::remove_dir_all(&root);
     out
@@ -351,9 +537,18 @@ fn skipped_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     ];
     let mut out: Vec<(&'static str, bool)> = refused
         .iter()
-        .map(|c| (*c, { let (code, stderr) = commit_attempt(hook, &current, c); code == 2 && stderr.contains("native") }))
+        .map(|c| {
+            (*c, {
+                let (code, stderr) = commit_attempt(hook, &current, c);
+                code == 2 && stderr.contains("native")
+            })
+        })
         .collect();
-    out.extend(allowed.iter().map(|c| (*c, commit_attempt(hook, &current, c).0 == 0)));
+    out.extend(
+        allowed
+            .iter()
+            .map(|c| (*c, commit_attempt(hook, &current, c).0 == 0)),
+    );
     out
 }
 
@@ -366,39 +561,75 @@ fn git_calls(hook: &Path, mode: &str, event: &serde_json::Value) -> Option<Vec<S
     fs::create_dir_all(&bin).unwrap();
     let log = root.join("calls.log");
     let fake = bin.join("git");
-    fs::write(&fake, format!("#!/bin/sh\necho \"$*\" >> '{}'\n", log.display())).unwrap();
+    fs::write(
+        &fake,
+        format!("#!/bin/sh\necho \"$*\" >> '{}'\n", log.display()),
+    )
+    .unwrap();
     fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
-    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
-    let mut child = Command::new("rust-script")
-        .arg(hook)
-        .arg(mode)
+    let path = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let mut child = Command::new(hook)
+        .args(["tool", "review-gate", mode])
         .env("PATH", path)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .expect("rust-script must be installed");
-    child.stdin.take().unwrap().write_all(event.to_string().as_bytes()).unwrap();
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(event.to_string().as_bytes())
+        .unwrap();
     let ran = child.wait().unwrap().success();
-    let calls = fs::read_to_string(&log).unwrap_or_default().lines().map(String::from).collect();
+    let calls = fs::read_to_string(&log)
+        .unwrap_or_default()
+        .lines()
+        .map(String::from)
+        .collect();
     let _ = fs::remove_dir_all(&root);
     ran.then_some(calls)
 }
 
 fn bash_calls(hook: &Path, command: &str) -> Option<Vec<String>> {
-    git_calls(hook, "check", &serde_json::json!({"tool_name": "Bash", "tool_input": {"command": command}}))
+    git_calls(
+        hook,
+        "check",
+        &serde_json::json!({"tool_name": "Bash", "tool_input": {"command": command}}),
+    )
 }
 
 /// A command that is not a commit costs no `git` call: the hook runs on every command of the agent.
 fn cheap_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let skill = |name: &str| serde_json::json!({"tool_name": "Skill", "tool_input": {"skill": name}, "tool_response": {"success": true}});
     vec![
-        ("a command that is not a commit runs no git", bash_calls(hook, "ls -la") == Some(vec![])),
-        ("a git command that is not a commit runs no git", bash_calls(hook, "git status") == Some(vec![])),
+        (
+            "a command that is not a commit runs no git",
+            bash_calls(hook, "ls -la") == Some(vec![]),
+        ),
+        (
+            "a git command that is not a commit runs no git",
+            bash_calls(hook, "git status") == Some(vec![]),
+        ),
         // the native hook judges the repository: `check` only reads the text of the commit
-        ("a commit runs no git", bash_calls(hook, "git commit -m x") == Some(vec![])),
-        ("a skill other than the review runs no git", git_calls(hook, "record", &skill("update-docs")) == Some(vec![])),
-        ("the review skill records at the top of its work tree", git_calls(hook, "record", &skill("code-review")).is_some_and(|c| c.iter().any(|c| c.contains("--show-toplevel")))),
+        (
+            "a commit runs no git",
+            bash_calls(hook, "git commit -m x") == Some(vec![]),
+        ),
+        (
+            "a skill other than the review runs no git",
+            git_calls(hook, "record", &skill("update-docs")) == Some(vec![]),
+        ),
+        (
+            "the review skill records at the top of its work tree",
+            git_calls(hook, "record", &skill("code-review"))
+                .is_some_and(|c| c.iter().any(|c| c.contains("--show-toplevel"))),
+        ),
     ]
 }
 
@@ -418,18 +649,26 @@ fn streaming_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     );
     fs::write(&fake, script).unwrap();
     fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
-    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
+    let path = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
     let event = serde_json::json!({"tool_name": "Skill", "cwd": root, "tool_input": {"skill": "code-review"}, "tool_response": {"success": true}});
-    let mut child = Command::new("rust-script")
-        .arg(hook)
-        .arg("record")
+    let mut child = Command::new(hook)
+        .args(["tool", "review-gate", "record"])
         .env("PATH", path)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .expect("rust-script must be installed");
-    child.stdin.take().unwrap().write_all(event.to_string().as_bytes()).unwrap();
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(event.to_string().as_bytes())
+        .unwrap();
     let ran = child.wait().unwrap().success();
     let fed: Vec<usize> = fs::read_to_string(&log)
         .unwrap_or_default()
@@ -439,7 +678,10 @@ fn streaming_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let _ = fs::remove_dir_all(&root);
     vec![
         ("the review ran with the fake git", ran && !fed.is_empty()),
-        ("no content of an untracked file is piped to git", fed.iter().all(|n| *n < 1 << 16)),
+        (
+            "no content of an untracked file is piped to git",
+            fed.iter().all(|n| *n < 1 << 16),
+        ),
     ]
 }
 
@@ -462,26 +704,41 @@ fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let marker = |hook: &Path| {
         review_done(hook, &root, "code-review");
         let text = fs::read_to_string(root.join(".git/claude-code-review.json")).unwrap();
-        serde_json::from_str::<serde_json::Value>(&text).unwrap()["hash"].as_str().unwrap().to_string()
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["hash"]
+            .as_str()
+            .unwrap()
+            .to_string()
     };
     let first = marker(hook);
-    let mut out = vec![("the marker is stable while nothing changes", marker(hook) == first)];
+    let mut out = vec![(
+        "the marker is stable while nothing changes",
+        marker(hook) == first,
+    )];
     fs::write(root.join("new.txt"), "bbbb\n").unwrap();
     let second = marker(hook);
-    out.push(("a content change of the same size changes the marker", second != first));
+    out.push((
+        "a content change of the same size changes the marker",
+        second != first,
+    ));
     fs::write(root.join("odd\nname.txt"), "bbbb\n").unwrap();
-    out.push(("a file with a newline in its name is covered", marker(hook) != second));
+    out.push((
+        "a file with a newline in its name is covered",
+        marker(hook) != second,
+    ));
     // a nested repository and an unreadable file do not stop the other files from being hashed
     fs::write(root.join("new.txt"), "cccc\n").unwrap();
-    out.push(("a nested repository and an unreadable file leave the other files covered", marker(hook) != second));
+    out.push((
+        "a nested repository and an unreadable file leave the other files covered",
+        marker(hook) != second,
+    ));
     fs::set_permissions(&locked, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
     let _ = fs::remove_dir_all(&root);
     out
 }
 
-fn main() {
-    let here = fs::canonicalize(Path::new(file!()).parent().unwrap_or(Path::new("."))).unwrap();
-    let hook = here.join("require_code_review.rs");
+#[test]
+fn review_gate() {
+    let hook = Path::new(env!("CARGO_BIN_EXE_harness")).to_path_buf();
     let project = std::env::temp_dir().join(format!("reviewtest-{}", std::process::id()));
     let _ = fs::remove_dir_all(&project);
     fs::create_dir_all(&project).unwrap();
@@ -497,21 +754,36 @@ fn main() {
     };
     let judged = |dir: &Path| native_run(&hook, dir, &[]).0;
 
-    check("lets through a commit with nothing changed", judged(&project) == 0);
+    check(
+        "lets through a commit with nothing changed",
+        judged(&project) == 0,
+    );
 
     fs::write(project.join("a.txt"), "two\n").unwrap();
     let (code, stderr) = native_run(&hook, &project, &[]);
-    check("refuses a commit without any review", code == 2 && stderr.contains("/code-review low"));
-    check("check leaves the judgment of a commit to the native hook", commit_attempt(&hook, &project, "git commit -am x").0 == 0);
+    check(
+        "refuses a commit without any review",
+        code == 2 && stderr.contains("/code-review low"),
+    );
+    check(
+        "check leaves the judgment of a commit to the native hook",
+        commit_attempt(&hook, &project, "git commit -am x").0 == 0,
+    );
 
     review_done(&hook, &project, "simplify");
     check("ignores the end of another skill", judged(&project) == 2);
 
     review_done(&hook, &project, "code-review");
-    check("lets through a commit of the reviewed diff", judged(&project) == 0);
+    check(
+        "lets through a commit of the reviewed diff",
+        judged(&project) == 0,
+    );
 
     fs::write(project.join("a.txt"), "two, fixed\n").unwrap();
-    check("accepts a fix made after the review in a reviewed file", judged(&project) == 0);
+    check(
+        "accepts a fix made after the review in a reviewed file",
+        judged(&project) == 0,
+    );
     fs::write(project.join("a.txt"), "two\n").unwrap();
 
     fs::write(project.join("new.txt"), "x\n").unwrap();
@@ -522,13 +794,22 @@ fn main() {
 
     sh(&project, &["commit", "-aqm", "feat: reviewed"]);
     fs::write(project.join("a.txt"), "three\n").unwrap();
-    check("refuses a review made before the last commit", judged(&project) == 2);
+    check(
+        "refuses a review made before the last commit",
+        judged(&project) == 2,
+    );
 
     fs::create_dir_all(project.join("deep")).unwrap();
-    check("sees the whole work tree from a subdirectory", judged(&project.join("deep")) == 2);
+    check(
+        "sees the whole work tree from a subdirectory",
+        judged(&project.join("deep")) == 2,
+    );
 
     review_done(&hook, &project, "code-review");
-    check("lets through the reviewed diff of the next change", judged(&project) == 0);
+    check(
+        "lets through the reviewed diff of the next change",
+        judged(&project) == 0,
+    );
     fs::write(project.join("é.txt"), "x\n").unwrap();
     check("refuses a new non-ASCII file", judged(&project) == 2);
     fs::remove_file(project.join("é.txt")).unwrap();
@@ -548,7 +829,10 @@ fn main() {
     sh(&esc, &["add", "-A"]);
     sh(&esc, &["commit", "-qm", "init"]);
     fs::write(esc.join("issues/i.md"), "two\n").unwrap();
-    check("lets through a commit that only touches issues", judged(&esc) == 0);
+    check(
+        "lets through a commit that only touches issues",
+        judged(&esc) == 0,
+    );
     fs::write(esc.join("issues/j.md"), "new\n").unwrap();
     check("lets through a new issue file", judged(&esc) == 0);
     sh(&esc, &["mv", "code.txt", "issues/code.txt"]);
@@ -562,39 +846,73 @@ fn main() {
     let waiver = esc.join(".git/claude-review-waived");
     fs::write(&waiver, "").unwrap();
     check("lets through a commit the user waived", judged(&esc) == 0);
-    check("keeps the waiver while no commit happened", waiver.exists() && judged(&esc) == 0);
+    check(
+        "keeps the waiver while no commit happened",
+        waiver.exists() && judged(&esc) == 0,
+    );
     sh(&esc, &["add", "-A"]);
     sh(&esc, &["commit", "-qm", "waived"]);
     fs::write(esc.join("docs.md"), "doc two\n").unwrap();
-    check("consumes the waiver once a commit happened", judged(&esc) == 2 && !waiver.exists());
+    check(
+        "consumes the waiver once a commit happened",
+        judged(&esc) == 2 && !waiver.exists(),
+    );
 
     // a waiver spent by a commit is gone at the next check, so the user's new one is not mistaken for it
     fs::write(&waiver, "").unwrap();
-    check("lets through the commit of a waiver created again", judged(&esc) == 0);
+    check(
+        "lets through the commit of a waiver created again",
+        judged(&esc) == 0,
+    );
     sh(&esc, &["add", "-A"]);
     sh(&esc, &["commit", "-qm", "waived again"]);
     fs::write(esc.join("issues/k.md"), "new\n").unwrap();
-    check("an issues-only check drops the waiver spent by a commit", judged(&esc) == 0 && !waiver.exists());
+    check(
+        "an issues-only check drops the waiver spent by a commit",
+        judged(&esc) == 0 && !waiver.exists(),
+    );
 
     let fresh = project.join("fresh");
     fs::create_dir_all(&fresh).unwrap();
     sh(&fresh, &["init", "-q", "."]);
     fs::write(fresh.join("c.txt"), "x\n").unwrap();
-    check("refuses the first commit of a repository", judged(&fresh) == 2);
+    check(
+        "refuses the first commit of a repository",
+        judged(&fresh) == 2,
+    );
     let fresh_waiver = fresh.join(".git/claude-review-waived");
     fs::write(&fresh_waiver, "").unwrap();
-    check("lets through the first commit the user waived", judged(&fresh) == 0);
-    check("stamps the waiver of a repository without commit", fs::read_to_string(&fresh_waiver).unwrap().trim() == "no-head");
+    check(
+        "lets through the first commit the user waived",
+        judged(&fresh) == 0,
+    );
+    check(
+        "stamps the waiver of a repository without commit",
+        fs::read_to_string(&fresh_waiver).unwrap().trim() == "no-head",
+    );
     fs::remove_file(&fresh_waiver).unwrap();
     review_done(&hook, &fresh, "code-review");
-    check("lets through the reviewed first commit", judged(&fresh) == 0);
+    check(
+        "lets through the reviewed first commit",
+        judged(&fresh) == 0,
+    );
 
-    for checks in [worktree_checks, recipe_checks, native_checks, native_hook_checks, native_worktree_checks, skipped_hook_checks, cheap_checks, streaming_checks, untracked_content_checks] {
+    for checks in [
+        worktree_checks,
+        recipe_checks,
+        native_checks,
+        native_hook_checks,
+        native_worktree_checks,
+        skipped_hook_checks,
+        cheap_checks,
+        streaming_checks,
+        untracked_content_checks,
+    ] {
         for (name, ok) in checks(&hook) {
             check(name, ok);
         }
     }
 
     let _ = fs::remove_dir_all(&project);
-    std::process::exit(i32::from(failed));
+    assert!(!failed, "a check failed: see the FAIL lines");
 }

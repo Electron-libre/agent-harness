@@ -107,7 +107,7 @@ again. Then set `Plan: validated` and the base commit. The spec file is the reco
    why one is not fixed; a finding outside the requirements of the deliverable becomes an issue
    (`skill:create-issue`), not a fix in this deliverable.
    Re-run `just check` after the fixes. Step 6 cannot start before the review has run.
-   The native `pre-commit` hook (`require_code_review.rs native`) enforces it: `git commit` fails while the diff holds a file
+   The native `pre-commit` hook (`harness run review-gate native`) enforces it: `git commit` fails while the diff holds a file
    the last review never saw, so write the tracking and the summary of steps 6 and 7 in the issue **before**
    the review (fixes to reviewed files pass; a diff under `issues/` only needs no review). Only the user can
    waive the review: never do it yourself ([details.md](details.md), "Review waiver").

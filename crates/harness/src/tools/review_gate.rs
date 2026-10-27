@@ -1,5 +1,4 @@
-#!/usr/bin/env rust-script
-//! The code review gate of a commit. Three modes: `record` (PostToolUse on `Skill`) stores a marker when the
+//! `review-gate <mode>`: the code review gate of a commit. Three modes: `record` (PostToolUse on `Skill`) stores a marker when the
 //! `code-review` skill ends; `native`, run by the git `pre-commit` hook that `harness sync` installs, compares the diff
 //! with the marker and fails the commit when the review is missing; `check` (PreToolUse on `Bash`) refuses what would
 //! skip that native hook (`specs/review-gate.md`, ADR 0005).
@@ -20,13 +19,6 @@
 //! of the command was, and reads no event. A native hook does not run under `--no-verify` / `-n` or a moved
 //! `core.hooksPath`, so `check` refuses a commit carrying either and any command that sets `core.hooksPath` (`--get`
 //! and the words of a message excepted). It reads the text only: the gate catches mistakes, not deliberate bypasses.
-//!
-//! Declare: PostToolUse Skill (argument `record`), PreToolUse Bash (argument `check`)
-//!
-//! ```cargo
-//! [dependencies]
-//! serde_json = "1"
-//! ```
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -62,14 +54,21 @@ fn git(cwd: &Path, args: &[&str], stdin: &[u8]) -> Vec<u8> {
     let mut pipe = child.stdin.take().unwrap();
     let input = stdin.to_vec();
     let writer = std::thread::spawn(move || pipe.write_all(&input).ok());
-    let out = child.wait_with_output().map(|o| o.stdout).unwrap_or_default();
+    let out = child
+        .wait_with_output()
+        .map(|o| o.stdout)
+        .unwrap_or_default();
     writer.join().ok();
     out
 }
 
 /// Names from `-z` output (NUL separated, never quoted by git).
 fn names(bytes: &[u8]) -> Vec<String> {
-    bytes.split(|b| *b == 0).filter(|n| !n.is_empty()).map(|n| String::from_utf8_lossy(n).into_owned()).collect()
+    bytes
+        .split(|b| *b == 0)
+        .filter(|n| !n.is_empty())
+        .map(|n| String::from_utf8_lossy(n).into_owned())
+        .collect()
 }
 
 /// The object id `git` gives the content of each untracked file, which it reads itself (`--stdin-paths`: the content
@@ -81,47 +80,109 @@ fn untracked_hashes(cwd: &Path, names: &[String]) -> Vec<String> {
         String::from_utf8_lossy(&out).trim().to_string()
     };
     let hashable = |name: &String| cwd.join(name).metadata().is_ok_and(|m| m.is_file());
-    let batch: Vec<&String> = names.iter().filter(|n| hashable(n) && !n.contains(['\n', '\r'])).collect();
+    let batch: Vec<&String> = names
+        .iter()
+        .filter(|n| hashable(n) && !n.contains(['\n', '\r']))
+        .collect();
     if batch.is_empty() {
         return names.iter().map(|_| "-".to_string()).collect();
     }
     let listing = batch.iter().map(|n| format!("{n}\n")).collect::<String>();
-    let out = git(cwd, &["hash-object", "--no-filters", "--stdin-paths"], listing.as_bytes());
-    let mut batched: Vec<String> = String::from_utf8_lossy(&out).lines().map(str::to_string).collect();
+    let out = git(
+        cwd,
+        &["hash-object", "--no-filters", "--stdin-paths"],
+        listing.as_bytes(),
+    );
+    let mut batched: Vec<String> = String::from_utf8_lossy(&out)
+        .lines()
+        .map(str::to_string)
+        .collect();
     // a file git could not read stops the batch: hash each one on its own
     if batched.len() != batch.len() {
         batched = batch.iter().map(|n| hash_one(n)).collect();
     }
-    let mut batched = batch.into_iter().zip(batched).collect::<std::collections::HashMap<_, _>>();
+    let mut batched = batch
+        .into_iter()
+        .zip(batched)
+        .collect::<std::collections::HashMap<_, _>>();
     names
         .iter()
-        .map(|n| batched.remove(n).or_else(|| hashable(n).then(|| hash_one(n))).filter(|h| !h.is_empty()).unwrap_or_else(|| "-".into()))
+        .map(|n| {
+            batched
+                .remove(n)
+                .or_else(|| hashable(n).then(|| hash_one(n)))
+                .filter(|h| !h.is_empty())
+                .unwrap_or_else(|| "-".into())
+        })
         .collect()
 }
 
 fn snapshot(cwd: &Path) -> Snapshot {
-    let head = String::from_utf8_lossy(&git(cwd, &["rev-parse", "-q", "--verify", "HEAD"], b"")).trim().to_string();
+    let head = String::from_utf8_lossy(&git(cwd, &["rev-parse", "-q", "--verify", "HEAD"], b""))
+        .trim()
+        .to_string();
     // the empty tree stands for HEAD in a repository without commit
-    let base = if head.is_empty() { "4b825dc642cb6eb9a060e54bf8d69288fbee4904" } else { "HEAD" };
-    let mut content = git(cwd, &["diff", base, "--binary", "--no-color", "--no-ext-diff", "--no-textconv"], b"");
-    let mut files = names(&git(cwd, &["diff", base, "--name-only", "--no-renames", "-z"], b""));
-    let untracked = names(&git(cwd, &["ls-files", "--others", "--exclude-standard", "-z"], b""));
+    let base = if head.is_empty() {
+        "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    } else {
+        "HEAD"
+    };
+    let mut content = git(
+        cwd,
+        &[
+            "diff",
+            base,
+            "--binary",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+        ],
+        b"",
+    );
+    let mut files = names(&git(
+        cwd,
+        &["diff", base, "--name-only", "--no-renames", "-z"],
+        b"",
+    ));
+    let untracked = names(&git(
+        cwd,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+        b"",
+    ));
     let hashes = untracked_hashes(cwd, &untracked);
     for (name, hash) in untracked.iter().zip(hashes) {
         content.extend(format!("\0{name}\0{hash}\0").into_bytes());
     }
     files.extend(untracked);
     files.sort();
-    let hash = String::from_utf8_lossy(&git(cwd, &["hash-object", "--stdin"], &content)).trim().to_string();
+    let hash = String::from_utf8_lossy(&git(cwd, &["hash-object", "--stdin"], &content))
+        .trim()
+        .to_string();
     Snapshot { head, hash, files }
 }
 
 /// Global options of `git` that do not take the next word as value.
-const SKIPPED_OPTIONS: [&str; 8] =
-    ["--no-pager", "--paginate", "-p", "-P", "--no-optional-locks", "--bare", "--no-replace-objects", "--literal-pathspecs"];
+const SKIPPED_OPTIONS: [&str; 8] = [
+    "--no-pager",
+    "--paginate",
+    "-p",
+    "-P",
+    "--no-optional-locks",
+    "--bare",
+    "--no-replace-objects",
+    "--literal-pathspecs",
+];
 
 /// Global options of `git` that take the next word as value.
-const GIT_VALUE_OPTIONS: [&str; 7] = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"];
+const GIT_VALUE_OPTIONS: [&str; 7] = [
+    "-C",
+    "-c",
+    "--git-dir",
+    "--work-tree",
+    "--namespace",
+    "--exec-path",
+    "--super-prefix",
+];
 
 /// Completes `first`, the start of a value, with the next words of `words` when it opens a quote it does not close.
 fn quoted<'a>(first: &str, words: &mut impl Iterator<Item = &'a &'a str>) -> String {
@@ -146,8 +207,20 @@ fn take_value<'a>(words: &mut impl Iterator<Item = &'a &'a str>) -> Option<Strin
 }
 
 /// Long options of the commit subcommand that take the next word as value.
-const COMMIT_VALUE_OPTIONS: [&str; 12] =
-    ["message", "file", "author", "date", "reuse-message", "reedit-message", "fixup", "squash", "template", "cleanup", "pathspec-from-file", "trailer"];
+const COMMIT_VALUE_OPTIONS: [&str; 12] = [
+    "message",
+    "file",
+    "author",
+    "date",
+    "reuse-message",
+    "reedit-message",
+    "fixup",
+    "squash",
+    "template",
+    "cleanup",
+    "pathspec-from-file",
+    "trailer",
+];
 
 /// Whether the arguments of a commit skip its hooks: `--no-verify` (or an abbreviation git accepts) and `-n`, alone or
 /// in a bundle (`-anm x`). The value of an option (`-m "fix -n"`, `--message x`) is not read; `--` ends the options.
@@ -185,7 +258,9 @@ fn skips_verification(args: &[&str]) -> bool {
 /// The commands of a line, split at the separators and brackets (a heredoc body or a quoted message is cut too, which
 /// can only hide words from the readers below, never add some).
 fn segments(command: &str) -> impl Iterator<Item = &str> {
-    command.split([';', '|', '&', '(', ')', '`', '\n']).filter(|s| !s.trim().is_empty())
+    command
+        .split([';', '|', '&', '(', ')', '`', '\n'])
+        .filter(|s| !s.trim().is_empty())
 }
 
 /// Whether a `git` command of `segment` (one command of a line) commits skipping its hooks (`skips_verification`).
@@ -194,16 +269,21 @@ fn segments(command: &str) -> impl Iterator<Item = &str> {
 /// a commit.
 fn commit_skips_hooks(segment: &str) -> bool {
     let words: Vec<&str> = segment.split_whitespace().collect();
-    let is_git = |w: &&str| w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() == Some("git");
+    let is_git =
+        |w: &&str| w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() == Some("git");
     (0..words.len()).filter(|i| is_git(&words[*i])).any(|at| {
         let mut rest = words[at + 1..].iter();
         while let Some(w) = rest.next() {
             if GIT_VALUE_OPTIONS.contains(w) {
                 take_value(&mut rest);
-            } else if let Some(value) = GIT_VALUE_OPTIONS.iter().find_map(|o| w.strip_prefix(o)?.strip_prefix('=')) {
+            } else if let Some(value) = GIT_VALUE_OPTIONS
+                .iter()
+                .find_map(|o| w.strip_prefix(o)?.strip_prefix('='))
+            {
                 quoted(value, &mut rest);
             } else if !SKIPPED_OPTIONS.contains(w) {
-                return w.trim_end_matches(['\'', '"']) == "commit" && skips_verification(&rest.copied().collect::<Vec<_>>());
+                return w.trim_end_matches(['\'', '"']) == "commit"
+                    && skips_verification(&rest.copied().collect::<Vec<_>>());
             }
         }
         false
@@ -222,18 +302,29 @@ fn skips_hooks(command: &str) -> bool {
 fn sets_hooks_path(command: &str) -> bool {
     segments(command).any(|segment| {
         let words: Vec<&str> = segment.split_whitespace().collect();
-        let mentions_git = words.iter().any(|w| w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() == Some("git") || w.starts_with("GIT_CONFIG"));
-        if !mentions_git || words.iter().any(|w| w.starts_with("--get") || w.starts_with("--unset")) {
+        let mentions_git = words.iter().any(|w| {
+            w.trim_start_matches(['$', '\'', '"']).rsplit('/').next() == Some("git")
+                || w.starts_with("GIT_CONFIG")
+        });
+        if !mentions_git
+            || words
+                .iter()
+                .any(|w| w.starts_with("--get") || w.starts_with("--unset"))
+        {
             return false;
         }
         let configuring = words.contains(&"config");
         let mut rest = words.iter();
         while let Some(w) = rest.next() {
-            if *w == "--message" || (w.starts_with('-') && !w.starts_with("--") && w.ends_with('m')) {
+            if *w == "--message" || (w.starts_with('-') && !w.starts_with("--") && w.ends_with('m'))
+            {
                 take_value(&mut rest);
                 continue;
             }
-            if let Some(message) = w.strip_prefix("--message=").or_else(|| w.strip_prefix("-m").filter(|m| !m.is_empty() && !w.starts_with("--"))) {
+            if let Some(message) = w.strip_prefix("--message=").or_else(|| {
+                w.strip_prefix("-m")
+                    .filter(|m| !m.is_empty() && !w.starts_with("--"))
+            }) {
                 quoted(message, &mut rest);
                 continue;
             }
@@ -255,7 +346,11 @@ fn sets_hooks_path(command: &str) -> bool {
 fn toplevel(cwd: &Path) -> PathBuf {
     let out = git(cwd, &["rev-parse", "--show-toplevel"], b"");
     let root = String::from_utf8_lossy(&out).trim().to_string();
-    if root.is_empty() { cwd.to_path_buf() } else { PathBuf::from(root) }
+    if root.is_empty() {
+        cwd.to_path_buf()
+    } else {
+        PathBuf::from(root)
+    }
 }
 
 /// A file of the git directory of the repository `cwd` belongs to, `None` outside a repository.
@@ -270,9 +365,14 @@ fn marker_path(cwd: &Path) -> Option<PathBuf> {
 }
 
 fn record(cwd: &Path) -> std::io::Result<()> {
-    let Some(path) = marker_path(cwd) else { return Ok(()) };
+    let Some(path) = marker_path(cwd) else {
+        return Ok(());
+    };
     let snap = snapshot(cwd);
-    std::fs::write(path, serde_json::json!({"head": snap.head, "hash": snap.hash, "files": snap.files}).to_string())
+    std::fs::write(
+        path,
+        serde_json::json!({"head": snap.head, "hash": snap.hash, "files": snap.files}).to_string(),
+    )
 }
 
 /// Why the commit must wait for a review, and the waiver the hook could not use, if any.
@@ -293,7 +393,9 @@ enum Waiver {
 
 /// The waiver of `cwd`; one gone before the read is absent, content that is not UTF-8 is content, not a read failure.
 fn waiver(cwd: &Path) -> Waiver {
-    let Some(path) = git_file(cwd, WAIVER) else { return Waiver::Absent };
+    let Some(path) = git_file(cwd, WAIVER) else {
+        return Waiver::Absent;
+    };
     match std::fs::read(&path) {
         Ok(bytes) => Waiver::Text(path, String::from_utf8_lossy(&bytes).trim().to_string()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Waiver::Absent,
@@ -307,7 +409,11 @@ fn refusal(cwd: &Path) -> Option<Refusal> {
     let path = marker_path(cwd)?;
     // the waiver is spent by a commit, not by a command that may not commit (`--dry-run`, a refusal of another hook
     // or of git): it is stamped with `HEAD` when it lets a commit through and dropped once `HEAD` moved
-    let stamp = if snap.head.is_empty() { NO_HEAD } else { snap.head.as_str() };
+    let stamp = if snap.head.is_empty() {
+        NO_HEAD
+    } else {
+        snap.head.as_str()
+    };
     let mut waiver = waiver(cwd);
     if let Waiver::Text(path, used) = &waiver {
         if !used.is_empty() && used != stamp {
@@ -331,8 +437,16 @@ fn refusal(cwd: &Path) -> Option<Refusal> {
         }
     }
     .map(|(path, failed)| (path.canonicalize().unwrap_or(path), failed));
-    let refused = |why| Some(Refusal { why, broken_waiver: broken_waiver.clone() });
-    let Some(marker) = std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else {
+    let refused = |why| {
+        Some(Refusal {
+            why,
+            broken_waiver: broken_waiver.clone(),
+        })
+    };
+    let Some(marker) = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+    else {
         return refused("no code review has run in this project");
     };
     if marker["head"].as_str() != Some(snap.head.as_str()) {
@@ -342,7 +456,12 @@ fn refusal(cwd: &Path) -> Option<Refusal> {
         return None;
     }
     // a fix made after the review touches files the review already saw; a file it never saw is refused
-    let reviewed: Vec<&str> = marker["files"].as_array().into_iter().flatten().filter_map(|f| f.as_str()).collect();
+    let reviewed: Vec<&str> = marker["files"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|f| f.as_str())
+        .collect();
     if snap.files.iter().all(|f| reviewed.contains(&f.as_str())) {
         return None;
     }
@@ -361,13 +480,15 @@ fn refuse(refusal: Refusal) -> ! {
 
 /// Refuses what would skip the native `pre-commit` hook, the last-resort gate that only this hook can defend.
 fn refuse_skipped_hook(what: &str) -> ! {
-    eprintln!("Refused: {what} skips the native pre-commit review hook that `harness sync` installs.");
+    eprintln!(
+        "Refused: {what} skips the native pre-commit review hook that `harness sync` installs."
+    );
     eprintln!("Commit without it, or ask the user to waive the review.");
     std::process::exit(2);
 }
 
-fn main() {
-    let mode = std::env::args().nth(1).unwrap_or_default();
+pub(super) fn main(args: &[String]) -> u8 {
+    let mode = args.first().cloned().unwrap_or_default();
     if mode == "native" {
         // run by git as `pre-commit`: git resolved the repository (`GIT_DIR`, `GIT_WORK_TREE`, the current directory), and
         // there is no event on stdin to read
@@ -383,7 +504,7 @@ fn main() {
         if let Some(refusal) = refusal(&toplevel(&here)) {
             refuse(refusal);
         }
-        return;
+        return 0;
     }
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).ok();
@@ -394,15 +515,21 @@ fn main() {
             let succeeded = event["tool_response"]["success"].as_bool() == Some(true);
             if skill.rsplit(':').next() == Some(REVIEW_SKILL) && succeeded {
                 let project = std::env::var("CLAUDE_PROJECT_DIR").ok().map(PathBuf::from);
-                let shell_dir = event["cwd"].as_str().map(PathBuf::from).or(project).unwrap_or_else(|| ".".into());
+                let shell_dir = event["cwd"]
+                    .as_str()
+                    .map(PathBuf::from)
+                    .or(project)
+                    .unwrap_or_else(|| ".".into());
                 if let Err(e) = record(&toplevel(&shell_dir)) {
                     eprintln!("Could not record the code review marker: {e}");
-                    std::process::exit(1);
+                    return 1;
                 }
             }
         }
         "check" => {
-            let Some(command) = event["tool_input"]["command"].as_str() else { return };
+            let Some(command) = event["tool_input"]["command"].as_str() else {
+                return 0;
+            };
             if sets_hooks_path(command) {
                 refuse_skipped_hook("setting core.hooksPath");
             }
@@ -412,4 +539,5 @@ fn main() {
         }
         _ => {}
     }
+    0
 }

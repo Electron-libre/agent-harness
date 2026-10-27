@@ -16,9 +16,9 @@ Step 0 of `SKILL.md` puts each issue in its own worktree: `just start-issue issu
 approval there, unlike for a path outside `.claude/worktrees/` (an issue started before ADR 0008 at
 `../<repo>-<name>`). `start-issue` also adds `/.claude/worktrees/` to `.git/info/exclude`. A shell `cd` is no
 substitute: the Bash tool resets the directory after a command that left the launch directory. Once entered, the
-`cwd` of the hook events is the worktree, and the hooks act on it (`clippy_gate.rs`, `require_code_review.rs`; `format_rust.rs` formats
-the project of the edited file); their scripts still come from the main worktree's `.claude/` (`CLAUDE_PROJECT_DIR`),
-which holds the same revision while both worktrees are on the same commit of the harness. While the branch or
+`cwd` of the hook events is the worktree, and the hooks act on it (`clippy-gate`, `review-gate`; `format-rust` formats
+the project of the edited file); `harness run` finds the `harness.toml` of the worktree and runs the tools
+of the revision it pins (with a local source, those of the worktree's own crate). While the branch or
 worktree exists, `just next-issue` skips the issue. `start-issue` refuses an issue not committed on the main
 branch, hence the commit of the issue (with its queue line) before it. The user may also open a session in the worktree directly;
 step 0 then has nothing to do.

@@ -8,7 +8,7 @@ adrs: [0005]
 
 ## Intent
 
-The Stop hook `clippy_gate.rs` keeps the Rust code of a project warning-free: it blocks the end of a turn while
+The Stop hook `harness run clippy-gate` keeps the Rust code of a project warning-free: it blocks the end of a turn while
 `cargo clippy` reports a problem. Everything it prints is read by the agent and billed as tokens, so it runs clippy
 only when there is something new to check and reports the problems in few lines.
 

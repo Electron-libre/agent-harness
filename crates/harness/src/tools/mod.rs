@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod check_commits;
+mod clippy_gate;
 mod commit_check;
+mod format_rust;
+mod review_gate;
 
 /// A tool: its name on the command line, a summary, and its entry point.
 pub struct Tool {
@@ -22,9 +25,24 @@ pub const TOOLS: &[Tool] = &[
         main: check_commits::main,
     },
     Tool {
+        name: "clippy-gate",
+        about: "Stop hook: block the end of a turn while clippy reports a problem",
+        main: clippy_gate::main,
+    },
+    Tool {
         name: "commit-check",
         about: "validate a commit message read from stdin against AGENTS.md",
         main: commit_check::main,
+    },
+    Tool {
+        name: "format-rust",
+        about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
+        main: format_rust::main,
+    },
+    Tool {
+        name: "review-gate",
+        about: "record | check | native: the code review gate of a commit",
+        main: review_gate::main,
     },
 ];
 

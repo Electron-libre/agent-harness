@@ -522,7 +522,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let wanted = entries::of_source(source)?;
     // decided first: a hook of the user that cannot be chained stops the sync before it writes anything
     let files = list(&managed)?;
-    let gate = gate::plan(root, files.iter().any(|f| f == gate::REVIEW_HOOK))?;
+    let gate = gate::plan(root, gate::manages(&wanted))?;
     // installed before the managed files are written, so a failure leaves the project as it was
     if let (Some(gate), false) = (&gate, options.dry_run) {
         gate.install()?;
@@ -620,7 +620,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let present = |path: &str| {
         done(path, Outcome::Added) || (root.join(path).is_file() && !done(path, Outcome::Removed))
     };
-    let gated = new_lock.files.contains_key(gate::REVIEW_HOOK);
+    let gated = gate::manages(&new_lock.entries);
     report.warnings = match &merge.settings {
         Some(settings) => settings::warnings_of(settings, gated, &present),
         None => settings::warnings(base, gated, &present),
@@ -763,7 +763,7 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
         bail!("no {LOCK}: run `harness sync` first");
     };
-    let gated = lock.files.contains_key(gate::REVIEW_HOOK);
+    let gated = gate::manages(&lock.entries);
     let problems = lock
         .files
         .iter()

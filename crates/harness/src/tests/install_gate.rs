@@ -4,16 +4,29 @@ use std::process::{Command, Output};
 
 use super::*;
 
-const HOOK: &str = ".claude/hooks/require_code_review.rs";
+/// The managed hook of the review gate.
+const RECORD: &str = "harness run review-gate record";
+/// Its report line once in the settings (SYN-34).
+const RECORD_ENTRY: &str =
+    ".claude/settings.json hook PostToolUse Skill harness run review-gate record";
 
-/// A source that ships the review hook, and a git project pointing at it.
+/// Make `source` manage the hook of the review gate, and seed empty settings for it.
+fn manage_the_review_gate(source: &Path) {
+    let hook = serde_json::json!({"type": "command", "command": RECORD});
+    let fragment =
+        serde_json::json!({"hooks": {"PostToolUse": [{"matcher": "Skill", "hooks": [hook]}]}});
+    put(
+        source,
+        "entries/.claude/settings.json",
+        &fragment.to_string(),
+    );
+    put(source, "seed/.claude/settings.json", "{}");
+}
+
+/// A source that manages the review gate, and a git project pointing at it.
 fn gated() -> (TempDir, TempDir) {
     let (source, root) = setup();
-    put(
-        source.path(),
-        &format!("files/{HOOK}"),
-        "// the review hook",
-    );
+    manage_the_review_gate(source.path());
     git_in(root.path(), &["init", "--quiet", "-b", "main"]);
     (source, root)
 }
@@ -22,10 +35,10 @@ fn pre_commit(root: &TempDir) -> PathBuf {
     root.path().join(".git/hooks/pre-commit")
 }
 
-/// A directory holding a fake `rust-script` that records its arguments in `calls` and exits with `code`.
-fn fake_rust_script(code: i32) -> TempDir {
+/// A directory holding a fake `harness` that records its arguments in `calls` and exits with `code`.
+fn fake_harness(code: i32) -> TempDir {
     let bin = tempdir().unwrap();
-    let script = bin.path().join("rust-script");
+    let script = bin.path().join("harness");
     fs::write(
         &script,
         format!(
@@ -59,8 +72,7 @@ fn installs_an_executable_hook_that_runs_the_review_in_native_mode() {
         text.starts_with("#!/bin/sh\n# harness: native review gate"),
         "{text}"
     );
-    assert!(text.contains(&format!("hook={HOOK}\n")), "{text}");
-    assert!(text.contains("rust-script \"$hook\" native"), "{text}");
+    assert!(text.contains("harness run review-gate native"), "{text}");
     assert!(is_executable(&pre_commit(&root)));
     assert_eq!(report.outcome(gate::GATE), Some(Outcome::Added));
 }
@@ -70,30 +82,30 @@ fn installs_an_executable_hook_that_runs_the_review_in_native_mode() {
 fn the_hook_runs_the_review_from_the_work_tree_and_fails_with_its_exit_code() {
     let (_source, root) = gated();
     run(&root);
-    put(root.path(), HOOK, "// the review hook");
     for code in [0, 3] {
-        let bin = fake_rust_script(code);
+        let bin = fake_harness(code);
         let out = run_hook(&root, bin.path(), &[]);
         assert_eq!(out.status.code(), Some(code));
         let calls = fs::read_to_string(bin.path().join("calls")).unwrap();
-        assert_eq!(calls.trim(), format!("{HOOK} native"));
+        assert_eq!(calls.trim(), "run review-gate native");
     }
 }
 
-// spec: SYN-18
+// spec: SYN-18, BIN-9
 #[test]
-fn the_hook_warns_and_lets_the_commit_through_without_the_review_hook_or_rust_script() {
+fn the_hook_warns_and_lets_the_commit_through_without_the_harness() {
     let (_source, root) = gated();
     run(&root);
-    let bin = fake_rust_script(3);
-    // no review hook in the work tree (a branch that predates the harness)
-    fs::remove_file(root.path().join(HOOK)).unwrap();
+    let bin = fake_harness(3);
+    // no harness.toml in the work tree (a branch that predates the harness)
+    let config = get(root.path(), CONFIG).unwrap();
+    fs::remove_file(root.path().join(CONFIG)).unwrap();
     let out = run_hook(&root, bin.path(), &[]);
     assert_eq!(out.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&out.stderr).contains("review gate skipped"));
     assert!(!bin.path().join("calls").exists());
-    // review hook present, no rust-script on the PATH
-    put(root.path(), HOOK, "// the review hook");
+    // harness.toml present, no harness on the PATH
+    put(root.path(), CONFIG, &config);
     let empty = tempdir().unwrap();
     let out = run_hook(&root, empty.path(), &[]);
     assert_eq!(out.status.code(), Some(0));
@@ -130,9 +142,8 @@ fn moves_a_hook_of_the_user_aside_and_runs_it_after_the_gate() {
         report.outcome("pre-commit -> pre-commit.user"),
         Some(Outcome::Moved)
     );
-    put(root.path(), HOOK, "// the review hook");
 
-    let bin = fake_rust_script(0);
+    let bin = fake_harness(0);
     let out = run_hook(&root, bin.path(), &["msg-file", "message"]);
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(
@@ -147,8 +158,7 @@ fn a_refusal_of_the_gate_stops_the_commit_before_the_hook_of_the_user() {
     let (_source, root) = gated();
     user_hook(&root, 0);
     run(&root);
-    put(root.path(), HOOK, "// the review hook");
-    let bin = fake_rust_script(2);
+    let bin = fake_harness(2);
     let out = run_hook(&root, bin.path(), &[]);
     assert_eq!(out.status.code(), Some(2));
     assert!(get(root.path(), "ran").is_none());
@@ -160,8 +170,7 @@ fn a_failure_of_the_hook_of_the_user_fails_the_commit() {
     let (_source, root) = gated();
     user_hook(&root, 7);
     run(&root);
-    put(root.path(), HOOK, "// the review hook");
-    let bin = fake_rust_script(0);
+    let bin = fake_harness(0);
     assert_eq!(run_hook(&root, bin.path(), &[]).status.code(), Some(7));
 }
 
@@ -362,11 +371,7 @@ fn installs_nothing_when_core_hooks_path_is_set_and_says_why() {
 #[test]
 fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
     let (source, root) = setup();
-    put(
-        source.path(),
-        &format!("files/{HOOK}"),
-        "// the review hook",
-    );
+    manage_the_review_gate(source.path());
     let report = run(&root);
     assert!(report.outcome(gate::GATE).is_none());
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
@@ -379,11 +384,7 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
 
     // a project inside another repository is not the top of one
     let (source, root) = setup();
-    put(
-        source.path(),
-        &format!("files/{HOOK}"),
-        "// the review hook",
-    );
+    manage_the_review_gate(source.path());
     let outer = tempdir().unwrap();
     git_in(outer.path(), &["init", "--quiet", "-b", "main"]);
     let inner = outer.path().join("project");
@@ -434,22 +435,22 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
     assert!(check_with(root.path(), false).unwrap().problems.is_empty());
     git_in(root.path(), &["config", "--unset", "core.hooksPath"]);
 
-    // the review hook deleted since the sync is still a managed file: the gate is still expected
-    fs::remove_file(root.path().join(HOOK)).unwrap();
+    // the hook of the review gate removed from the settings since the sync is still recorded: the gate is still expected
+    put(root.path(), ".claude/settings.json", "{}");
     assert_eq!(
         check_with(root.path(), false).unwrap().problems,
         vec![
-            format!("missing: {HOOK}"),
+            format!("missing: {RECORD_ENTRY}"),
             "missing: native review gate".to_string()
         ]
     );
     // a fresh clone of a CI run has no git hooks
     assert_eq!(
         check_with(root.path(), true).unwrap().problems,
-        vec![format!("missing: {HOOK}")]
+        vec![format!("missing: {RECORD_ENTRY}")]
     );
 
-    // a source without the review hook: no gate expected
+    // a source that does not manage the review gate: no gate expected
     let (_source, plain) = setup();
     git_in(plain.path(), &["init", "--quiet", "-b", "main"]);
     run(&plain);
@@ -457,11 +458,7 @@ fn check_reports_a_missing_or_modified_gate_and_nothing_else() {
 
     // not a repository
     let (source, root) = setup();
-    put(
-        source.path(),
-        &format!("files/{HOOK}"),
-        "// the review hook",
-    );
+    manage_the_review_gate(source.path());
     run(&root);
     assert!(check_with(root.path(), false).unwrap().problems.is_empty());
 }
@@ -503,6 +500,7 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
             .collect()
     };
     // no settings file: nothing to warn about
+    fs::remove_file(root.path().join(settings)).unwrap();
     assert!(check_with(root.path(), false).unwrap().warnings.is_empty());
 
     put(
@@ -527,8 +525,11 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
         deny_warnings(root.path()),
         vec![warning("Edit(//**/claude-review-waived)")]
     );
-    // a warning does not make `check` fail
-    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    // a warning does not make `check` fail: the only problem is the hook entry these settings lack
+    assert_eq!(
+        check_with(root.path(), false).unwrap().problems,
+        vec![format!("missing: {RECORD_ENTRY}")]
+    );
 
     let all = serde_json::json!({"permissions": {"deny": settings::DENY_RULES}});
     put(root.path(), settings, &all.to_string());
@@ -543,7 +544,7 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
         "{invalid:?}"
     );
 
-    // a source without the review hook: no rule expected
+    // a source that does not manage the review gate: no rule expected
     let (_source, plain) = setup();
     run(&plain);
     put(plain.path(), settings, "{}");

@@ -9,8 +9,8 @@ adrs: [0004, 0005]
 ## Intent
 
 A `git commit` waits until the diff has been through a code review. The native git `pre-commit` hook (installed by
-`harness`, see `specs/sync.md`) runs `require_code_review.rs native` and judges the repository git resolved; the Claude
-hook `require_code_review.rs` only records the review and refuses what would skip the native hook. The gates catch the
+`harness`, see `specs/sync.md`) runs `harness run review-gate native` and judges the repository git resolved; the Claude
+hook `harness run review-gate` only records the review and refuses what would skip the native hook. The gates catch the
 mistakes of a cooperative agent, not deliberate bypasses (ADR 0005).
 
 ## Requirements
@@ -23,7 +23,7 @@ mistakes of a cooperative agent, not deliberate bypasses (ADR 0005).
 - **REV-6** (deterministic) withdrawn: see REV-1.
 - **REV-7** (deterministic) withdrawn: see REV-1.
 - **REV-8** (deterministic) withdrawn: see REV-1.
-- **REV-9** (deterministic) `require_code_review.rs native` (run by the native `pre-commit` hook) must judge the repository git resolved for the commit (the `GIT_DIR` and work tree git passes, or the current directory when it passes none), never the text of a command, and must refuse a commit while the diff holds a file the last recorded review never saw, except when there is nothing to commit, when the diff is under `issues/` only, or when the waiver of the repository lets it through.
+- **REV-9** (deterministic) `harness run review-gate native` (run by the native `pre-commit` hook) must judge the repository git resolved for the commit (the `GIT_DIR` and work tree git passes, or the current directory when it passes none), never the text of a command, and must refuse a commit while the diff holds a file the last recorded review never saw, except when there is nothing to commit, when the diff is under `issues/` only, or when the waiver of the repository lets it through.
 - **REV-10** (deterministic) `native` must exit non-zero when it refuses and zero otherwise, and its refusal must tell the agent to run `/code-review low` on the diff. A waiver it cannot read or cannot stamp must let nothing through: `native` must judge the commit as if there were no waiver, and a refusal must then also tell the agent to ask the user to fix that waiver, naming its path.
 - **REV-11** (deterministic) `native` must judge a linked worktree by its own marker and waiver (the git directory of that worktree), and a repository reached through `--git-dir` by that git directory.
 - **REV-12** (deterministic) `check` must refuse a `git commit` line carrying `--no-verify` or `-n` (also in a bundle of short options such as `-nm`; `-am` and a `-n` inside a quoted message are not one), and a line that sets `core.hooksPath` (`-c core.hooksPath=…`, `--config-env=core.hooksPath=…`, `git config core.hooksPath …`), since they skip the native hook; the message must say why.

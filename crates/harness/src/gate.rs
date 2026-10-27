@@ -1,7 +1,8 @@
 //! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-23).
 //!
-//! The hook is a small `sh` script that starts the managed `require_code_review.rs native` of the project, then the
-//! `pre-commit` the user already had (moved to `pre-commit.user`, never overwritten).
+//! The hook is a small `sh` script that starts `harness run review-gate native` (the tool of the revision the project
+//! pins, `specs/tool-binaries.md`), then the `pre-commit` the user already had (moved to `pre-commit.user`, never
+//! overwritten).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,13 +10,14 @@ use std::process::{Command, Output};
 
 use anyhow::{bail, Result};
 
+use crate::entries::Entry;
 use crate::{is_executable, set_executable, write, Outcome};
 
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 
-/// The review hook of the project, relative to its root: the gate exists only where this managed file does.
-pub const REVIEW_HOOK: &str = ".claude/hooks/require_code_review.rs";
+/// The command of the hooks that run the review gate: the gate exists only where the harness manages such a hook.
+pub const REVIEW_TOOL: &str = "harness run review-gate";
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
 /// The line that tells the installed hook from one of the user.
@@ -23,15 +25,14 @@ const MARK: &str = "# harness: native review gate";
 /// Where a `pre-commit` of the user goes, and is run from.
 const CHAINED: &str = "pre-commit.user";
 
-/// The managed hook. Git runs it from the top of the work tree; a missing review hook or `rust-script` is a warning,
-/// not a refusal, so a branch or a machine without the harness can still commit.
+/// The managed hook. Git runs it from the top of the work tree; a work tree without `harness.toml` or a machine without
+/// `harness` is a warning, not a refusal, so a branch or a machine without the harness can still commit (BIN-9).
 const SCRIPT: &str = r#"#!/bin/sh
 # harness: native review gate (installed by `harness sync`, do not edit)
-hook=.claude/hooks/require_code_review.rs
-if [ -f "$hook" ] && command -v rust-script >/dev/null 2>&1; then
-    rust-script "$hook" native || exit $?
+if [ -f .claude/harness.toml ] && command -v harness >/dev/null 2>&1; then
+    harness run review-gate native || exit $?
 else
-    echo "harness: review gate skipped, $hook or rust-script is missing" >&2
+    echo "harness: review gate skipped, .claude/harness.toml or harness is missing" >&2
 fi
 case "$0" in */*) dir="${0%/*}" ;; *) dir=. ;; esac
 user="$dir/pre-commit.user"
@@ -117,8 +118,14 @@ pub fn state(hooks: &Path) -> State {
     }
 }
 
+/// Whether the managed `entries` hold a hook that runs the review gate.
+#[must_use]
+pub fn manages(entries: &[Entry]) -> bool {
+    entries.iter().any(|e| e.label().contains(REVIEW_TOOL))
+}
+
 /// The hooks directory of the project and what its `pre-commit` is, `None` when the project is not expected to have the
-/// gate (`expected` is false: the review hook is not among its managed files) or is not the top of a git repository.
+/// gate (`expected` is false: the harness manages no hook of the review gate) or is not the top of a git repository.
 /// One decision for `sync` and `check`, so they never disagree about where the gate goes.
 fn inspect(root: &Path, expected: bool) -> Option<(PathBuf, State)> {
     if !expected {
@@ -134,8 +141,8 @@ fn inspect(root: &Path, expected: bool) -> Option<(PathBuf, State)> {
 }
 
 /// The line `check` prints when the project should have the gate and does not (or not as managed), `None` when it is
-/// there, cannot be installed (`core.hooksPath`, no repository) or is not expected. `expected` tells whether the review
-/// hook is among the managed files, whether or not it was deleted since.
+/// there, cannot be installed (`core.hooksPath`, no repository) or is not expected. `expected` tells whether the lock
+/// records a managed hook of the review gate, whether or not the settings still hold it.
 #[must_use]
 pub fn problem(root: &Path, expected: bool) -> Option<String> {
     match inspect(root, expected)?.1 {
@@ -145,7 +152,7 @@ pub fn problem(root: &Path, expected: bool) -> Option<String> {
     }
 }
 
-/// Decide what to do for the project at `root`, whose managed files include the review hook when `has_review_hook`.
+/// Decide what to do for the project at `root`, whose source manages a hook of the review gate when `has_review_hook`.
 ///
 /// # Errors
 /// When a `pre-commit` of the user must move to `pre-commit.user` and that file exists already.
@@ -169,7 +176,7 @@ impl Plan {
     pub fn outcomes(&self) -> Vec<(String, Outcome)> {
         let mut out = Vec::new();
         if self.state == State::Redirected {
-            let why = "not installed: core.hooksPath is set, so git reads its hooks elsewhere; add `rust-script .claude/hooks/require_code_review.rs native` to your own pre-commit, run from the top of the work tree";
+            let why = "not installed: core.hooksPath is set, so git reads its hooks elsewhere; add `harness run review-gate native` to your own pre-commit, run from the top of the work tree";
             return vec![(GATE.to_string(), Outcome::Skipped(why))];
         }
         if self.state == State::Foreign {

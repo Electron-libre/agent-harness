@@ -1,9 +1,4 @@
 # Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.
-afca83926df442802f261aa7cce6f59a6b5d4313dca2233fe672b4cad5da8a40+x  .claude/hooks/clippy_gate.rs
-e19f15963cdaf97eb3fa24ce34463f9d1269627671ecccbc91799754ee4645a6+x  .claude/hooks/format_rust.rs
-73f8ff7d2b4d96aa704ef9d30849eb3cd5da8a9aa87fc3ea7ba3fa8c58641cd4  .claude/hooks/require_code_review.rs
-fd54e7e2e1012945a1438a5cb9a5d12e6b264a736f50fb16da183ed9ebb9cbf2+x  .claude/hooks/test_hooks.rs
-9f7ab65a4f341f67b1d946989bda79b06ced318125b73875cb2ce1350256113a  .claude/hooks/test_require_code_review.rs
 6addf7f1af2badb6ea6c6b1c7a56b6ccacf74b41e71262850fa6556c97c5ef24  .claude/repo_files.rs
 adb015a408ba21b51dcfbcade42911a22bb3559e66be924c269a370d36c4bd97  .claude/skills/audit-instructions/SKILL.md
 5530064af00eafad54c6eb8246beebfa2da4c6d316c338a235c6094a526fc6ad  .claude/skills/audit-instructions/audit_sources.rs
@@ -13,9 +8,9 @@ adb015a408ba21b51dcfbcade42911a22bb3559e66be924c269a370d36c4bd97  .claude/skills
 5c5a0cbac46a42b78dbeeaffaa145413e01d53487b0f8923c65d9d9610c93e6a  .claude/skills/create-issue/check_issue.rs
 d2db744e6291a53f6c90457db7fa2704f044815c4ebbff5fc8c85497eced7894  .claude/skills/create-issue/test_check_issue.rs
 e632be85a3847d1043e3d277f89bbdc86042cf7f13143ae9882232a5a73367ea  .claude/skills/evaluate-harness/SKILL.md
-2daeaebdc1f7d2560cc2d0de5a960a3d1be866b209776cde0ac00fe955d8028a  .claude/skills/issue-workflow/SKILL.md
+7d8f859426308003cb509d3c53dc2ae406e7e4d92c96d9a3f1754902d64d081a  .claude/skills/issue-workflow/SKILL.md
 d8bd901225209ce6b860fa2ca50e682d1265010fe0922d7dfaa63cc9fa6056d3  .claude/skills/issue-workflow/close_issue.rs
-02d1ed7e5e8e1af0a4b6fa631d9205a5925b83702e971aa73a693923afebecd6  .claude/skills/issue-workflow/details.md
+96fc13c68b8681d78f1ff2b0d04c6f4d3e2ba005b5f197f0d40f684ee09a16ee  .claude/skills/issue-workflow/details.md
 17d72a90772093c8cc73607f9cf5fc266a0b76d9bca71433cff53bd27b536a73+x  .claude/skills/issue-workflow/issue_worktree.rs
 59ca70c69792b4c6b4788d6889755b6ea579cf0d59a8fe614e411cd18160af1a  .claude/skills/issue-workflow/next_issue.rs
 174b746aec847b5b0ffe706f626404ad7744be00774e85d682a2f4b113347e77  .claude/skills/issue-workflow/test_close_issue.rs
@@ -28,7 +23,7 @@ fb2d21c5484dbad2bd0639f2a326a6385731bee3a4143fb8778807e1169d5e14  .claude/skills
 d1c75f59c8bba4ceade5cd282c6a1b3010efb97233686538e9a203f05fe52175  .claude/specs/check_specs.rs
 57cecfec0b3ecf8a80557f7587026e29fd73f0a3c9231a6222ef9e39226ad793  .claude/specs/test_check_specs.rs
 5ef0ab2500a2acedba5279f540433fe3d23dad8b3c60109ae769312e6cbbcdf5  .claude/test_recipes.rs
-79537062b5963275a2c4cd97e4039e12d7be8bb838c5106fa59dba0cd03f0bb9  .claude/test_settings.rs
+4ba84da02a8f40f4277014846e4faeac47102f8c6d392824c0251edd0c9ee598  .claude/test_settings.rs
 8e0cdaac649fb053d053310574cbe3478e8df920a54e848d26391eb3e0a6d0f3  .claude/transcripts/delivered_quality.rs
 ec623b22e57fe7af33ae984707357c8ae4fa08ff27b18689e831de2a3fbf999f  .claude/transcripts/fixed_context.rs
 e149aa88021fb5af58f14bed1299224e1d75d33b698bca5abc7904ccf65d7e20  .claude/transcripts/harness_report.rs
@@ -49,7 +44,7 @@ e138cb3a79312c3f8aa9f6241683556d97073fe6f4f8cdda35d24d1394a80abf  .claude/transc
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}
 entry  {"deny":"Edit(//**/claude-review-waived)"}
-entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs check"}}
-entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require_code_review.rs record"}}
-entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_rust.rs"}}
-entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"rust-script \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/clippy_gate.rs","timeout":600}}
+entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command":"harness run review-gate check"}}
+entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"harness run review-gate record"}}
+entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"harness run format-rust"}}
+entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"harness run clippy-gate","timeout":600}}
