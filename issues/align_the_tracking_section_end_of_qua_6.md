@@ -7,7 +7,7 @@ starting with `#`, which would stop at `## Plan` and count no `Code review` line
 written from the spec would fail against the code: make the wording say what the code does.
 
 # Findings
-* Found by the `high` review of `issues/check_the_red_run_of_traced_tests.md`; QUA-11 already says "ending at the next
+* Found by the `high` review of `issues/done/check_the_red_run_of_traced_tests.md`; QUA-11 already says "ending at the next
   line starting with `# `".
 
 # Approach
