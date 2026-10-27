@@ -574,7 +574,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     let seeded = report.outcome(entries::SETTINGS) == Some(Outcome::Seeded);
     let base = if seeded { &seeds } else { root };
     let text = fs::read_to_string(base.join(entries::SETTINGS)).ok();
-    let merge = entries::merge(text.as_deref(), &wanted, &recorded);
+    let merge = entries::merge(text.as_deref(), &wanted, &recorded, options.force);
     if let (Some(text), false) = (&merge.write, options.dry_run) {
         write(&root.join(entries::SETTINGS), text.as_bytes())?;
     }
@@ -738,6 +738,12 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
             Some(print) if print != *locked => Some(format!("modified: {rel}")),
             Some(_) => None,
         })
+        .chain(entries::missing(
+            fs::read_to_string(root.join(entries::SETTINGS))
+                .ok()
+                .as_deref(),
+            &lock.entries,
+        ))
         .chain(gate::problem(root, !ci && gated))
         .collect();
     Ok(Checked {

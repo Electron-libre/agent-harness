@@ -157,14 +157,15 @@ pub struct Merge {
     pub write: Option<String>,
     /// The entries for the lock.
     pub lock: Vec<Entry>,
-    /// One line per entry added, labelled as SYN-34 says.
+    /// One line per entry added, removed or in conflict, labelled as SYN-34 says.
     pub outcomes: Vec<(String, Outcome)>,
     /// Why the settings were left alone, when they were not merged although they exist.
     pub warning: Option<String>,
 }
 
-/// The merge of `wanted` into the settings `text` (`None`: no settings), the lock having `recorded`.
-pub fn merge(text: Option<&str>, wanted: &[Entry], recorded: &[Entry]) -> Merge {
+/// The merge of `wanted` into the settings `text` (`None`: no settings), the lock having `recorded`; `force` adds back
+/// the entries the project removed or edited.
+pub fn merge(text: Option<&str>, wanted: &[Entry], recorded: &[Entry], force: bool) -> Merge {
     let left_alone = |settings, warning| Merge {
         settings,
         write: None,
@@ -186,13 +187,27 @@ pub fn merge(text: Option<&str>, wanted: &[Entry], recorded: &[Entry]) -> Merge 
         return left_alone(Some(settings), Some(warning));
     }
     let mut outcomes = Vec::new();
-    for entry in wanted {
-        if !holds(&settings, entry) {
-            add(&mut settings, entry);
-            outcomes.push((entry.label(), Outcome::Added));
+    // an entry dropped by the source goes when the settings hold it unchanged (SYN-31)
+    for entry in recorded.iter().filter(|entry| !wanted.contains(entry)) {
+        if remove(&mut settings, entry) {
+            outcomes.push((entry.label(), Outcome::Removed));
         }
     }
-    let write = (!outcomes.is_empty()).then(|| {
+    let mut changed = !outcomes.is_empty();
+    for entry in wanted {
+        if holds(&settings, entry) {
+            continue;
+        }
+        // recorded yet no longer held: the project removed or edited it (SYN-33)
+        if recorded.contains(entry) && !force {
+            outcomes.push((entry.label(), Outcome::Conflict));
+            continue;
+        }
+        add(&mut settings, entry);
+        outcomes.push((entry.label(), Outcome::Added));
+        changed = true;
+    }
+    let write = changed.then(|| {
         let mut text = serde_json::to_string_pretty(&settings).expect("a JSON value serialises");
         text.push('\n');
         text
@@ -270,6 +285,70 @@ fn add(settings: &mut Value, entry: &Entry) {
             }
         }
     }
+}
+
+/// `settings` without the first occurrence of `entry`, its group and event dropped when left empty (SYN-31); whether
+/// `settings` held it. `settings` is in the shape of SYN-29.
+fn remove(settings: &mut Value, entry: &Entry) -> bool {
+    match entry {
+        Entry::Deny(rule) => {
+            let Some(deny) = settings["permissions"]["deny"].as_array_mut() else {
+                return false;
+            };
+            let Some(at) = deny.iter().position(|r| r.as_str() == Some(rule)) else {
+                return false;
+            };
+            deny.remove(at);
+            true
+        }
+        Entry::Hook {
+            event,
+            matcher,
+            hook,
+        } => {
+            let Some(hooks) = settings["hooks"].as_object_mut() else {
+                return false;
+            };
+            let Some(groups) = hooks.get_mut(event).and_then(Value::as_array_mut) else {
+                return false;
+            };
+            let found = groups.iter().enumerate().find_map(|(g, group)| {
+                let held = group["hooks"].as_array()?;
+                let at = held.iter().position(|h| h == hook)?;
+                (group["matcher"].as_str() == matcher.as_deref()).then_some((g, at))
+            });
+            let Some((g, at)) = found else {
+                return false;
+            };
+            let held = groups[g]["hooks"]
+                .as_array_mut()
+                .expect("checked by `entries`");
+            held.remove(at);
+            if held.is_empty() {
+                groups.remove(g);
+            }
+            if groups.is_empty() {
+                // `shift_remove`, not `remove`: the other events keep their order
+                hooks.shift_remove(event);
+            }
+            true
+        }
+    }
+}
+
+/// One `missing: .claude/settings.json <entry>` per entry of `recorded` the settings `text` no longer hold (SYN-36);
+/// none when the settings cannot be parsed or are not in the shape of SYN-29, which the warnings report.
+pub fn missing(text: Option<&str>, recorded: &[Entry]) -> Vec<String> {
+    let settings = match text.map(serde_json::from_str::<Value>) {
+        None => Value::Object(Map::new()),
+        Some(Ok(settings)) if entries(&settings).is_ok() => settings,
+        Some(_) => return Vec::new(),
+    };
+    recorded
+        .iter()
+        .filter(|entry| !holds(&settings, entry))
+        .map(|entry| format!("missing: {}", entry.label()))
+        .collect()
 }
 
 /// The object at `key` of `map`, created empty when missing.

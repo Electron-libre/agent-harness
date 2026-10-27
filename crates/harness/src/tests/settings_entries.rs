@@ -279,3 +279,140 @@ fn the_repository_settings_once_synced_give_check_nothing_to_warn_of() {
     assert_eq!(checked.warnings, Vec::<String>::new());
     assert_eq!(checked.problems, Vec::<String>::new());
 }
+
+/// The `with_fragment` project, synced once from settings holding a hook of its own at `Stop`.
+fn synced() -> (TempDir, TempDir) {
+    let (source, root) = with_fragment(&fragment());
+    put(
+        root.path(),
+        SETTINGS,
+        &json!({"hooks": {"Stop": [{"hooks": [hook("mine")]}]}}).to_string(),
+    );
+    run(&root);
+    (source, root)
+}
+
+fn forced(root: &TempDir) -> Report {
+    sync(
+        root.path(),
+        &SyncOptions {
+            force: true,
+            dry_run: false,
+        },
+    )
+    .unwrap()
+}
+
+// spec: SYN-31
+#[test]
+fn removes_the_entries_the_source_dropped_and_the_groups_they_empty() {
+    let (source, root) = synced();
+    put(source.path(), FRAGMENT, "{}");
+    let report = run(&root);
+    assert_eq!(
+        settings(&root),
+        json!({"hooks": {"Stop": [{"hooks": [hook("mine")]}]}, "permissions": {"deny": []}})
+    );
+    assert_eq!(
+        report.outcome(&format!("{SETTINGS} hook PostToolUse Skill {RECORD}")),
+        Some(Outcome::Removed)
+    );
+    assert_eq!(
+        report.outcome(&format!("{SETTINGS} deny {DENY}")),
+        Some(Outcome::Removed)
+    );
+    assert!(!get(root.path(), LOCK).unwrap().contains("entry  "));
+    assert_eq!(report.conflicts(), 0);
+}
+
+// spec: SYN-31
+#[test]
+fn a_changed_hook_replaces_the_old_one_in_its_group() {
+    let (source, root) = synced();
+    let mut changed = fragment();
+    changed["hooks"]["Stop"][0]["hooks"][0] = hook("gate");
+    put(source.path(), FRAGMENT, &changed.to_string());
+    let report = run(&root);
+    assert_eq!(
+        settings(&root)["hooks"]["Stop"],
+        json!([{"hooks": [hook("mine"), hook("gate")]}])
+    );
+    assert_eq!(
+        report.outcome(&format!("{SETTINGS} hook Stop {GATE}")),
+        Some(Outcome::Removed)
+    );
+    assert_eq!(
+        report.outcome(&format!("{SETTINGS} hook Stop gate")),
+        Some(Outcome::Added)
+    );
+    // replaced once: the next sync has nothing to do
+    let text = get(root.path(), SETTINGS);
+    run(&root);
+    assert_eq!(get(root.path(), SETTINGS), text);
+}
+
+// spec: SYN-31
+#[test]
+fn a_dropped_entry_the_project_edited_is_left_as_it_is() {
+    let (source, root) = synced();
+    let mut edited = settings(&root);
+    edited["hooks"]["Stop"][0]["hooks"][1]["timeout"] = json!(5);
+    put(root.path(), SETTINGS, &edited.to_string());
+    let mut dropped = fragment();
+    dropped["hooks"].as_object_mut().unwrap().remove("Stop");
+    put(source.path(), FRAGMENT, &dropped.to_string());
+    let report = run(&root);
+    assert_eq!(settings(&root)["hooks"]["Stop"], edited["hooks"]["Stop"]);
+    assert_eq!(report.conflicts(), 0);
+}
+
+// spec: SYN-33
+#[test]
+fn a_managed_entry_the_project_removed_or_edited_is_a_conflict_unless_forced() {
+    let (_source, root) = synced();
+    let mut edited = settings(&root);
+    edited["permissions"]["deny"] = json!([]);
+    edited["hooks"]["Stop"][0]["hooks"][1]["timeout"] = json!(5);
+    put(root.path(), SETTINGS, &edited.to_string());
+    let text = get(root.path(), SETTINGS);
+    let lock = get(root.path(), LOCK);
+
+    let report = run(&root);
+    assert_eq!(report.conflicts(), 2, "{:?}", report.entries);
+    assert_eq!(
+        report.outcome(&format!("{SETTINGS} deny {DENY}")),
+        Some(Outcome::Conflict)
+    );
+    assert_eq!(get(root.path(), SETTINGS), text, "not added back");
+    assert_eq!(get(root.path(), LOCK), lock, "still recorded");
+    // the conflict survives the next run
+    assert_eq!(run(&root).conflicts(), 2);
+
+    let report = forced(&root);
+    assert_eq!(report.conflicts(), 0);
+    let got = settings(&root);
+    assert_eq!(got["permissions"]["deny"], json!([DENY]));
+    assert_eq!(
+        got["hooks"]["Stop"][0]["hooks"],
+        json!([
+            hook("mine"),
+            edited["hooks"]["Stop"][0]["hooks"][1],
+            hook(GATE)
+        ])
+    );
+}
+
+// spec: SYN-36
+#[test]
+fn check_reports_each_recorded_entry_the_settings_no_longer_hold() {
+    let (_source, root) = synced();
+    assert!(check_with(root.path(), false).unwrap().problems.is_empty());
+    let mut edited = settings(&root);
+    edited["permissions"]["deny"] = json!(["Bash(rm *)"]);
+    edited["hooks"]["Stop"][0]["hooks"][0] = hook("not mine any more");
+    put(root.path(), SETTINGS, &edited.to_string());
+    assert_eq!(
+        check_with(root.path(), false).unwrap().problems,
+        vec![format!("missing: {SETTINGS} deny {DENY}")]
+    );
+}

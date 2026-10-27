@@ -66,8 +66,26 @@ project, so approach 3 is out (ADR 0007).
    the scope of deliverable 2 (SYN-31, SYN-33), not fixed here.
    not verified: an old `harness` binary reading a lock with `entry` lines (it would report them as missing files).
    decisions needed: none.
-2. [ ] Remove and replace: entries the source dropped or changed, an entry the project edited or removed, `check`
+2. [x] Remove and replace: entries the source dropped or changed, an entry the project edited or removed, `check`
    reporting; verified by sync and check tests; makes true SYN-31, SYN-33, SYN-36.
+
+   done: `merge` removes the recorded entries the source dropped (empty group and event dropped, the other events in
+   order), reports a recorded entry no longer held as a conflict (`--force` adds it back), `check` reports it as
+   `missing: .claude/settings.json <entry>`. A changed hook is appended to its group, not put at the old position.
+
+   | check | result |
+   |---|---|
+   | tests | `just check` ok (75 + 1) |
+   | lint | clippy clean |
+   | specs | ok, every SYN requirement traced |
+   | docs | deferred to deliverable 3 (plan) |
+   | harness | `just test-harness` ok |
+
+   red: `removes_the_entries_the_source_dropped_and_the_groups_they_empty` and three others: the dropped entries
+   stayed, the removed ones were added back, `check` reported nothing.
+   Code review: no findings
+   not verified: none.
+   decisions needed: none.
 3. [ ] Docs: `docs/architecture.md` ("Hooks and their declaration"), README, the hint of `test_settings.rs` naming
    the fragment, ADR 0007 accepted, spec accepted; verified by `just check`, `just test-harness`.
 
