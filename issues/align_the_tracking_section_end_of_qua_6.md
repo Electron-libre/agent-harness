@@ -20,3 +20,35 @@ written from the spec would fail against the code: make the wording say what the
 # Resources
 * `specs/delivered-quality.md` (QUA-3, QUA-6, QUA-11), `crates/harness/src/tools/delivered_quality.rs` (`section`,
   `reviews`), `crates/harness/tests/delivered_quality.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Amend the wording of QUA-6 so the `# Tracking` section ends at the next line starting with `# ` (as the code and
+QUA-11 do), not at any `#` line. Out of scope: any change of the code. The existing QUA-6 test already covers it.
+
+## Plan
+1. [x] Amend QUA-6: end the section at the next `# ` line outside a fence; verified by `just check` and the
+   existing QUA-6 test (fixture `ALPHA` has its `Code review` lines under `## Deliverable 1`); makes true QUA-6.
+
+## Decisions
+- Mode: autonomous
+- Base commit: `2abdb79c41abfc003244ca62f4284b8c9661ea24`
+
+## Deliverable 1
+- done: QUA-6 ends the `# Tracking` section at the next line starting with `# ` outside a fence, as the code and QUA-11.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass (`just check-specs`) |
+| docs | no other text cites the old ending |
+| code review | low, see below |
+
+- red: none (wording only; the existing QUA-6 test already passes against the code)
+- Code review: 0 findings
+- not verified: nothing
+- decisions needed: none
