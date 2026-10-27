@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [accept_an_internal_proof_with_its_reason](accept_an_internal_proof_with_its_reason.md) - before the gate proofs, so they keep an internal proof where a binary test would be slow or fragile
 - [prove_the_gate_specs_through_the_binary](prove_the_gate_specs_through_the_binary.md) - after the run proofs, reuses their fake programs; moves the install gate and settings warnings proofs
 - [make_the_architecture_doc_skimmable](make_the_architecture_doc_skimmable.md) - after the spec proofs, which move edge cases into the specs; unblocked by the binaries
 - [bootstrap_specs_for_an_existing_capability](bootstrap_specs_for_an_existing_capability.md) - widest scope, benefits from the spec clarity checks and the proof rule first
