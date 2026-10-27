@@ -37,6 +37,8 @@ reports signals, not verdicts: a fix after a feature may come from a new need.
 - (QUA-11) Given an issue whose commits add `// spec: ABC-1, ABC-2` and `// spec: ABC-3` to a test and whose tracking holds `red: ABC-1, ABC-3: assertion failed`, when the row is printed, then `traced` is 3 and `traced_without_red` 1.
 - (QUA-11) Given an issue whose commit only renames a test file that cites `// spec: ABC-1`, when the row is printed, then `traced` is 0.
 - (QUA-11) Given an issue whose commit turns `// spec: ABC-1` into `// spec: ABC-1, ABC-5` and whose tracking holds `- red: none (ABC-5 not covered: ABC-6)` and `Not covered: ABC-5`, when the row is printed, then `traced` is 1 and `traced_without_red` 1.
+- (QUA-11) Given an issue whose commit adds `// spec: ABC-1 (internal: the ABC-2 fixture is slow)` to a test, when the
+  row is printed, then `traced` is 1.
 - (QUA-7) Given a session on the branch `alpha` and a later-starting session on another branch both holding a commit of the issue `alpha`, when the row is printed, then the commit counts with the first.
 - (QUA-6) Given an issue file with `Code review: 6 findings` and `Code review: no findings`, then `reviews` is 2 and `review_findings` 6; with one more `Code review: fixed the doc`, `review_findings` is empty.
 - (QUA-2) Given an issue opened in a commit whose Goal quotes `# Tracking` in a fence, then a commit adding its `# Tracking` section, a commit of its deliverable and its close commit, when the row is printed, then `commits` is 3.

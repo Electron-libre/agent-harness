@@ -7,7 +7,7 @@
 //! Usage: `harness run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the current
 //! directory, `~/.claude/projects` and 30 days).
 
-use super::check_specs::is_req_id;
+use super::check_specs::{citation, is_req_id};
 use super::transcripts;
 
 use chrono::{DateTime, Duration, FixedOffset};
@@ -250,7 +250,8 @@ fn reviews(text: &str) -> (Option<usize>, Option<usize>) {
 
 /// The requirement ids of a `// spec: A-1, B-2` list, read as `check-specs` reads them.
 fn cited(list: &str) -> impl Iterator<Item = String> + '_ {
-    list.split(|c: char| c == ',' || c.is_whitespace())
+    citation(list)
+        .0
         .filter(|w| is_req_id(w))
         .map(str::to_string)
 }

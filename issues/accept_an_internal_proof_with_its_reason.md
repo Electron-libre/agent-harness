@@ -32,3 +32,46 @@ must be an improvement made when it is cheap and stable, not a rule.
 
 # Hints
 * The citation parser is shared with `delivered-quality`: the reason must not change the ids it reads.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+A citation under `src` may give its reason, `// spec: ID (internal: <reason>)`; `check-specs` then leaves the
+requirement out of the TRC-1 warning, fails on a blank reason, and the reason never changes the ids read (by
+`check-specs` nor `delivered-quality`). The docs and skills present the boundary test as preferred, not required.
+
+## Plan
+1. [x] Reasoned citation: one shared citation parser (ids + reason) in `check_specs.rs`, used by `delivered-quality`;
+   boundary warning skips reasoned requirements and names the syntax; blank reason is a problem; verified by
+   `tests/check_specs.rs` and a `delivered-quality` test; makes true TRC-1, TRC-6, TRC-7, TRC-8 (and the new QUA-11
+   scenario). ~250 lines.
+2. [ ] Wording: `specs/README.md`, `files/.claude/skills/write-spec/SKILL.md`, the "test first" step of
+   `files/.claude/skills/issue-workflow/SKILL.md`, then `just sync`; verified by `just check-harness`. ~40 lines.
+3. [ ] Reasons on this repo's internal-only citations (SYN-18 to SYN-24, REV-19, BIN-9), so `just check-specs` warns
+   of nothing; verified by `just check-specs`. ~20 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: f34ae899b66e605f52aace8dc3303ddc004b6567
+- TRC goes `draft` while TRC-6 to TRC-8 are untraced, back to `accepted` in deliverable 1.
+- The boundary warning names the reason syntax.
+- Deliverable 3 gives reasons to this repo's internal-only citations, each from what its test does.
+
+## Deliverable 1
+- done: `citation()` in `check_specs.rs` splits ids and reason, shared with `delivered-quality`; the boundary warning
+  skips reasoned requirements and names the syntax; a blank reason is a problem; TRC back to `accepted`.
+
+| check | result |
+|---|---|
+| tests | ok |
+| lint | ok |
+| specs | ok (9 warnings left, deliverable 3) |
+| docs | module doc; README wording in deliverable 2 |
+| code review | low: no findings |
+
+- red: TRC-6, TRC-7, TRC-8: `crates/a/src/t.rs: cites \`(internal:\`, which no spec defines`; QUA-11: `traced` 4, not 3
+- Code review: no findings
+- not verified: none
+- decisions needed: none

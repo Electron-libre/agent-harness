@@ -512,7 +512,7 @@ fn unread_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
-/// A repository where `eps` adds three citations and records the red run of two, `zeta` only renames a test and
+/// A repository where `eps` adds three citations, one with a reason, and records the red run of two, `zeta` only renames a test and
 /// `eta` extends its citation.
 fn traced_fixture(tmp: &Path) -> PathBuf {
     let repo = tmp.join("proj");
@@ -536,7 +536,7 @@ fn traced_fixture(tmp: &Path) -> PathBuf {
         "2026-01-02T00:00:00Z",
         "feat(files): eps",
         &[
-            ("tests/a.rs", Some("// spec: ABC-1, ABC-2\nfn a() {}\n    // spec: ABC-3\nfn b() {}\n// spec: ABC-1\nfn c() {}\nconst T: &str = \"// spec: ABC-9 in a string\";\n")),
+            ("tests/a.rs", Some("// spec: ABC-1, ABC-2\nfn a() {}\n    // spec: ABC-3 (internal: the ABC-7 fixture is slow)\nfn b() {}\n// spec: ABC-1\nfn c() {}\nconst T: &str = \"// spec: ABC-9 in a string\";\n")),
             ("specs/a.md", Some("Cite with // spec: ABC-8 above a test.\n")),
             ("docs/a.md", Some("// spec: ABC-4\n")),
             ("issues/eps.md", Some(eps)),
@@ -610,7 +610,7 @@ fn traced_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let r = rows(&out);
     vec![
         (
-            "the distinct ids of the added citation lines are traced, docs, prose and strings excluded".to_string(),
+            "the distinct ids of the added citation lines are traced, docs, prose, strings and reasons excluded".to_string(),
             has(&r, "eps", "traced", "3"),
         ),
         (

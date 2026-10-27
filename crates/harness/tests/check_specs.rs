@@ -508,7 +508,7 @@ fn marker_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
 }
 
-// spec: TRC-1, TRC-2, TRC-3, TRC-4, TRC-5
+// spec: TRC-1, TRC-2, TRC-3, TRC-4, TRC-5, TRC-6, TRC-7, TRC-8
 fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     let boundary = |name: &str, tests: &str, others: &[(&str, &str)]| {
         let stderr = case(name, SPEC, tests, others, None);
@@ -520,10 +520,7 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     let lines = boundary("internal proofs only pass", TESTS, &[]);
     report(
         "requirements proven only under src are warned of in one line",
-        lines
-            == [
-                "warning: specs/rerun.md: 2 requirements proven only by tests under `src`: RER-1, RER-2",
-            ],
+        lines == [warning("2 requirements", "RER-1, RER-2")],
     );
     let lines = boundary(
         "a boundary proof passes",
@@ -532,7 +529,7 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
     report(
         "a requirement also proven outside src is not listed",
-        lines == ["warning: specs/rerun.md: 1 requirement proven only by tests under `src`: RER-2"],
+        lines == [warning("1 requirement", "RER-2")],
     );
     let lines = boundary(
         "managed tests are boundary proofs",
@@ -546,8 +543,7 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
         "a spec proven outside src is not warned of",
         lines.is_empty(),
     );
-    let only_rer1 =
-        ["warning: specs/rerun.md: 1 requirement proven only by tests under `src`: RER-1"];
+    let only_rer1 = [warning("1 requirement", "RER-1")];
     let draft = SPEC.replace("status: accepted", "status: draft");
     let stderr = case(
         "an uncited draft requirement passes",
@@ -584,6 +580,38 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
         "a managed test under a src directory is a boundary proof",
         lines.is_empty(),
     );
+    let reasoned = "// spec: RER-1, RER-2 (internal: the RER-9 fixture is slow)\nfn t() {}\n";
+    let lines = boundary("internal proofs with a reason pass", reasoned, &[]);
+    report(
+        "requirements whose internal proofs give a reason are not listed",
+        lines.is_empty(),
+    );
+    let lines = boundary(
+        "a reasoned and a bare internal proof pass",
+        reasoned,
+        &[("crates/a/src/u.rs", "// spec: RER-2\nfn u() {}\n")],
+    );
+    report(
+        "a requirement with one internal proof giving no reason is listed",
+        lines == [warning("1 requirement", "RER-2")],
+    );
+    for blank in ["(internal: )", "(internal:)"] {
+        case(
+            &format!("a blank reason `{blank}` is flagged"),
+            SPEC,
+            &format!("// spec: RER-1, RER-2 {blank}\nfn t() {{}}\n"),
+            &[],
+            Some("crates/a/src/t.rs:1: `(internal: <reason>)` gives no reason"),
+        );
+    }
+}
+
+/// The boundary warning of `specs/rerun.md` for `count` requirements, `ids`.
+fn warning(count: &str, ids: &str) -> String {
+    format!(
+        "warning: specs/rerun.md: {count} proven only by tests under `src` with no reason: {ids} \
+         (give it as `// spec: ID (internal: <reason>)`)"
+    )
 }
 
 /// The boundary warnings of a checker's stderr.

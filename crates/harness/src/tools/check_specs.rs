@@ -3,7 +3,8 @@
 //! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
 //! Prints one line per problem, exit 1 if any; a `[NEEDS CLARIFICATION: ...]` marker is a problem in an `accepted`
 //! spec and a warning on stderr in a `draft` one; the vague wording of a `draft` requirement (`VAGUE`, not exactly one
-//! `must`) is a warning, and so are the requirements proven only by tests under a `src` directory (TRC-1).
+//! `must`) is a warning, and so are the requirements proven only by tests under a `src` directory whose citations
+//! give no reason, `// spec: ID (internal: <reason>)` (TRC-1, TRC-6).
 
 use super::repo_files;
 
@@ -306,9 +307,31 @@ fn all_files(dir: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
+/// The ids of a `// spec:` list and the reason it gives for an internal proof, `A-1, B-2 (internal: <reason>)`
+/// (TRC-6, TRC-8): the reason never adds an id. A blank reason is `Some("")`.
+pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>) {
+    let (ids, reason) = match list.split_once("(internal:") {
+        Some((ids, reason)) => {
+            let reason = reason.trim();
+            (ids, Some(reason.strip_suffix(')').unwrap_or(reason).trim()))
+        }
+        None => (list, None),
+    };
+    let ids = ids
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|s| !s.is_empty());
+    (ids, reason)
+}
+
+/// A file citing a requirement, and whether that citation gives the reason of an internal proof.
+struct Cite {
+    file: String,
+    reasoned: bool,
+}
+
 /// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them. A citation sits right above a
 /// test: only attributes and other comments may come between it and the `fn`; any other place is a problem.
-fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<String>> {
+fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> {
     // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
     // lists, so never those of a nested worktree (ADR 0008) nor the build output
     let dirs = [root.join("crates"), root.join(".claude")];
@@ -328,7 +351,7 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<String>
     let files = files.into_iter().filter(|f| {
         f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d))
     });
-    let mut cited: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut cited: BTreeMap<String, Vec<Cite>> = BTreeMap::new();
     for file in files {
         let Ok(text) = std::fs::read_to_string(&file) else {
             continue;
@@ -353,11 +376,18 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<String>
                     i + 1
                 ));
             }
-            for id in list
-                .split(|c: char| c == ',' || c.is_whitespace())
-                .filter(|s| !s.is_empty())
-            {
-                cited.entry(id.to_string()).or_default().push(name.clone());
+            let (ids, reason) = citation(list);
+            if reason == Some("") {
+                out.push(format!(
+                    "{name}:{}: `(internal: <reason>)` gives no reason",
+                    i + 1
+                ));
+            }
+            for id in ids {
+                cited.entry(id.to_string()).or_default().push(Cite {
+                    file: name.clone(),
+                    reasoned: reason.is_some_and(|r| !r.is_empty()),
+                });
             }
         }
     }
@@ -394,12 +424,12 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
         .iter()
         .flat_map(|s| s.requirements.iter().map(|r| r.id.as_str()))
         .collect();
-    for (id, files) in cited.iter().filter(|(id, _)| !known.contains(id.as_str())) {
+    for (id, cites) in cited.iter().filter(|(id, _)| !known.contains(id.as_str())) {
         // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
         let foreign = |file: &str| {
             !strict && is_managed(file) && !ids.contains_key(id.split('-').next().unwrap_or(""))
         };
-        for file in files.iter().filter(|f| !foreign(f)) {
+        for file in cites.iter().map(|c| &c.file).filter(|f| !foreign(f)) {
             out.push(format!("{file}: cites `{id}`, which no spec defines"));
         }
     }
@@ -428,24 +458,26 @@ fn is_internal(file: &str) -> bool {
     !is_managed(file) && Path::new(file).components().any(|c| c.as_os_str() == "src")
 }
 
-/// Warn, per spec, of the cited requirements whose every citation is internal (TRC-1 to TRC-4).
-fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<String>>) {
+/// Warn, per spec, of the cited requirements whose every citation is internal, one at least giving no reason
+/// (TRC-1 to TRC-4, TRC-6).
+fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<Cite>>) {
     for spec in specs {
         let internal: Vec<&str> = spec
             .requirements
             .iter()
             .filter(|r| !r.exempt)
             .filter(|r| {
-                cited
-                    .get(&r.id)
-                    .is_some_and(|files| files.iter().all(|f| is_internal(f)))
+                cited.get(&r.id).is_some_and(|cites| {
+                    cites.iter().all(|c| is_internal(&c.file)) && cites.iter().any(|c| !c.reasoned)
+                })
             })
             .map(|r| r.id.as_str())
             .collect();
         if !internal.is_empty() {
             let plural = if internal.len() == 1 { "" } else { "s" };
             eprintln!(
-                "warning: {}: {} requirement{plural} proven only by tests under `src`: {}",
+                "warning: {}: {} requirement{plural} proven only by tests under `src` with no reason: {} \
+                 (give it as `// spec: ID (internal: <reason>)`)",
                 spec.file,
                 internal.len(),
                 internal.join(", ")
