@@ -21,4 +21,4 @@ copy keeps passing on a stale format. One check should cover every `#[path]` inc
 
 # Resources
 * `docs/adr/0006-transcript-readers-are-managed-scripts.md`, `docs/adr/0009-scanners-list-the-repository-files-through-git.md`.
-* `issues/ship_the_harness_scripts_as_prebuilt_binaries.md`.
+* `issues/done/ship_the_harness_scripts_as_prebuilt_binaries.md`.
