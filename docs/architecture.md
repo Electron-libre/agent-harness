@@ -105,8 +105,8 @@ line per diagnostic (`--message-format=short`: file, line, column, message) and 
 40, never the build progress, and runs clippy only when the Rust state changed since the last passing run: that run
 writes a hash of `HEAD` and of the path and content of each changed `.rs` file to `claude-clippy-pass` in the git
 directory of the worktree.
-The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session opened in the main worktree that entered an
-issue worktree (`EnterWorktree`) keeps it on the main one, where another agent may work. `clippy-gate` checks the
+The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session opened in the main worktree that entered another
+worktree (`EnterWorktree`, an agent's) keeps it on the main one, where another agent may work. `clippy-gate` checks the
 work tree of the event's `cwd`, at the place `CLAUDE_PROJECT_DIR` has in its own (a crate in a subdirectory), and
 `format-rust` runs `cargo fmt` from the directory of the edited file.
 For the same reason the seeded `justfile` asks the project's `check` to print nothing on success.
@@ -281,8 +281,8 @@ ancestry, patch equivalence, or a merge that would change no file, which covers 
 creates or enters one, since Claude Code isolates a session entered with `EnterWorktree` and refuses every command it
 cannot prove stays there. The user runs `just start-issue` and launches a plain `claude` in the worktree; the
 session's `cwd`, and the `cwd` of the hook events, are the worktree. The hooks act on the work tree of that `cwd`
-(their declarations still come from the main worktree, `CLAUDE_PROJECT_DIR`, but `harness run` takes the revision of
-the `harness.toml` it finds from the `cwd`): `review-gate` keeps its marker and waiver in the git directory of each
+(a session launched in the worktree has it as `CLAUDE_PROJECT_DIR`, so the worktree's `.claude/settings.json`
+declares them, and `harness run` takes the revision of the `harness.toml` it finds from the `cwd`): `review-gate` keeps its marker and waiver in the git directory of each
 worktree (`git rev-parse --git-path`), `format-rust` and `clippy-gate` run cargo there. `.claude/` is tracked, so each worktree holds its own copy of the harness (a project that does not track `.claude/` gets bare worktrees). At the close, the agent rebases the branch, runs `just check-harness` there (and installs the `harness` of the branch when the installed one refuses a hook of it, BIN-15), then prints the commands left to the user in the main worktree: fast-forward the main branch, `just close-issue`, `just finish-issue`.
 
 ## The cost of a turn

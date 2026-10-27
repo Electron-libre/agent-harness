@@ -62,6 +62,9 @@ resumed in one; a plain `claude` launched in a worktree made by `git worktree ad
 1. [x] Optional worktree: `issue-workflow` step 0, "Merge back" and Rules, `details.md`, ADR 0011 (supersedes the
    "each issue gets a worktree" of 0003/0008), `docs/architecture.md`, `CLAUDE.md`; verified by `just sync`,
    `just check-harness`, `just check` and a reread.
+2. [x] Fixes of the `high` review: step 0 stops on an issue taken elsewhere; `check-harness` right after a sync that
+   adds a hook; hooks declared by the worktree in a session launched there; rebase again when the fast-forward
+   refuses; `low` review of the close commit; ADR 0008 partly superseded; no ADR number in the shared skill.
 
 ## Decisions
 - Mode: autonomous
@@ -76,3 +79,9 @@ resumed in one; a plain `claude` launched in a worktree made by `git worktree ad
 - checks: `just check` ok, `just check-harness` ok, `just sync` done.
 - not verified: that a plain `claude` launched in an issue worktree has no isolation refusal (taken from the Claude
   Code docs); to see at the next parallel issue.
+
+## Summary of deliverable 2
+- done: the fixes of the `high` review listed in the plan.
+- red: none (docs and skill text, no test).
+- Code review: no findings (`low`, on the fixes). The `high` review: 10 findings; 9 fixed, 1 left (a session in a nested worktree may load the main `CLAUDE.md` as
+  an ancestor: written in ADR 0011 as not measured, follow-up to decide with the user).

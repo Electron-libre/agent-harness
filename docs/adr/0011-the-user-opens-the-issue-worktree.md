@@ -21,4 +21,8 @@ rest: the place under `.claude/worktrees/`, the mark "taken" from git, the queue
 ## Consequences
 An issue in the main worktree pays no isolation refusal and needs no merge. Two parallel issues need the user to open
 the second session and to merge each worktree. A session started with `claude --worktree` or `EnterWorktree` still
-gets the isolation; the docs name the plain `claude` launch.
+gets the isolation; the docs name the plain `claude` launch. An issue worked in the main worktree has no branch, so
+`next-issue` still offers it: the user does not start it in parallel, and `issue-workflow` stops when it is handed an
+issue whose branch exists. With no `EnterWorktree`, the placement under `.claude/worktrees/` of ADR 0008 loses its
+reason (no approval prompt), and a session launched in a nested worktree may also load the main worktree's
+`CLAUDE.md` as an ancestor (not measured).

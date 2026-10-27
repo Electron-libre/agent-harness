@@ -18,9 +18,10 @@ Reports to the user (stops, summaries, final report) are read at a glance:
 
 ## 0. Resume or start
 
-**Work where the session was started** (ADR 0011): the main worktree, or the issue worktree the user opened for
-parallel work. Never create, enter or leave a worktree yourself (no `just start-issue`, no `EnterWorktree`). In a
-linked worktree, never redirect to the main one (`git -C`, its paths). Details: [details.md](details.md).
+**Work where the session was started**: the main worktree, or the issue worktree the user opened for parallel work.
+Never create, enter or leave a worktree yourself (no `just start-issue`, no `EnterWorktree`). In a linked worktree,
+never redirect to the main one (`git -C`, its paths). Stop and ask the user when the issue is taken elsewhere: in the
+main worktree, a branch `<stem>` exists; in a linked one, its branch is not `<stem>`. Details: [details.md](details.md).
 
 Read the issue file. No `# Tracking` section: start at step 1. If `# Tracking` says `Plan: proposed`, the plan was never
 validated: redo the stop of step 2. Otherwise (`Plan: validated`, or no marker: planned before it existed) show where it stands in two `next` / `left` lines (the next unchecked
@@ -142,6 +143,8 @@ the commands left to the user).
 
 - Anything outward-facing or hard to reverse (push, deleting, rewriting history) needs an explicit ask.
 - Don't re-litigate decisions already recorded in the issue.
+- After a `harness sync` that adds a hook, run `just check-harness` at once and the `cargo install` it prints: the
+  live hooks call the installed `harness`, and one it refuses blocks every command, the install included.
 - If something blocks you, say what and propose one recommendation; don't enumerate every option.
 - When the issue is fully done, mark it in the issue and say what, if anything, remains. Then **ask the
   user whether to close it** (in a linked worktree, see "Merge back"); on their agreement run `just close-issue issues/<name>.md` (moves it to

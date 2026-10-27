@@ -1,6 +1,6 @@
 # 0008. Issue worktrees nest under .claude/worktrees
 
-Status: Accepted
+Status: Accepted, partly superseded by 0011 (the user opens the worktree; no `EnterWorktree`)
 Date: 2026-10-27
 
 ## Context
