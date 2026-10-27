@@ -3,3 +3,10 @@
 Open issues in the order to work on them: the first is the next one. Read by `just next-issue`;
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
+
+- [start_an_issue_in_its_own_worktree](start_an_issue_in_its_own_worktree.md) - first: parallel sessions already collide in the main worktree, and every later issue run in parallel needs it
+- [propagate_new_hook_declarations_on_sync](propagate_new_hook_declarations_on_sync.md) - removes a manual step per project, and unblocks the switch of the hook commands to binaries
+- [ship_the_harness_scripts_as_prebuilt_binaries](ship_the_harness_scripts_as_prebuilt_binaries.md) - after the propagation of the hook declarations, which it needs to change every hook command
+- [check_the_red_run_of_traced_tests](check_the_red_run_of_traced_tests.md) - makes the spec traceability prove more than a citation; independent of the above
+- [make_the_architecture_doc_skimmable](make_the_architecture_doc_skimmable.md) - after the binaries, which rewrite several of its sections
+- [bootstrap_specs_for_an_existing_capability](bootstrap_specs_for_an_existing_capability.md) - widest scope, benefits from the spec clarity checks first
