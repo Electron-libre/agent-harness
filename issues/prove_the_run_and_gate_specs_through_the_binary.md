@@ -44,7 +44,7 @@ boundary); the gate and the settings warnings (`prove_the_gate_specs_through_the
    launcher through `harness run` (cached binary, GitHub asset and digest, `cargo install`, local source and its
    last good build, rev resolved in the cached clone) and `sync` (prefetch warning); `src/tests/run.rs` dropped;
    makes true BIN-1 to BIN-6, BIN-10 to BIN-13 (~900 lines).
-2. [ ] Installed harness: `tests/launcher_cli.rs` proves `check` and `update` against a fake `harness` that knows
+2. [x] Installed harness: `tests/launcher_cli.rs` proves `check` and `update` against a fake `harness` that knows
    only `run`; `src/tests/launcher.rs` dropped; makes true BIN-15, BIN-16 (~350 lines).
 3. [ ] Retention: `tests/retention_cli.rs` gains each warning (user settings in `CLAUDE_CONFIG_DIR` or `HOME`,
    unreadable, unlocatable, project files, `CI`); `src/tests/retention.rs` dropped; makes true SYN-28 (~250 lines).
@@ -63,5 +63,15 @@ boundary); the gate and the settings warnings (`prove_the_gate_specs_through_the
   good build off fails BIN-12.
 - Code review: no findings; the `low` review read only the non-test files (the diff is all tests), so the test files
   were reread by hand: nothing found.
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `tests/launcher_cli.rs` proves BIN-15 and BIN-16 through `check` and `update` with a fake installed
+  `harness` that knows only `run` (and a `PATH` without any `harness` for the look-at-nothing case);
+  `src/tests/launcher.rs` dropped.
+- red: none (the behaviour exists: the proofs move); mutation checked: `launcher::refused` returning nothing fails
+  the 3 proofs that expect a refusal.
+- Code review: no findings
 - not verified: none
 - decisions needed: none
