@@ -74,7 +74,7 @@ scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they reso
 2. [x] Scanners: `close_issue.rs` skips `.claude/worktrees/` of the root it walks (by path, not by name), the
    existing `check_specs.rs` skip gets its citation; verified by `test_close_issue.rs`, `test_check_specs.rs`;
    makes true PAR-14.
-3. [ ] Transcripts: `repository()` of `transcripts.rs` maps a removed `<repo>/.claude/worktrees/<x>` cwd to
+3. [x] Transcripts: `repository()` of `transcripts.rs` maps a removed `<repo>/.claude/worktrees/<x>` cwd to
    `<repo>`; verified by `test_session_metrics.rs`; makes true EVA-7 (amended).
 
 ## Decisions
@@ -97,3 +97,8 @@ scope: `bypassPermissions`, moving existing worktrees. Hooks reviewed: they reso
 - red: `FAIL - the files of a worktree under .claude/worktrees are untouched` (and the same for `--relink`).
 - Deviation: the citation of PAR-14 is in `test_close_issue.rs` only; the `check_specs.rs` half is proven by the
   existing cases of `test_check_specs.rs`, which sit in its `main` and carry no citation, like the rest of that file.
+
+## Deliverable 3
+- done: `repository()` maps a removed cwd under `<repo>/.claude/worktrees/` to `<repo>`; the scripts that include
+  `transcripts.rs` carry its new SHA-256; `specs/parallel-issues.md` and `specs/evaluation.md` back to `accepted`.
+- red: `FAIL - a removed worktree under .claude/worktrees counts with its repository`.

@@ -124,6 +124,9 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
     let s4 = line("user", &removed, "2026-10-26T09:00:00.000Z", ",\"gitBranch\":\"gone_issue\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}");
     std::fs::write(proj.join("s3.jsonl"), s3).unwrap();
     std::fs::write(proj.join("s4.jsonl"), s4).unwrap();
+    let nested = repo.join(".claude/worktrees/gone_nested/crates");
+    let s5 = line("user", &nested, "2026-10-26T09:00:00.000Z", ",\"gitBranch\":\"gone_nested\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}");
+    std::fs::write(proj.join("s5.jsonl"), s5).unwrap();
     (projects, repo)
 }
 
@@ -138,10 +141,11 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let s2 = rows.get("s2").unwrap_or(&empty);
     let s3 = rows.get("s3").unwrap_or(&empty);
     let s4 = rows.get("s4").unwrap_or(&empty);
+    let s5 = rows.get("s5").unwrap_or(&empty);
     let col = |r: &HashMap<String, String>, c: &str| r.get(c).cloned().unwrap_or_else(|| "<none>".into());
     vec![
         ("the script succeeds", out.status.success()),
-        ("header names every column, one row per session, none for the sub-agent", rows.len() == 4),
+        ("header names every column, one row per session, none for the sub-agent", rows.len() == 5),
         ("a message repeated on 3 lines is one turn; the sub-agent adds one", col(s1, "turns") == "3"),
         ("tool calls count every tool_use block, sub-agent included", col(s1, "tool_calls") == "4"),
         ("tokens are added once per message, sub-agent included", col(s1, "input_tokens") == "1011" && col(s1, "output_tokens") == "22"),
@@ -159,6 +163,7 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ("a cwd outside git falls back to its last component", col(s2, "project") == "elsewhere"),
         ("a submodule is its own project", col(s3, "project") == "lib"),
         ("a removed issue worktree counts with its repository", col(s4, "project") == "myrepo"),
+        ("a removed worktree under .claude/worktrees counts with its repository", col(s5, "project") == "myrepo"),
         ("unreadable lines are counted, sub-agent included", col(s1, "unreadable_lines") == "2"),
         ("unknown line types are counted", col(s1, "unknown_lines") == "1"),
         ("assistant lines without usage are missing fields, metadata lines without timestamp are not", col(s1, "missing_fields") == "1"),

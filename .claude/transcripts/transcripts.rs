@@ -161,10 +161,14 @@ pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
 }
 
 /// The main worktree of the repository holding `cwd`: a linked worktree counts with its main repository, a submodule
-/// or a separate git directory is its own work tree. A removed issue worktree `<repo>-<branch>` (ADR 0003) counts
-/// with `<repo>` when that one still exists.
+/// or a separate git directory is its own work tree. A removed worktree under `<repo>/.claude/worktrees/` (ADR 0008),
+/// or a removed issue worktree `<repo>-<branch>` (ADR 0003), counts with `<repo>` when that one still exists.
 pub fn repository(cwd: &str, branches: &[String]) -> Option<PathBuf> {
     let dir = Path::new(cwd);
+    let nested_in = dir.ancestors().find(|a| a.ends_with(".claude/worktrees")).and_then(|a| a.parent()?.parent()).filter(|r| r.exists());
+    if let (false, Some(repo)) = (dir.exists(), nested_in) {
+        return repository(repo.to_str()?, &[]);
+    }
     if !dir.exists() {
         let name = dir.file_name()?.to_string_lossy().into_owned();
         let repo = branches.iter().find_map(|b| name.strip_suffix(&format!("-{b}")).map(|r| dir.with_file_name(r)))?;

@@ -14,7 +14,7 @@
 //! toml = "0.8"
 //! ```
 
-// transcripts.rs sha256: 88aa683cf117f2087cfff20243255bd66990027890ee1f3f654b6f73590b0e85
+// transcripts.rs sha256: c8ae2cc5427c66ae28c0f7de0c8c325564a69641435a71f5dd4672b15f034901
 #[path = "transcripts.rs"]
 mod transcripts;
 
