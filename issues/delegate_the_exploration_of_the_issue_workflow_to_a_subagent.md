@@ -66,7 +66,7 @@ verdict. Out of scope: subagents for the tests or `update-docs`, a custom agent 
 1. [x] Main-context metric: `session-metrics` column `main_context_peak` (old archives upgraded), its median in the
    efficiency table, a metric of `Expected-effect:`; verified by tests of `session_metrics`, `harness_report`,
    `harness_changes`/`commit_check`; makes true EVA-16, EVA-17, REP-9, VRD-1 (~250 lines).
-2. [ ] Delegated exploration: `issue-workflow` steps 1 and 3.1 hand a broad exploration (many files, history,
+2. [x] Delegated exploration: `issue-workflow` steps 1 and 3.1 hand a broad exploration (many files, history,
    conventions) to a read-only `Explore` subagent asking for the conclusion with the paths and lines behind it; a
    targeted read stays in the main thread; `just sync`; commit with `Expected-effect: main_context_peak down`;
    verified by `just check` and `just check-harness` (~20 lines).
@@ -94,4 +94,22 @@ verdict. Out of scope: subagents for the tests or `update-docs`, a custom agent 
 - red: EVA-16, EVA-17, REP-9, VRD-1: `FAIL - header names every column` (no `main_context_peak` column); `FAIL - the median main context peak leaves out the sessions with no peak`; `commit_check_refuses_an_expected_effect_it_cannot_read` panicked on `main context peak`.
 - Code review: no findings
 - not verified: the column on the real transcripts.
+- decisions needed: none.
+
+## Deliverable 2: delegated exploration
+
+- done: `issue-workflow` step 1 hands a broad exploration to a read-only `Explore` subagent that cites the paths and
+  lines behind each conclusion; step 3.1 points to it; `docs/workflow.md` says so.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | n/a (no capability changed) |
+| docs | `docs/workflow.md` |
+| code review | low, see below |
+
+- red: none (skill text, no test)
+- Code review: no findings
+- not verified: whether the agent delegates in practice; the verdict of `main_context_peak down` needs sessions.
 - decisions needed: none.
