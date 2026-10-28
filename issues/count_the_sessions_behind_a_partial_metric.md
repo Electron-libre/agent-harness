@@ -8,7 +8,7 @@ be `helped` or `hurt`. The expected outcome: a verdict on such a metric is `conf
 sessions that have it are fewer than `--min-sessions`.
 
 # Findings
-* Raised by the `high` review of `issues/delegate_the_exploration_of_the_issue_workflow_to_a_subagent.md` (commits
+* Raised by the `high` review of `issues/done/delegate_the_exploration_of_the_issue_workflow_to_a_subagent.md` (commits
   `e311105`, `657bf10`).
 * Only `main_context_peak` can be empty in a session row today; every other efficiency column is always filled.
 * The archived rows lose their transcripts over time, so the groups before the column was added hold the most
