@@ -52,10 +52,10 @@ approval Claude Code asks before loading an import outside the working directory
    (scenario of the linked `CLAUDE.md`); verified by a `fixed-context` test on a commit and an `audit-sources` test on
    a work tree; makes true REP-2, AUD-1. ~60 lines.
 2. [x] Ancestors: `audit-sources` lists the instruction files of each ancestor of the working directory up to the
-   root of its repository, by absolute path, `~/.claude/` excepted; amended AUD-1; verified by an `audit-sources` test with `HOME` set to a
+   root of its repository, by absolute path, the home directory's `.claude/` excepted; amended AUD-1; verified by an `audit-sources` test with `HOME` set to a
    temporary directory; makes true AUD-1. ~120 lines.
 3. [x] Fixes of the `high` review: the ancestors read in the tree of the repository (an import may climb to any of
-   its directories), `~/.claude/` left out only from the listing of the home directory, AUD-1 worded with absolute
+   its directories), the home directory's `.claude/` left out only from the listing of the home directory, AUD-1 worded with absolute
    paths; verified by the ancestors test of `audit_sources`; makes true AUD-1.
 
 ## Decisions
@@ -82,7 +82,7 @@ approval Claude Code asks before loading an import outside the working directory
 
 ## Deliverable 2
 - done: `audit-sources` lists the instruction files of each working directory and of its ancestors up to the
-  repository root (nearest `.git`), by absolute path, sorted, `~/.claude/` left out; the `audit-instructions` skill
+  repository root (nearest `.git`), by absolute path, sorted, the home directory's `.claude/` left out; the `audit-instructions` skill
   says so.
 - | check | result |
   |---|---|
@@ -99,7 +99,7 @@ approval Claude Code asks before loading an import outside the working directory
 
 ## Deliverable 3 (fixes of the `high` review)
 - done: `memory.rs` reads the memory files of a directory inside a tree; `audit-sources` reads every ancestor in the
-  tree of the repository; the `~/.claude/` filter only applies to the home directory's own listing; AUD-1 states the
+  tree of the repository; the the home directory's `.claude/` filter only applies to the home directory's own listing; AUD-1 states the
   absolute paths.
 - | check | result |
   |---|---|
