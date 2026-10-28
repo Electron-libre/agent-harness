@@ -28,3 +28,51 @@ loads, so the audit can miss a rule the user wrote and propose it again:
 
 # Resources
 * `crates/harness/src/memory.rs`, `crates/harness/src/tools/audit_sources.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Make the audit list the instruction files of the ancestors of each working directory, and resolve the imports of a
+linked memory file against the directory of its target, for the audit and `fixed-context` alike. Out of scope: the
+approval Claude Code asks before loading an import outside the working directory.
+
+## Measure (2026-10-28, Claude Code 2.1.312, `claude -p` in scratch repositories)
+* A linked `CLAUDE.md` (`CLAUDE.md -> sub2/target.md`) importing `@inc.md` and `@./inc2.md` loads `sub2/inc.md`
+  and `sub2/inc2.md`, not the files next to the link: imports resolve against the directory of the target.
+* A session in `repo/a/b` loads the `CLAUDE.md` of `repo/a/b`, `repo/a`, `repo` and of the directory above the
+  repository, and the unscoped rules of `repo/a/.claude/rules` and `repo/.claude/rules`; the walk does not stop at the
+  repository root. `repo/a/AGENTS.md` was not loaded (`repo/a/CLAUDE.md` exists).
+* From `repo/a/b`, the import of `repo/sub2/target.md` (outside the working directory) was not loaded: an external
+  import waits for an approval a `-p` session never gives. The audit still lists it: the user wrote it.
+
+## Plan
+1. [x] Linked imports: `memory.rs` resolves an import against the directory of the resolved file; amended REP-2
+   (scenario of the linked `CLAUDE.md`); verified by a `fixed-context` test on a commit and an `audit-sources` test on
+   a work tree; makes true REP-2, AUD-1. ~60 lines.
+2. [ ] Ancestors: `audit-sources` lists the instruction files of each ancestor of the working directory up to the
+   root of its repository, by absolute path, `~/.claude/` excepted; amended AUD-1; verified by an `audit-sources` test with `HOME` set to a
+   temporary directory; makes true AUD-1. ~120 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 301f4979b0d39eed4fb4fafcafc85af6bb26970b
+- Ancestors: the walk stops at the repository root (nearest `.git`; the working directory alone without one),
+  though a session loads the files above it too: reading outside the repository is a security and privacy concern
+  (user, 2026-10-28).
+
+## Deliverable 1
+- done: an import of a linked memory file resolves against the directory of its target (`memory.rs`), for
+  `fixed-context` and `audit-sources`; REP-2 amended, AUD-1 amended for deliverable 2 too.
+- | check | result |
+  |---|---|
+  | tests | pass |
+  | lint | pass |
+  | specs | pass |
+  | docs | n/a: no document states the directory an import resolves against |
+  | code review | see below |
+- red: REP-2, AUD-1: `fixed_context` counted 51 bytes instead of 54 for `r1`; `audit_sources_lists_every_instruction_file_once` lacked `docs/x.md`.
+- Code review: no findings
+- not verified: none
+- decisions needed: none

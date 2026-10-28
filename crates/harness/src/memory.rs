@@ -114,13 +114,9 @@ fn loaded(tree: &impl Tree) -> Vec<Loaded> {
         if !seen.insert(file.clone()) {
             continue;
         }
-        loaded.push(Loaded {
-            path: file,
-            agents: AGENTS.contains(&path.as_str()),
-            bytes: text.len() as u64,
-        });
         if hops < HOPS {
-            let dir = Path::new(&path).parent().unwrap_or(Path::new(""));
+            // against the directory of the file a symbolic link points to; outside the tree, `resolve` drops them
+            let dir = Path::new(&file).parent().unwrap_or(Path::new(""));
             queue.extend(
                 imports(&String::from_utf8_lossy(&text))
                     .iter()
@@ -128,6 +124,11 @@ fn loaded(tree: &impl Tree) -> Vec<Loaded> {
                     .map(|p| (p, hops + 1)),
             );
         }
+        loaded.push(Loaded {
+            path: file,
+            agents: AGENTS.contains(&path.as_str()),
+            bytes: text.len() as u64,
+        });
     }
     loaded
 }

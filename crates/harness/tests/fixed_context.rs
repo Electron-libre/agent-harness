@@ -110,7 +110,9 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             ("CLAUDE.md", "@AGENTS.md"),
             (".claude/CLAUDE.md", "@../docs/x.md `@AGENTS.md`"),
             ("docs/x.md", "xxx"),
-            ("shared/rule.md", "1234567"),
+            // imported from the directory of the linked rule's target
+            ("shared/rule.md", "@inc.md"),
+            ("shared/inc.md", "iii"),
             (".claude/rules/r.md", "rrrrr"),
             (".claude/rules/s.md", "---\npaths: src\n---\nSECRET scoped"),
             (".claude/skills/one/SKILL.md", &skill("one", "d1d1")),
@@ -207,8 +209,8 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             full(&own)
         ),
         // the memory files and their imports; AGENTS.md only when imported or in place of the CLAUDE.md files
-        format!("pinned\tr1\t{c1}\t51\t4\t7\tone"),
-        format!("pinned\tr2\t{c2}\t12\t10\t18\tone,three,two"),
+        format!("pinned\tr1\t{c1}\t54\t4\t7\tone"),
+        format!("pinned\tr2\t{c2}\t15\t10\t18\tone,three,two"),
     ];
     let lines: Vec<&str> = out.lines().collect();
     if lines != expected {

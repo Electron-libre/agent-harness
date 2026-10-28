@@ -120,7 +120,9 @@ fn audit_sources_lists_every_instruction_file_once() {
     let write = |path: &str, text: &str| std::fs::write(repo.join(path), text).unwrap();
     write("AGENTS.md", "# agents\n");
     std::os::unix::fs::symlink("AGENTS.md", repo.join("CLAUDE.md")).unwrap();
-    write(".claude/CLAUDE.md", "see @../docs/x.md and @~/notes.md\n");
+    // a linked memory file imports from the directory of the file it points to
+    write("docs/main.md", "see @x.md and @~/notes.md\n");
+    std::os::unix::fs::symlink("../docs/main.md", repo.join(".claude/CLAUDE.md")).unwrap();
     write("docs/x.md", "imported\n");
     write("docs/y.md", "not imported\n");
     write(".claude/rules/a.md", "always\n");
@@ -152,7 +154,6 @@ fn audit_sources_lists_every_instruction_file_once() {
     assert_eq!(
         listed,
         [
-            ".claude/CLAUDE.md".into(),
             ".claude/rules/a.md".into(),
             ".claude/rules/sub/b.md".into(),
             std::fs::canonicalize(&shared)
@@ -160,6 +161,7 @@ fn audit_sources_lists_every_instruction_file_once() {
                 .display()
                 .to_string(),
             "AGENTS.md".into(),
+            "docs/main.md".into(),
             "docs/x.md".into(),
         ]
     );
