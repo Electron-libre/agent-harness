@@ -16,7 +16,7 @@ use transcripts::{
     result_text, revision, sessions, subagents, typed_text, Place,
 };
 
-const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+pub(super) const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
 /// The line types seen in the transcripts; any other is counted in `unknown_lines`, since the format moves.
 const KNOWN_TYPES: &[&str] = &[

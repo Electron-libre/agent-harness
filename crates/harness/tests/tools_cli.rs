@@ -168,8 +168,59 @@ fn commit_check_enforces_each_rule_of_agents_md() {
         ),
         ("emoji", "feat(docs): add flag \u{1F680}\n".into(), "emoji"),
     ];
+    check_messages(repo.path(), cases);
+}
+
+// spec: VRD-1, VRD-2
+#[test]
+fn commit_check_refuses_an_expected_effect_it_cannot_read() {
+    let repo = project(Some("[project]\ncommit_scopes = [\"files\"]\n"));
+    let message = |line: &str| format!("feat(files): trim the skill\n\n{line}\n");
+    let cases: Vec<(&str, String, &str)> = vec![
+        ("median metric", message("Expected-effect: turns down"), ""),
+        (
+            "quality ratio",
+            message("Expected-effect: findings_per_review down"),
+            "",
+        ),
+        (
+            "fixed context",
+            message("Expected-effect: total_bytes up"),
+            "",
+        ),
+        (
+            "rule share",
+            message("Expected-effect: breached_share:commit-attribution down"),
+            "",
+        ),
+        (
+            "unknown metric",
+            message("Expected-effect: speed up"),
+            "Expected-effect",
+        ),
+        (
+            "unknown direction",
+            message("Expected-effect: turns lower"),
+            "line 3",
+        ),
+        (
+            "rule with no name",
+            message("Expected-effect: breached_share: down"),
+            "Expected-effect",
+        ),
+        (
+            "extra word",
+            message("Expected-effect: turns down a lot"),
+            "Expected-effect",
+        ),
+    ];
+    check_messages(repo.path(), cases);
+}
+
+/// Each case: a name, a message, and the hint its refusal must hold (empty: the message is valid).
+fn check_messages(repo: &Path, cases: Vec<(&str, String, &str)>) {
     for (name, message, hint) in cases {
-        let (code, stdout, _) = tool(repo.path(), &["commit-check"], &message);
+        let (code, stdout, _) = tool(repo, &["commit-check"], &message);
         if hint.is_empty() {
             assert_eq!((code, stdout.as_str()), (0, ""), "{name}");
         } else {

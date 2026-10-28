@@ -14,6 +14,7 @@ mod commit_check;
 mod delivered_quality;
 mod fixed_context;
 mod format_rust;
+mod harness_changes;
 mod harness_report;
 mod issue_worktree;
 mod language;
@@ -86,6 +87,11 @@ pub const TOOLS: &[Tool] = &[
         name: "format-rust",
         about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
         main: format_rust::main,
+    },
+    Tool {
+        name: "harness-changes",
+        about: "[repo] --sessions <file>: the expected effects of the harness changes, with the revisions holding each",
+        main: harness_changes::main,
     },
     Tool {
         name: "harness-report",

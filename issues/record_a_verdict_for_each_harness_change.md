@@ -24,8 +24,7 @@ else changed too.
    the model, version or project mix changed between the groups, or a group is `too few`.
 
 # Specs
-* `specs/harness-report.md` if a tool reads the expectations; new requirement ids decided at `issue-workflow`
-  step 1.
+* `specs/harness-verdicts.md` (VRD-1 to VRD-8, new); `specs/harness-report.md` (REP-3 amended for `--changes`).
 
 # Resources
 * `files/.claude/skills/evaluate-harness/SKILL.md`, `specs/harness-report.md`, `specs/delivered-quality.md`
@@ -35,3 +34,53 @@ else changed too.
 # Hints
 * No target on agent behaviour: the expectation names a direction, never a threshold to reach.
 * After `weigh_the_form_and_the_evidence_of_harness_proposals`, which sets the evidence rules this verdict applies.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+A `feat(files)`/`fix(files)` commit records `Expected-effect: <metric> <up|down>` (a column of `harness-report`);
+`harness run harness-changes` lists them with the revisions in use that hold each change, and `harness-report
+--changes` gives each a verdict from the groups around it, `confounded` by default. Out of scope: replays,
+thresholds, expectations outside the commit messages. Spec: `specs/harness-verdicts.md` (VRD), REP-3 amended.
+
+## Plan
+1. [x] Record the expectation: `Expected-effect` line checked by `commit-check`, `harness run harness-changes`
+   (rows of the expectations and the revisions holding each change); verified by tests through the binary on a
+   temp git repository; makes true VRD-1, VRD-2, VRD-3, VRD-4, VRD-7, VRD-8; ~600 lines.
+2. [ ] Verdict table: `harness-report --changes` prints `## Verdicts` (groups before and after, values, verdict);
+   verified by tests through the binary on TSV fixtures; makes true VRD-5, VRD-6, REP-3 (amended); ~500 lines.
+3. [ ] Skill and docs: `evaluate-harness` collects `harness-changes`, passes `--changes` and reads the verdicts
+   (`confounded` and `too few` are no conclusion); `AGENTS.md` names the footer line; verified by new
+   `REQUIRED_PASSAGES` in `crates/harness/tests/skills.rs`, `just check-harness`; ~80 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 0de9d401e04936ce272bd199708b04844399a362
+- Where: the commit message (a footer line), read from the history of the harness source; no tool reads an issue
+  section or a `docs/` file for this.
+- Confounders (VRD-6): the most frequent name of `models`, `versions` and `projects` is compared, not the whole set
+  (a weekly Claude Code release would confound everything); any other change with an expectation and the same after
+  group confounds, whatever its metric.
+
+## Deliverable 1
+done: `Expected-effect: <metric> <up|down>` lines checked by `commit-check`; `harness run harness-changes [repo]
+--sessions <file>` lists them per change of `files/` with the revisions in use that hold it.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass; VRD draft; REP-2, 3, 6, 7 warn of 2 `must` since REP is back in `draft` (pre-existing wording) |
+| docs | `docs/usage.md`, `docs/architecture.md` (reader table) |
+| code review | low, see below |
+
+red: VRD-3, VRD-4, VRD-7, VRD-8: `harness: unknown tool 'harness-changes'`; VRD-1, VRD-2: `unknown metric:
+left: 0, right: 1` (`commit-check` accepted `Expected-effect: speed up`).
+
+Code review: no findings
+
+not verified: a run on the real history (no commit carries an expectation yet).
+
+decisions needed: none

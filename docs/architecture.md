@@ -222,6 +222,7 @@ flowchart LR
 | `rule-breaches` | finding (`--summary`: rule and revision) | the rules a program can check, `breach` or `blocked` | [`rule-breaches.md`](../specs/rule-breaches.md) |
 | `delivered-quality` | done issue (`--summary`: revision) | deliverables, fixes inside and after, review findings, failed checks, traced ids | [`delivered-quality.md`](../specs/delivered-quality.md) |
 | `fixed-context` | project and revision | the bytes every session pays before any work, the skills shipped | [`harness-report.md`](../specs/harness-report.md) |
+| `harness-changes` | expected effect of a change | the `Expected-effect` lines of the commits of `files/`, the revisions in use that hold each | [`harness-verdicts.md`](../specs/harness-verdicts.md) |
 | `harness-report` | group of revisions | the tables of the four above, never the transcripts | [`harness-report.md`](../specs/harness-report.md) |
 
 The choices behind them:
