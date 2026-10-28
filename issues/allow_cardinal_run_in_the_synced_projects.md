@@ -42,6 +42,8 @@ old `Bash(harness run *)` of a project (never recorded as managed, so it stays t
    `settings_entries_cli.rs`; makes true SYN-29, SYN-34 (allow rules), SYN-31, SYN-36 for them.
 2. [x] Fixes of the `high` review: the permission lists paired with their entry constructor (no wildcard fallback), the
    doc comment of `of_source` on the order; verified by the existing tests.
+3. [x] `type Rule` for the constructor table: commit 3eb4e91 went in with `clippy::type_complexity` red (the commit
+   was chained without waiting for `just check`); verified by `just check`.
 
 ## Decisions
 - Mode: autonomous
@@ -88,4 +90,8 @@ red: none (refactor under the green tests).
   as for the hooks and deny rules (ADR 0007).
 - wildcard `Entry::rule`, twin variants: fixed by the constructor table.
 - `of_source` doc on the order: fixed.
+Code review: no findings
+
+## Summary of deliverable 3
+done: `type Rule = fn(String) -> Entry`, clippy green again. red: none. Code review: see below.
 Code review: no findings

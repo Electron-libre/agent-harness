@@ -17,9 +17,11 @@ pub const SETTINGS: &str = ".claude/settings.json";
 /// The managed entries, relative to the source.
 pub const FRAGMENT: &str = "entries/.claude/settings.json";
 
+/// The entry of a rule of a list of `permissions`.
+type Rule = fn(String) -> Entry;
+
 /// The lists of `permissions` whose rules are managed entries, with the entry of one of their rules.
-const PERMISSIONS: [(&str, fn(String) -> Entry); 2] =
-    [("allow", Entry::Allow), ("deny", Entry::Deny)];
+const PERMISSIONS: [(&str, Rule); 2] = [("allow", Entry::Allow), ("deny", Entry::Deny)];
 
 /// One managed entry: a rule of `permissions.allow` or `permissions.deny`, or a hook object of an event and matcher of
 /// `hooks`.
