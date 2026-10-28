@@ -72,6 +72,7 @@ fn no_tool_or_an_unknown_one_exits_3_listing_the_tools() {
             stderr.contains("commit-check") && stderr.contains("check-commits"),
             "{stderr}"
         );
+        assert!(stderr.starts_with("cardinal: "), "{stderr}");
     }
 }
 

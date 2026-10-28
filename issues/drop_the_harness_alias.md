@@ -31,4 +31,5 @@ one binary.
   `files/.github/install_cardinal.sh`
 
 # Hints
+* The cache moved to `<cache>/cardinal`: the old `<cache>/harness` (clones, binaries) can be deleted then.
 * A gate already installed calls `harness` when `cardinal` is missing: `sync` reinstalls it with the new script.

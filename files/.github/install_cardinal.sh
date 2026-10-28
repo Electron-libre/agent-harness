@@ -14,7 +14,7 @@ case "$source" in
   *://*|git@*) ;;
   *)
     if [ -f "$source/crates/cardinal/Cargo.toml" ]; then
-      exec cargo install --quiet --path "$source/crates/cardinal" --locked
+      exec cargo install --quiet --force --path "$source/crates/cardinal" --locked
     fi
     echo "source '$source' is a local path outside this repository: cardinal not installed"
     exit 0 ;;
@@ -73,5 +73,6 @@ elif [ -n "$full" ]; then
   rm -rf "$dir/.root"
   echo "$dir" >> "$GITHUB_PATH"
 else
-  cargo install --quiet --git "$cargo_url" ${rev:+--rev "$rev"} --locked
+  # --force: over a `harness` package installed before the rename
+  cargo install --quiet --force --git "$cargo_url" ${rev:+--rev "$rev"} --locked
 fi

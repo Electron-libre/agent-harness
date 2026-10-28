@@ -145,8 +145,8 @@ pub fn run(args: &[String]) -> u8 {
         return (tool.main)(&args[1..]);
     }
     match args.first() {
-        Some(name) => eprintln!("harness: unknown tool `{name}`; the tools are:"),
-        None => eprintln!("harness: name a tool; the tools are:"),
+        Some(name) => eprintln!("cardinal: unknown tool `{name}`; the tools are:"),
+        None => eprintln!("cardinal: name a tool; the tools are:"),
     }
     for tool in TOOLS {
         eprintln!("  {:<16} {}", tool.name, tool.about);

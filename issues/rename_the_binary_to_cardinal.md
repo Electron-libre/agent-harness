@@ -110,6 +110,23 @@ own issues).
    - Code review: no findings.
    - not verified: a consumer synced to this revision (its hooks need `cardinal` installed).
    - decisions needed: none.
+6. [x] Fixes of the `high` review (`428ec4a..c677a0f`, 9 findings): verified by `tools_cli.rs`, `just check`.
+   - done: `install_cardinal.sh` installs with `--force` (local source, non-commit rev); the tool list says
+     `cardinal:`; doc comments of `check`, `update` and the CLI help name the launcher; issue
+     `allow_cardinal_run_in_the_synced_projects` queued second; cache cleanup noted in `drop_the_harness_alias`.
+   - check | result: tests, lint, specs pass (`just check`); `sh -n` passes; docs: doc comments.
+   - red: BIN-7: `no_tool_or_an_unknown_one_exits_3_listing_the_tools` panicked, stderr began `harness: name a
+     tool`.
+   - Code review: no findings.
+   - High review: 9 findings. Fixed: 4 (`--force` in the CI install, `harness:` messages, doc comments, cache
+     cleanup noted for the alias issue). Issue: 1 (the seeded allow rule, `allow_cardinal_run_in_the_synced_projects`).
+     Not fixed: 4, as decided at the stop (1 a) or out of reach: hooks with no `harness` fallback (an older `update`
+     writes them unchecked, a BIN non-goal; a missing command never blocks the agent); an old launcher in the gate
+     fallback cannot build a post-rename commit off GitHub (BIN-9 warning, the gate is skipped); a `harness` hook
+     with only `cardinal` installed is not refused (every install puts both, BIN-18); the alias bin includes
+     `main.rs` by `#[path]` (it declares no module; dropped with the alias).
+   - not verified: none.
+   - decisions needed: none.
 
 ## Decisions
 - Mode: autonomous

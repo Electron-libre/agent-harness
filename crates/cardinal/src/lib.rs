@@ -655,7 +655,7 @@ pub struct UpdateReport {
 }
 
 /// Move the project to `rev` of its git source (default: the head of the default branch): sync to it, then write
-/// the resolved commit to `rev` in `harness.toml`. A conflict, an unknown revision, an unreadable source or a hook the `harness` on the path refuses (BIN-16) leave the project as it was;
+/// the resolved commit to `rev` in `harness.toml`. A conflict, an unknown revision, an unreadable source or a hook the launcher on the path refuses (`cardinal`, else `harness`, BIN-16) leave the project as it was;
 /// an I/O error during the write itself is not rolled back, as for `sync`.
 ///
 /// # Errors
@@ -746,7 +746,7 @@ fn update_in(
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Checked {
     /// Managed files modified or deleted since the last sync, and the native review gate when the project should have
-    /// it and does not, and the hook commands the `harness` on the path refuses (BIN-15).
+    /// it and does not, and the hook commands the launcher on the path refuses (BIN-15).
     pub problems: Vec<String>,
     /// What the project's settings lack or run in vain (SYN-24 to SYN-26).
     pub warnings: Vec<String>,
@@ -756,7 +756,8 @@ pub struct Checked {
 /// should have it and does not. Under CI (the `CI` environment variable is set) the gate is not looked at: a fresh
 /// clone has no git hooks, and nobody commits there. It also warns of what the project's settings lack: the deny rules of
 /// the review waiver (when the review hook is among the managed files), the hooks they run, the attribution turned off.
-/// A hook command whose subcommand the `harness` on the path refuses is a problem too (BIN-15).
+/// A hook command whose subcommand the launcher on the path refuses (`cardinal`, else `harness`) is a problem too
+/// (BIN-15).
 ///
 /// # Errors
 /// When the project was never synced (no lock file) or the lock cannot be read.
