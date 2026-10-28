@@ -1,8 +1,8 @@
 # Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.
-e3e51f6f18193d7f1e6038fd864db46beef88c1d5dc6764d0c56ae0299eeaef7  .claude/skills/audit-instructions/SKILL.md
+cd4c90b533f6dd667baaa58608c25c53bf67c32dff13334d7aa9b809f0f58960  .claude/skills/audit-instructions/SKILL.md
 9e47d720de527cc71aa3b0a6a56cf6dbb49c817226134473654487c082c38dcb  .claude/skills/commit-message/SKILL.md
 fe5eafac04a3bac9f735b206b0f196c17131a6384bd2a054462ade8e6427e697  .claude/skills/create-issue/SKILL.md
-615e260a6005e26f130d5a5a440946d0ddaaf7c2f12d095fb0dfbe8bca20864d  .claude/skills/evaluate-harness/SKILL.md
+03c17677068dcab6bc988ae9b508af6565148871d776b2314e24ef9295fe5be9  .claude/skills/evaluate-harness/SKILL.md
 7651489b64c5b0b7d1b1ac3cd60127ab5706e58588b2c8b00547bb04a5c7223e  .claude/skills/issue-workflow/SKILL.md
 9c33f0c0a6e861d889aabab43f2d76f65d515e03098582b935b4b25f2db2851b  .claude/skills/issue-workflow/details.md
 a4a97bcd508675dab0db8578c011312a9af3cc19b080a42cb50e764534e81b85  .claude/skills/prioritize-issues/SKILL.md

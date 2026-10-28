@@ -240,7 +240,8 @@ The choices behind them:
 
 `audit-instructions` is the other skill that reads outside the repository: the transcripts, memory and instruction
 files under `~/.claude/projects`, through `audit-sources`, and the summary of `rule-breaches`, whose rules broken often
-are hook candidates. It only proposes skills and hooks; its report holds private content, so it stays in the
+are hook candidates. It only proposes what more than one session shows, in the cheapest form that holds it (skill,
+script or `harness` tool, hook, always-on rule last); its report holds private content, so it stays in the
 conversation and each validated proposal becomes an issue in generic wording. It is a skill rather than a tool because
 telling a repeated procedure from a rule needs judgment.
 

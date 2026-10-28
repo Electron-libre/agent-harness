@@ -51,12 +51,19 @@ No spec: shared skill content, not a capability of the tool.
    always-on rule names its trade), add the evidence rules to both skills and trim as much as is added (skill
    descriptions untouched, so `harness run fixed-context` stays flat); verified by new `REQUIRED_PASSAGES` in
    `crates/harness/tests/skills.rs` (red before the edit), `just check`, `just check-harness`; ~60 lines.
+2. [x] Fixes of the `high` review: the one-session threshold moved to Detect (also for "never/always" phrases),
+   the cost note of the ladder counts a skill's description line, the trade of a rule goes in `why`,
+   `evaluate-harness` keeps to measuring ("no change is a valid conclusion"), docs aligned, bodies trimmed; verified
+   by the updated `REQUIRED_PASSAGES`.
 
 ## Decisions
 - Mode: autonomous
 - Base commit: b4dd9e07cb7b5d40d593e0f1498becede562d65d
-- Fixed context: no skill description changed, so `harness run fixed-context` is unchanged; the bodies grew by
-  ~165 bytes (`audit-instructions`, step 1 rewritten shorter) and ~90 bytes (`evaluate-harness`), loaded on demand.
+- Fixed context: no skill description changed, so `harness run fixed-context` is unchanged; after deliverable 2 the
+  bodies, loaded on demand, grew by 44 bytes (`audit-instructions`) and 54 bytes (`evaluate-harness`).
+- Not fixed from the `high` review: `REQUIRED_PASSAGES` matched on raw text, not whitespace-flattened (a reflow
+  can break a passage; pre-existing behaviour of the test); the `audit-instructions` description still says
+  "skills and hooks" (rewording it costs fixed context, the body says the rest).
 
 ## Deliverable 1
 done: cost-ordered forms (skill, script or `harness` tool, hook with its shapes, always-on rule last naming its
@@ -76,5 +83,25 @@ missing passages.
 Code review: no findings
 
 not verified: a real `audit-instructions` run with the new ladder (needs the user's transcripts).
+
+decisions needed: none
+
+## Deliverable 2
+done: fixes of 7 of the 9 findings of the `high` review (2 not fixed, see Decisions).
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass, none touched |
+| docs | `docs/architecture.md`, `docs/workflow.md` aligned; copies synced |
+| code review | low, see below |
+
+red: none traced (no spec); `skills` test failed with `audit-instructions: missing 'its `why` names what it replaces
+or trims'` and `evaluate-harness: missing 'no change is a valid conclusion'`.
+
+Code review: no findings
+
+not verified: a real audit run with the fixed ladder.
 
 decisions needed: none

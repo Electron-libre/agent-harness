@@ -27,7 +27,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "audit-instructions",
-        "names what it replaces or trims",
+        "its `why` names what it replaces or trims",
         "an always-on rule pays for itself by cutting something else",
     ),
     (
@@ -37,17 +37,17 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "audit-instructions",
-        "Proposing nothing is a valid outcome",
+        "proposing nothing is a valid outcome",
         "the audit does not grow the harness without evidence",
     ),
     (
         "audit-instructions",
-        "seen in one session only is noise",
+        "nor what one session only shows",
         "a single occurrence is no evidence",
     ),
     (
         "evaluate-harness",
-        "Proposing nothing is a valid outcome",
+        "no change is a valid conclusion",
         "the measure does not invent a change to make",
     ),
     (
