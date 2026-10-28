@@ -1,4 +1,4 @@
-//! Copy the managed files of a harness source into a project, and detect drift.
+//! Copy the managed files of a Cardinal source into a project, and detect drift.
 //!
 //! A source holds `files/` (managed: overwritten on every sync while untouched locally) and `seed/`
 //! (project-owned: copied once, never again), and may hold `entries/.claude/settings.json`, the entries of the

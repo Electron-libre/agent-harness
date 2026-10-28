@@ -1,7 +1,7 @@
 //! Reading of the Claude Code transcripts, shared by the tools that read them (ADR 0006, 0010):
 //! the projects directory, its projects and sessions, the sub-agent transcripts of a session, the parsed lines, the
 //! filter of the messages the user typed, and what a session is resolved to (its repository, project, start and the
-//! harness revision then).
+//! Cardinal revision then).
 #![allow(dead_code)]
 
 use chrono::{DateTime, FixedOffset};
@@ -333,7 +333,7 @@ pub fn committed_config(repo: &Path, at: &str) -> Option<toml::Table> {
 }
 
 /// The revision a parsed configuration pins (ADR 0002): its `rev`, `unpinned` with no `rev`; `None` for the
-/// harness repository itself (`source = "."`, no `rev`), whose revision is a commit of its `files/`.
+/// Cardinal repository itself (`source = "."`, no `rev`), whose revision is a commit of its `files/`.
 pub fn pinned_revision(config: &toml::Table) -> Option<String> {
     let harness = config.get("cardinal").or_else(|| config.get("harness"));
     let field = |key: &str| {
@@ -348,8 +348,8 @@ pub fn pinned_revision(config: &toml::Table) -> Option<String> {
     }
 }
 
-/// The harness revision in force in `repo` at `start`: the `pinned_revision` of the configuration committed
-/// on the default branch then; `self:<commit>` for the harness repository itself, the last commit touching `files/`;
+/// The Cardinal revision in force in `repo` at `start`: the `pinned_revision` of the configuration committed
+/// on the default branch then; `self:<commit>` for the Cardinal repository itself, the last commit touching `files/`;
 /// empty when it cannot be read.
 pub fn revision(repo: &Path, start: &str) -> String {
     let Some(config) = committed_config(repo, start) else {

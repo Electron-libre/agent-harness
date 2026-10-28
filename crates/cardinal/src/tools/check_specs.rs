@@ -516,7 +516,7 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
         .flat_map(|s| s.requirements.iter().map(|r| r.id.as_str()))
         .collect();
     for (id, cites) in cited.iter().filter(|(id, _)| !known.contains(id.as_str())) {
-        // a managed test (under `.claude/`) may cite a spec that stays in the harness repository
+        // a managed test (under `.claude/`) may cite a spec that stays in the Cardinal repository
         let foreign = |file: &str| {
             !strict && is_managed(file) && !ids.contains_key(id.split('-').next().unwrap_or(""))
         };

@@ -1,10 +1,10 @@
-//! Print the evolution of the harness by revision (`specs/cardinal-report.md`): one markdown table per axis, one row
+//! Print the evolution of Cardinal by revision (`specs/cardinal-report.md`): one markdown table per axis, one row
 //! per group of consecutive revisions holding at least `--min-sessions` sessions, with the model, version and project
 //! mix and the sample size next to the numbers. Reads the outputs of the other transcript readers, never the
 //! transcripts; it reports trends, never a pass or a fail.
 //! Usage: `cardinal run cardinal-report --sessions <session-metrics rows> [--breaches <rule-breaches --summary>]
 //! [--quality <delivered-quality --summary>]... [--context <fixed-context rows>] [--changes <cardinal-changes rows>]
-//! [--min-sessions <n>] [--anonymous]`. With `--changes`, a last table gives each recorded change of the harness a
+//! [--min-sessions <n>] [--anonymous]`. With `--changes`, a last table gives each recorded change of Cardinal a
 //! verdict from the groups before and after it (`specs/cardinal-verdicts.md`).
 
 use std::collections::{BTreeMap, HashMap, HashSet};

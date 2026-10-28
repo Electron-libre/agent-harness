@@ -1,4 +1,4 @@
-//! `cardinal run <tool>`: run a tool of the harness with the `cardinal` binary of the revision the project pins
+//! `cardinal run <tool>`: run a tool of Cardinal with the `cardinal` binary of the revision the project pins
 //! (spec `specs/tool-binaries.md`, ADR 0010).
 //!
 //! The installed `cardinal` is only a launcher. With a git source it executes the binary cached for the pinned commit

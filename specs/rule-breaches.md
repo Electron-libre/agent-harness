@@ -4,20 +4,20 @@ status: accepted
 adrs: [0003, 0005, 0006, 0010]
 ---
 
-# Breaches of the harness rules in the session transcripts
+# Breaches of the Cardinal rules in the session transcripts
 
 ## Intent
 
 `cardinal run rule-breaches` reads the Claude Code transcripts of every project and lists where the agent
-broke a rule the harness states (`AGENTS.md`, the skills, the ADRs), apart from where a gate refused it, then counts
-them per rule and per harness revision over the sessions where the rule applied, so `audit-instructions` can tell a
+broke a rule Cardinal states (`AGENTS.md`, the skills, the ADRs), apart from where a gate refused it, then counts
+them per rule and per Cardinal revision over the sessions where the rule applied, so `audit-instructions` can tell a
 rule broken often (a hook candidate) from a rule that rarely applies. Only the breaches a program can see are in
 scope.
 
 ## Requirements
 
 - **BRE-1** (deterministic) `rule-breaches [projects_dir]` must print a header line then one tab-separated row per finding, with the columns `session`, `project`, `revision`, `rule`, `kind`, `location`, `detail`; `kind` is `breach` when the act went through and `blocked` when a hook or a permission rule refused it; `location` is `<transcript file name>:<line>` (1-based, the file name of a sub-agent transcript being `subagents/<name>`), empty for a finding read from git.
-- **BRE-2** (deterministic) `project` and `revision` must be resolved as in `session-metrics` (EVA-7, EVA-8), through the shared module `transcripts.rs`, so both scripts give a session the same project and revision; no rule applies to a session whose `revision` is empty (the project had no harness then).
+- **BRE-2** (deterministic) `project` and `revision` must be resolved as in `session-metrics` (EVA-7, EVA-8), through the shared module `transcripts.rs`, so both scripts give a session the same project and revision; no rule applies to a session whose `revision` is empty (the project had no Cardinal then).
 - **BRE-3** (deterministic) With `--summary`, the script must print instead a header then one row per rule and revision, with the columns `rule`, `revision`, `applied` (sessions where the rule applied, as each requirement below defines), `breached` (those with at least one `breach`), `breaches` and `blocked` (counts of findings), sorted by rule then revision.
 - **BRE-4** (deterministic) Rule `no-verify`: a `Bash` call whose command holds the words `git` and `commit` or `push` and the token `--no-verify` must be a finding (`blocked` when its result is an error). It applies to the sessions with a `Bash` call holding `git` and `commit` or `push`.
 - **BRE-5** (deterministic) Rule `review-before-commit`: an error result of a `Bash` call holding `git` and `commit` whose text holds `Refused:` and `code review` but not `Refused: only the user waives` must be a `blocked` finding (a refusal of another command is a mistake of the gate, not of the agent); a `Bash` call holding `git` and `commit` whose result is not an error, after such a refusal with neither a `Skill` call whose skill name ends with `code-review` nor a user turn in between (a typed message, the filter of `transcripts.rs`, or a command the user typed: a user line, not meta nor sidechain, whose text holds `<command-name>/` or starts with `<bash-input>`), must be a `breach` (the bypass of ADR 0005). It applies to the sessions with a `Bash` call holding `git` and `commit`.
@@ -42,6 +42,6 @@ scope.
 
 - The rules that need judgment (the shape of the reports to the user): a later LLM judge.
 - One worktree per issue (ADR 0003): it is required only for agents working in parallel, which one transcript cannot show.
-- The `files:<skill>` calls of the harness repository: Claude Code offers the skills under `files/` as directory-scoped skills and tells the agent to prefer them there; they are the same text as the synced copies, so calling them is no breach.
+- The `files:<skill>` calls of the Cardinal repository: Claude Code offers the skills under `files/` as directory-scoped skills and tells the agent to prefer them there; they are the same text as the synced copies, so calling them is no breach.
 - A write made through `Bash` (a heredoc, `sed -i`): only the `Edit`, `Write` and `NotebookEdit` calls are read for the file rules.
 - A command that breaks a rule only by a construction nobody would write by mistake (ADR 0005), such as `-n` for `--no-verify` or a shell variable holding the flag.

@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool audit-sources`: counts, typed-message filter, instruction files and memory.
+//! Behavior test for `cardinal tool audit-sources`: counts, typed-message filter, instruction files and memory.
 
 /// The project `repo` under `tmp`, its instruction file, memory and transcripts; returns the project directory.
 fn fixture(tmp: &std::path::Path) -> std::path::PathBuf {
@@ -311,7 +311,7 @@ fn audit_sources_lists_the_user_level_files_before_the_projects() {
     assert_eq!(unset, expected(&home_config));
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

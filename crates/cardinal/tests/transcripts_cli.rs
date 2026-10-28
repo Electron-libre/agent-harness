@@ -4,7 +4,7 @@
 
 use std::process::{Command, Output};
 
-/// `harness tool <name> <args>` with neither `CLAUDE_CONFIG_DIR` nor `HOME` set to a value.
+/// `cardinal tool <name> <args>` with neither `CLAUDE_CONFIG_DIR` nor `HOME` set to a value.
 fn unlocated(name: &str, args: &[&std::path::Path]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .arg("tool")
@@ -56,7 +56,7 @@ fn delivered_quality_runs_without_the_transcripts() {
     );
 }
 
-/// `harness tool <name> <args>` with `config` as the configuration directory and an empty home directory.
+/// `cardinal tool <name> <args>` with `config` as the configuration directory and an empty home directory.
 fn configured(name: &str, args: &[&std::path::Path], config: &std::path::Path) -> Output {
     let home = tempfile::tempdir().unwrap();
     Command::new(env!("CARGO_BIN_EXE_cardinal"))

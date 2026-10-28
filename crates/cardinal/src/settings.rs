@@ -1,6 +1,6 @@
 //! The warnings of `check` and `sync` on the project's `.claude/settings.json` (`specs/sync.md`, SYN-24 to SYN-27):
-//! what a harness expects of the file beyond the entries `sync` manages (`entries.rs`). Also the
-//! retention of the transcripts in the user settings, which the harness never writes (SYN-28).
+//! what Cardinal expects of the file beyond the entries `sync` manages (`entries.rs`). Also the
+//! retention of the transcripts in the user settings, which Cardinal never writes (SYN-28).
 
 use std::fs;
 use std::io::ErrorKind;
@@ -20,7 +20,7 @@ pub const DENY_RULES: [&str; 3] = [
 const LOCAL_SETTINGS: &str = ".claude/settings.local.json";
 /// The days Claude Code keeps the transcripts when `cleanupPeriodDays` is unset.
 const DEFAULT_RETENTION: f64 = 30.0;
-/// The days of transcripts the evaluation of the harness needs to span several revisions.
+/// The days of transcripts the evaluation of Cardinal needs to span several revisions.
 const MIN_RETENTION: f64 = 365.0;
 /// Where the hooks the settings run live, relative to the root of the project.
 const HOOKS: &str = ".claude/hooks/";

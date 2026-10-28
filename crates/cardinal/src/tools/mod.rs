@@ -1,4 +1,4 @@
-//! The tools of the harness, run by `cardinal tool <name>` (and so by `cardinal run <name>`, which picks the binary
+//! The tools of Cardinal, run by `cardinal tool <name>` (and so by `cardinal run <name>`, which picks the binary
 //! of the pinned revision). Each reads its arguments, standard input and current directory, and returns its exit code.
 
 use std::path::{Path, PathBuf};
@@ -45,7 +45,7 @@ pub const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "cardinal-changes",
-        about: "[repo] --sessions <file>: the expected effects of the harness changes, with the revisions holding each",
+        about: "[repo] --sessions <file>: the expected effects of the Cardinal changes, with the revisions holding each",
         main: cardinal_changes::main,
     },
     Tool {
@@ -90,7 +90,7 @@ pub const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "fixed-context",
-        about: "[projects_dir]: the bytes every session pays, per project and harness revision",
+        about: "[projects_dir]: the bytes every session pays, per project and Cardinal revision",
         main: fixed_context::main,
     },
     Tool {

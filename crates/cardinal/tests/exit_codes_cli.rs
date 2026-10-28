@@ -7,7 +7,7 @@ use std::process::Command;
 
 use tempfile::tempdir;
 
-/// The exit code and stderr of `harness <args>` run in `root`.
+/// The exit code and stderr of `cardinal <args>` run in `root`.
 fn harness(root: &Path, args: &[&str]) -> (Option<i32>, String) {
     let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(args)

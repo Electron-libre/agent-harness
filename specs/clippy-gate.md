@@ -14,7 +14,7 @@ only when there is something new to check and reports the problems in few lines.
 
 ## Requirements
 
-- **CLG-1** (deterministic) The gate must exit 0 without running clippy when the event sets `stop_hook_active`, when the project has no `Cargo.toml`, and when `git status` shows no changed or untracked `.rs` file outside the `.claude` directories (the scripts of the harness are not crate code).
+- **CLG-1** (deterministic) The gate must exit 0 without running clippy when the event sets `stop_hook_active`, when the project has no `Cargo.toml`, and when `git status` shows no changed or untracked `.rs` file outside the `.claude` directories (the scripts of Cardinal are not crate code).
 - **CLG-2** (deterministic) When clippy fails, the gate must exit 2 and write to stderr one line per diagnostic, each naming the file, line and column of the problem with its message, plus the errors that have no location (a build script, a missing crate), and nothing of the build progress (`Checking`, `Compiling`, `could not compile`).
 - **CLG-3** (deterministic) The gate must report at most 40 diagnostics; when there are more, it must end with one line giving how many were left out.
 - **CLG-4** (deterministic) After a passing run, the gate must record a stamp of the Rust state (the `HEAD` commit and the path and content of every changed or untracked `.rs` file) in the git directory of the worktree, and must exit 0 without running clippy while that state is unchanged.
@@ -33,4 +33,4 @@ only when there is something new to check and reports the problems in few lines.
 ## Non-goals
 
 - Detecting a change that only touches `Cargo.toml`, `clippy.toml` or the toolchain: the next `.rs` edit or `just check` catches it.
-- The output of the `just` recipes (`check`): they are recipes of the harness, not a requirement of this hook.
+- The output of the `just` recipes (`check`): they are recipes of Cardinal, not a requirement of this hook.

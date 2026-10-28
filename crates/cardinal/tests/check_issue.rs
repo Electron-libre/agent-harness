@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool check-issue`: accepts a good issue, flags each template violation.
+//! Behavior test for `cardinal tool check-issue`: accepts a good issue, flags each template violation.
 
 const GOOD: &str = "# Fix the thing\n\n# Goal\n\nMake it work.\n\n# Approach\n\n1. Do it.\n\n# Resources\n\n* `a.rs`\n";
 
@@ -86,7 +86,7 @@ fn check_issue() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

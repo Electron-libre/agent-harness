@@ -4,11 +4,11 @@ status: accepted
 adrs: [0002, 0010]
 ---
 
-# Prebuilt tools of the harness
+# Prebuilt tools of Cardinal
 
 ## Intent
 
-The hooks, checks and transcript readers of the harness run in every consumer, Rust or not. They ship as the
+The hooks, checks and transcript readers of Cardinal run in every consumer, Rust or not. They ship as the
 `cardinal` binary of the pinned revision, fetched prebuilt, so a project needs only `cardinal` and `just`, and runs the
 tools of the revision its managed files come from. The binary was named `harness` before: a `harness` alias keeps the
 projects synced before the rename running until their next sync.

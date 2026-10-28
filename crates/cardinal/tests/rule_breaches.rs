@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool rule-breaches` on fixture transcripts and repositories: the findings of each rule, `breach`
+//! Behavior test for `cardinal tool rule-breaches` on fixture transcripts and repositories: the findings of each rule, `breach`
 //! apart from `blocked`, their locations, the summary per rule and revision, no message text.
 
 use serde_json::json;
@@ -687,7 +687,7 @@ fn rule_breaches() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

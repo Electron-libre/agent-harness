@@ -1,4 +1,4 @@
-//! Behavior test for the Stop hook `harness tool language-hint` (`specs/language-hint.md`): a temp repository with a
+//! Behavior test for the Stop hook `cardinal tool language-hint` (`specs/language-hint.md`): a temp repository with a
 //! `user_language`, a `Stop` event on stdin, the exit code and the hint on stderr.
 
 mod common;

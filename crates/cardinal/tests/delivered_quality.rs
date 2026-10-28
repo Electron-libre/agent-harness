@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool delivered-quality` on a fixture repository: the commits of each done issue, the fixes and
+//! Behavior test for `cardinal tool delivered-quality` on a fixture repository: the commits of each done issue, the fixes and
 //! reverts of its files after the close, its deliverables, revision and reviews, the failed checks and typed messages
 //! of its sessions, no text of a commit, an issue or a message.
 
@@ -809,7 +809,7 @@ fn delivered_quality() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

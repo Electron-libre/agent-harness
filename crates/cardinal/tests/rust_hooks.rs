@@ -1,4 +1,4 @@
-//! Behavior test for the Rust hooks `harness tool clippy-gate` and `format-rust`: runs them against a throwaway Cargo
+//! Behavior test for the Rust hooks `cardinal tool clippy-gate` and `format-rust`: runs them against a throwaway Cargo
 //! project. A hook is named by a path holding its tool name.
 
 use std::fs;

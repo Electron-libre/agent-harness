@@ -60,7 +60,7 @@ No `FORMAT` raise: no fragment key, lock line or source layout changes meaning; 
 4. [x] CI and recipe: workflow `Cardinal` (job, concurrency group), recipe `check-cardinal`, `ci.yml`,
    `install_cardinal.sh`, README, docs, skills; verified by `just check-cardinal`, `just check-harness` (alias);
    ~80 lines.
-5. [ ] Product prose: "the harness" meaning Cardinal becomes "Cardinal" in the specs (`sync.md`, REP, VRD, EVA,
+5. [x] Product prose: "the harness" meaning Cardinal becomes "Cardinal" in the specs (`sync.md`, REP, VRD, EVA,
    BIN titles and intents) and the crate doc comments and tool about strings; the generic "agent harness" stays;
    verified by `just check`; ~120 lines.
 
@@ -141,4 +141,22 @@ Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names
 - red: none (recipes and CI, no test)
 - Code review: no findings
 - not verified: the GitHub run of the workflow (runs on push)
+- decisions needed: none
+
+## Deliverable 5: product prose
+- done: "the harness" naming the product became "Cardinal" in the spec titles and intents (sync, report, verdicts,
+  evaluation, rule breaches, tool binaries, delivered quality, clippy gate), the crate doc comments, the tool about
+  strings, and the binary named in the test doc comments (`cardinal tool <name>`); "the shared agent harness" (the
+  generic noun) and the old-name compatibility (`[harness]`, `harness run`, the gate mark) stay.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| copies | `just sync` changes nothing |
+| docs | specs and doc comments are the change |
+| code review | low, see below |
+
+- red: none (prose only)
+- Code review: no findings
+- not verified: none
 - decisions needed: none

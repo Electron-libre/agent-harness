@@ -4,11 +4,11 @@ status: accepted
 adrs: [0002, 0010]
 ---
 
-# Verdicts on the recorded changes of the harness
+# Verdicts on the recorded changes of Cardinal
 
 ## Intent
 
-A commit of the harness source that changes the shared files records the effect it is expected to have, as a
+A commit of the Cardinal source that changes the shared files records the effect it is expected to have, as a
 metric of `cardinal-report` and a direction; `cardinal run cardinal-changes` lists these expectations with the
 revisions in use that hold each change, and `cardinal-report --changes` gives each one a verdict from the groups
 before and after it, `confounded` whenever something else changed too, so `skill:evaluate-harness` ties a trend to
@@ -47,4 +47,4 @@ the change that should have caused it, or says it cannot.
 - Replaying a task under two revisions: the evaluation stays on real sessions of real projects.
 - Expectations recorded outside the commit messages (an issue section, a file under `docs/`), or changed after the
   commit: the history is the record.
-- The changes of a consumer's own files: only the harness source is read.
+- The changes of a consumer's own files: only the Cardinal source is read.

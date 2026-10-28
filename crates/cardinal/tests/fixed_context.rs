@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool fixed-context` on fixture transcripts and repositories: one row per project and revision,
+//! Behavior test for `cardinal tool fixed-context` on fixture transcripts and repositories: one row per project and revision,
 //! the commit the revision came in force with, the bytes read from its tree, the skills it ships.
 
 use serde_json::json;
@@ -253,7 +253,7 @@ fn fixed_context() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

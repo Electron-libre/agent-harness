@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool check-specs`: accepts good specs, flags each violation of `specs/README.md`.
+//! Behavior test for `cardinal tool check-specs`: accepts good specs, flags each violation of `specs/README.md`.
 
 use std::cell::Cell;
 use std::path::Path;
@@ -902,7 +902,7 @@ fn wording_scope_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     );
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

@@ -1,6 +1,6 @@
-//! List where the agent broke a rule of the harness in the Claude Code transcripts (`specs/rule-breaches.md`): one
+//! List where the agent broke a rule of Cardinal in the Claude Code transcripts (`specs/rule-breaches.md`): one
 //! tab-separated row per finding, `breach` when the act went through, `blocked` when a hook or a permission rule
-//! refused it. With `--summary`, count them per rule and harness revision over the sessions where the rule applied,
+//! refused it. With `--summary`, count them per rule and Cardinal revision over the sessions where the rule applied,
 //! so a rule broken often (a hook candidate) stands out from one that rarely applies. The commit messages are read
 //! from the git history of each project, a commit counting with the session whose span holds its date. No text of a
 //! message is printed.

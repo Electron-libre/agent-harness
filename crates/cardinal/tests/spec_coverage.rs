@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool spec-coverage`: the test files that cite no requirement of an `accepted` spec,
+//! Behavior test for `cardinal tool spec-coverage`: the test files that cite no requirement of an `accepted` spec,
 //! largest first.
 
 use std::path::Path;

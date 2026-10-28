@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool next-issue` and the queue handling of `harness tool close-issue`.
+//! Behavior test for `cardinal tool next-issue` and the queue handling of `cardinal tool close-issue`.
 
 use std::path::Path;
 use std::process::Command;
@@ -273,7 +273,7 @@ fn next_issue() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()

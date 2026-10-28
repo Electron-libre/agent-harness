@@ -17,7 +17,7 @@ use crate::{is_executable, set_executable, write, Outcome};
 use std::os::unix::fs::symlink;
 
 /// The commands of the hooks that run the review gate, and their name before the rename: the gate exists only where the
-/// harness manages such a hook, or the review hook script of an older revision (`LEGACY_HOOK`).
+/// Cardinal manages such a hook, or the review hook script of an older revision (`LEGACY_HOOK`).
 pub const REVIEW_TOOLS: [&str; 2] = ["cardinal run review-gate", "harness run review-gate"];
 /// The review hook of the revisions before the tools moved into `harness`, among their managed files.
 pub const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
@@ -31,7 +31,7 @@ const CHAINED: &str = "pre-commit.user";
 
 /// The managed hook. Git runs it from the top of the work tree, which may be of an older revision whose review gate
 /// is still the `rust-script` hook. A work tree without either, a machine without the program it needs, or a launcher
-/// that cannot run the tool (exit 3, BIN-14) is a warning, not a refusal, so a branch or a machine without the harness
+/// that cannot run the tool (exit 3, BIN-14) is a warning, not a refusal, so a branch or a machine without Cardinal
 /// can still commit (BIN-9).
 const SCRIPT: &str = r#"#!/bin/sh
 # harness: native review gate (installed by `cardinal sync`, do not edit)
@@ -134,7 +134,7 @@ pub fn state(hooks: &Path) -> State {
     }
 }
 
-/// Whether the harness manages the review gate: a managed hook of `entries` runs it, or the managed `files` hold the
+/// Whether Cardinal manages the review gate: a managed hook of `entries` runs it, or the managed `files` hold the
 /// review hook of an older revision.
 #[must_use]
 pub fn manages<'a>(entries: &[Entry], mut files: impl Iterator<Item = &'a String>) -> bool {
@@ -145,7 +145,7 @@ pub fn manages<'a>(entries: &[Entry], mut files: impl Iterator<Item = &'a String
 }
 
 /// The hooks directory of the project and what its `pre-commit` is, `None` when the project is not expected to have the
-/// gate (`expected` is false: the harness manages no hook of the review gate) or is not the top of a git repository.
+/// gate (`expected` is false: Cardinal manages no hook of the review gate) or is not the top of a git repository.
 /// One decision for `sync` and `check`, so they never disagree about where the gate goes.
 fn inspect(root: &Path, expected: bool) -> Option<(PathBuf, State)> {
     if !expected {

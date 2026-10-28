@@ -1,4 +1,4 @@
-//! The tools of `harness tool <name>`, run as a hook or a recipe runs them: the registry, `commit-check` and
+//! The tools of `cardinal tool <name>`, run as a hook or a recipe runs them: the registry, `commit-check` and
 //! `check-commits`.
 
 use std::fs;
@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 
 use tempfile::{tempdir, TempDir};
 
-/// Exit code, stdout and stderr of `harness tool <args>` run in `cwd` with `stdin`.
+/// Exit code, stdout and stderr of `cardinal tool <args>` run in `cwd` with `stdin`.
 fn tool(cwd: &Path, args: &[&str], stdin: &str) -> (i32, String, String) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .arg("tool")

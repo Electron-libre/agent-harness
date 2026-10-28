@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool review-gate`: runs `record`, `check` and `native` against throwaway git
+//! Behavior test for `cardinal tool review-gate`: runs `record`, `check` and `native` against throwaway git
 //! repositories. `hook` is the `harness` binary.
 
 use std::fs;

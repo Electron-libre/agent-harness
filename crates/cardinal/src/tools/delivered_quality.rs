@@ -2,7 +2,7 @@
 //! tab-separated row per file of `issues/done/`, with the commits of the issue, the fixes inside it, and the fixes
 //! and reverts of its files on the default branch after its close. Signals, not verdicts: a fix after a feature may
 //! come from a new need. The sessions that made its commits give the failed checks and the typed messages of its
-//! span. With `--summary`, the columns are summed per harness revision. No text of a commit, an issue or a message
+//! span. With `--summary`, the columns are summed per Cardinal revision. No text of a commit, an issue or a message
 //! is printed.
 //! Usage: `cardinal run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the
 //! current directory, the `projects/` of the configuration directory (EVA-15) and 30 days).

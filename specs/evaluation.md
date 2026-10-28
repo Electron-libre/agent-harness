@@ -4,12 +4,12 @@ status: accepted
 adrs: [0002, 0003, 0006, 0008, 0010]
 ---
 
-# Evaluation of the harness from the session transcripts
+# Evaluation of Cardinal from the session transcripts
 
 ## Intent
 
 `cardinal run session-metrics` turns the Claude Code transcripts of every project into one row of
-numbers per session (cost, user interventions, and what may explain a difference: harness revision, model, Claude
+numbers per session (cost, user interventions, and what may explain a difference: Cardinal revision, model, Claude
 Code version, project, issue), so the other evaluation tools compare sessions without reading the transcripts. It
 measures; it does not judge.
 

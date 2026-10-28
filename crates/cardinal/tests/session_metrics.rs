@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool session-metrics` on fixture transcripts: columns, deduplicated assistant messages,
+//! Behavior test for `cardinal tool session-metrics` on fixture transcripts: columns, deduplicated assistant messages,
 //! sub-agents, typed messages, hook refusals, skills, project, tolerance to unknown lines, no message text.
 
 use std::collections::HashMap;
@@ -761,7 +761,7 @@ fn session_metrics() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
-/// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
+/// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script
         .as_ref()
