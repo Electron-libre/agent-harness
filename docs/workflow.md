@@ -78,7 +78,7 @@ sequenceDiagram
   Note over U: .claude/worktrees/NAME on branch NAME
   U->>W: launch claude in the worktree
   W->>W: issue-workflow, commits on NAME
-  W->>W: user agrees to close: rebase on main,<br/>just check-harness
+  W->>W: user agrees to close: rebase on main,<br/>just check-cardinal
   W-->>U: prints the commands left
   U->>U: git merge --ff-only NAME
   U->>U: just close-issue issues/NAME.md, commit
@@ -89,7 +89,7 @@ sequenceDiagram
   is isolated by Claude Code, which refuses every command it cannot prove stays there.
 - While the branch or the worktree exists, `just next-issue` skips the issue for every other session.
 - The queue is edited only in the main worktree: `close-issue` refuses in a linked one.
-- `just check-harness` before the merge catches a hook the installed `cardinal` would refuse once merged; run the
+- `just check-cardinal` before the merge catches a hook the installed `cardinal` would refuse once merged; run the
   `cargo install` it prints first.
 - The project's own tools run on `.` may read the nested worktrees: [usage.md](usage.md#parallel-issues-in-worktrees)
   says how to keep them out.

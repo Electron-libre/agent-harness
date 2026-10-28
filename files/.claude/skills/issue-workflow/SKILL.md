@@ -155,7 +155,7 @@ the commands left to the user).
 
 - Anything outward-facing or hard to reverse (push, deleting, rewriting history) needs an explicit ask.
 - Don't re-litigate decisions already recorded in the issue.
-- After a `cardinal sync` that adds a hook, run `just check-harness` at once and the `cargo install` it prints: the
+- After a `cardinal sync` that adds a hook, run `just check-cardinal` at once and the `cargo install` it prints: the
   live hooks call the installed `cardinal`, and one it refuses blocks every command, the install included.
 - If something blocks you, say what and propose one recommendation; don't enumerate every option.
 - When the issue is fully done, mark it in the issue and say what, if anything, remains. Then **ask the

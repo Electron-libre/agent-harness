@@ -25,7 +25,7 @@ Cardinal, the shared agent harness (skills, hooks, scripts, recipes, CI) of the 
   `.claude/rules/reports-to-the-user.md`: the output rule for the reports to the user, loaded in every session.
 
 This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `cardinal.just`, `script/` and
-`specs/README.md` are copies of `files/`. After changing `files/`, run `just sync`; `just check-harness`
+`specs/README.md` are copies of `files/`. After changing `files/`, run `just sync`; `just check-cardinal`
 fails when a copy drifted.
 
 Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability) before

@@ -27,7 +27,7 @@ install:
     cargo install --force --path crates/cardinal --locked
 
 # This repository is its own first consumer: check it with the binary just built.
-check-harness:
+check-cardinal:
     cargo run -q -p cardinal -- check
 
 # The spec checker of the working tree, whatever `cardinal` is installed (CI installs none for this repository).

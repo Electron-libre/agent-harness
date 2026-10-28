@@ -22,6 +22,6 @@ jobs:
         with:
           tool: just
       - run: cargo fmt --all --check
-      - run: just clippy test check-harness
+      - run: just clippy test check-cardinal
       # last and alone: its `*args` would take the recipe names that follow as arguments
       - run: just check-specs

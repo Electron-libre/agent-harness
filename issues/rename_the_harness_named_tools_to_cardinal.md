@@ -57,7 +57,7 @@ No `FORMAT` raise: no fragment key, lock line or source layout changes meaning; 
    `docs`, `cardinal` and `harness` (past commits); AGENTS.md, the `cardinal.toml` comments; verified by a
    commit-check test (`cardinal` accepted, `harness` refused) and a rule-breaches test (a past `harness` commit is no
    breach); makes true BRE-9 amended; ~80 lines.
-4. [ ] CI and recipe: workflow `Cardinal` (job, concurrency group), recipe `check-cardinal`, `ci.yml`,
+4. [x] CI and recipe: workflow `Cardinal` (job, concurrency group), recipe `check-cardinal`, `ci.yml`,
    `install_cardinal.sh`, README, docs, skills; verified by `just check-cardinal`, `just check-harness` (alias);
    ~80 lines.
 5. [ ] Product prose: "the harness" meaning Cardinal becomes "Cardinal" in the specs (`sync.md`, REP, VRD, EVA,
@@ -123,4 +123,22 @@ Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names
 - red: BRE-9: a `fix(cardinal): v` commit counted as a `commit-format` breach; commit-check: `unknown scope \`cardinal\``
 - Code review: no findings
 - not verified: none
+- decisions needed: none
+
+## Deliverable 4: CI and recipe
+- done: workflow `Cardinal` (concurrency group and job id `cardinal`), recipe `check-cardinal` with
+  `alias check-harness`, `ci.yml`, README, CLAUDE.md, docs, `issue-workflow`; the alias added to
+  `drop_the_harness_alias`. The job's display name `agent harness checks` is kept: GitHub names a required check by
+  it, so a consumer's branch protection keeps working (decision 3 needs no action there).
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| recipes | `just check-cardinal` and the alias `just check-harness` pass |
+| docs | README, CLAUDE.md, usage, workflow, `issue-workflow` |
+| code review | low, see below |
+
+- red: none (recipes and CI, no test)
+- Code review: no findings
+- not verified: the GitHub run of the workflow (runs on push)
 - decisions needed: none

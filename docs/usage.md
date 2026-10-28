@@ -28,7 +28,7 @@ the tools of the working tree, or of the last build that compiled.
 The installed `cardinal` is the launcher of every project of the machine, not a binary of the pinned revision. A
 revision whose hooks call a subcommand it does not know needs its `cardinal` installed first, or every hook refuses and
 the agent can run nothing, the install included. `cardinal update` refuses such a revision and prints the install to
-run; in this repository, `just check-harness` says so before an issue branch is merged (`issue-workflow`, "Merge back").
+run; in this repository, `just check-cardinal` says so before an issue branch is merged (`issue-workflow`, "Merge back").
 A machine that has only the `harness` of before the rename refuses every `cardinal` hook the same way: the install
 (`cargo install --force ...`) puts `cardinal` and its `harness` alias in place of the old binary. The git review gate
 runs `cardinal`, else `harness`.

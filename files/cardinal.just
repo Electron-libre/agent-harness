@@ -46,5 +46,8 @@ spec-coverage *args:
     @cardinal run spec-coverage {{args}}
 
 # Fail when a managed Cardinal file was modified or deleted since the last `cardinal sync`.
-check-harness:
+check-cardinal:
     cardinal check
+
+# The name of `check-cardinal` before the rename, kept until the `harness` alias is dropped.
+alias check-harness := check-cardinal

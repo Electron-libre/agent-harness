@@ -39,7 +39,7 @@ In a linked worktree, once the user agreed to close the issue:
 
 1. Commit the last tracking, then `git rebase <main branch>` (the branch checked out by the main worktree); a
    conflict stops here, for the user.
-2. Run `just check-harness`: when it names a hook the installed `cardinal` refuses (the branch adds a subcommand the
+2. Run `just check-cardinal`: when it names a hook the installed `cardinal` refuses (the branch adds a subcommand the
    hooks call), run the `cargo install` it prints before going on. After the fast-forward the hooks of the main worktree
    call it too, and one the installed `cardinal` refuses blocks every command, the install included.
 3. Stop and print, without running them, the commands left to the user in the main worktree: `git merge --ff-only
