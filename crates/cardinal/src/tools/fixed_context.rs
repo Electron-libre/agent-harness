@@ -2,7 +2,7 @@
 //! tab-separated row per project and revision used by a session of the transcripts, with the bytes of the memory files
 //! a session loads at launch (`memory.rs`, `AGENTS.md` apart) and of the skill descriptions in the commit the revision
 //! came in force with, and the skills it ships.
-//! Usage: `harness run fixed-context [projects_dir]`
+//! Usage: `cardinal run fixed-context [projects_dir]`
 //! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::transcripts;
@@ -222,7 +222,7 @@ fn context(repo: &Path, pins: &[(String, Option<String>)], revision: &str) -> Ve
 pub(super) fn main(args: &[String]) -> u8 {
     let args: Vec<String> = args.to_vec();
     if let Some(flag) = args.iter().find(|a| a.starts_with('-')) {
-        eprintln!("unknown option {flag}\nusage: harness run fixed-context [projects_dir]");
+        eprintln!("unknown option {flag}\nusage: cardinal run fixed-context [projects_dir]");
         std::process::exit(2);
     }
     let root = match projects_root(args.first()) {

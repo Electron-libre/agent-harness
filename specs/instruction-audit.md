@@ -8,7 +8,7 @@ adrs: [0006]
 
 ## Intent
 
-`harness run audit-sources` lists, per project of the transcripts directory, what the user told the agent over time
+`cardinal run audit-sources` lists, per project of the transcripts directory, what the user told the agent over time
 (sessions, typed messages, memory files, instruction files), so that `audit-instructions` proposes only the skills,
 hooks and rules that do not exist yet.
 

@@ -4,7 +4,7 @@
 //! come from a new need. The sessions that made its commits give the failed checks and the typed messages of its
 //! span. With `--summary`, the columns are summed per harness revision. No text of a commit, an issue or a message
 //! is printed.
-//! Usage: `harness run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the
+//! Usage: `cardinal run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the
 //! current directory, the `projects/` of the configuration directory (EVA-15) and 30 days).
 
 use super::check_specs::{citation, is_req_id};

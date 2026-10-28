@@ -2,7 +2,7 @@
 //! per `Expected-effect: <metric> <up|down>` line of a commit that changes `files/`, with the revisions in use (read
 //! from the `session-metrics` rows) that hold the change, so `harness-report --changes` can give each a verdict.
 //! Prints no commit text but the metric and the direction.
-//! Usage: `harness run harness-changes [repo] --sessions <session-metrics rows>`.
+//! Usage: `cardinal run harness-changes [repo] --sessions <session-metrics rows>`.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -11,7 +11,7 @@ use super::session_metrics::HEADER as SESSIONS;
 use super::transcripts::{default_branch, git};
 
 pub(super) const HEADER: &str = "change\tmetric\tdirection\trevisions";
-const USAGE: &str = "usage: harness run harness-changes [repo] --sessions <file>";
+const USAGE: &str = "usage: cardinal run harness-changes [repo] --sessions <file>";
 const PREFIX: &str = "Expected-effect:";
 /// The metrics an expectation can name: columns of the `harness-report` tables (`breached_share:<rule>` apart).
 pub(super) const METRICS: [&str; 10] = [

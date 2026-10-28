@@ -8,7 +8,7 @@ adrs: [0002, 0006, 0010]
 
 ## Intent
 
-`harness run harness-report` joins the outputs of the transcript readers (`session-metrics`,
+`cardinal run harness-report` joins the outputs of the transcript readers (`session-metrics`,
 `rule-breaches --summary`, `delivered-quality --summary`, `fixed-context`) into one markdown table per axis
 (efficiency, quality, rules, skills, fixed context), one row per group of consecutive harness revisions, with the
 confounders and the sample size next to the numbers, so `skill:evaluate-harness` shows the trend without computing

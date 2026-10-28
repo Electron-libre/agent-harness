@@ -1,4 +1,4 @@
-# Values of this project that Cardinal, the shared agent harness, reads. Owned by the project: `harness sync` never
+# Values of this project that Cardinal, the shared agent harness, reads. Owned by the project: `cardinal sync` never
 # rewrites it.
 
 [project]

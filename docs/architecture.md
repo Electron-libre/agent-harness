@@ -3,12 +3,12 @@
 ## What is shared, and how
 
 A consumer project holds a `.claude/harness.toml`: the `[harness]` table (`source`, and `rev` for a git source) and
-its own values (`[project]`, read by the tools and the skills). `harness sync` reads the source, writes three kinds of
+its own values (`[project]`, read by the tools and the skills). `cardinal sync` reads the source, writes three kinds of
 files, records them in the lock and installs the review gate ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)):
 
 ```mermaid
 flowchart LR
-  toml[".claude/harness.toml<br/>source, rev"] --> sync["harness sync"]
+  toml[".claude/harness.toml<br/>source, rev"] --> sync["cardinal sync"]
   subgraph source
     files["files/"]
     seed["seed/"]
@@ -22,7 +22,7 @@ flowchart LR
   sync -->|"entries merged<br/>(SYN-29 to SYN-36)"| settings[".claude/settings.json"]
   sync -->|"installed<br/>(SYN-18 to SYN-23)"| gate[".git/hooks/pre-commit"]
   sync --> lock[".claude/harness.lock"]
-  lock -.->|hashes compared| check["harness check"]
+  lock -.->|hashes compared| check["cardinal check"]
 ```
 
 | Kind | From | Examples | Owner |
@@ -36,7 +36,7 @@ hash differs from the lock was edited locally: `sync` reports a conflict instead
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/harness.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`), and `harness` its `fixed_context_budget`; the skills tell the agent
+(`commit_scopes`, `root_docs`, `skipped_dirs`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
@@ -45,7 +45,7 @@ language-specific recipes of the `justfile`) stays in the project.
 
 A source is a directory (relative to the project) or a git URL. A git source is cloned in `$XDG_CACHE_HOME/harness`
 and checked out at `rev` (default: the remote's default branch), which pins a commit, not a moving name
-([ADR 0002](adr/0002-rev-pins-the-resolved-commit.md)). `harness update [--rev <name>]` resolves a name to a commit,
+([ADR 0002](adr/0002-rev-pins-the-resolved-commit.md)). `cardinal update [--rev <name>]` resolves a name to a commit,
 previews the sync, and only then syncs and writes the commit to `rev` (SYN-11 to SYN-17); a local directory has no
 revision. `check` compares the project with its lock and never reads the source.
 
@@ -54,8 +54,8 @@ revision. `check` compares the project with its lock and never reads the source.
 The tools of Cardinal (hooks, checks, issue tools, transcript readers) are modules of the `cardinal` crate, one per
 tool under `crates/cardinal/src/tools/`, listed in `TOOLS`
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec
-[`specs/tool-binaries.md`](../specs/tool-binaries.md)). A hook, a recipe or a skill calls `harness run <tool> [args]`.
-A consumer needs `harness` and `just`, and Rust only for a commit with no published binary. The tests of the tools and
+[`specs/tool-binaries.md`](../specs/tool-binaries.md)). A hook, a recipe or a skill calls `cardinal run <tool> [args]`.
+A consumer needs `cardinal` and `just`, and Rust only for a commit with no published binary. The tests of the tools and
 of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`) are the `cargo test` of this repository;
 consumers run none.
 
@@ -66,7 +66,7 @@ project synced before the rename keep running until its next sync.
 
 ```mermaid
 flowchart TD
-  hook["hook, recipe or skill:<br/>harness run TOOL"] --> find["nearest .claude/harness.toml<br/>(else CLAUDE_PROJECT_DIR)"]
+  hook["hook, recipe or skill:<br/>cardinal run TOOL"] --> find["nearest .claude/harness.toml<br/>(else CLAUDE_PROJECT_DIR)"]
   find -->|git source| cached{"binary of the<br/>commit cached?"}
   cached -->|yes| exec["exec the binary:<br/>tool TOOL args"]
   cached -->|no| download["release asset and its .sha256 (curl):<br/>cardinal-COMMIT, else harness-COMMIT"]
@@ -136,10 +136,10 @@ also warn when the fixed context of the work tree (the memory files a session lo
 skill descriptions, measured by `memory.rs` as `fixed-context` measures a revision) exceeds the `fixed_context_budget`
 of the project (SYN-38, SYN-39, `budget.rs`): always-on text only grows unless something bounds it. A
 test of the crate (`every_tool_the_shared_harness_runs_exists`) fails when a declared hook, a recipe or a skill runs a
-tool `harness run` does not know.
+tool `cardinal run` does not know.
 
 No hook guards the attribution: the seeded settings turn it off (`"attribution": {"commit": "", "pr": "",
-"sessionUrl": false}`), `harness run commit-check` rejects a credit line (run by `skill:commit-message` and by CI through
+"sessionUrl": false}`), `cardinal run commit-check` rejects a credit line (run by `skill:commit-message` and by CI through
 `just check-commits`), and `check` warns of settings that leave it on.
 
 ### The review gate
@@ -186,7 +186,7 @@ sequenceDiagram
   directory of the common git directory, keeps a user's own hook as `pre-commit.user` run after it, and skips a
   `core.hooksPath` set elsewhere (SYN-18 to SYN-23); a project nested in another repository, or outside any, gets
   no gate and no error. `.git/hooks` is not cloned, so each clone needs its own `sync`. A
-  missing `harness`, or a launcher that cannot run the tool (exit 3), is a warning, not a refusal.
+  missing `cardinal` (and `harness`), or a launcher that cannot run the tool (exit 3), is a warning, not a refusal.
 
 ### The Rust hooks
 
@@ -202,7 +202,7 @@ the project's `check` to print nothing on success.
 ## The evaluation from the transcripts
 
 Cardinal is judged by what it changes in the sessions, read after the fact from the Claude Code transcripts and the
-git history of the projects. The readers are tools of `harness`; the skill `evaluate-harness` runs them into a
+git history of the projects. The readers are tools of `cardinal`; the skill `evaluate-harness` runs them into a
 temporary directory and reports the trend per axis next to the confounders.
 
 ```mermaid
@@ -258,7 +258,7 @@ The choices behind them:
 `audit-instructions` is the other skill that reads outside the repository: the transcripts, memory and instruction
 files under the `projects/` of the configuration directory and its user-level ones, through `audit-sources` ([`instruction-audit.md`](../specs/instruction-audit.md)),
 and the summary of `rule-breaches`, whose rules broken often are hook candidates. It only proposes what more than one session shows, in the cheapest form that holds it (skill,
-script or `harness` tool, hook, always-on rule last); its report holds private content, so it stays in the
+script or `cardinal` tool, hook, always-on rule last); its report holds private content, so it stays in the
 conversation and each validated proposal becomes an issue in generic wording. It is a skill rather than a tool because
 telling a repeated procedure from a rule needs judgment.
 
@@ -271,7 +271,7 @@ working tree and index, shared object store ([ADR 0003](adr/0003-one-worktree-pe
 [`specs/parallel-issues.md`](../specs/parallel-issues.md)). The steps are in [workflow.md](workflow.md#parallel-issues);
 the design:
 
-- **Tool**: `harness run issue-worktree` (`just start-issue`, `just finish-issue`), `next-issue` and `close-issue`.
+- **Tool**: `cardinal run issue-worktree` (`just start-issue`, `just finish-issue`), `next-issue` and `close-issue`.
 - **Taken** is the worktree itself, or a branch holding commits not on the main branch (PAR-3): `next-issue` reads
   `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and
   no file needs cleaning. A leftover branch with neither is listed `Stale:` for `finish-issue` to clean (PAR-4, PAR-6).
@@ -282,7 +282,7 @@ the design:
   `check-specs` and `spec-coverage` read every `.rs` file of the root whatever its layout, but those under `.git`,
   `node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` (TRC-9, TRC-10).
 - **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as
-  `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `harness run` takes the revision of the
+  `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `cardinal run` takes the revision of the
   `harness.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,
   so each worktree holds its own copy of Cardinal's files (a project that does not track it gets bare worktrees).
 - **Queue**: edited only at merge time, in the main worktree (PAR-8).

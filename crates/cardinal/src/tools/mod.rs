@@ -1,4 +1,4 @@
-//! The tools of the harness, run by `harness tool <name>` (and so by `harness run <name>`, which picks the binary
+//! The tools of the harness, run by `cardinal tool <name>` (and so by `cardinal run <name>`, which picks the binary
 //! of the pinned revision). Each reads its arguments, standard input and current directory, and returns its exit code.
 
 use std::path::{Path, PathBuf};

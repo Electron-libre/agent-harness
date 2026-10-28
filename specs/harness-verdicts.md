@@ -9,7 +9,7 @@ adrs: [0002, 0010]
 ## Intent
 
 A commit of the harness source that changes the shared files records the effect it is expected to have, as a
-metric of `harness-report` and a direction; `harness run harness-changes` lists these expectations with the
+metric of `harness-report` and a direction; `cardinal run harness-changes` lists these expectations with the
 revisions in use that hold each change, and `harness-report --changes` gives each one a verdict from the groups
 before and after it, `confounded` whenever something else changed too, so `skill:evaluate-harness` ties a trend to
 the change that should have caused it, or says it cannot.

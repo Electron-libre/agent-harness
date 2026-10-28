@@ -7,7 +7,7 @@ use super::commit_check::{scopes, violations};
 
 pub(super) fn main(args: &[String]) -> u8 {
     let [base, head] = args else {
-        eprintln!("usage: harness run check-commits <base> <head>");
+        eprintln!("usage: cardinal run check-commits <base> <head>");
         return 2;
     };
     let scopes = match scopes() {

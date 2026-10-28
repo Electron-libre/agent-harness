@@ -15,18 +15,18 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 1. **Collect** from the repository root into `<dir>`, a directory made by `mktemp -d` and removed at the end (the
    rows name projects and issues: never write them in the repository):
-   - `harness run session-metrics > <dir>/sessions.tsv`; if the user keeps an archive of the rows
+   - `cardinal run session-metrics > <dir>/sessions.tsv`; if the user keeps an archive of the rows
      (`--archive <file>`), pass `--archive` to it and use the archive instead, since it outlives the transcripts; the
      other scripts read only the transcripts still kept, so a group older than them has empty rules, quality and
      fixed context cells: say the data is missing, never read it as a trend;
-   - `harness run rule-breaches --summary > <dir>/breaches.tsv`;
-   - `harness run delivered-quality <repo> --summary > <dir>/quality-<n>.tsv` for each repository
+   - `cardinal run rule-breaches --summary > <dir>/breaches.tsv`;
+   - `cardinal run delivered-quality <repo> --summary > <dir>/quality-<n>.tsv` for each repository
      the sessions name that has an `issues/done/` directory (the current one at least);
-   - `harness run fixed-context > <dir>/context.tsv`;
-   - `harness run harness-changes <source> --sessions <dir>/sessions.tsv > <dir>/changes.tsv`, `<source>` a local
+   - `cardinal run fixed-context > <dir>/context.tsv`;
+   - `cardinal run harness-changes <source> --sessions <dir>/sessions.tsv > <dir>/changes.tsv`, `<source>` a local
      checkout of the Cardinal source (the `source` of `.claude/harness.toml` when it is a directory), for the
      `Expected-effect` lines of its commits; skip it, and `--changes`, when there is none;
-   - `harness run harness-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv --changes <dir>/changes.tsv`,
+   - `cardinal run harness-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv --changes <dir>/changes.tsv`,
      with `--min-sessions <n>` when the user asks for another sample size than 10.
 2. **Read** each table of the report, oldest group first: the tables are the numbers, never recompute them.
    - A trend is a change kept over two groups or more; one group out of line is noise.

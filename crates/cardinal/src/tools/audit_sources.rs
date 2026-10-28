@@ -5,7 +5,7 @@
 //! configuration directory (AUD-2). With
 //! `--messages`, print the typed messages as `project<TAB>session<TAB>text` (newlines escaped); subagent
 //! transcripts are skipped. Prints private content: never commit the output.
-//! Usage: `harness run audit-sources [projects_dir] [--messages]`
+//! Usage: `cardinal run audit-sources [projects_dir] [--messages]`
 //! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::transcripts;
@@ -73,7 +73,7 @@ pub(super) fn main(args: &[String]) -> u8 {
         .find(|a| a.starts_with('-') && *a != "--messages")
     {
         eprintln!(
-            "unknown option {flag}\nusage: harness run audit-sources [projects_dir] [--messages]"
+            "unknown option {flag}\nusage: cardinal run audit-sources [projects_dir] [--messages]"
         );
         std::process::exit(2);
     }

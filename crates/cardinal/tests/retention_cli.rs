@@ -25,7 +25,7 @@ fn user_warning(days: &str, path: &Path) -> String {
     )
 }
 
-/// `harness check --root <root>` as `cmd` sets it up.
+/// `cardinal check --root <root>` as `cmd` sets it up.
 fn check(home: &Home, root: &Path, setup: impl FnOnce(&mut Command)) -> Run {
     let mut cmd = home.command();
     cmd.args(["check", "--root"]).arg(root);

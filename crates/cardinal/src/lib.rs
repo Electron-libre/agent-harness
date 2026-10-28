@@ -201,7 +201,7 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
 
 fn write_lock(root: &Path, lock: &Lock) -> Result<()> {
     let mut text = String::from(
-        "# Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
+        "# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
     );
     for (path, h) in &lock.files {
         text.push_str(&format!("{h}  {path}\n"));
@@ -512,11 +512,11 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
     Ok(report)
 }
 
-/// Fetch the tools binary of `commit` into the cache, as `harness run` would: a warning when it fails (BIN-13).
+/// Fetch the tools binary of `commit` into the cache, as `cardinal run` would: a warning when it fails (BIN-13).
 fn prefetch(cache: &Path, source: &str, commit: &str, programs: &run::Programs) -> Option<String> {
     run::binary_of(cache, source, commit, programs)
         .err()
-        .map(|e| format!("warning: {e:#} (`harness run` will try again)"))
+        .map(|e| format!("warning: {e:#} (`cardinal run` will try again)"))
 }
 
 fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report> {

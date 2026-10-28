@@ -8,7 +8,7 @@ adrs: [0003, 0006, 0010]
 
 ## Intent
 
-`harness run delivered-quality` measures what happened to the work of each done issue of a repository
+`cardinal run delivered-quality` measures what happened to the work of each done issue of a repository
 after it was delivered (fixes, reverts) and while it was made (review findings, failed checks, typed messages), one
 row of numbers per issue, so the evaluation report compares harness revisions on quality and not only on cost. It
 reports signals, not verdicts: a fix after a feature may come from a new need.

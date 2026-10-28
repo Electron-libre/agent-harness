@@ -6,7 +6,7 @@ The `language-hint` Stop hook (`specs/language-hint.md`) sends the agent back on
 or drop it.
 
 # Findings
-* `harness run rule-breaches --summary` on 2026-10-28, before the hook: rule `user-language` breached in 12 of the
+* `cardinal run rule-breaches --summary` on 2026-10-28, before the hook: rule `user-language` breached in 12 of the
   142 sessions where it applied, 21 breaches.
 * The hook was added in commit `ad56d2a`; no session had run with it when this issue was written.
 * The hook judges only the last reply of a turn, while BRE-10 judges every assistant text block: intermediate blocks

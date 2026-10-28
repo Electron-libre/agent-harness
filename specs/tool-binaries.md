@@ -1,6 +1,6 @@
 ---
 id: BIN
-status: draft
+status: accepted
 adrs: [0002, 0010]
 ---
 
@@ -68,7 +68,7 @@ projects synced before the rename running until their next sync.
 - Running the tools of another revision than the pinned one, or without `harness.toml`.
 - Signing the binaries: the digest proves the asset is the one published with the release, not who published it.
 - The release workflow itself: it runs on the source's CI and is checked by its own run, not by a test.
-- Checking the words after the subcommand (the tool of `harness run`): the pinned binary runs them (BIN-1), not the
+- Checking the words after the subcommand (the tool of `cardinal run`): the pinned binary runs them (BIN-1), not the
   installed one.
 - Hook commands that start with neither `cardinal` nor `harness`, and an installed `harness` older than BIN-15 and
   BIN-16, or older than the rename: it cannot refuse what it does not check (an older `update` writes `cardinal` hooks

@@ -4,7 +4,7 @@
 //! so a rule broken often (a hook candidate) stands out from one that rarely applies. The commit messages are read
 //! from the git history of each project, a commit counting with the session whose span holds its date. No text of a
 //! message is printed.
-//! Usage: `harness run rule-breaches [projects_dir] [--summary]`
+//! Usage: `cardinal run rule-breaches [projects_dir] [--summary]`
 //! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::language::Language;
@@ -510,7 +510,7 @@ fn check_commits(repo: &Path, records: &mut [&mut Record]) {
 }
 
 pub(super) fn main(args: &[String]) -> u8 {
-    const USAGE: &str = "usage: harness run rule-breaches [projects_dir] [--summary]";
+    const USAGE: &str = "usage: cardinal run rule-breaches [projects_dir] [--summary]";
     let (mut dir, mut summary) = (None, false);
     for arg in args.iter().cloned() {
         match arg.as_str() {

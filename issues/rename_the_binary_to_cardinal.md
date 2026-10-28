@@ -95,9 +95,21 @@ own issues).
      workspace has and BIN-5 states.
    - not verified: `release.yml` and `harness.yml` on GitHub (after the push).
    - decisions needed: none.
-5. [ ] Switch the commands: the managed hooks, `files/harness.just`, the skills, `AGENTS.md`, the specs, the docs and
+5. [x] Switch the commands: the managed hooks, `files/harness.just`, the skills, `AGENTS.md`, the specs, the docs and
    the `justfile` call `cardinal`; `just install` then `just sync`; follow-up issue to drop the alias; verified by
    `just check`, `just check-harness`; makes true BIN-8; sets `tool-binaries` and `sync` `accepted`.
+   - done: hooks, recipes, skills, specs, docs, usages and seed call `cardinal`; `session-metrics` names a refusal
+     by `cardinal run` or `harness run` (EVA-5 amended); the BIN-8 test refuses `harness run` in what the source
+     ships; the lock header says `cardinal sync`; copies synced; follow-up issue `drop_the_harness_alias` queued
+     after the rename. The ADRs keep the names of their time (ADR 0012).
+   - check | result: tests, lint, specs pass (`just check`); `just check-harness` passes; docs: README, CLAUDE.md,
+     architecture, usage, workflow, update-docs-map.
+   - red: EVA-5: `session_metrics` panicked at `session_metrics.rs:721`, "a check failed" (a `cardinal run`
+     refusal not named after its tool); BIN-8: `settings_hygiene` failed, hooks `cardinal run ...` "point to a
+     missing script" before the sync.
+   - Code review: no findings.
+   - not verified: a consumer synced to this revision (its hooks need `cardinal` installed).
+   - decisions needed: none.
 
 ## Decisions
 - Mode: autonomous

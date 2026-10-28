@@ -1,25 +1,25 @@
-# Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.
+# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.
 ae32a54ad3e59066328e1a2f7f5afff0ca4b13bf194272c376e23280e4a7ce4e  .claude/rules/reports-to-the-user.md
-86e0c158038e5624b673354ba93329ce6ff80614df5b686a5e26e37acd347145  .claude/skills/audit-instructions/SKILL.md
-be8c82dbe5a8c2952f72a567d410f7cbeb96c7068b7131b5c789074b18c0db6c  .claude/skills/commit-message/SKILL.md
-6d2bbc79ab135d0eb300382475f7d5e5c110c3103a24357a22dde3ca6933fd2e  .claude/skills/create-issue/SKILL.md
-60d4ca42e78718af39a5e6993e950dcbd39c746b99a9bfe11004e5733389248c  .claude/skills/evaluate-harness/SKILL.md
-f33fc893c2e340291c8de1d589dd898892a2111f3c1ceed67fd7333285028733  .claude/skills/issue-workflow/SKILL.md
-aa99684d51ec155100bf3d44c0361e0b1a18ba969431c20412f73ba9ef493dda  .claude/skills/issue-workflow/details.md
+4b9c74884d807a490d35e67018a5c981431fa3bf14da70b5c43143d64e8430d0  .claude/skills/audit-instructions/SKILL.md
+7a89df35224f9599902b1137d2906dfbc213c95c42f2593bd63f94cf36025f56  .claude/skills/commit-message/SKILL.md
+6515be9e80c786c1333f0dfe9ff2bb3a1f0a3dce3d9abe97e88d72fffa534eb5  .claude/skills/create-issue/SKILL.md
+db2a89ac971dfb48e4c6af3ed0712f7fa1aefd9e9e5d3f6bfa00c3dd7c471dd0  .claude/skills/evaluate-harness/SKILL.md
+e9545fbee1b4b0de58ab6e8e6cb253ea8fcd1ca2bca81baaac6edb9fc20824cb  .claude/skills/issue-workflow/SKILL.md
+4760c7e8914ac7b18886aaa8fc5c70cbb165f9b15ff8aaf17f959787f08fc7c1  .claude/skills/issue-workflow/details.md
 54f3b95264e60821cb53008c1fc4ed5c90b3bb1b1651df527ff24363ce6c81a9  .claude/skills/prioritize-issues/SKILL.md
-0436740b6bad222898c95d3b0c21e4736afa9f986c914d4a711aa47164785875  .claude/skills/update-docs/SKILL.md
-0798598ddbe4b0a1caaf31dfca970ba34cf63905ae8f6eae7d87827933e96358  .claude/skills/write-spec/SKILL.md
+1c6335a86d6fcc1a24bc4b229986c5bf89bc385c2fbfc41eaf9870e7fd220713  .claude/skills/update-docs/SKILL.md
+8e77a3c231b051e1553dce195bfe1458a14d8aca9cd7867ede28e77996589d0f  .claude/skills/write-spec/SKILL.md
 d26a14341b44763d5f3b362df5eca0812742614102f2557f03a0b3443171892e+x  .github/install_cardinal.sh
 b62476023e1d6aea7b55d3d30ac81cd750d60d3e263a8e4b0784a5335664fb5f  .github/workflows/harness.yml
 1391ccc8946ad1f0e9f60e299d02e16bec53eca994c851535a9243f00dcd8711  AGENTS.md
-7496bb66aacb571a768af0e0d960f32da996f70e5f4c2ae645f7dfba017d32a9  harness.just
-238ff12cc4e9e9027a25b98121033fb8da39d08dfb5b65b64400c0857ace9150  specs/README.md
+bb5364191f1020fc237c1c516c6030d553aa80cc1fe7da9e0fa2fdf73ffac1ac  harness.just
+6fcb30f4bc1309ae99269fde9cacb6bf9256cdc9cfe03d4950eeca1bb26aba22  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}
 entry  {"deny":"Edit(//**/claude-review-waived)"}
-entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command":"harness run review-gate check"}}
-entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"harness run review-gate record"}}
-entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"harness run format-rust"}}
-entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"harness run clippy-gate","timeout":600}}
-entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"harness run language-hint","timeout":600}}
+entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command":"cardinal run review-gate check"}}
+entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"cardinal run review-gate record"}}
+entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"cardinal run format-rust"}}
+entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"cardinal run clippy-gate","timeout":600}}
+entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"cardinal run language-hint","timeout":600}}

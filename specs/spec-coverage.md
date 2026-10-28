@@ -14,7 +14,7 @@ worth a spec read back from their code and tests (`skill:write-spec`).
 
 ## Requirements
 
-- **COV-1** (deterministic) `harness run spec-coverage` must print one line for each test file, a `.rs` file `check-specs` reads (TRC-9, TRC-10) holding a test attribute (`#[test]`, or one whose path ends in `::test` such as `#[tokio::test]`), that cites no requirement of an `accepted` spec.
+- **COV-1** (deterministic) `cardinal run spec-coverage` must print one line for each test file, a `.rs` file `check-specs` reads (TRC-9, TRC-10) holding a test attribute (`#[test]`, or one whose path ends in `::test` such as `#[tokio::test]`), that cites no requirement of an `accepted` spec.
 - **COV-2** (deterministic) The report must not list a test file holding a `// spec:` citation of a requirement of an `accepted` spec.
 - **COV-3** (deterministic) The report must read a citation of a withdrawn requirement, of a requirement of a `draft` spec, or of an id no spec defines, as no citation.
 - **COV-4** (deterministic) Each line must give the line count of the file, a tab, then its path relative to the root.

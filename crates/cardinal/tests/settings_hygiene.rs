@@ -30,7 +30,7 @@ const REQUIRED: [&str; 7] = [
     "cargo clippy",
     "cargo fmt",
     "just ",
-    "harness run",
+    "cardinal run",
     "git diff",
 ];
 
@@ -72,12 +72,12 @@ fn settings_hygiene() {
                 Value::Null
             });
 
-    // hooks reference scripts that exist; a tool of `harness run` is checked by the tests of the harness source
+    // hooks reference scripts that exist; a tool of `cardinal run` is checked by the tests of the harness source
     for event in shared["hooks"].as_object().into_iter().flatten() {
         for group in event.1.as_array().into_iter().flatten() {
             for hook in group["hooks"].as_array().into_iter().flatten() {
                 let cmd = hook["command"].as_str().unwrap_or("");
-                if cmd.starts_with("harness run ") {
+                if cmd.starts_with("cardinal run ") {
                     continue;
                 }
                 let script = cmd

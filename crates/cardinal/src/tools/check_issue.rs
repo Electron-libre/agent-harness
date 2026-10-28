@@ -76,7 +76,7 @@ fn problems(path: &Path, text: &str) -> Vec<String> {
 
 pub(super) fn main(args: &[String]) -> u8 {
     let Some(arg) = args.first().cloned() else {
-        eprintln!("usage: harness run check-issue issues/<name>.md");
+        eprintln!("usage: cardinal run check-issue issues/<name>.md");
         std::process::exit(2);
     };
     let path = Path::new(&arg);

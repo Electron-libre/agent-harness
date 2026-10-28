@@ -170,11 +170,12 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
             "2026-10-26T10:00:23.700Z",
             "PreToolUse:Bash failed: the hook error: was elsewhere",
         ),
-        // the hooks became tools of `harness run`: same names as the scripts they were
+        // the hooks became tools of `cardinal run` (`harness run` before the rename): same names as the scripts they
+        // were
         error_result(
             &worktree,
             "2026-10-26T10:00:23.800Z",
-            "PreToolUse:Bash hook error: [harness run review-gate check]: SECRET refusal text",
+            "PreToolUse:Bash hook error: [cardinal run review-gate check]: SECRET refusal text",
         ),
         error_result(
             &worktree,

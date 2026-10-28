@@ -58,7 +58,7 @@ fn deny_warning(rule: &str) -> String {
     format!("warning: {SETTINGS} lacks the deny rule {rule}")
 }
 
-/// `harness check`, which must exit 0: a warning never makes it fail.
+/// `cardinal check`, which must exit 0: a warning never makes it fail.
 fn check(home: &Home, root: &TempDir) -> Run {
     home.ok(root.path(), &["check"])
 }

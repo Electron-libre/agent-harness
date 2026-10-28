@@ -379,7 +379,7 @@ fn refuse_linked_worktree(dir: &Path) {
 
 pub(super) fn main(args: &[String]) -> u8 {
     let Some(arg) = args.first().cloned() else {
-        eprintln!("usage: harness run close-issue issues/<name>.md | --relink");
+        eprintln!("usage: cardinal run close-issue issues/<name>.md | --relink");
         std::process::exit(2);
     };
     if arg == "--relink" {

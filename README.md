@@ -1,7 +1,7 @@
 # Cardinal
 
 Cardinal is one agent harness for many projects. This repository holds the Claude Code skills, hooks, checks, `just`
-recipes and CI that a project needs to have an agent work its issues safely, plus `harness`, the tool that copies them
+recipes and CI that a project needs to have an agent work its issues safely, plus `cardinal`, the tool that copies them
 into each project and tells when a copy drifted.
 
 ## What a project gets
@@ -13,7 +13,7 @@ into each project and tells when a copy drifted.
 | Gates | no commit without a code review of the diff, no Rust turn ending on a clippy warning, a reply not in the `user_language` sent back once, `cargo fmt` after each edit; commit messages checked (Conventional Commits, no AI attribution) |
 | Recipes | `harness.just`: `next-issue`, `start-issue`, `close-issue`, `check-issue`, `check-specs`, `spec-coverage`, `check-commit`, `check-harness`… |
 | CI | `.github/workflows/harness.yml`: the copies and the specs checked on main and on each pull request, plus its commit messages |
-| Evaluation | `harness run session-metrics`, `rule-breaches`, `delivered-quality`…: did a Cardinal revision make the agent better? |
+| Evaluation | `cardinal run session-metrics`, `rule-breaches`, `delivered-quality`…: did a Cardinal revision make the agent better? |
 
 ```mermaid
 flowchart LR
@@ -22,9 +22,9 @@ flowchart LR
     seed["seed/<br/>project-owned"]
     entries["entries/<br/>hooks and deny rules"]
   end
-  sync(["harness sync"])
+  sync(["cardinal sync"])
   subgraph project["your project"]
-    copies["same paths,<br/>checked by harness check"]
+    copies["same paths,<br/>checked by cardinal check"]
     owned["copied once,<br/>then yours"]
     settings[".claude/settings.json"]
     gate[".git/hooks/pre-commit<br/>review gate"]
@@ -41,8 +41,8 @@ flowchart LR
 ```sh
 cargo install --force --path crates/cardinal --locked   # from a clone (--force: over a `harness` of before)
 cd my-project
-harness init <git-url-or-path> [--rev main]    # writes .claude/harness.toml
-harness sync                                   # copies, seeds, merges the settings, installs the review gate
+cardinal init <git-url-or-path> [--rev main]    # writes .claude/harness.toml
+cardinal sync                                   # copies, seeds, merges the settings, installs the review gate
 ```
 
 Then keep the Claude Code transcripts a year, the evaluation reads them:
@@ -52,10 +52,10 @@ Then keep the Claude Code transcripts a year, the evaluation reads them:
 
 | Command | Does |
 |---|---|
-| `harness sync [--dry-run] [--force]` | brings the project in step with its source |
-| `harness update [--rev <rev>] [--dry-run] [--force]` | moves a git source to a revision, syncs, pins the commit |
-| `harness check` | fails when a copy drifted, the review gate is missing or a hook needs a newer `harness` |
-| `harness run [<tool>]` | runs a tool of the pinned revision (hooks, checks, transcript readers); alone, lists them |
+| `cardinal sync [--dry-run] [--force]` | brings the project in step with its source |
+| `cardinal update [--rev <rev>] [--dry-run] [--force]` | moves a git source to a revision, syncs, pins the commit |
+| `cardinal check` | fails when a copy drifted, the review gate is missing or a hook needs a newer `cardinal` |
+| `cardinal run [<tool>]` | runs a tool of the pinned revision (hooks, checks, transcript readers); alone, lists them |
 
 ## Daily flow
 

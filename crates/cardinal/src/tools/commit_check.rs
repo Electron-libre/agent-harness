@@ -1,7 +1,7 @@
 //! `commit-check`: validate a commit message read from stdin against the rules of `AGENTS.md`.
 //! Prints each violation and exits 1; prints nothing and exits 0 when the message is valid.
 //! Exits 2 with an `error:` line on stderr when `.claude/harness.toml` cannot be read from the repository root.
-//! Usage: `printf '%s\n' "$msg" | harness run commit-check`, or `just check-commit` (checks the message of HEAD).
+//! Usage: `printf '%s\n' "$msg" | cardinal run commit-check`, or `just check-commit` (checks the message of HEAD).
 
 use std::io::Read;
 

@@ -3,7 +3,7 @@
 //! sub-agent transcripts count with their session; the harness revision comes from the git history of the
 //! project's `.claude/harness.toml`. No text of a message is printed, so the rows can be archived.
 //! With `--archive <file>`, also merge the rows into that file, so the history outlives the transcripts.
-//! Usage: `harness run session-metrics [projects_dir] [--archive <file>]`
+//! Usage: `cardinal run session-metrics [projects_dir] [--archive <file>]`
 //! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::transcripts;
@@ -74,12 +74,17 @@ fn is_refusal(text: &str) -> bool {
         .is_some_and(|(tool, _)| !tool.is_empty() && !tool.contains(char::is_whitespace))
 }
 
-/// The hook a refusal names: the tool of the first `harness run <tool>` its text cites, under the name of the script
+/// The hook a refusal names: the tool of the first `cardinal run <tool>` (`harness run <tool>` before the rename) its
+/// text cites, under the name of the script
 /// it was (`-` written `_`, `review-gate` named `require_code_review`) so the counts compare across revisions; else
 /// the stem of the first `.rs` file name it cites; `unknown` when none.
 fn hook_name(text: &str) -> String {
     let name_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';
-    if let Some((_, rest)) = text.split_once("harness run ") {
+    let cited = ["cardinal run ", "harness run "]
+        .iter()
+        .filter_map(|launcher| text.find(launcher).map(|at| at + launcher.len()))
+        .min();
+    if let Some(rest) = cited.map(|at| &text[at..]) {
         let tool: String = rest.chars().take_while(|c| name_char(*c)).collect();
         if !tool.is_empty() {
             return match tool.as_str() {
@@ -317,7 +322,7 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
 }
 
 pub(super) fn main(args: &[String]) -> u8 {
-    const USAGE: &str = "usage: harness run session-metrics [projects_dir] [--archive <file>]";
+    const USAGE: &str = "usage: cardinal run session-metrics [projects_dir] [--archive <file>]";
     let mut args = args.iter().cloned();
     let (mut dir, mut archive_path) = (None, None);
     while let Some(arg) = args.next() {

@@ -74,7 +74,7 @@ fn test_file(root: &Path, file: &Path) -> Option<(usize, String)> {
 
 pub(super) fn main(args: &[String]) -> u8 {
     if args.len() > 1 || args.iter().any(|a| a.starts_with('-')) {
-        eprintln!("usage: harness run spec-coverage [root]");
+        eprintln!("usage: cardinal run spec-coverage [root]");
         return 2;
     }
     let root = PathBuf::from(args.first().map_or(".", String::as_str));

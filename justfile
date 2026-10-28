@@ -30,7 +30,7 @@ install:
 check-harness:
     cargo run -q -p cardinal -- check
 
-# The spec checker of the working tree, whatever `harness` is installed (CI installs none for this repository).
+# The spec checker of the working tree, whatever `cardinal` is installed (CI installs none for this repository).
 check-specs *args:
     @cargo run -q -p cardinal -- run check-specs {{args}}
 

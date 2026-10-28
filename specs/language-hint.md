@@ -8,7 +8,7 @@ adrs: [0005]
 
 ## Intent
 
-The Stop hook `harness run language-hint` sends the agent back once when its last reply is not in the
+The Stop hook `cardinal run language-hint` sends the agent back once when its last reply is not in the
 `user_language` of `.claude/harness.toml`, a rule the agent breaks although it is always in its context. It judges
 the reply with the test of rule `user-language` (BRE-10, `specs/rule-breaches.md`), so the hook and the measure agree
 on what a breach is.

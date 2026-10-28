@@ -413,7 +413,7 @@ fn no_gate_and_no_error_outside_a_git_repository_or_without_the_review_hook() {
     assert!(!outer.path().join(".git/hooks/pre-commit").exists());
 }
 
-/// `harness check` on `root`, with the `CI` environment variable set when `ci`.
+/// `cardinal check` on `root`, with the `CI` environment variable set when `ci`.
 fn check(home: &Home, root: &TempDir, ci: bool) -> Run {
     let env: &[(&str, &str)] = if ci { &[("CI", "true")] } else { &[] };
     home.harness_env(root.path(), &["check"], env)

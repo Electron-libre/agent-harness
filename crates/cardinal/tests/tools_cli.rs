@@ -381,8 +381,8 @@ fn every_tool_the_shared_harness_runs_exists() {
         let Ok(text) = fs::read_to_string(&path) else {
             continue;
         };
-        for (at, _) in text.match_indices("harness run ") {
-            let rest = &text[at + "harness run ".len()..];
+        for (at, _) in text.match_indices("cardinal run ") {
+            let rest = &text[at + "cardinal run ".len()..];
             let name = rest.split_whitespace().next().unwrap_or("");
             let name = name.trim_end_matches(['"', '`', ')', ',', ';']);
             if name.is_empty() || name.starts_with('<') {
@@ -396,12 +396,12 @@ fn every_tool_the_shared_harness_runs_exists() {
             );
         }
     }
-    assert!(runs > 0, "no `harness run` found: the scan is broken");
+    assert!(runs > 0, "no `cardinal run` found: the scan is broken");
 }
 
 // spec: BIN-8
 #[test]
-fn nothing_the_source_ships_runs_rust_script() {
+fn nothing_the_source_ships_runs_rust_script_or_the_name_before_the_rename() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let shipped = ["files", "entries", "seed"]
         .iter()
@@ -410,7 +410,12 @@ fn nothing_the_source_ships_runs_rust_script() {
         let text = fs::read_to_string(&path).unwrap_or_default();
         assert!(
             !text.contains("rust-script"),
-            "{} still names rust-script: run the tool through `harness run`",
+            "{} still names rust-script: run the tool through `cardinal run`",
+            path.display()
+        );
+        assert!(
+            !text.contains("harness run"),
+            "{} still runs `harness run`: run the tool through `cardinal run`",
             path.display()
         );
     }

@@ -285,7 +285,7 @@ pub(super) fn main(args: &[String]) -> u8 {
             finish(Path::new("."), stem, true)
         }
         _ => Err(
-            "usage: harness run issue-worktree start issues/<stem>.md | finish <stem> [--force]"
+            "usage: cardinal run issue-worktree start issues/<stem>.md | finish <stem> [--force]"
                 .to_string(),
         ),
     };

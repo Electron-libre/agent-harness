@@ -8,7 +8,7 @@ adrs: [0003, 0005, 0006, 0010]
 
 ## Intent
 
-`harness run rule-breaches` reads the Claude Code transcripts of every project and lists where the agent
+`cardinal run rule-breaches` reads the Claude Code transcripts of every project and lists where the agent
 broke a rule the harness states (`AGENTS.md`, the skills, the ADRs), apart from where a gate refused it, then counts
 them per rule and per harness revision over the sessions where the rule applied, so `audit-instructions` can tell a
 rule broken often (a hook candidate) from a rule that rarely applies. Only the breaches a program can see are in

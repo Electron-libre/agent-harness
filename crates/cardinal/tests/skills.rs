@@ -67,17 +67,17 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "evaluate-harness",
-        "harness run harness-report",
+        "cardinal run harness-report",
         "the tables come from the report script, not from the agent's arithmetic",
     ),
     (
         "evaluate-harness",
-        "harness run fixed-context",
+        "cardinal run fixed-context",
         "the fixed context of each revision is measured",
     ),
     (
         "evaluate-harness",
-        "harness run delivered-quality",
+        "cardinal run delivered-quality",
         "the quality axis reads each repository with done issues",
     ),
     (
@@ -87,7 +87,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "evaluate-harness",
-        "harness run harness-changes",
+        "cardinal run harness-changes",
         "the recorded changes of the harness get a verdict",
     ),
     (

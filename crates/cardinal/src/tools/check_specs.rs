@@ -563,11 +563,11 @@ fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<Cite>>) {
 pub(super) fn main(args: &[String]) -> u8 {
     let args: Vec<String> = args.to_vec();
     if let Some(flag) = args.iter().find(|a| a.starts_with('-') && *a != "--strict") {
-        eprintln!("unknown option `{flag}` (usage: harness run check-specs [--strict] [root])");
+        eprintln!("unknown option `{flag}` (usage: cardinal run check-specs [--strict] [root])");
         std::process::exit(2);
     }
     if args.iter().filter(|a| *a != "--strict").count() > 1 {
-        eprintln!("usage: harness run check-specs [--strict] [root]");
+        eprintln!("usage: cardinal run check-specs [--strict] [root]");
         std::process::exit(2);
     }
     let strict = args.iter().any(|a| a == "--strict");
