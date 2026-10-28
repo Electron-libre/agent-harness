@@ -124,7 +124,7 @@ verdict. Out of scope: subagents for the tests or `update-docs`, a custom agent 
 | # | finding | done |
 |---|---|---|
 | 1 | inline sidechain turns counted in `main_context_peak` | fixed, EVA-16 states it |
-| 2 | median on fewer sessions than the group counts, verdict not marked | follow-up `issues/count_the_sessions_behind_a_partial_metric.md` |
+| 2 | median on fewer sessions than the group counts, verdict not marked | follow-up `issues/done/count_the_sessions_behind_a_partial_metric.md` |
 | 3 | `harness-report`/`harness-changes` refuse an old archive | not fixed: `evaluate-harness` runs `session-metrics --archive` first, which upgrades it |
 | 4 | `PEAK_INDEX` hard-coded | fixed: position read from `HEADER` |
 | 5 | short archived row padded silently | not fixed: the merge never checked row widths, out of this issue |
