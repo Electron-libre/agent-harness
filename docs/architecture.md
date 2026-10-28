@@ -32,7 +32,7 @@ flowchart LR
 | Entries | `entries/.claude/settings.json` | the hooks, the deny rules of the review waiver and the allow rule of `cardinal run` | the source, inside a file the project owns ("Hooks and their declaration") |
 
 `.claude/harness.lock` records the hash of each managed file and each managed entry as written, and the format of
-the `cardinal` that wrote it, which an older one refuses to read (SYN-42). A managed file whose
+the source it was synced from, which an older `cardinal` refuses to read (SYN-42). A managed file whose
 hash differs from the lock was edited locally: `sync` reports a conflict instead of overwriting it and `check` fails.
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 

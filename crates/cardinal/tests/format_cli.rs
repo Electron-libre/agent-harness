@@ -7,7 +7,7 @@ mod common;
 use std::path::Path;
 
 use common::{get, project, put, snapshot, Home, CONFIG, LOCK};
-use tempfile::tempdir;
+use tempfile::{tempdir, TempDir};
 
 /// The format the `cardinal` under test reads: the one of its own revision (SYN-43).
 fn format() -> String {
@@ -115,20 +115,68 @@ fn update_refuses_a_revision_of_a_newer_format_and_keeps_the_project_as_it_was()
     }
 }
 
+/// A git source with one commit, holding `cardinal-format` when `declared` is given, a project pinned on it by
+/// `update`, and the commit.
+fn git_project(home: &Home, declared: Option<&str>) -> (TempDir, TempDir, String) {
+    let repo = tempdir().unwrap();
+    home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), "files/a.txt", "a1");
+    if let Some(declared) = declared {
+        put(repo.path(), "cardinal-format", declared);
+    }
+    home.git(repo.path(), &["add", "."]);
+    home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
+    let commit = home.git(repo.path(), &["rev-parse", "HEAD"]);
+    let root = tempdir().unwrap();
+    put(
+        root.path(),
+        CONFIG,
+        &format!("[harness]\nsource = \"{}\"\n", url(repo.path())),
+    );
+    (repo, root, commit)
+}
+
+// spec: SYN-40
+#[test]
+fn sync_of_an_unpinned_git_source_names_the_commit_it_checked_out() {
+    let home = Home::new();
+    let (repo, root, commit) = git_project(&home, Some("99\n"));
+    let run = home.harness(root.path(), &["sync"]);
+    assert_eq!(run.code, Some(3), "{run:?}");
+    let install = format!(
+        "cargo install --force --git {} --rev {commit} --locked",
+        url(repo.path())
+    );
+    assert!(
+        run.stderr.contains(&format!("install it with `{install}`")),
+        "{run:?}"
+    );
+    assert!(get(root.path(), LOCK).is_none());
+}
+
+/// The `format` lines of the lock of `root`.
+fn format_lines(root: &Path) -> Vec<String> {
+    get(root, LOCK)
+        .unwrap()
+        .lines()
+        .filter(|l| l.starts_with("format "))
+        .map(String::from)
+        .collect()
+}
+
 // spec: SYN-41
 #[test]
-fn the_lock_records_the_format_of_the_cardinal_that_wrote_it() {
+fn the_lock_records_the_format_of_its_source_before_every_other_line() {
     let home = Home::new();
-    let (_source, root) = project(&home);
+    let (source, root) = project(&home);
     home.ok(root.path(), &["sync"]);
+    assert_eq!(format_lines(root.path()), ["format 1"]);
+    put(source.path(), "cardinal-format", &format!("{}\n", format()));
+    home.ok(root.path(), &["sync"]);
+    assert_eq!(format_lines(root.path()), [format!("format {}", format())]);
     let lock = get(root.path(), LOCK).unwrap();
-    assert_eq!(
-        lock.lines()
-            .filter(|l| l.starts_with("format "))
-            .collect::<Vec<_>>(),
-        [format!("format {}", format())],
-        "{lock}"
-    );
+    let first = lock.lines().find(|l| !l.starts_with('#')).unwrap();
+    assert_eq!(first, format!("format {}", format()), "{lock}");
 }
 
 // spec: SYN-41
@@ -157,11 +205,12 @@ fn check_sync_and_update_refuse_a_lock_of_a_newer_format_and_write_nothing() {
     let (source, root) = project(&home);
     home.ok(root.path(), &["sync"]);
     let lock = get(root.path(), LOCK).unwrap();
-    put(
-        root.path(),
-        LOCK,
-        &lock.replace(&format!("format {}", format()), "format 99"),
+    // a newer format may write lines this one cannot parse, before its format line
+    let newer = format!(
+        "{}entry  {{\"ask\": \"Bash(x)\"}}\n../outside  h\nformat 99\n",
+        lock.replace("format 1\n", "")
     );
+    put(root.path(), LOCK, &newer);
     put(source.path(), "files/a.txt", "a2");
     let before = snapshot(root.path());
     let install = format!(
@@ -169,7 +218,7 @@ fn check_sync_and_update_refuse_a_lock_of_a_newer_format_and_write_nothing() {
         source.path().display()
     );
     let refusal = format!(
-        "{LOCK} was written by a cardinal that reads the format 99, this one reads up to {}: install a newer one with `{install}`",
+        "{LOCK} was synced from a source of the format 99, this one reads up to {}: install it with `{install}`",
         format()
     );
     for args in [&["check"][..], &["sync"], &["sync", "--dry-run"]] {
@@ -182,34 +231,22 @@ fn check_sync_and_update_refuse_a_lock_of_a_newer_format_and_write_nothing() {
 
 // spec: SYN-42
 #[test]
-fn update_refuses_a_lock_of_a_newer_format_naming_the_head_of_the_source() {
+fn update_refuses_a_lock_of_a_newer_format_naming_the_pinned_revision() {
     let home = Home::new();
-    let repo = tempdir().unwrap();
-    home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
-    put(repo.path(), "files/a.txt", "a1");
-    home.git(repo.path(), &["add", "."]);
-    home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
-    let root = tempdir().unwrap();
-    put(
-        root.path(),
-        CONFIG,
-        &format!("[harness]\nsource = \"{}\"\n", url(repo.path())),
-    );
+    let (repo, root, commit) = git_project(&home, None);
     home.ok(root.path(), &["update"]);
     let lock = get(root.path(), LOCK).unwrap();
-    put(
-        root.path(),
-        LOCK,
-        &lock.replace(&format!("format {}", format()), "format 99"),
-    );
+    put(root.path(), LOCK, &lock.replace("format 1", "format 99"));
     let before = snapshot(root.path());
 
     let run = home.harness(root.path(), &["update"]);
     assert_eq!(run.code, Some(3), "{run:?}");
-    let install = format!("cargo install --force --git {} --locked", url(repo.path()));
+    let install = format!(
+        "cargo install --force --git {} --rev {commit} --locked",
+        url(repo.path())
+    );
     assert!(
-        run.stderr
-            .contains(&format!("install a newer one with `{install}`")),
+        run.stderr.contains(&format!("install it with `{install}`")),
         "{run:?}"
     );
     assert_eq!(snapshot(root.path()), before);

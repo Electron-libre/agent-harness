@@ -176,11 +176,12 @@ struct Lock {
 
 /// The mark of a lock line that holds a managed entry of the settings instead of a file.
 const ENTRY: &str = "entry";
-/// The mark of the lock line that holds the format of the `cardinal` that wrote it, followed by one space: a
+/// The mark of the lock line that holds the format of the source it was synced from, followed by one space: a
 /// `cardinal` older than SYN-41 skips a line with no two spaces.
 const FORMAT_LINE: &str = "format ";
 
-/// The lock of the project, `None` when it has none yet; an error when a newer `cardinal` wrote it (SYN-42).
+/// The lock of the project, `None` when it has none yet; an error when its source has a format this `cardinal` does
+/// not read, judged before any other line (SYN-42).
 fn read_lock(root: &Path) -> Result<Option<Lock>> {
     let path = root.join(LOCK);
     let text = match fs::read_to_string(&path) {
@@ -188,21 +189,17 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
     };
-    let mut lock = Lock::default();
-    for line in text.lines().filter(|l| !l.starts_with('#')) {
-        if let Some(format) = line.strip_prefix(FORMAT_LINE) {
-            let format: u32 = format
-                .parse()
-                .with_context(|| format!("{}: not a format: {line}", path.display()))?;
-            if format > FORMAT {
-                let install = match source_and_rev(root) {
-                    Ok((source, _)) => format!("`{}`", launcher::install(&source, None)),
-                    Err(_) => "the cardinal of the head of the source".to_string(),
-                };
-                bail!("{LOCK} was written by a cardinal that reads the format {format}, this one reads up to {FORMAT}: install a newer one with {install}");
-            }
-            continue;
+    let lines = || text.lines().filter(|l| !l.starts_with('#'));
+    for format in lines().filter_map(|line| line.strip_prefix(FORMAT_LINE)) {
+        let format: u32 = format
+            .parse()
+            .with_context(|| format!("{}: not a format: {format}", path.display()))?;
+        if format > FORMAT {
+            bail!("{LOCK} was synced from a source of the format {format}, this one reads up to {FORMAT}: install it with {}", install_hint(root));
         }
+    }
+    let mut lock = Lock::default();
+    for line in lines().filter(|l| !l.starts_with(FORMAT_LINE)) {
         let Some((h, rel)) = line.split_once("  ") else {
             continue;
         };
@@ -220,11 +217,21 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
     Ok(Some(lock))
 }
 
-fn write_lock(root: &Path, lock: &Lock) -> Result<()> {
+/// The command that installs the `cardinal` of the revision `harness.toml` pins, quoted, or what to install when it
+/// cannot be read.
+fn install_hint(root: &Path) -> String {
+    match source_and_rev(root) {
+        Ok((source, rev)) => format!("`{}`", launcher::install(&source, rev.as_deref())),
+        Err(_) => "the cardinal of this revision".to_string(),
+    }
+}
+
+/// Write the lock of a sync from a source of the format `format`.
+fn write_lock(root: &Path, lock: &Lock, format: u32) -> Result<()> {
     let mut text = String::from(
         "# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
     );
-    text.push_str(&format!("{FORMAT_LINE}{FORMAT}\n"));
+    text.push_str(&format!("{FORMAT_LINE}{format}\n"));
     for (path, h) in &lock.files {
         text.push_str(&format!("{h}  {path}\n"));
     }
@@ -498,15 +505,6 @@ fn readable(dir: &Path, name: &str, install: &str) -> Result<()> {
     Ok(())
 }
 
-fn source_dir(cache: Option<&Path>, root: &Path, rev_override: Option<&str>) -> Result<PathBuf> {
-    let (source, rev) = source_and_rev(root)?;
-    if is_git_url(&source) {
-        checkout(cache, &source, rev_override.or(rev.as_deref()))
-    } else {
-        Ok(root.join(source))
-    }
-}
-
 /// Create `.claude/harness.toml` from the source and the project-owned defaults of the source.
 ///
 /// # Errors
@@ -541,16 +539,25 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
 /// # Errors
 /// When the configuration or the source cannot be read, or a file cannot be written.
 pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
-    let dir = source_dir(None, root, None)?;
     let (source, rev) = source_and_rev(root)?;
-    readable(&dir, &source, &launcher::install(&source, rev.as_deref()))?;
-    let mut report = sync_from(root, &dir, options)?;
-    if is_git_url(&source) && !options.dry_run {
+    let (dir, commit) = if is_git_url(&source) {
+        let dir = checkout(None, &source, rev.as_deref())?;
         let commit = git_output(&dir, &["rev-parse", "HEAD"])?;
+        (dir, Some(commit))
+    } else {
+        (root.join(&source), None)
+    };
+    readable(
+        &dir,
+        &source,
+        &launcher::install(&source, commit.as_deref()),
+    )?;
+    let mut report = sync_from(root, &dir, options)?;
+    if let (Some(commit), false) = (&commit, options.dry_run) {
         report.warnings.extend(prefetch(
             &cache_dir()?,
             &source,
-            &commit,
+            commit,
             &run::Programs::default(),
         ));
     }
@@ -671,7 +678,7 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
         entries: merge.lock,
     };
     if !options.dry_run {
-        write_lock(root, &new_lock)?;
+        write_lock(root, &new_lock, format_of(source)?)?;
     }
     // judged on the project as the sync leaves it, or would under `--dry-run`
     let done = |path: &str, outcome| report.outcome(path) == Some(outcome);
@@ -860,10 +867,7 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
         .and_then(|text| serde_json::from_str(text).ok())
         .map(|settings| launcher::refused(&settings))
         .unwrap_or_default();
-    let install = match source_and_rev(root) {
-        Ok((source, rev)) => format!("`{}`", launcher::install(&source, rev.as_deref())),
-        Err(_) => "the cardinal of this revision".to_string(),
-    };
+    let install = install_hint(root);
     let problems = lock
         .files
         .iter()

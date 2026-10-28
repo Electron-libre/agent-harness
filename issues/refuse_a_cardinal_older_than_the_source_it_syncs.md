@@ -49,6 +49,8 @@ the issue, a format integer rather than the crate version, never raised). Out of
 2. [x] Lock format: `write_lock` records `format <n>`, `read_lock` reads it, `check`, `sync` and `update` refuse a
    higher one with the install of the head of the source; ADR 0014 accepted, docs; verified by lock tests; makes
    true SYN-41, SYN-42.
+3. [x] Fixes of the `high` review: the lock records the format of its source, read before any other line; `sync`
+   names the commit it checked out; verified by `format_cli` tests; makes true SYN-40, SYN-41, SYN-42.
 
 ## Decisions
 - Mode: autonomous
@@ -57,6 +59,9 @@ the issue, a format integer rather than the crate version, never raised). Out of
 - The lock records the format of the binary that wrote it; its refusal installs the head of the source.
 - Format 2 is the one of ADR 0013; no declaration means 1.
 - `--dry-run` refuses too.
+- After the `high` review (option a): the lock records the format of the source it was synced from, not of the
+  binary, so a newer binary never makes a lock unreadable by the one pinned with it (CI, teammates); its refusal
+  installs the pinned revision.
 
 ## Deliverable 1
 
@@ -92,6 +97,28 @@ the issue, a format integer rather than the crate version, never raised). Out of
 
 - red: SYN-41, SYN-42: `assertion left == right failed` (no `format` line in the lock; `check` exited 0 on a newer
   lock)
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3
+
+- done: the lock records the format of its source, as its first line, read before any other; its refusal installs
+  the pinned revision; `sync` of a git source names the commit it checked out and reads `harness.toml` once.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | usage, architecture, ADR 0014 |
+| code review | low: no findings |
+
+- red: SYN-40, SYN-41, SYN-42: `assertion failed` (no `--rev <commit>` in the install of `sync`; lock line
+  `format 2` instead of `format 1`; `not a settings entry` before `format 99`)
+- `high` review, not fixed: `init` does not check the format (it writes only `harness.toml`, the next `sync`
+  refuses); `FORMAT` read from `cardinal-format` by `include_str!` (the crate would read a file outside its
+  directory; SYN-43 keeps them equal); duplicated test helpers.
 - Code review: no findings
 - not verified: none
 - decisions needed: none

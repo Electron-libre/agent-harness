@@ -13,10 +13,11 @@ fragment or of the lock. The crate version is never raised, so it cannot tell th
 ## Decision
 A whole number, the format, names what a `cardinal` can read of a source and of a lock. The source declares the
 format its content needs in `cardinal-format` at its root; the binary reads up to the format compiled in it, which a
-test keeps equal to the `cardinal-format` of its own revision; the lock records the format of the binary that wrote
-it, as a line `format <n>` that a binary built before this decision skips. `sync` and `update` refuse a source of a
-higher format, and `sync`, `update` and `check` a lock of a higher one, with the command that installs a binary that
-reads it. A source or lock with no format has the format 1; this decision starts at 2, the format of ADR 0013.
+test keeps equal to the `cardinal-format` of its own revision; the lock records the format of the source it was
+synced from, as a line `format <n>` that a binary built before this decision skips: its lines come from the content of
+that source, and a binary of a higher format must not make the lock unreadable by the binary pinned with the source
+(the one of the CI, of the teammates). `sync` and `update` refuse a source of a higher format, and `sync`, `update` and
+`check` a lock of a higher one, with the command that installs a binary that reads it. A source or lock with no format has the format 1; this decision starts at 2, the format of ADR 0013.
 
 The format is raised in the commit that changes the meaning of the managed content (a key of the fragment, a line of
 the lock, a directory of the source) in a way an older binary would misread; an addition an older binary reads
