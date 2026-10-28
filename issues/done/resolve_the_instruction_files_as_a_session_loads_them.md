@@ -113,6 +113,6 @@ approval Claude Code asks before loading an import outside the working directory
 - High review, not fixed: the walk stops at the `.git` file of a nested worktree (decision: the repository bounds the
   walk); the imports of a linked target outside the repository count nothing (REP-2); the ancestors are printed
   again for each working directory (AUD-1 lists per working directory); a relative `cwd` (transcripts record absolute
-  ones); `CLAUDE.local.md` never listed (`issues/list_the_local_memory_files_in_the_audit.md`).
+  ones); `CLAUDE.local.md` never listed (`issues/done/list_the_local_memory_files_in_the_audit.md`).
 - not verified: none
 - decisions needed: none

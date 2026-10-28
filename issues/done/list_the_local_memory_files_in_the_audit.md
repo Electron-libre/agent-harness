@@ -27,7 +27,7 @@ again. The audit should list it in each directory it reads, as it lists `CLAUDE.
 
 # Tracking
 
-Plan: validated
+Plan: validated (done)
 
 ## Understanding
 List `CLAUDE.local.md` and its imports among the instruction files of each directory the audit reads (AUD-1). Out of
