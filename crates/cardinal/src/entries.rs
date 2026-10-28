@@ -17,8 +17,9 @@ pub const SETTINGS: &str = ".claude/settings.json";
 /// The managed entries, relative to the source.
 pub const FRAGMENT: &str = "entries/.claude/settings.json";
 
-/// The lists of `permissions` whose rules are managed entries.
-const PERMISSIONS: [&str; 2] = ["allow", "deny"];
+/// The lists of `permissions` whose rules are managed entries, with the entry of one of their rules.
+const PERMISSIONS: [(&str, fn(String) -> Entry); 2] =
+    [("allow", Entry::Allow), ("deny", Entry::Deny)];
 
 /// One managed entry: a rule of `permissions.allow` or `permissions.deny`, or a hook object of an event and matcher of
 /// `hooks`.
@@ -56,14 +57,6 @@ impl fmt::Display for Entry {
 }
 
 impl Entry {
-    /// The rule `rule` of the list `list` of `permissions`.
-    fn rule(list: &str, rule: &str) -> Entry {
-        match list {
-            "allow" => Entry::Allow(rule.to_string()),
-            _ => Entry::Deny(rule.to_string()),
-        }
-    }
-
     /// The list of `permissions` that holds the entry, `hooks` for a hook.
     fn list(&self) -> &'static str {
         match self {
@@ -89,9 +82,9 @@ impl Entry {
     /// The entry of a line written by `to_lock`.
     pub fn from_lock(line: &str) -> Result<Entry> {
         let value: Value = serde_json::from_str(line)?;
-        for list in PERMISSIONS {
+        for (list, entry) in PERMISSIONS {
             if let Some(rule) = value[list].as_str() {
-                return Ok(Entry::rule(list, rule));
+                return Ok(entry(rule.to_string()));
             }
         }
         match (&value["event"], &value["matcher"], &value["hook"]) {
@@ -112,7 +105,7 @@ impl Entry {
     }
 }
 
-/// The entries the source manages, in the order of its fragment; none when it has no fragment. An error when the
+/// The entries the source manages, its allow rules, deny rules then hooks, each in the order of its fragment; none when it has no fragment. An error when the
 /// fragment is not in the shape of SYN-29.
 pub fn of_source(source: &Path) -> Result<Vec<Entry>> {
     let path = source.join(FRAGMENT);
@@ -136,7 +129,7 @@ fn entries(settings: &Value) -> Result<Vec<Entry>> {
         let Some(permissions) = permissions.as_object() else {
             bail!("`permissions` is not an object");
         };
-        for list in PERMISSIONS {
+        for (list, entry) in PERMISSIONS {
             let Some(rules) = permissions.get(list) else {
                 continue;
             };
@@ -147,7 +140,7 @@ fn entries(settings: &Value) -> Result<Vec<Entry>> {
                 let rule = rule
                     .as_str()
                     .with_context(|| format!("a rule of `permissions.{list}` is not a string"))?;
-                entries.push(Entry::rule(list, rule));
+                entries.push(entry(rule.to_string()));
             }
         }
     }

@@ -40,6 +40,8 @@ old `Bash(harness run *)` of a project (never recorded as managed, so it stays t
 1. [x] Managed allow rules: `Entry::Allow` in `entries.rs` (parse, lock, add, remove, report `allow <rule>`),
    `Bash(cardinal run *)` moved from `seed/` to `entries/`, `just sync`, docs; verified by tests of
    `settings_entries_cli.rs`; makes true SYN-29, SYN-34 (allow rules), SYN-31, SYN-36 for them.
+2. [x] Fixes of the `high` review: the permission lists paired with their entry constructor (no wildcard fallback), the
+   doc comment of `of_source` on the order; verified by the existing tests.
 
 ## Decisions
 - Mode: autonomous
@@ -64,3 +66,26 @@ removed nor reported missing (`check` exit 0).
 Code review: no findings
 
 not verified: none. decisions needed: none.
+
+## Summary of deliverable 2 (fixes of the `high` review)
+done: `PERMISSIONS` pairs each list with its constructor, `Entry::rule` and its wildcard gone; `of_source` doc fixed.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | n/a (no behaviour change) |
+| code review | `low`, see below |
+
+red: none (refactor under the green tests).
+
+`high` review: 8 findings.
+- older binary drops the allow rules / fails on the new lock lines: issue
+  `refuse_a_cardinal_older_than_the_source_it_syncs`.
+- malformed `permissions.allow` stops the sync of every entry: not fixed, the same as a malformed `deny` (SYN-35).
+- a managed allow rule cannot be revoked, a seeded `Bash(cardinal run *)` is adopted as managed: not fixed, by design
+  as for the hooks and deny rules (ADR 0007).
+- wildcard `Entry::rule`, twin variants: fixed by the constructor table.
+- `of_source` doc on the order: fixed.
+Code review: no findings
