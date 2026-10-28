@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [allow_cardinal_run_in_the_synced_projects](allow_cardinal_run_in_the_synced_projects.md) - right after the binary rename: the consumers it updated prompt on every `cardinal run` of a skill
 - [refuse_a_cardinal_older_than_the_source_it_syncs](refuse_a_cardinal_older_than_the_source_it_syncs.md) - before the renames: their migrations ship in `cardinal`, so an older binary would misread the renamed source too
 - [rename_the_consumer_files_to_cardinal](rename_the_consumer_files_to_cardinal.md) - after the binary: its migration of the old names ships in `cardinal`
 - [rename_the_harness_named_tools_to_cardinal](rename_the_harness_named_tools_to_cardinal.md) - last of the rename: the leftovers once the binary and files carry the new name
