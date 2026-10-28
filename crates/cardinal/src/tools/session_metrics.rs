@@ -327,13 +327,14 @@ pub(super) fn main(args: &[String]) -> u8 {
     let (mut dir, mut archive_path) = (None, None);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--archive" => match args.next() {
-                Some(file) => archive_path = Some(PathBuf::from(file)),
-                None => {
+            "--archive" => {
+                if let Some(file) = args.next() {
+                    archive_path = Some(PathBuf::from(file));
+                } else {
                     eprintln!("--archive needs a file\n{USAGE}");
                     std::process::exit(2);
                 }
-            },
+            }
             flag if flag.starts_with('-') => {
                 eprintln!("unknown option {flag}\n{USAGE}");
                 std::process::exit(2);

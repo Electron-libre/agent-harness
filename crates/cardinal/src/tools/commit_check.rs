@@ -38,13 +38,14 @@ fn check_subject(subject: &str, scopes: &[String], errors: &mut Vec<String>) {
         return;
     };
     let (ty, scope) = match head.split_once('(') {
-        Some((ty, rest)) => match rest.strip_suffix(')') {
-            Some(scope) => (ty, Some(scope)),
-            None => {
+        Some((ty, rest)) => {
+            if let Some(scope) = rest.strip_suffix(')') {
+                (ty, Some(scope))
+            } else {
                 errors.push("format: unclosed scope parenthesis".into());
                 return;
             }
-        },
+        }
         None => (head, None),
     };
     if !TYPES.contains(&ty) {

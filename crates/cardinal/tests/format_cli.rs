@@ -190,7 +190,7 @@ fn a_lock_without_a_format_is_read_and_rewritten_with_one() {
     let older: String = lock
         .lines()
         .filter(|l| !l.starts_with("format "))
-        .map(|l| format!("{l}\n"))
+        .map(|l| l.to_string() + "\n")
         .collect();
     put(root.path(), LOCK, &older);
     home.ok(root.path(), &["check"]);

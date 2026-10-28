@@ -67,7 +67,7 @@ fn rows(out: &str) -> Option<HashMap<String, HashMap<String, String>>> {
             .map(|l| {
                 let row: HashMap<String, String> = header
                     .iter()
-                    .map(|h| h.to_string())
+                    .map(std::string::ToString::to_string)
                     .zip(l.split('\t').map(str::to_string))
                     .collect();
                 (row.get("session").cloned().unwrap_or_default(), row)
@@ -76,13 +76,12 @@ fn rows(out: &str) -> Option<HashMap<String, HashMap<String, String>>> {
     )
 }
 
-/// Builds the fixture projects directory; returns (projects dir, main repository).
-fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
-    let repo = tmp.join("myrepo");
-    std::fs::create_dir_all(&repo).unwrap();
-    sh(&repo, &["init", "-q", "-b", "main"]);
+/// A git repository at `dir` with one empty commit on `main`.
+fn git_repo(dir: &Path) {
+    std::fs::create_dir_all(dir).unwrap();
+    sh(dir, &["init", "-q", "-b", "main"]);
     sh(
-        &repo,
+        dir,
         &[
             "-c",
             "user.name=t",
@@ -95,6 +94,100 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
             "init",
         ],
     );
+}
+
+/// The main transcript of the session `s1`, in `worktree`.
+fn first_session(worktree: &Path) -> String {
+    [
+        typed(worktree, "2026-10-26T10:00:00.000Z", "please fix SECRET"),
+        typed(worktree, "2026-10-26T10:00:05.000Z", "OK!"),
+        typed(worktree, "2026-10-26T10:00:06.000Z", "1 a, 2 c"),
+        typed(worktree, "2026-10-26T10:00:07.000Z", "c'est bon."),
+        typed(worktree, "2026-10-26T10:00:08.000Z", "4k"),
+        typed(worktree, "2026-10-26T10:00:09.000Z", "2a"),
+        assistant(
+            worktree,
+            "2026-10-26T10:00:10.000Z",
+            "m1",
+            "model-a",
+            SKILL,
+            &usage(10, 20, Some(5), 100, 7),
+        ),
+        assistant(
+            worktree,
+            "2026-10-26T10:00:11.000Z",
+            "m1",
+            "model-a",
+            BASH,
+            &usage(10, 20, Some(5), 100, 7),
+        ),
+        assistant(
+            worktree,
+            "2026-10-26T10:00:12.000Z",
+            "m1",
+            "model-a",
+            TEXT,
+            &usage(10, 20, Some(5), 100, 7),
+        ),
+        assistant(
+            worktree,
+            "2026-10-26T10:00:20.000Z",
+            "m2",
+            "model-b",
+            BASH,
+            &usage(1, 2, None, 3, 4),
+        ),
+        refusal(
+            worktree,
+            "2026-10-26T10:00:21.000Z",
+            ".claude/hooks/require_code_review.rs",
+        ),
+        refusal(
+            worktree,
+            "2026-10-26T10:00:22.000Z",
+            ".claude/hooks/require_code_review.rs",
+        ),
+        refusal(worktree, "2026-10-26T10:00:23.000Z", "nothing"),
+        refusal(
+            worktree,
+            "2026-10-26T10:00:23.500Z",
+            "~/.rsync/notes.rst .claude/hooks/block_ai_attribution.rs",
+        ),
+        error_result(
+            worktree,
+            "2026-10-26T10:00:23.700Z",
+            "PreToolUse:Bash failed: the hook error: was elsewhere",
+        ),
+        // the hooks became tools of `cardinal run` (`harness run` before the rename): same names as the scripts they
+        // were
+        error_result(
+            worktree,
+            "2026-10-26T10:00:23.800Z",
+            "PreToolUse:Bash hook error: [cardinal run review-gate check]: SECRET refusal text",
+        ),
+        error_result(
+            worktree,
+            "2026-10-26T10:00:23.900Z",
+            "PreToolUse:Bash hook error: [harness run some-new-tool]: SECRET refusal text",
+        ),
+        line("brand-new-type", worktree, "2026-10-26T10:00:24.000Z", ""),
+        "{not json\n".to_string(),
+        line(
+            "assistant",
+            worktree,
+            "2026-10-26T10:00:25.000Z",
+            ",\"message\":{\"id\":\"m9\",\"model\":\"model-a\",\"content\":[]}",
+        ),
+        line("attachment", worktree, "2026-10-26T11:00:00.000Z", ""),
+        "{\"type\":\"ai-title\",\"sessionId\":\"x\"}\n".to_string(),
+    ]
+    .concat()
+}
+
+/// Builds the fixture projects directory; returns (projects dir, main repository).
+fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
+    let repo = tmp.join("myrepo");
+    git_repo(&repo);
     let worktree = tmp.join("myrepo-my_issue");
     sh(
         &repo,
@@ -110,90 +203,7 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
     let projects = tmp.join("projects");
     let proj = projects.join("-tmp-myrepo");
     std::fs::create_dir_all(proj.join("s1/subagents")).unwrap();
-    let s1 = [
-        typed(&worktree, "2026-10-26T10:00:00.000Z", "please fix SECRET"),
-        typed(&worktree, "2026-10-26T10:00:05.000Z", "OK!"),
-        typed(&worktree, "2026-10-26T10:00:06.000Z", "1 a, 2 c"),
-        typed(&worktree, "2026-10-26T10:00:07.000Z", "c'est bon."),
-        typed(&worktree, "2026-10-26T10:00:08.000Z", "4k"),
-        typed(&worktree, "2026-10-26T10:00:09.000Z", "2a"),
-        assistant(
-            &worktree,
-            "2026-10-26T10:00:10.000Z",
-            "m1",
-            "model-a",
-            SKILL,
-            &usage(10, 20, Some(5), 100, 7),
-        ),
-        assistant(
-            &worktree,
-            "2026-10-26T10:00:11.000Z",
-            "m1",
-            "model-a",
-            BASH,
-            &usage(10, 20, Some(5), 100, 7),
-        ),
-        assistant(
-            &worktree,
-            "2026-10-26T10:00:12.000Z",
-            "m1",
-            "model-a",
-            TEXT,
-            &usage(10, 20, Some(5), 100, 7),
-        ),
-        assistant(
-            &worktree,
-            "2026-10-26T10:00:20.000Z",
-            "m2",
-            "model-b",
-            BASH,
-            &usage(1, 2, None, 3, 4),
-        ),
-        refusal(
-            &worktree,
-            "2026-10-26T10:00:21.000Z",
-            ".claude/hooks/require_code_review.rs",
-        ),
-        refusal(
-            &worktree,
-            "2026-10-26T10:00:22.000Z",
-            ".claude/hooks/require_code_review.rs",
-        ),
-        refusal(&worktree, "2026-10-26T10:00:23.000Z", "nothing"),
-        refusal(
-            &worktree,
-            "2026-10-26T10:00:23.500Z",
-            "~/.rsync/notes.rst .claude/hooks/block_ai_attribution.rs",
-        ),
-        error_result(
-            &worktree,
-            "2026-10-26T10:00:23.700Z",
-            "PreToolUse:Bash failed: the hook error: was elsewhere",
-        ),
-        // the hooks became tools of `cardinal run` (`harness run` before the rename): same names as the scripts they
-        // were
-        error_result(
-            &worktree,
-            "2026-10-26T10:00:23.800Z",
-            "PreToolUse:Bash hook error: [cardinal run review-gate check]: SECRET refusal text",
-        ),
-        error_result(
-            &worktree,
-            "2026-10-26T10:00:23.900Z",
-            "PreToolUse:Bash hook error: [harness run some-new-tool]: SECRET refusal text",
-        ),
-        line("brand-new-type", &worktree, "2026-10-26T10:00:24.000Z", ""),
-        "{not json\n".to_string(),
-        line(
-            "assistant",
-            &worktree,
-            "2026-10-26T10:00:25.000Z",
-            ",\"message\":{\"id\":\"m9\",\"model\":\"model-a\",\"content\":[]}",
-        ),
-        line("attachment", &worktree, "2026-10-26T11:00:00.000Z", ""),
-        "{\"type\":\"ai-title\",\"sessionId\":\"x\"}\n".to_string(),
-    ]
-    .concat();
+    let s1 = first_session(&worktree);
     std::fs::write(proj.join("s1.jsonl"), s1).unwrap();
     let sub = [
         line("user", &worktree, "2026-10-26T10:00:30.000Z", ",\"isSidechain\":true,\"message\":{\"role\":\"user\",\"content\":\"subagent SECRET prompt\"}"),
@@ -208,22 +218,7 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
     std::fs::create_dir_all(projects.join("-nonexistent-elsewhere")).unwrap();
     std::fs::write(projects.join("-nonexistent-elsewhere/s2.jsonl"), s2).unwrap();
     let lib = tmp.join("lib");
-    std::fs::create_dir_all(&lib).unwrap();
-    sh(&lib, &["init", "-q", "-b", "main"]);
-    sh(
-        &lib,
-        &[
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "commit",
-            "-q",
-            "--allow-empty",
-            "-m",
-            "init",
-        ],
-    );
+    git_repo(&lib);
     sh(
         &repo,
         &[
@@ -389,13 +384,15 @@ fn new_repo(dir: &Path) -> PathBuf {
     dir.to_path_buf()
 }
 
-// spec: EVA-8
-fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
-    let tmp = tmp.join("revision");
+/// A `.claude/harness.toml` pinning `rev`.
+fn toml(rev: &str) -> String {
+    format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"  # v1\n")
+}
+
+/// A repository pinning `aaa` then `bbb` on `main`, `ddd` merged from a branch, and a linked worktree pinning `ccc`;
+/// returns (repository, worktree).
+fn pinned_repo(tmp: &Path) -> (PathBuf, PathBuf) {
     let pinned = new_repo(&tmp.join("pinned"));
-    let toml = |rev: &str| {
-        format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"  # v1\n")
-    };
     commit_at(
         &pinned,
         "2026-01-01T10:00:00Z",
@@ -449,6 +446,33 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         .output()
         .unwrap();
     assert!(merge.status.success(), "merge failed");
+    (pinned, worktree)
+}
+
+/// A repository pinning `old` in `.claude/harness.toml`, then `new` in `.claude/cardinal.toml`.
+fn migrated_repo(tmp: &Path) -> PathBuf {
+    let migrated = new_repo(&tmp.join("migrated"));
+    commit_at(
+        &migrated,
+        "2026-01-01T10:00:00Z",
+        &[(".claude/harness.toml", &toml("old"))],
+    );
+    std::fs::remove_file(migrated.join(".claude/harness.toml")).unwrap();
+    commit_at(
+        &migrated,
+        "2026-01-01T12:00:00Z",
+        &[(
+            ".claude/cardinal.toml",
+            &toml("new").replace("[harness]", "[cardinal]"),
+        )],
+    );
+    migrated
+}
+
+// spec: EVA-8
+fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let tmp = tmp.join("revision");
+    let (pinned, worktree) = pinned_repo(&tmp);
     let own = new_repo(&tmp.join("own"));
     commit_at(
         &own,
@@ -469,21 +493,7 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "[harness]\nsource = \"https://example.org/harness\"\n",
         )],
     );
-    let migrated = new_repo(&tmp.join("migrated"));
-    commit_at(
-        &migrated,
-        "2026-01-01T10:00:00Z",
-        &[(".claude/harness.toml", &toml("old"))],
-    );
-    std::fs::remove_file(migrated.join(".claude/harness.toml")).unwrap();
-    commit_at(
-        &migrated,
-        "2026-01-01T12:00:00Z",
-        &[(
-            ".claude/cardinal.toml",
-            &toml("new").replace("[harness]", "[cardinal]"),
-        )],
-    );
+    let migrated = migrated_repo(&tmp);
     let projects = tmp.join("projects");
     let sessions: [(&str, &Path, &str); 10] = [
         ("before_migration", &migrated, "2026-01-01T11:00:00.000Z"),
@@ -558,9 +568,8 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: EVA-11, EVA-14, EVA-17
-fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
-    let tmp = tmp.join("archive");
+/// The sessions `b` (two validations) and `c` (one) of the project `p` under `tmp/projects`.
+fn archived_sessions(tmp: &Path) {
     let projects = tmp.join("projects/-p");
     std::fs::create_dir_all(&projects).unwrap();
     let cwd = Path::new("/nonexistent/p");
@@ -578,6 +587,12 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         typed(cwd, "2026-01-01T12:00:00.000Z", "ok"),
     )
     .unwrap();
+}
+
+// spec: EVA-11, EVA-14, EVA-17
+fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let tmp = tmp.join("archive");
+    archived_sessions(&tmp);
     let archive = tmp.join("state/deep/sessions.tsv");
     let run = || {
         tool_command(dir.join("session_metrics.rs"))
@@ -660,7 +675,7 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
                 && upgraded_rows.len() == 3
                 && old
                     .and_then(|r| r.get("main_context_peak"))
-                    .is_some_and(|p| p.is_empty())
+                    .is_some_and(std::string::String::is_empty)
                 && old
                     .and_then(|r| r.get("validations"))
                     .is_some_and(|v| v == "9"),
@@ -729,8 +744,8 @@ fn default_root_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
 #[test]
 fn session_metrics() {
     let dir = std::path::PathBuf::from("/tools");
-    let temp = tempfile::tempdir().unwrap();
-    let tmp = temp.path().to_path_buf();
+    let scratch = tempfile::tempdir().unwrap();
+    let tmp = scratch.path().to_path_buf();
     let checks: Vec<_> = row_checks(&dir, &tmp)
         .into_iter()
         .chain(revision_checks(&dir, &tmp))

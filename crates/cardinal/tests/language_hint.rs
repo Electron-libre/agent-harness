@@ -130,20 +130,20 @@ fn with_no_last_message_the_last_assistant_text_of_the_transcript_is_judged() {
         json!({"type": "assistant", "message": {"id": "m2", "content": [{"type": "tool_use", "id": "t", "name": "Bash", "input": {}}]}}),
         json!({"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t", "content": FRENCH}]}}),
     ];
-    let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
+    let text: String = lines.iter().map(|l| l.to_string() + "\n").collect();
     put(dir.path(), "t.jsonl", &text);
     let event = json!({"hook_event_name": "Stop", "cwd": dir.path(), "transcript_path": dir.path().join("t.jsonl")});
     let run = hook(dir.path(), &event);
     assert_eq!(run.code, Some(2), "{run:?}");
 
-    let french_last: String = lines[..2].iter().map(|l| format!("{l}\n")).collect();
+    let french_last: String = lines[..2].iter().map(|l| l.to_string() + "\n").collect();
     put(dir.path(), "t.jsonl", &french_last);
     assert!(silent_pass(&hook(dir.path(), &event)));
 
     // a new turn with no text yet: the English reply of the turn before is not judged again
     let new_turn: String = [&lines[2], &lines[0], &lines[3]]
         .iter()
-        .map(|l| format!("{l}\n"))
+        .map(|l| l.to_string() + "\n")
         .collect();
     put(dir.path(), "t.jsonl", &new_turn);
     let run = hook(dir.path(), &event);

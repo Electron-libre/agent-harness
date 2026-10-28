@@ -1,6 +1,6 @@
 //! Behavior test for `harness tool close-issue`: moves tracked and untracked issues, refuses bad targets.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn run(script: &Path, cwd: &Path, arg: &str) -> (bool, String) {
@@ -100,10 +100,9 @@ fn refuses_a_linked_worktree(script: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
-// spec: PAR-14
-/// The issue worktrees nest in the main one (ADR 0008): closing an issue there must not rewrite their files, ignored
-/// by git (`info/exclude`) or listed as an embedded repository (a clone that never ran `start-issue`), wherever they are.
-fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
+/// A main worktree with issues and references, and two linked worktrees nested in it; returns (main, the one under
+/// `.claude/worktrees`, the one under `docs`).
+fn nested_worktrees() -> (PathBuf, PathBuf, PathBuf) {
     let main = std::fs::canonicalize(tempfile::tempdir().unwrap().keep()).unwrap();
     let _ = std::fs::remove_dir_all(&main);
     let nested = main.join(".claude/worktrees/bar");
@@ -159,6 +158,14 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
         "baz",
         elsewhere.to_str().unwrap(),
     ]);
+    (main, nested, elsewhere)
+}
+
+// spec: PAR-14
+/// The issue worktrees nest in the main one (ADR 0008): closing an issue there must not rewrite their files, ignored
+/// by git (`info/exclude`) or listed as an embedded repository (a clone that never ran `start-issue`), wherever they are.
+fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
+    let (main, nested, elsewhere) = nested_worktrees();
     std::fs::write(main.join("docs/draft.md"), "see issues/foo.md\n").unwrap();
     let read = |p: &Path| std::fs::read_to_string(p).unwrap();
     let kept = |wt: &Path| {
@@ -284,6 +291,71 @@ fn relinks_the_markdown_links(script: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+/// `--relink` in `tmp` repairs the references to the done issues only, outside the skipped directories.
+fn relink_checks(script: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let mut out = Vec::new();
+    let mut check = |name, ok| out.push((name, ok));
+    std::fs::write(tmp.join("issues/done/README.md"), "x").unwrap();
+    std::fs::write(
+        tmp.join("NOTES.md"),
+        "issues/untracked.md issues/README.md issues/other.md",
+    )
+    .unwrap();
+    std::fs::write(tmp.join("issues/other.md"), "x").unwrap();
+    for dir in [".claude", "vendor/docs", "node_modules/pkg"] {
+        std::fs::create_dir_all(tmp.join(dir)).unwrap();
+    }
+    std::fs::write(
+        tmp.join(".claude/harness.toml"),
+        "[project]\nskipped_dirs = [\"vendor\"]\n",
+    )
+    .unwrap();
+    std::fs::write(tmp.join("vendor/docs/v.md"), "issues/untracked.md").unwrap();
+    std::fs::write(tmp.join("node_modules/pkg/n.md"), "issues/untracked.md").unwrap();
+    let (ok, _) = run(script, tmp, "--relink");
+    let notes = std::fs::read_to_string(tmp.join("NOTES.md")).unwrap();
+    check(
+        "--relink repairs done issues only",
+        ok && notes == "issues/done/untracked.md issues/README.md issues/other.md",
+    );
+    let untouched =
+        |p: &str| std::fs::read_to_string(tmp.join(p)).unwrap() == "issues/untracked.md";
+    check(
+        "skipped_dirs and node_modules are not rewritten",
+        untouched("vendor/docs/v.md") && untouched("node_modules/pkg/n.md"),
+    );
+    out
+}
+
+/// Closing issues of `issues/queue.md` in `tmp` drops their entries.
+fn queue_checks(script: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let header = "# Issue queue\n\nIntro.\n";
+    std::fs::write(
+        tmp.join("issues/queue.md"),
+        format!("{header}\n- [a](a.md) - why\n- [b](b.md) - why\n- [c](c.md) - why\n"),
+    )
+    .unwrap();
+    for f in ["a.md", "b.md", "c.md"] {
+        std::fs::write(tmp.join("issues").join(f), "x").unwrap();
+    }
+    let (ok, _) = run(script, tmp, "issues/b.md");
+    let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
+    let middle = (
+        "closing a middle entry keeps the others",
+        ok && queue == format!("{header}\n- [a](a.md) - why\n- [c](c.md) - why\n"),
+    );
+    run(script, tmp, "issues/a.md");
+    let (ok, _) = run(script, tmp, "issues/c.md");
+    let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
+    vec![
+        middle,
+        (
+            "closing the last entry leaves the header ending with one newline",
+            ok && queue == header,
+        ),
+    ]
+}
+
 // spec: CLS-1
 #[test]
 fn close_issue() {
@@ -297,7 +369,7 @@ fn close_issue() {
             .current_dir(&tmp)
             .status()
             .unwrap()
-            .success())
+            .success());
     };
     git(&["init", "-q"]);
     for f in ["tracked.md", "untracked.md"] {
@@ -335,35 +407,9 @@ fn close_issue() {
         "untracked issue is moved and left out of the index",
         ok && outside_index && tmp.join("issues/done/untracked.md").is_file(),
     );
-    std::fs::write(tmp.join("issues/done/README.md"), "x").unwrap();
-    std::fs::write(
-        tmp.join("NOTES.md"),
-        "issues/untracked.md issues/README.md issues/other.md",
-    )
-    .unwrap();
-    std::fs::write(tmp.join("issues/other.md"), "x").unwrap();
-    for dir in [".claude", "vendor/docs", "node_modules/pkg"] {
-        std::fs::create_dir_all(tmp.join(dir)).unwrap();
+    for (name, ok) in relink_checks(&script, &tmp) {
+        check(name, ok);
     }
-    std::fs::write(
-        tmp.join(".claude/harness.toml"),
-        "[project]\nskipped_dirs = [\"vendor\"]\n",
-    )
-    .unwrap();
-    std::fs::write(tmp.join("vendor/docs/v.md"), "issues/untracked.md").unwrap();
-    std::fs::write(tmp.join("node_modules/pkg/n.md"), "issues/untracked.md").unwrap();
-    let (ok, _) = run(&script, &tmp, "--relink");
-    let notes = std::fs::read_to_string(tmp.join("NOTES.md")).unwrap();
-    check(
-        "--relink repairs done issues only",
-        ok && notes == "issues/done/untracked.md issues/README.md issues/other.md",
-    );
-    let untouched =
-        |p: &str| std::fs::read_to_string(tmp.join(p)).unwrap() == "issues/untracked.md";
-    check(
-        "skipped_dirs and node_modules are not rewritten",
-        untouched("vendor/docs/v.md") && untouched("node_modules/pkg/n.md"),
-    );
     std::fs::remove_dir_all(tmp.join("node_modules")).unwrap();
     std::fs::create_dir_all(tmp.join("elsewhere")).unwrap();
     std::fs::write(tmp.join("elsewhere/x.md"), "x").unwrap();
@@ -394,28 +440,9 @@ fn close_issue() {
         ok && staged && out.contains("git mv"),
     );
 
-    let header = "# Issue queue\n\nIntro.\n";
-    std::fs::write(
-        tmp.join("issues/queue.md"),
-        format!("{header}\n- [a](a.md) - why\n- [b](b.md) - why\n- [c](c.md) - why\n"),
-    )
-    .unwrap();
-    for f in ["a.md", "b.md", "c.md"] {
-        std::fs::write(tmp.join("issues").join(f), "x").unwrap();
+    for (name, ok) in queue_checks(&script, &tmp) {
+        check(name, ok);
     }
-    let (ok, _) = run(&script, &tmp, "issues/b.md");
-    let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
-    check(
-        "closing a middle entry keeps the others",
-        ok && queue == format!("{header}\n- [a](a.md) - why\n- [c](c.md) - why\n"),
-    );
-    run(&script, &tmp, "issues/a.md");
-    let (ok, _) = run(&script, &tmp, "issues/c.md");
-    let queue = std::fs::read_to_string(tmp.join("issues/queue.md")).unwrap();
-    check(
-        "closing the last entry leaves the header ending with one newline",
-        ok && queue == header,
-    );
 
     for (name, ok) in refuses_a_linked_worktree(&script)
         .into_iter()

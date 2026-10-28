@@ -206,25 +206,6 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let too_few = eff
         .and_then(|r| r.iter().find(|c| c[0] == "r-c"))
         .is_some_and(|c| c[1] == "4" && c[2..].iter().all(|v| v == "too few"));
-    let (_, small, _) = run(
-        dir,
-        &[
-            "--sessions".as_ref(),
-            file.as_os_str(),
-            "--min-sessions".as_ref(),
-            "2".as_ref(),
-        ],
-    );
-    let small = tables(&small);
-    let (_, anonymous, _) = run(
-        dir,
-        &[
-            "--sessions".as_ref(),
-            file.as_os_str(),
-            "--anonymous".as_ref(),
-        ],
-    );
-    let anon = tables(&anonymous);
     vec![
         (
             "the report prints an efficiency table with its columns",
@@ -267,6 +248,38 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "the sessions with a peak are counted next to its median",
             cell(eff, first, "peak_sessions") == "9",
         ),
+    ]
+}
+
+// spec: REP-3, REP-4, REP-5, REP-8, REP-9, REP-10
+fn option_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let rows: Vec<String> = sessions()
+        .iter()
+        .enumerate()
+        .map(|(i, s)| s.row(i))
+        .collect();
+    let file = write(&tmp.join("options-sessions.tsv"), SESSIONS, &rows);
+    let first = "self:1111111..r-b";
+    let (_, small, _) = run(
+        dir,
+        &[
+            "--sessions".as_ref(),
+            file.as_os_str(),
+            "--min-sessions".as_ref(),
+            "2".as_ref(),
+        ],
+    );
+    let small = tables(&small);
+    let (_, anonymous, _) = run(
+        dir,
+        &[
+            "--sessions".as_ref(),
+            file.as_os_str(),
+            "--anonymous".as_ref(),
+        ],
+    );
+    let anon = tables(&anonymous);
+    vec![
         (
             "a group with no peak has an empty main context peak and 0 peak sessions",
             cell(small.get("Efficiency"), "r-c", "main_context_peak").is_empty()
@@ -292,8 +305,8 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: REP-6, REP-7
-fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+/// The sessions, breaches, two quality and context files of the axes checks.
+fn axes_inputs(tmp: &Path) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
     let rows: Vec<String> = sessions()
         .iter()
         .enumerate()
@@ -332,6 +345,12 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "p2\tr-b\t\t\t\t\t".into(),
         ],
     );
+    (sessions, breaches, quality_a, quality_b, context)
+}
+
+// spec: REP-6, REP-7
+fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let (sessions, breaches, quality_a, quality_b, context) = axes_inputs(tmp);
     let arg = |s: &'static str| std::ffi::OsStr::new(s);
     let (ok, out, err) = run(
         dir,
@@ -376,31 +395,6 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         })
     };
     let too_few = [quality, rules, skills, fixed].into_iter().all(few);
-    let only_b = write(
-        &tmp.join("breaches-b.tsv"),
-        BREACHES,
-        &["x-rule\tr-b\t4\t1\t1\t2".into()],
-    );
-    let (_, small, _) = run(
-        dir,
-        &[
-            arg("--sessions"),
-            sessions.as_os_str(),
-            arg("--min-sessions"),
-            arg("2"),
-            arg("--breaches"),
-            only_b.as_os_str(),
-            arg("--quality"),
-            quality_a.as_os_str(),
-        ],
-    );
-    let small = tables(&small);
-    let no_rule = small
-        .get("Rules")
-        .and_then(|r| r.iter().find(|c| c[0] == "self:1111111"))
-        .is_some_and(|c| c.len() == 8 && c[2..].iter().all(String::is_empty));
-    let (_, bare, _) = run(dir, &[arg("--sessions"), sessions.as_os_str()]);
-    let bare = tables(&bare);
     vec![
         (
             "quality sums over the revisions and files of a group, other revisions left out",
@@ -444,6 +438,39 @@ fn axes_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "a group with too few sessions is one row of `too few` in every table",
             too_few,
         ),
+    ]
+}
+
+// spec: REP-6, REP-7
+fn axes_threshold_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let (sessions, _, quality_a, _, _) = axes_inputs(tmp);
+    let arg = |s: &'static str| std::ffi::OsStr::new(s);
+    let only_b = write(
+        &tmp.join("breaches-b.tsv"),
+        BREACHES,
+        &["x-rule\tr-b\t4\t1\t1\t2".into()],
+    );
+    let (_, small, _) = run(
+        dir,
+        &[
+            arg("--sessions"),
+            sessions.as_os_str(),
+            arg("--min-sessions"),
+            arg("2"),
+            arg("--breaches"),
+            only_b.as_os_str(),
+            arg("--quality"),
+            quality_a.as_os_str(),
+        ],
+    );
+    let small = tables(&small);
+    let no_rule = small
+        .get("Rules")
+        .and_then(|r| r.iter().find(|c| c[0] == "self:1111111"))
+        .is_some_and(|c| c.len() == 8 && c[2..].iter().all(String::is_empty));
+    let (_, bare, _) = run(dir, &[arg("--sessions"), sessions.as_os_str()]);
+    let bare = tables(&bare);
+    vec![
         (
             "a group with no quality row has empty sums, not zeros",
             cell(small.get("Quality"), "r-c", "issues").is_empty()
@@ -516,62 +543,81 @@ fn refusal_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+/// A 40-digit commit hash made of `c`.
+fn hash(c: char) -> String {
+    c.to_string().repeat(40)
+}
+
+/// The rows of the `Verdicts` table, header apart, for these sessions and changes (and the extra arguments).
+fn verdicts(
+    dir: &Path,
+    tmp: &Path,
+    sessions: &[S],
+    changes: &[String],
+    extra: &[&str],
+) -> Vec<Vec<String>> {
+    static RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    let rows: Vec<String> = sessions.iter().enumerate().map(|(i, s)| s.row(i)).collect();
+    let sessions = write(&tmp.join(format!("v-sessions-{n}.tsv")), SESSIONS, &rows);
+    let changes = write(&tmp.join(format!("v-changes-{n}.tsv")), CHANGES, changes);
+    let breaches = write(
+        &tmp.join(format!("v-breaches-{n}.tsv")),
+        BREACHES,
+        &[
+            "x-rule\tra\t4\t2\t2\t0".into(),
+            "x-rule\trb\t4\t1\t1\t0".into(),
+        ],
+    );
+    let mut args: Vec<&std::ffi::OsStr> = vec![
+        "--sessions".as_ref(),
+        sessions.as_os_str(),
+        "--changes".as_ref(),
+        changes.as_os_str(),
+        "--breaches".as_ref(),
+        breaches.as_os_str(),
+        "--min-sessions".as_ref(),
+        "2".as_ref(),
+    ];
+    args.extend(extra.iter().map(std::ffi::OsStr::new));
+    let (ok, out, err) = run(dir, &args);
+    if !ok {
+        println!("{err}");
+    }
+    let last = out.rfind("## ").map_or("", |i| &out[i..]);
+    tables(&out)
+        .remove("Verdicts")
+        .filter(|_| last.starts_with("## Verdicts"))
+        .unwrap_or_default()
+        .into_iter()
+        .skip(1)
+        .collect()
+}
+
+/// Two identical sessions.
+fn two(project: &'static str, revision: &'static str, day: u32, turns: u64) -> Vec<S<'static>> {
+    vec![
+        base(project, revision, day, turns),
+        base(project, revision, day, turns),
+    ]
+}
+
+fn pair(a: Vec<S<'static>>, b: Vec<S<'static>>) -> Vec<S<'static>> {
+    a.into_iter().chain(b).collect()
+}
+
+/// A change `c` of `metric` expected down, held by `revisions`.
+fn change(c: char, metric: &str, revisions: &str) -> String {
+    format!("{}\t{metric}\tdown\t{revisions}", hash(c))
+}
+
+/// The verdict column of verdict rows.
+fn verdict(rows: &[Vec<String>]) -> Vec<String> {
+    rows.iter().map(|r| r[7].clone()).collect()
+}
+
 // spec: VRD-5, VRD-6, VRD-7, VRD-9
 fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
-    let hash = |c: char| c.to_string().repeat(40);
-    let n = std::cell::Cell::new(0);
-    // The rows of the `Verdicts` table, header apart, for these sessions and changes (and the extra arguments).
-    let verdicts = |sessions: &[S], changes: &[String], extra: &[&str]| -> Vec<Vec<String>> {
-        n.set(n.get() + 1);
-        let rows: Vec<String> = sessions.iter().enumerate().map(|(i, s)| s.row(i)).collect();
-        let sessions = write(
-            &tmp.join(format!("v-sessions-{}.tsv", n.get())),
-            SESSIONS,
-            &rows,
-        );
-        let changes = write(
-            &tmp.join(format!("v-changes-{}.tsv", n.get())),
-            CHANGES,
-            changes,
-        );
-        let breaches = write(
-            &tmp.join(format!("v-breaches-{}.tsv", n.get())),
-            BREACHES,
-            &[
-                "x-rule\tra\t4\t2\t2\t0".into(),
-                "x-rule\trb\t4\t1\t1\t0".into(),
-            ],
-        );
-        let mut args: Vec<&std::ffi::OsStr> = vec![
-            "--sessions".as_ref(),
-            sessions.as_os_str(),
-            "--changes".as_ref(),
-            changes.as_os_str(),
-            "--breaches".as_ref(),
-            breaches.as_os_str(),
-            "--min-sessions".as_ref(),
-            "2".as_ref(),
-        ];
-        args.extend(extra.iter().map(std::ffi::OsStr::new));
-        let (ok, out, err) = run(dir, &args);
-        if !ok {
-            println!("{err}");
-        }
-        let last = out.rfind("## ").map_or("", |i| &out[i..]);
-        tables(&out)
-            .remove("Verdicts")
-            .filter(|_| last.starts_with("## Verdicts"))
-            .unwrap_or_default()
-            .into_iter()
-            .skip(1)
-            .collect()
-    };
-    let two = |project: &'static str, revision: &'static str, day: u32, turns: u64| {
-        vec![
-            base(project, revision, day, turns),
-            base(project, revision, day, turns),
-        ]
-    };
     // Groups `ra` (turns 10), `rb` (5), `rc` (8), `rd` (one session: too few).
     let plain: Vec<S> = [
         two("p1", "ra", 1, 10),
@@ -583,6 +629,8 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     .flatten()
     .collect();
     let main = verdicts(
+        dir,
+        tmp,
         &plain,
         &[
             format!("{}\tturns\tdown\trb,rc,rd", hash('a')),
@@ -614,13 +662,8 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         row('d', "turns", &["down", "", "", "", "", "no data"]),
         row('e', "turns", &["up", "", "ra", "", "10", "no data"]),
     ];
-    let verdict = |rows: &[Vec<String>]| rows.iter().map(|r| r[7].clone()).collect::<Vec<_>>();
-    let pair = |a: Vec<S<'static>>, b: Vec<S<'static>>| a.into_iter().chain(b).collect::<Vec<_>>();
     let one = |extra: &[&str], sessions: Vec<S<'static>>, changes: &[String]| {
-        verdict(&verdicts(&sessions, changes, extra))
-    };
-    let change = |c: char, metric: &str, revisions: &str| {
-        format!("{}\t{metric}\tdown\t{revisions}", hash(c))
+        verdict(&verdicts(dir, tmp, &sessions, changes, extra))
     };
     let models: Vec<S> = pair(
         two("p1", "ra", 1, 10),
@@ -636,6 +679,8 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ],
     );
     let anonymous = verdicts(
+        dir,
+        tmp,
         &pair(two("p1", "ra", 1, 10), two("secret-project", "rb", 2, 5)),
         &[change('a', "turns", "rb")],
         &["--anonymous"],
@@ -644,22 +689,6 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     mixed.extend(two("p1", "ra", 1, 10));
     mixed.extend(two("p1", "rb", 2, 5));
     mixed.extend(two("p1", "rc", 3, 5));
-    let unpeaked = |s: S<'static>| S { peak: None, ..s };
-    let peak_after: Vec<S> = pair(
-        two("p1", "ra", 1, 10),
-        vec![base("p1", "rb", 2, 5), unpeaked(base("p1", "rb", 2, 5))],
-    );
-    let peak_before: Vec<S> = pair(
-        vec![unpeaked(base("p1", "ra", 1, 10)), base("p1", "ra", 1, 10)],
-        two("p1", "rb", 2, 5),
-    );
-    let no_peak_before: Vec<S> = pair(
-        vec![
-            unpeaked(base("p1", "ra", 1, 10)),
-            unpeaked(base("p1", "ra", 1, 10)),
-        ],
-        two("p1", "rb", 2, 5),
-    );
     vec![
         (
             "the verdicts table comes last with a row per change and metric",
@@ -682,36 +711,57 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
                 &[change('a', "turns", "rc")],
             ) == ["confounded"],
         ),
+    ]
+}
+
+// spec: VRD-5, VRD-6, VRD-7, VRD-9
+fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let one = |sessions: Vec<S<'static>>, changes: &[String]| {
+        verdict(&verdicts(dir, tmp, &sessions, changes, &[]))
+    };
+    let unpeaked = |s: S<'static>| S { peak: None, ..s };
+    let peak_after: Vec<S> = pair(
+        two("p1", "ra", 1, 10),
+        vec![base("p1", "rb", 2, 5), unpeaked(base("p1", "rb", 2, 5))],
+    );
+    let peak_before: Vec<S> = pair(
+        vec![unpeaked(base("p1", "ra", 1, 10)), base("p1", "ra", 1, 10)],
+        two("p1", "rb", 2, 5),
+    );
+    let no_peak_before: Vec<S> = pair(
+        vec![
+            unpeaked(base("p1", "ra", 1, 10)),
+            unpeaked(base("p1", "ra", 1, 10)),
+        ],
+        two("p1", "rb", 2, 5),
+    );
+    vec![
         (
             "two changes with the same after group confound each other",
             one(
-                &[],
                 pair(two("p1", "ra", 1, 10), two("p1", "rb", 2, 5)),
                 &[change('a', "turns", "rb"), change('b', "validations", "rb")],
             ) == ["confounded", "confounded"],
         ),
         (
             "a main context peak held by fewer sessions than the threshold confounds, before or after",
-            one(&[], peak_after, &[change('a', "main_context_peak", "rb")]) == ["confounded"]
-                && one(&[], peak_before, &[change('a', "main_context_peak", "rb")])
-                    == ["confounded"],
+            one(peak_after, &[change('a', "main_context_peak", "rb")]) == ["confounded"]
+                && one(peak_before, &[change('a', "main_context_peak", "rb")]) == ["confounded"],
         ),
         (
             "a main context peak every session holds gets a verdict",
             one(
-                &[],
                 pair(two("p1", "ra", 1, 10), two("p1", "rb", 2, 5)),
                 &[change('a', "main_context_peak", "rb")],
             ) == ["helped"],
         ),
         (
             "a group with no main context peak at all gives no data",
-            one(&[], no_peak_before, &[change('a', "main_context_peak", "rb")]) == ["no data"],
+            one(no_peak_before, &[change('a', "main_context_peak", "rb")]) == ["no data"],
         ),
         (
             "an unchanged value is no observed effect",
             one(
-                &[],
                 pair(two("p1", "ra", 1, 5), two("p1", "rb", 2, 5)),
                 &[change('a', "turns", "rb")],
             ) == ["no observed effect"],
@@ -725,9 +775,12 @@ fn harness_report() {
     let temp = tempfile::tempdir().unwrap();
     let checks: Vec<_> = efficiency_checks(&dir, temp.path())
         .into_iter()
+        .chain(option_checks(&dir, temp.path()))
         .chain(axes_checks(&dir, temp.path()))
+        .chain(axes_threshold_checks(&dir, temp.path()))
         .chain(refusal_checks(&dir, temp.path()))
         .chain(verdict_checks(&dir, temp.path()))
+        .chain(verdict_edge_checks(&dir, temp.path()))
         .collect();
     let mut failed = false;
     for (name, ok) in checks {

@@ -36,7 +36,7 @@ fn read(path: &str, header: &str) -> Result<Vec<Row>, String> {
         .map(|l| {
             columns
                 .iter()
-                .map(|c| c.to_string())
+                .map(std::string::ToString::to_string)
                 .zip(l.split('\t').map(str::to_string))
                 .collect()
         })
@@ -317,6 +317,7 @@ fn sum(rows: &[&Row], column: &str) -> Option<u64> {
 }
 
 /// `a / b` with two decimals, empty when a term is missing or `b` is 0.
+#[allow(clippy::cast_precision_loss)] // counts far below 2^52
 fn ratio(a: Option<u64>, b: Option<u64>) -> String {
     match (a, b) {
         (Some(a), Some(b)) if b > 0 => format!("{:.2}", a as f64 / b as f64),
@@ -373,7 +374,7 @@ fn quality(groups: &[Group], files: &[Vec<Row>]) -> Table {
     })
 }
 
-fn rules(groups: &[Group], breaches: &[Row]) -> Table {
+fn rules(groups: &[Group], breach_rows: &[Row]) -> Table {
     let columns = [
         "rule",
         "applied",
@@ -384,7 +385,7 @@ fn rules(groups: &[Group], breaches: &[Row]) -> Table {
     ];
     table("Rules", &columns, groups, |g| {
         let mut by_rule: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
-        for row in of_group(breaches, g) {
+        for row in of_group(breach_rows, g) {
             by_rule.entry(value(row, "rule")).or_default().push(row);
         }
         if by_rule.is_empty() {
@@ -572,7 +573,7 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
                 } else {
                     let (bv, av): (f64, f64) =
                         (bv.parse().unwrap_or(0.0), av.parse().unwrap_or(0.0));
-                    if av == bv {
+                    if av.total_cmp(&bv).is_eq() {
                         "no observed effect"
                     } else if (av > bv) == (direction == "up") {
                         "helped"

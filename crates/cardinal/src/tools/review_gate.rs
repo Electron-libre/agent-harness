@@ -1,6 +1,6 @@
-//! `review-gate <mode>`: the code review gate of a commit. Three modes: `record` (PostToolUse on `Skill`) stores a marker when the
+//! `review-gate <mode>`: the code review gate of a commit. Three modes: `record` (`PostToolUse` on `Skill`) stores a marker when the
 //! `code-review` skill ends; `native`, run by the git `pre-commit` hook that `cardinal sync` installs, compares the diff
-//! with the marker and fails the commit when the review is missing; `check` (PreToolUse on `Bash`) refuses what would
+//! with the marker and fails the commit when the review is missing; `check` (`PreToolUse` on `Bash`) refuses what would
 //! skip that native hook (`specs/review-gate.md`, ADR 0005).
 //!
 //! The marker, `claude-code-review.json` in the git directory of the repository (so it is never a file of the
@@ -87,7 +87,7 @@ fn untracked_hashes(cwd: &Path, names: &[String]) -> Vec<String> {
     if batch.is_empty() {
         return names.iter().map(|_| "-".to_string()).collect();
     }
-    let listing = batch.iter().map(|n| format!("{n}\n")).collect::<String>();
+    let listing = batch.iter().map(|n| [n, "\n"].concat()).collect::<String>();
     let out = git(
         cwd,
         &["hash-object", "--no-filters", "--stdin-paths"],

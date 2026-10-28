@@ -67,6 +67,71 @@ fn toml(rev: &str) -> String {
 
 const ALPHA: &str = "# SECRET alpha\n\nRun the code review.\n\n# Tracking\n\n## Plan\n1. [x] SECRET one\n2. [x] two\n   3. [ ] not a plan line\n\n## Decisions\n1. [x] not in the plan\n\n## Deliverable 1\n```sh\n# a comment, not a heading\n```\n| code review | low |\n- Code review: 6 findings, 1 finding dismissed.\n- code review (low): 1 finding; second review: no findings\n- Code review: no findings.\n\n# Notes\n- Code review: 4 findings, after the Tracking section.\n";
 
+/// The commits after `alpha` is closed: fixes in and out of the window, reverts of `gap` and of `alpha`, a fix on a
+/// side branch.
+fn commits_after_close(repo: &Path, gap: &str) {
+    commit_at(
+        repo,
+        "2026-01-10T00:00:00Z",
+        "fix(files): later",
+        &[("src/a.rs", Some("c"))],
+    );
+    commit_at(
+        repo,
+        "2026-01-10T01:00:00Z",
+        "fix: docs and lock only",
+        &[
+            ("docs/arch.md", Some("b")),
+            (".claude/harness.lock", Some("b")),
+            (".claude/cardinal.lock", Some("b")),
+        ],
+    );
+    commit_at(
+        repo,
+        "2026-01-11T00:00:00Z",
+        "chore: undo",
+        &[("src/b.rs", Some("x"))],
+    );
+    commit_at(
+        repo,
+        "2026-01-11T01:00:00Z",
+        &format!("chore: undo the gap\n\nThis reverts commit {gap}."),
+        &[("src/b.rs", Some("y"))],
+    );
+    commit_at(
+        repo,
+        "2026-01-12T00:00:00Z",
+        "Revert \"feat(files): a\"",
+        &[("src/a.rs", Some("d"))],
+    );
+    commit_at(
+        repo,
+        "2026-01-13T00:00:00Z",
+        "revert(files): a",
+        &[("src/a.rs", Some("e"))],
+    );
+    commit_at(
+        repo,
+        "2026-02-20T00:00:00Z",
+        "fix(files): too late",
+        &[("src/a.rs", Some("f"))],
+    );
+    commit_at(
+        repo,
+        "2026-01-04T23:00:00Z",
+        "fix(files): rebased after the close",
+        &[("src/a.rs", Some("h"))],
+    );
+    sh(repo, &["checkout", "-q", "-b", "side"]);
+    commit_at(
+        repo,
+        "2026-01-09T00:00:00Z",
+        "fix(files): on a side branch",
+        &[("src/a.rs", Some("g"))],
+    );
+    sh(repo, &["checkout", "-q", "main"]);
+}
+
 /// The fixture repository: `alpha` (three commits, one fix inside, fixes and reverts after), `beta` (closed in one
 /// commit that also rewrites a citation in `alpha`), `gamma` (done in the work tree only).
 fn fixture(tmp: &Path) -> PathBuf {
@@ -130,66 +195,7 @@ fn fixture(tmp: &Path) -> PathBuf {
             ("issues/done/alpha.md", Some(ALPHA)),
         ],
     );
-    commit_at(
-        &repo,
-        "2026-01-10T00:00:00Z",
-        "fix(files): later",
-        &[("src/a.rs", Some("c"))],
-    );
-    commit_at(
-        &repo,
-        "2026-01-10T01:00:00Z",
-        "fix: docs and lock only",
-        &[
-            ("docs/arch.md", Some("b")),
-            (".claude/harness.lock", Some("b")),
-            (".claude/cardinal.lock", Some("b")),
-        ],
-    );
-    commit_at(
-        &repo,
-        "2026-01-11T00:00:00Z",
-        "chore: undo",
-        &[("src/b.rs", Some("x"))],
-    );
-    commit_at(
-        &repo,
-        "2026-01-11T01:00:00Z",
-        &format!("chore: undo the gap\n\nThis reverts commit {gap}."),
-        &[("src/b.rs", Some("y"))],
-    );
-    commit_at(
-        &repo,
-        "2026-01-12T00:00:00Z",
-        "Revert \"feat(files): a\"",
-        &[("src/a.rs", Some("d"))],
-    );
-    commit_at(
-        &repo,
-        "2026-01-13T00:00:00Z",
-        "revert(files): a",
-        &[("src/a.rs", Some("e"))],
-    );
-    commit_at(
-        &repo,
-        "2026-02-20T00:00:00Z",
-        "fix(files): too late",
-        &[("src/a.rs", Some("f"))],
-    );
-    commit_at(
-        &repo,
-        "2026-01-04T23:00:00Z",
-        "fix(files): rebased after the close",
-        &[("src/a.rs", Some("h"))],
-    );
-    sh(&repo, &["checkout", "-q", "-b", "side"]);
-    commit_at(
-        &repo,
-        "2026-01-09T00:00:00Z",
-        "fix(files): on a side branch",
-        &[("src/a.rs", Some("g"))],
-    );
-    sh(&repo, &["checkout", "-q", "main"]);
+    commits_after_close(&repo, &gap);
     std::fs::write(repo.join("issues/done/gamma.md"), "# gamma\n\n# Tracking\n").unwrap();
     repo
 }
@@ -632,7 +638,7 @@ fn traced_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
 }
 
 /// A transcript line of `kind` in `cwd` at `ts`, with `fields` merged in.
-fn line(kind: &str, cwd: &Path, ts: &str, fields: serde_json::Value) -> String {
+fn line(kind: &str, cwd: &Path, ts: &str, fields: &serde_json::Value) -> String {
     let mut line = serde_json::json!({"type": kind, "cwd": cwd, "timestamp": ts, "sessionId": "x", "gitBranch": "main"});
     line.as_object_mut()
         .unwrap()
@@ -645,7 +651,7 @@ fn typed(cwd: &Path, ts: &str, text: &str) -> String {
         "user",
         cwd,
         ts,
-        serde_json::json!({"message": {"role": "user", "content": text}}),
+        &serde_json::json!({"message": {"role": "user", "content": text}}),
     )
 }
 
@@ -655,13 +661,13 @@ fn bash(cwd: &Path, ts: &str, id: &str, command: &str, error: bool) -> String {
         "assistant",
         cwd,
         &format!("{ts}:00Z"),
-        serde_json::json!({"message": {"id": id, "content": [{"type": "tool_use", "id": id, "name": "Bash", "input": {"command": command}}]}}),
+        &serde_json::json!({"message": {"id": id, "content": [{"type": "tool_use", "id": id, "name": "Bash", "input": {"command": command}}]}}),
     );
     let result = line(
         "user",
         cwd,
         &format!("{ts}:01Z"),
-        serde_json::json!({"message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": id, "is_error": error, "content": "SECRET output"}]}}),
+        &serde_json::json!({"message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": id, "is_error": error, "content": "SECRET output"}]}}),
     );
     call + &result
 }
@@ -783,8 +789,8 @@ fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
 #[test]
 fn delivered_quality() {
     let dir = std::path::PathBuf::from("/tools");
-    let temp = tempfile::tempdir().unwrap();
-    let tmp = temp.path().to_path_buf();
+    let scratch = tempfile::tempdir().unwrap();
+    let tmp = scratch.path().to_path_buf();
     let checks: Vec<_> = git_checks(&dir, &tmp)
         .into_iter()
         .chain(review_checks(&dir, &tmp))

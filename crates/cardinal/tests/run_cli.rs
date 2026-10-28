@@ -348,7 +348,10 @@ fn with_no_asset_the_binary_is_built_with_cargo_install() {
                 "{install}"
             );
             // no crate named: the single package of the commit, `harness` before the rename
-            assert!(install.ends_with(".root"), "{install}");
+            assert!(
+                Path::new(install).extension().is_some_and(|e| e == "root"),
+                "{install}"
+            );
             // a source not on GitHub is built without a download
             assert_eq!(!log.starts_with("install"), downloads, "{source}: {log}");
             assert!(l.leftovers().is_empty(), "{:?}", l.leftovers());
@@ -421,13 +424,13 @@ fn a_local_source_runs_the_crate_it_builds() {
 
     assert_eq!(run.code, Some(0), "{run:?}");
     assert_eq!(ran(&run), built, "the fresh build runs");
-    let build = l.log();
+    let log = l.log();
     let manifest = fs::canonicalize(source.path()).unwrap().join("Cargo.toml");
     assert!(
-        build.starts_with("build ")
-            && build.contains("-p cardinal ")
-            && build.contains(&manifest.display().to_string()),
-        "{build}"
+        log.starts_with("build ")
+            && log.contains("-p cardinal ")
+            && log.contains(&manifest.display().to_string()),
+        "{log}"
     );
 }
 

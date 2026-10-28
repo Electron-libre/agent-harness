@@ -133,12 +133,11 @@ fn without_quotes(text: &str) -> String {
         let after = &rest[start + open.len_utf8()..];
         let close = if open == '"' { '"' } else { '\u{201d}' };
         out.push_str(&rest[..start]);
-        match after.find(close) {
-            Some(end) => rest = &after[end + close.len_utf8()..],
-            None => {
-                out.push(open);
-                rest = after;
-            }
+        if let Some(end) = after.find(close) {
+            rest = &after[end + close.len_utf8()..];
+        } else {
+            out.push(open);
+            rest = after;
         }
     }
     out.push_str(rest);
@@ -255,9 +254,23 @@ fn parse(
             problem(format!("missing section `{section}`"));
         }
     }
+    parse_requirements(file, &lines, &mut spec, out, warn);
+    check_markers(file, &lines, spec.status == "accepted", out, warn);
+    spec
+}
+
+/// Read the requirement lines of the `## Requirements` section of `lines` into `spec`.
+fn parse_requirements(
+    file: &str,
+    lines: &[&str],
+    spec: &mut Spec,
+    out: &mut Vec<String>,
+    warn: &mut Vec<String>,
+) {
+    let mut problem = |m: String| out.push(format!("{file}: {m}"));
     let mut seen = BTreeSet::new();
     let mut in_requirements = false;
-    for line in &lines {
+    for line in lines {
         if line.starts_with("## ") {
             in_requirements = line.trim() == "## Requirements";
         }
@@ -309,8 +322,6 @@ fn parse(
             exempt: withdrawn || kind == "quality",
         });
     }
-    check_markers(file, &lines, spec.status == "accepted", out, warn);
-    spec
 }
 
 /// Every file under `dir` (outside a git repository, where no worktree can nest), but those of the directories
@@ -466,7 +477,11 @@ pub(super) fn read_specs(root: &Path, out: &mut Vec<String>, warn: &mut Vec<Stri
         .flatten()
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n.ends_with(".md") && n != "README.md" && n != "TEMPLATE.md")
+        .filter(|n| {
+            Path::new(n).extension().is_some_and(|e| e == "md")
+                && n != "README.md"
+                && n != "TEMPLATE.md"
+        })
         .collect();
     names.sort();
     let mut specs = Vec::new();
@@ -482,7 +497,9 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     let mut out = Vec::new();
     let mut warnings = Vec::new();
     let specs = read_specs(root, &mut out, &mut warnings);
-    warnings.iter().for_each(|w| eprintln!("{w}"));
+    for w in &warnings {
+        eprintln!("{w}");
+    }
     let mut ids: BTreeMap<&str, &str> = BTreeMap::new();
     for spec in specs.iter().filter(|s| !s.id.is_empty()) {
         if let Some(other) = ids.insert(&spec.id, &spec.file) {

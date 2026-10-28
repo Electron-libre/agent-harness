@@ -77,7 +77,10 @@ fn changed_rust_files(dir: &str) -> Vec<String> {
         files.extend(
             paths
                 .into_iter()
-                .filter(|p| p.ends_with(".rs") && !p.split('/').any(|c| c == ".claude"))
+                .filter(|p| {
+                    Path::new(p).extension().is_some_and(|e| e == "rs")
+                        && !p.split('/').any(|c| c == ".claude")
+                })
                 .map(String::from),
         );
     }

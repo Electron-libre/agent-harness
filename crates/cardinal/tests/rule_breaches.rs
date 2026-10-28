@@ -89,7 +89,7 @@ impl Transcript {
         self.push(json!({"type": "user", "gitBranch": "main", "message": {"role": "user", "content": text}}))
     }
 
-    fn call(&mut self, id: &str, name: &str, input: serde_json::Value) -> usize {
+    fn call(&mut self, id: &str, name: &str, input: &serde_json::Value) -> usize {
         self.push(json!({"type": "assistant", "message": {"id": format!("m{id}"), "content": [{"type": "tool_use", "id": id, "name": name, "input": input}]}}))
     }
 
@@ -106,7 +106,7 @@ impl Transcript {
         &mut self,
         id: &str,
         name: &str,
-        input: serde_json::Value,
+        input: &serde_json::Value,
         error: Option<&str>,
     ) -> usize {
         let at = self.call(id, name, input);
@@ -120,7 +120,7 @@ impl Transcript {
             path,
             self.lines
                 .iter()
-                .map(|l| format!("{l}\n"))
+                .map(|l| l.clone() + "\n")
                 .collect::<String>(),
         )
         .unwrap();
@@ -146,6 +146,220 @@ fn run(dir: &Path, projects: &Path, summary: bool) -> (bool, String) {
         out.status.success(),
         String::from_utf8_lossy(&out.stdout).into_owned(),
     )
+}
+
+/// A finding row of the session `s` at revision `rev`.
+fn row(s: &str, rev: &str, rule: &str, kind: &str, loc: &str, detail: &str) -> String {
+    format!("{s}\tproj\t{rev}\t{rule}\t{kind}\t{loc}\t{detail}")
+}
+
+/// Writes the session `a` of `repo` (and its subagent) under `proj`; returns its expected finding rows.
+fn session_a(repo: &Path, proj: &Path) -> Vec<String> {
+    let in_repo = |p: &str| repo.join(p);
+    let mut t = Transcript::new(repo, "2026-02-01T10:00:00.000Z");
+    t.typed("please SECRET");
+    let no_verify = t.run("t1", "Bash", &bash("git commit --no-verify -m SECRET"), Some("PreToolUse:Bash hook error: [x/require_code_review.rs check]: Refused: --no-verify skips the gate."));
+    let refused1 = t.call(
+        "t2",
+        "Bash",
+        &bash("git commit -m \"SECRET mentions --no-verify\""),
+    );
+    t.result(
+        "t2",
+        true,
+        "Refused: the last code review predates the last commit.",
+    );
+    t.run(
+        "t3",
+        "Skill",
+        &json!({"skill": "code-review", "args": "low"}),
+        None,
+    );
+    t.run(
+        "t4",
+        "Bash",
+        &bash("git commit -q -F - <<'EOF'\nfeat: SECRET\n\n--no-verify\nEOF\n"),
+        None,
+    );
+    t.call("t5", "Bash", &bash("git commit -m x"));
+    let refused2 = t.result("t5", true, "Refused: the diff holds files the last code review never saw. Or ask the user to waive the review.");
+    let bypass = t.run("t6", "Bash", &bash("git add a && git commit -m y"), None);
+    let waive = t.run(
+        "t7",
+        "Bash",
+        &bash("just waive-review"),
+        Some("Permission to use Bash has been denied."),
+    );
+    let waiver_file = t.run(
+        "t8",
+        "Write",
+        &json!({"file_path": in_repo(".git/claude-review-waived"), "content": ""}),
+        None,
+    );
+    t.call("t9", "Bash", &bash("touch somewhere"));
+    let waive_refused = t.result(
+        "t9",
+        true,
+        "PreToolUse:Bash hook error: [x]: Refused: only the user waives the code review.",
+    );
+    let managed = t.run("t10", "Edit", &edit(&in_repo(".claude/hooks/x.rs")), None);
+    t.run(
+        "t11",
+        "Edit",
+        &edit(&in_repo("files/.claude/hooks/x.rs")),
+        None,
+    );
+    t.run(
+        "t12",
+        "Write",
+        &json!({"file_path": in_repo("issues/a.md"), "content": "SECRET\n# Tracking\n\nPlan: proposed\n"}),
+        None,
+    );
+    t.run("t13", "Edit", &edit(&in_repo("specs/a.md")), None);
+    t.run("t14", "Edit", &edit(&in_repo("docs/adr/0001-a.md")), None);
+    let early = t.run("t15", "Edit", &edit(&in_repo("src/main.rs")), None);
+    t.run(
+        "t16",
+        "Edit",
+        &edit(Path::new("/elsewhere/memory.md")),
+        None,
+    );
+    t.typed("ok");
+    t.run("t17", "Edit", &edit(&in_repo("src/lib.rs")), None);
+    t.write(&proj.join("a.jsonl"));
+    let mut sub = Transcript::new(repo, "2026-02-01T10:30:00.000Z");
+    let pushed = sub.run("s1", "Bash", &bash("git push --no-verify"), None);
+    sub.write(&proj.join("a/subagents/agent-x.jsonl"));
+
+    let a = |rule: &str, kind: &str, n: usize, detail: &str| {
+        row("a", "r1", rule, kind, &format!("a.jsonl:{n}"), detail)
+    };
+    vec![
+        a("no-verify", "blocked", no_verify, ""),
+        a("review-before-commit", "blocked", refused1 + 1, ""),
+        a("review-before-commit", "blocked", refused2, ""),
+        a("review-before-commit", "breach", bypass, ""),
+        a("review-waiver", "blocked", waive, ""),
+        a("review-waiver", "breach", waiver_file, ""),
+        a("review-waiver", "blocked", waive_refused, ""),
+        a("managed-copy", "breach", managed, ".claude/hooks/x.rs"),
+        a("validation-stop", "breach", early, "src/main.rs"),
+        row(
+            "a",
+            "r1",
+            "no-verify",
+            "breach",
+            &format!("subagents/agent-x.jsonl:{pushed}"),
+            "",
+        ),
+    ]
+}
+
+/// Writes the sessions `b` to `h` of `repo` (and `c` of `bare`) under `projects`; returns their expected finding rows.
+#[allow(clippy::many_single_char_names)] // each transcript is named after its file, `b` writes `b.jsonl`
+fn other_sessions(tmp: &Path, repo: &Path, bare: &Path, projects: &Path) -> Vec<String> {
+    let proj = projects.join("-proj");
+    let in_repo = |p: &str| repo.join(p);
+    let mut b = Transcript::new(repo, "2026-02-02T10:00:00.000Z");
+    b.typed("hello");
+    b.run("t1", "Edit", &edit(&in_repo("src/x.rs")), None);
+    b.run(
+        "t2",
+        "Write",
+        &json!({"file_path": in_repo("tests/t.rs"), "content": "SECRET \"Plan: proposed\""}),
+        None,
+    );
+    b.run("t3", "Edit", &edit(&in_repo("src/y.rs")), None);
+    b.run("t4", "Bash", &bash("python3 edit.py"), Some("PreToolUse:Bash hook error: [x]: Refused: the diff changed since the last code review."));
+    b.run("t5", "Bash", &bash("git commit -m z"), None);
+    b.write(&proj.join("b.jsonl"));
+
+    let mut c = Transcript::new(bare, "2026-02-02T10:00:00.000Z");
+    c.run("t1", "Bash", &bash("git commit --no-verify -m x"), None);
+    c.write(&projects.join("-bare/c.jsonl"));
+
+    let mut d = Transcript::new(repo, "2025-12-01T10:00:00.000Z");
+    d.run("t1", "Bash", &bash("git commit --no-verify -m x"), None);
+    d.write(&proj.join("d.jsonl"));
+
+    let mut g = Transcript::new(repo, "2026-02-03T10:00:00.000Z");
+    g.call("t1", "Bash", &bash("git commit -m x"));
+    let refused3 = g.result(
+        "t1",
+        true,
+        "Refused: no code review has run in this project.",
+    );
+    g.typed("<command-name>/code-review</command-name>\n<command-args>low</command-args>");
+    g.run("t2", "Bash", &bash("git commit -m x"), None);
+    g.write(&proj.join("g.jsonl"));
+
+    let linked = tmp.join("proj-foo");
+    sh(
+        repo,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "foo",
+            linked.to_str().unwrap(),
+        ],
+    );
+    let mut h = Transcript::new(repo, "2026-02-04T10:00:00.000Z");
+    h.typed("start the issue");
+    h.cwd = linked.display().to_string();
+    let switched = h.run(
+        "t1",
+        "Edit",
+        &edit(&linked.join(".claude/hooks/x.rs")),
+        None,
+    );
+    let quoted = h.run(
+        "t2",
+        "Bash",
+        &bash("echo \"a << b\"\ngit commit --no-verify -m x"),
+        None,
+    );
+    h.write(&proj.join("h.jsonl"));
+
+    let mut e = Transcript::new(repo, "2026-03-02T10:00:00.000Z");
+    let late = e.run("t1", "Bash", &bash("git -C x commit --no-verify"), None);
+    e.write(&proj.join("e.jsonl"));
+
+    vec![
+        row(
+            "e",
+            "r2",
+            "no-verify",
+            "breach",
+            &format!("e.jsonl:{late}"),
+            "",
+        ),
+        row(
+            "g",
+            "r1",
+            "review-before-commit",
+            "blocked",
+            &format!("g.jsonl:{refused3}"),
+            "",
+        ),
+        row(
+            "h",
+            "r1",
+            "managed-copy",
+            "breach",
+            &format!("h.jsonl:{switched}"),
+            ".claude/hooks/x.rs",
+        ),
+        row(
+            "h",
+            "r1",
+            "no-verify",
+            "breach",
+            &format!("h.jsonl:{quoted}"),
+            "",
+        ),
+    ]
 }
 
 /// Builds the fixture; returns the projects directory and the expected finding rows (without header).
@@ -175,218 +389,8 @@ fn fixture(tmp: &Path) -> (PathBuf, Vec<String>) {
     let bare = new_repo(&tmp.join("bare"));
     commit_at(&bare, "2026-01-01T00:00:00Z", "init", &[("README", "x")]);
     let projects = tmp.join("projects");
-    let proj = projects.join("-proj");
-    let r = |p: &str| repo.join(p);
-
-    let mut a = Transcript::new(&repo, "2026-02-01T10:00:00.000Z");
-    a.typed("please SECRET");
-    let no_verify = a.run("t1", "Bash", bash("git commit --no-verify -m SECRET"), Some("PreToolUse:Bash hook error: [x/require_code_review.rs check]: Refused: --no-verify skips the gate."));
-    let refused1 = a.call(
-        "t2",
-        "Bash",
-        bash("git commit -m \"SECRET mentions --no-verify\""),
-    );
-    a.result(
-        "t2",
-        true,
-        "Refused: the last code review predates the last commit.",
-    );
-    a.run(
-        "t3",
-        "Skill",
-        json!({"skill": "code-review", "args": "low"}),
-        None,
-    );
-    a.run(
-        "t4",
-        "Bash",
-        bash("git commit -q -F - <<'EOF'\nfeat: SECRET\n\n--no-verify\nEOF\n"),
-        None,
-    );
-    a.call("t5", "Bash", bash("git commit -m x"));
-    let refused2 = a.result("t5", true, "Refused: the diff holds files the last code review never saw. Or ask the user to waive the review.");
-    let bypass = a.run("t6", "Bash", bash("git add a && git commit -m y"), None);
-    let waive = a.run(
-        "t7",
-        "Bash",
-        bash("just waive-review"),
-        Some("Permission to use Bash has been denied."),
-    );
-    let waiver_file = a.run(
-        "t8",
-        "Write",
-        json!({"file_path": r(".git/claude-review-waived"), "content": ""}),
-        None,
-    );
-    a.call("t9", "Bash", bash("touch somewhere"));
-    let waive_refused = a.result(
-        "t9",
-        true,
-        "PreToolUse:Bash hook error: [x]: Refused: only the user waives the code review.",
-    );
-    let managed = a.run("t10", "Edit", edit(&r(".claude/hooks/x.rs")), None);
-    a.run("t11", "Edit", edit(&r("files/.claude/hooks/x.rs")), None);
-    a.run(
-        "t12",
-        "Write",
-        json!({"file_path": r("issues/a.md"), "content": "SECRET\n# Tracking\n\nPlan: proposed\n"}),
-        None,
-    );
-    a.run("t13", "Edit", edit(&r("specs/a.md")), None);
-    a.run("t14", "Edit", edit(&r("docs/adr/0001-a.md")), None);
-    let early = a.run("t15", "Edit", edit(&r("src/main.rs")), None);
-    a.run("t16", "Edit", edit(Path::new("/elsewhere/memory.md")), None);
-    a.typed("ok");
-    a.run("t17", "Edit", edit(&r("src/lib.rs")), None);
-    a.write(&proj.join("a.jsonl"));
-    let mut sub = Transcript::new(&repo, "2026-02-01T10:30:00.000Z");
-    let pushed = sub.run("s1", "Bash", bash("git push --no-verify"), None);
-    sub.write(&proj.join("a/subagents/agent-x.jsonl"));
-
-    let mut b = Transcript::new(&repo, "2026-02-02T10:00:00.000Z");
-    b.typed("hello");
-    b.run("t1", "Edit", edit(&r("src/x.rs")), None);
-    b.run(
-        "t2",
-        "Write",
-        json!({"file_path": r("tests/t.rs"), "content": "SECRET \"Plan: proposed\""}),
-        None,
-    );
-    b.run("t3", "Edit", edit(&r("src/y.rs")), None);
-    b.run("t4", "Bash", bash("python3 edit.py"), Some("PreToolUse:Bash hook error: [x]: Refused: the diff changed since the last code review."));
-    b.run("t5", "Bash", bash("git commit -m z"), None);
-    b.write(&proj.join("b.jsonl"));
-
-    let mut c = Transcript::new(&bare, "2026-02-02T10:00:00.000Z");
-    c.run("t1", "Bash", bash("git commit --no-verify -m x"), None);
-    c.write(&projects.join("-bare/c.jsonl"));
-
-    let mut d = Transcript::new(&repo, "2025-12-01T10:00:00.000Z");
-    d.run("t1", "Bash", bash("git commit --no-verify -m x"), None);
-    d.write(&proj.join("d.jsonl"));
-
-    let mut g = Transcript::new(&repo, "2026-02-03T10:00:00.000Z");
-    g.call("t1", "Bash", bash("git commit -m x"));
-    let refused3 = g.result(
-        "t1",
-        true,
-        "Refused: no code review has run in this project.",
-    );
-    g.typed("<command-name>/code-review</command-name>\n<command-args>low</command-args>");
-    g.run("t2", "Bash", bash("git commit -m x"), None);
-    g.write(&proj.join("g.jsonl"));
-
-    let linked = tmp.join("proj-foo");
-    sh(
-        &repo,
-        &[
-            "worktree",
-            "add",
-            "-q",
-            "-b",
-            "foo",
-            linked.to_str().unwrap(),
-        ],
-    );
-    let mut h = Transcript::new(&repo, "2026-02-04T10:00:00.000Z");
-    h.typed("start the issue");
-    h.cwd = linked.display().to_string();
-    let switched = h.run("t1", "Edit", edit(&linked.join(".claude/hooks/x.rs")), None);
-    let quoted = h.run(
-        "t2",
-        "Bash",
-        bash("echo \"a << b\"\ngit commit --no-verify -m x"),
-        None,
-    );
-    h.write(&proj.join("h.jsonl"));
-
-    let mut e = Transcript::new(&repo, "2026-03-02T10:00:00.000Z");
-    let late = e.run("t1", "Bash", bash("git -C x commit --no-verify"), None);
-    e.write(&proj.join("e.jsonl"));
-
-    let row = |s: &str, rev: &str, rule: &str, kind: &str, loc: String, detail: &str| {
-        format!("{s}\tproj\t{rev}\t{rule}\t{kind}\t{loc}\t{detail}")
-    };
-    let at = |n: usize| format!("a.jsonl:{n}");
-    let expected = vec![
-        row("a", "r1", "no-verify", "blocked", at(no_verify), ""),
-        row(
-            "a",
-            "r1",
-            "review-before-commit",
-            "blocked",
-            at(refused1 + 1),
-            "",
-        ),
-        row(
-            "a",
-            "r1",
-            "review-before-commit",
-            "blocked",
-            at(refused2),
-            "",
-        ),
-        row("a", "r1", "review-before-commit", "breach", at(bypass), ""),
-        row("a", "r1", "review-waiver", "blocked", at(waive), ""),
-        row("a", "r1", "review-waiver", "breach", at(waiver_file), ""),
-        row("a", "r1", "review-waiver", "blocked", at(waive_refused), ""),
-        row(
-            "a",
-            "r1",
-            "managed-copy",
-            "breach",
-            at(managed),
-            ".claude/hooks/x.rs",
-        ),
-        row(
-            "a",
-            "r1",
-            "validation-stop",
-            "breach",
-            at(early),
-            "src/main.rs",
-        ),
-        row(
-            "a",
-            "r1",
-            "no-verify",
-            "breach",
-            format!("subagents/agent-x.jsonl:{pushed}"),
-            "",
-        ),
-        row(
-            "e",
-            "r2",
-            "no-verify",
-            "breach",
-            format!("e.jsonl:{late}"),
-            "",
-        ),
-        row(
-            "g",
-            "r1",
-            "review-before-commit",
-            "blocked",
-            format!("g.jsonl:{refused3}"),
-            "",
-        ),
-        row(
-            "h",
-            "r1",
-            "managed-copy",
-            "breach",
-            format!("h.jsonl:{switched}"),
-            ".claude/hooks/x.rs",
-        ),
-        row(
-            "h",
-            "r1",
-            "no-verify",
-            "breach",
-            format!("h.jsonl:{quoted}"),
-            "",
-        ),
-    ];
+    let mut expected = session_a(&repo, &projects.join("-proj"));
+    expected.extend(other_sessions(tmp, &repo, &bare, &projects));
     (projects, expected)
 }
 
@@ -455,9 +459,22 @@ fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     )]
 }
 
-// spec: BRE-9
-fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
-    let tmp = tmp.join("commits");
+/// Run git with `args` in `repo` as the user `t`, at the given author and committer dates.
+fn git_at(repo: &Path, author_date: &str, committer_date: &str, args: &[&str]) {
+    let out = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+        .args(args)
+        .env("GIT_AUTHOR_DATE", author_date)
+        .env("GIT_COMMITTER_DATE", committer_date)
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?} failed");
+}
+
+/// The repository `cm` of the commit checks; returns it with the commits that breach a rule: a long subject, an
+/// unknown scope, an attribution trailer, a capitalized subject, a generated mark.
+fn commit_repo(tmp: &Path) -> (PathBuf, [String; 5]) {
     let repo = new_repo(&tmp.join("cm"));
     let toml = "[harness]\nsource = \"https://example.org/harness\"\nrev = \"r1\"\n\n[project]\ncommit_scopes = [\"sync\"]\n";
     commit_at(
@@ -509,52 +526,40 @@ fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     );
     sh(&repo, &["checkout", "-q", "main"]);
     std::fs::write(repo.join("a"), "stashed").unwrap();
-    let stash = Command::new("git")
-        .args(["-c", "user.name=t", "-c", "user.email=t@t", "stash", "-q"])
-        .env("GIT_AUTHOR_DATE", "2026-02-01T10:40:00Z")
-        .env("GIT_COMMITTER_DATE", "2026-02-01T10:40:00Z")
-        .current_dir(&repo)
-        .output()
-        .unwrap();
-    assert!(stash.status.success(), "stash failed");
+    git_at(
+        &repo,
+        "2026-02-01T10:40:00Z",
+        "2026-02-01T10:40:00Z",
+        &["stash", "-q"],
+    );
     std::fs::write(repo.join("c"), "1").unwrap();
     sh(&repo, &["add", "c"]);
-    let rebased = Command::new("git")
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "commit",
-            "-q",
-            "-m",
-            "Mine, rebased.",
-        ])
-        .env("GIT_AUTHOR_DATE", "2026-01-15T10:00:00Z")
-        .env("GIT_COMMITTER_DATE", "2026-02-01T10:41:00Z")
-        .current_dir(&repo)
-        .output()
-        .unwrap();
-    assert!(rebased.status.success(), "rebased commit failed");
-    let merge = Command::new("git")
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
+    git_at(
+        &repo,
+        "2026-01-15T10:00:00Z",
+        "2026-02-01T10:41:00Z",
+        &["commit", "-q", "-m", "Mine, rebased."],
+    );
+    git_at(
+        &repo,
+        "2026-02-01T11:40:00Z",
+        "2026-02-01T11:40:00Z",
+        &[
             "merge",
             "-q",
             "--no-ff",
             "-m",
             "Merge branch other.",
             "other",
-        ])
-        .env("GIT_AUTHOR_DATE", "2026-02-01T11:40:00Z")
-        .env("GIT_COMMITTER_DATE", "2026-02-01T11:40:00Z")
-        .current_dir(&repo)
-        .output()
-        .unwrap();
-    assert!(merge.status.success(), "merge failed");
+        ],
+    );
+    (repo, [long, scope, trailer, capital, generated])
+}
+
+// spec: BRE-9
+fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("commits");
+    let (repo, [long, scope, trailer, capital, generated]) = commit_repo(&tmp);
     let projects = tmp.join("projects");
     for (id, start, end) in [
         ("s1", "2026-02-01T10:00:00.000Z", "2026-02-01T11:00:00.000Z"),
@@ -660,8 +665,8 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
 #[test]
 fn rule_breaches() {
     let dir = std::path::PathBuf::from("/tools");
-    let temp = tempfile::tempdir().unwrap();
-    let tmp = temp.path().to_path_buf();
+    let scratch = tempfile::tempdir().unwrap();
+    let tmp = scratch.path().to_path_buf();
     let checks: Vec<_> = finding_checks(&dir, &tmp)
         .into_iter()
         .chain(summary_checks(&dir, &tmp))

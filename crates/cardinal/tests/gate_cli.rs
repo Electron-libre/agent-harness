@@ -439,7 +439,7 @@ fn check(home: &Home, root: &TempDir, ci: bool) -> Run {
 
 /// Assert `check` exits 0 with no problem when `problems` is empty, else exits 1 printing exactly `problems`.
 fn assert_problems(run: &Run, problems: &[&str]) {
-    let code = if problems.is_empty() { 0 } else { 1 };
+    let code = i32::from(!problems.is_empty());
     assert_eq!(run.code, Some(code), "{run:?}");
     assert_eq!(run.lines(), problems, "{run:?}");
 }

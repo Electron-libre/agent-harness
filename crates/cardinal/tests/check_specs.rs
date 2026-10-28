@@ -14,7 +14,7 @@ fn check_specs() {
     let failed = Cell::new(false);
     let report = |name: &str, ok: bool| {
         println!("{} - {name}", if ok { "ok  " } else { "FAIL" });
-        failed.set(failed.get() | !ok);
+        failed.set(failed.get() || !ok);
     };
     let strict = Cell::new(false);
     let case =
@@ -58,6 +58,67 @@ fn check_specs() {
         &[],
         None,
     );
+    traceability_checks(&case);
+    format_checks(&case);
+    tree_checks(&case);
+    outside_git(&case);
+    any_layout(&case, &report);
+
+    deprecation_checks(&case, &report);
+
+    marker_checks(&case, &report);
+    wording_checks(&case, &report);
+    boundary_checks(&case, &report);
+
+    strict.set(true);
+    case(
+        "strict: a managed test citing a spec the project lacks is flagged",
+        SPEC,
+        TESTS,
+        &[(".claude/hooks/test_h.rs", "// spec: PAR-1\nfn t() {}\n")],
+        Some("PAR-1"),
+    );
+    case(
+        "strict: a managed test citing a defined requirement passes",
+        SPEC,
+        TESTS,
+        &[(".claude/hooks/test_h.rs", "// spec: RER-1\nfn t() {}\n")],
+        None,
+    );
+
+    case(
+        "strict: an unknown id of a present spec is flagged",
+        SPEC,
+        TESTS,
+        &[(".claude/hooks/test_h.rs", "// spec: RER-9\nfn t() {}\n")],
+        Some("RER-9"),
+    );
+    strict.set(false);
+
+    let bad = tool_command(&script)
+        .arg("--strcit")
+        .arg(tmp.join("missing"))
+        .output()
+        .unwrap();
+    let ok = bad.status.code() == Some(2);
+    report("an unknown option is rejected", ok);
+    // the tree of the last case still holds the unknown id RER-9 under `.claude/`
+    let first = tool_command(&script)
+        .arg("--strict")
+        .arg(&tmp)
+        .output()
+        .unwrap();
+    let ok = !first.status.success() && String::from_utf8_lossy(&first.stdout).contains("RER-9");
+    report("--strict may come before the root", ok);
+
+    in_git(&script, &report);
+
+    let _ = std::fs::remove_dir_all(&tmp);
+    assert!(!failed.get(), "a check failed: see the FAIL lines");
+}
+
+/// The citations of the tests against the requirements of the specs.
+fn traceability_checks(case: &Case) {
     case(
         "untraced requirement of an accepted spec is flagged",
         SPEC,
@@ -93,6 +154,10 @@ fn check_specs() {
         &[],
         Some("PAR-1"),
     );
+}
+
+/// The front matter, sections and requirement lines of a spec.
+fn format_checks(case: &Case) {
     case(
         "bad status is flagged",
         &SPEC.replace("accepted", "done"),
@@ -185,7 +250,10 @@ fn check_specs() {
         &[("specs/other.md", "# none either\n")],
         Some("front matter"),
     );
+}
 
+/// The tests found in every directory of the tree, whatever its name.
+fn tree_checks(case: &Case) {
     case(
         "a test under a module directory named worktrees is traced",
         SPEC,
@@ -207,9 +275,6 @@ fn check_specs() {
         &[("crates/a/src/worktrees/t.rs", "// spec: RER-9\nfn t() {}\n")],
         Some("RER-9"),
     );
-    outside_git(&case);
-    any_layout(&case, &report);
-
     case(
         "a test of a harness script under .claude traces a requirement",
         SPEC,
@@ -224,7 +289,10 @@ fn check_specs() {
         &[(".claude/hooks/test_h.rs", "// spec: RER-1\nlet x = 1;\n")],
         Some("right above"),
     );
+}
 
+/// The deprecated `quality` kind and `implemented` status, read with a warning.
+fn deprecation_checks(case: &Case, report: &dyn Fn(&str, bool)) {
     let quality = SPEC.replace(
         "(deterministic) A run must resume.",
         "(quality) Docs must be good.",
@@ -274,56 +342,6 @@ fn check_specs() {
             "warning: specs/rerun.md: status `implemented` is deprecated, use `accepted`",
         ),
     );
-
-    marker_checks(&case, &report);
-    wording_checks(&case, &report);
-    boundary_checks(&case, &report);
-
-    strict.set(true);
-    case(
-        "strict: a managed test citing a spec the project lacks is flagged",
-        SPEC,
-        TESTS,
-        &[(".claude/hooks/test_h.rs", "// spec: PAR-1\nfn t() {}\n")],
-        Some("PAR-1"),
-    );
-    case(
-        "strict: a managed test citing a defined requirement passes",
-        SPEC,
-        TESTS,
-        &[(".claude/hooks/test_h.rs", "// spec: RER-1\nfn t() {}\n")],
-        None,
-    );
-
-    case(
-        "strict: an unknown id of a present spec is flagged",
-        SPEC,
-        TESTS,
-        &[(".claude/hooks/test_h.rs", "// spec: RER-9\nfn t() {}\n")],
-        Some("RER-9"),
-    );
-    strict.set(false);
-
-    let bad = tool_command(&script)
-        .arg("--strcit")
-        .arg(tmp.join("missing"))
-        .output()
-        .unwrap();
-    let ok = bad.status.code() == Some(2);
-    report("an unknown option is rejected", ok);
-    // the tree of the last case still holds the unknown id RER-9 under `.claude/`
-    let first = tool_command(&script)
-        .arg("--strict")
-        .arg(&tmp)
-        .output()
-        .unwrap();
-    let ok = !first.status.success() && String::from_utf8_lossy(&first.stdout).contains("RER-9");
-    report("--strict may come before the root", ok);
-
-    in_git(&script, &report);
-
-    let _ = std::fs::remove_dir_all(&tmp);
-    assert!(!failed.get(), "a check failed: see the FAIL lines");
 }
 
 /// Runs one checker case: name, spec, crate tests, other files, expected stdout text (`None`: passes); returns stderr.
@@ -682,6 +700,19 @@ fn boundary_checks(case: &Case, report: &dyn Fn(&str, bool)) {
         "a managed test under a src directory is a boundary proof",
         lines.is_empty(),
     );
+    reason_checks(case, report);
+}
+
+// spec: TRC-1, TRC-2, TRC-3, TRC-4, TRC-5, TRC-6, TRC-7, TRC-8
+/// The reason an internal proof gives, `(internal: <reason>)`: it lifts the boundary warning, and must be well formed.
+fn reason_checks(case: &Case, report: &dyn Fn(&str, bool)) {
+    let boundary = |name: &str, tests: &str, others: &[(&str, &str)]| {
+        let stderr = case(name, SPEC, tests, others, None);
+        boundary_lines(&stderr)
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>()
+    };
     let reasoned = "// spec: RER-1, RER-2 (internal: the RER-9 fixture (git) is slow)\nfn t() {}\n";
     let lines = boundary("internal proofs with a reason pass", reasoned, &[]);
     report(
@@ -824,6 +855,13 @@ fn wording_checks(case: &Case, report: &dyn Fn(&str, bool)) {
         "mustn't counts as a must",
         !stderr.contains("`must`, expected 1"),
     );
+    wording_scope_checks(case, report);
+}
+
+// spec: CLR-3, CLR-4, CLR-5, CLR-6, CLR-7
+/// The requirements the wording is not checked in: with no kind, withdrawn, or of an accepted spec.
+fn wording_scope_checks(case: &Case, report: &dyn Fn(&str, bool)) {
+    let draft = SPEC.replace("status: accepted", "status: draft");
     let kindless = draft.replace("(deterministic) A run must resume.", "A run must resume.");
     let stderr = case(
         "a requirement with no kind is flagged",

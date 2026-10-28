@@ -620,24 +620,26 @@ pub(super) fn main(args: &[String]) -> u8 {
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
-            "--window-days" => match rest
-                .next()
-                .and_then(|n| n.parse::<i64>().ok())
-                .filter(|n| (0..=3650).contains(n))
-            {
-                Some(n) => window_days = n,
-                None => {
+            "--window-days" => {
+                if let Some(n) = rest
+                    .next()
+                    .and_then(|n| n.parse::<i64>().ok())
+                    .filter(|n| (0..=3650).contains(n))
+                {
+                    window_days = n;
+                } else {
                     eprintln!("--window-days needs a whole number of days from 0 to 3650");
                     std::process::exit(2);
                 }
-            },
-            "--projects" => match rest.next() {
-                Some(dir) => projects_dir = Some(dir.clone()),
-                None => {
+            }
+            "--projects" => {
+                if let Some(dir) = rest.next() {
+                    projects_dir = Some(dir.clone());
+                } else {
                     eprintln!("--projects needs a directory");
                     std::process::exit(2);
                 }
-            },
+            }
             "--summary" => summed = true,
             other if other.starts_with("--") => {
                 eprintln!("unknown option {other}");
@@ -666,7 +668,9 @@ pub(super) fn main(args: &[String]) -> u8 {
     rows.sort_by(|a, b| a.closed.cmp(&b.closed).then_with(|| a.issue.cmp(&b.issue)));
     if summed {
         println!("{SUMMARY_HEADER}");
-        summary(&rows).iter().for_each(|line| println!("{line}"));
+        for line in summary(&rows) {
+            println!("{line}");
+        }
         return 0;
     }
     println!("{HEADER}");

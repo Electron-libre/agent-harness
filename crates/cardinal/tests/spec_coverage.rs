@@ -205,5 +205,5 @@ fn fails_when_git_cannot_list_the_files() {
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("git ls-files"));
-    assert!(out.stdout.is_empty());
+    assert_eq!(out.stdout, [] as [u8; 0]);
 }

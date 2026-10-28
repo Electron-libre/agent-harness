@@ -179,7 +179,57 @@ fn is_doc_path(s: &str, root_docs: &[String]) -> bool {
     path_chars
         && (BUILT_IN_ROOT_DOCS.contains(&s)
             || root_docs.iter().any(|d| d == s)
-            || ((s.starts_with("docs/") || s.starts_with(".claude/rules/")) && s.ends_with(".md")))
+            || ((s.starts_with("docs/") || s.starts_with(".claude/rules/"))
+                && Path::new(s).extension().is_some_and(|e| e == "md")))
+}
+
+/// The broken references of the text of the skill `name` in `dir`: unknown skills, missing doc files, broken links.
+fn reference_failures(
+    name: &str,
+    text: &str,
+    dir: &Path,
+    root: &Path,
+    root_docs: &[String],
+) -> Vec<String> {
+    let mut failures = Vec::new();
+    // `skill:<name>` references
+    for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || ":-".contains(c))) {
+        if let Some(target) = word.strip_prefix("skill:").filter(|t| !t.is_empty()) {
+            if !root
+                .join(".claude/skills")
+                .join(target)
+                .join("SKILL.md")
+                .exists()
+            {
+                failures.push(format!("{name}: references unknown skill '{target}'"));
+            }
+        }
+    }
+    // `path` references to repo docs (odd segments between backticks)
+    for path in text
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|s| is_doc_path(s, root_docs))
+    {
+        if !root.join(path).exists() {
+            failures.push(format!("{name}: references missing file '{path}'"));
+        }
+    }
+    // relative markdown links outside code spans, resolved in the skill's directory
+    let prose = text.split('`').step_by(2).collect::<Vec<_>>().join(" ");
+    for link in prose
+        .split("](")
+        .skip(1)
+        .filter_map(|t| t.split(')').next())
+    {
+        // drop the title and the anchor; a target with a scheme (`https:`, `mailto:`) is not a file
+        let target = link.split([' ', '#']).next().unwrap_or_default();
+        if !target.is_empty() && !target.contains(':') && !dir.join(target).exists() {
+            failures.push(format!("{name}: links the missing file '{target}'"));
+        }
+    }
+    failures
 }
 
 #[test]
@@ -246,38 +296,13 @@ fn skills() {
             acc + "\n" + &fs::read_to_string(p).unwrap_or_default()
         });
 
-        // `skill:<name>` references
-        for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || ":-".contains(c))) {
-            if let Some(target) = word.strip_prefix("skill:").filter(|t| !t.is_empty()) {
-                if !skills.join(target).join("SKILL.md").exists() {
-                    failures.push(format!("{name}: references unknown skill '{target}'"));
-                }
-            }
-        }
-        // `path` references to repo docs (odd segments between backticks)
-        for path in text
-            .split('`')
-            .skip(1)
-            .step_by(2)
-            .filter(|s| is_doc_path(s, &root_docs))
-        {
-            if !root.join(path).exists() {
-                failures.push(format!("{name}: references missing file '{path}'"));
-            }
-        }
-        // relative markdown links outside code spans, resolved in the skill's directory
-        let prose = text.split('`').step_by(2).collect::<Vec<_>>().join(" ");
-        for link in prose
-            .split("](")
-            .skip(1)
-            .filter_map(|t| t.split(')').next())
-        {
-            // drop the title and the anchor; a target with a scheme (`https:`, `mailto:`) is not a file
-            let target = link.split([' ', '#']).next().unwrap_or_default();
-            if !target.is_empty() && !target.contains(':') && !entry.path().join(target).exists() {
-                failures.push(format!("{name}: links the missing file '{target}'"));
-            }
-        }
+        failures.extend(reference_failures(
+            &name,
+            &text,
+            &entry.path(),
+            &root,
+            &root_docs,
+        ));
         // `AGENTS.md` section "<heading>" references, wherever the text wraps
         let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
         for cited in flat.split("`AGENTS.md` section \"").skip(1) {

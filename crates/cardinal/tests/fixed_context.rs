@@ -89,9 +89,8 @@ fn run(dir: &Path, projects: &Path) -> (bool, String) {
     )
 }
 
-// spec: REP-1, REP-2
-fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
-    let projects = tmp.join("projects");
+/// The project `pinned` with its sessions under `projects`; returns the commits that put `r1` and `r2` in force.
+fn pinned_project(tmp: &Path, projects: &Path) -> (String, String) {
     let toml = |rev: &str| {
         format!("[harness]\nsource = \"https://example.org/harness\"\nrev = \"{rev}\"\n")
     };
@@ -141,26 +140,33 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         &[("AGENTS.md", "aaaaaaaaaaaaaaaaaaaa")],
     );
     session(
-        &projects,
+        projects,
         "-pinned-b",
         "s3",
         &pinned,
         "2026-01-08T00:00:00.000Z",
     );
     session(
-        &projects,
+        projects,
         "-pinned-a",
         "s2",
         &pinned,
         "2026-01-07T00:00:00.000Z",
     );
     session(
-        &projects,
+        projects,
         "-pinned-a",
         "s1",
         &pinned,
         "2026-01-02T00:00:00.000Z",
     );
+    (c1, c2)
+}
+
+// spec: REP-1, REP-2
+fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let projects = tmp.join("projects");
+    let (c1, c2) = pinned_project(tmp, &projects);
     let harness = new_repo(&tmp.join("harness"));
     commit_at(
         &harness,

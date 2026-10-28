@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
-use std::fmt;
+use std::fmt::{self, Write as _};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
@@ -202,7 +202,7 @@ fn hash(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .fold(String::new(), |mut s, b| {
-            s.push_str(&format!("{b:02x}"));
+            let _ = write!(s, "{b:02x}");
             s
         })
 }
@@ -300,12 +300,12 @@ fn write_lock(root: &Path, lock: &Lock, format: u32, name: &str) -> Result<()> {
     let mut text = String::from(
         "# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
     );
-    text.push_str(&format!("{FORMAT_LINE}{format}\n"));
+    let _ = writeln!(text, "{FORMAT_LINE}{format}");
     for (path, h) in &lock.files {
-        text.push_str(&format!("{h}  {path}\n"));
+        let _ = writeln!(text, "{h}  {path}");
     }
     for entry in &lock.entries {
-        text.push_str(&format!("{ENTRY}  {}\n", entry.to_lock()));
+        let _ = writeln!(text, "{ENTRY}  {}", entry.to_lock());
     }
     write(&root.join(name), text.as_bytes())
 }
@@ -356,7 +356,11 @@ fn read_config(root: &Path) -> Result<toml::Table> {
 }
 
 fn is_git_url(source: &str) -> bool {
-    source.contains("://") || source.starts_with("git@") || source.ends_with(".git")
+    source.contains("://")
+        || source.starts_with("git@")
+        || Path::new(source)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("git"))
 }
 
 fn git(dir: Option<&Path>, args: &[&str]) -> Result<()> {
@@ -632,7 +636,7 @@ fn table_renamed(text: &str) -> Result<String> {
             }
         })
         .collect();
-    let renamed = out.parse::<toml::Table>().ok().is_some_and(|t| {
+    let renamed = out.parse::<toml::Table>().is_ok_and(|t| {
         !t.contains_key(OLD.table) && t.get(NEW.table).and_then(|c| c.get("source")).is_some()
     });
     if !renamed {
@@ -656,7 +660,7 @@ fn imports_renamed(text: &str) -> String {
                 return l.to_string();
             }
             let at = l.len() - path.len() + 1;
-            format!("{}cardinal.just{}", &l[..at], &l[at + OLD_JUST.len()..])
+            [&l[..at], "cardinal.just", &l[at + OLD_JUST.len()..]].concat()
         })
         .collect()
 }
@@ -740,7 +744,7 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
         &source,
         &launcher::install(&source, commit.as_deref()),
     )?;
-    let mut report = sync_from(root, &dir, options)?;
+    let mut report = sync_from(root, &dir, *options)?;
     if let (Some(commit), false) = (&commit, options.dry_run) {
         report.warnings.extend(prefetch(
             &cache_dir()?,
@@ -759,7 +763,7 @@ fn prefetch(cache: &Path, source: &str, commit: &str, programs: &run::Programs) 
         .map(|e| format!("warning: {e:#} (`cardinal run` will try again)"))
 }
 
-fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report> {
+fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report> {
     let managed = source.join("files");
     let seeds = source.join("seed");
     if !managed.is_dir() {
@@ -784,7 +788,6 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     if let (Some(gate), false) = (&gate, options.dry_run) {
         gate.install()?;
     }
-    let mut new_lock = BTreeMap::new();
     let mut report = Report::default();
     if let Some(migration) = &migration {
         if !options.dry_run {
@@ -794,70 +797,9 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     }
 
     let file_set: BTreeSet<&String> = files.iter().collect();
-    for rel in &files {
-        let bytes = fs::read(managed.join(rel))?;
-        let executable = is_executable(&managed.join(rel));
-        let want = fingerprint(&bytes, executable);
-        let have = fingerprint_of(&root.join(rel));
-        let locked = lock.get(rel);
-        let outcome = match &have {
-            None => Outcome::Added,
-            Some(h) if *h == want => Outcome::Unchanged,
-            Some(h) if Some(h) == locked || options.force => Outcome::Updated,
-            Some(_) => Outcome::Conflict,
-        };
-        match outcome {
-            Outcome::Added | Outcome::Updated => {
-                if !options.dry_run {
-                    write_as(&root.join(rel), &bytes, executable)?;
-                }
-                new_lock.insert(rel.clone(), want);
-            }
-            Outcome::Unchanged => {
-                new_lock.insert(rel.clone(), want);
-            }
-            _ => {
-                if let Some(old) = locked {
-                    new_lock.insert(rel.clone(), old.clone());
-                }
-            }
-        }
-        report.entries.push((rel.clone(), outcome));
-    }
-
-    for (rel, locked) in lock.iter().filter(|(rel, _)| !file_set.contains(rel)) {
-        let path = root.join(rel);
-        match fingerprint_of(&path) {
-            None => {}
-            Some(h) if h == *locked => {
-                if !options.dry_run {
-                    fs::remove_file(&path)?;
-                }
-                report.entries.push((rel.clone(), Outcome::Removed));
-            }
-            Some(_) => report.entries.push((rel.clone(), Outcome::Kept)),
-        }
-    }
-
-    for rel in list(&seeds)? {
-        let dst = root.join(&rel);
-        // `symlink_metadata`: a dangling symlink is something the project has. A managed path is not a seed, nor the
-        // configuration, which `init` writes and the migration moves.
-        if file_set.contains(&rel)
-            || [CONFIG, OLD_CONFIG].contains(&rel.as_str())
-            || fs::symlink_metadata(&dst).is_ok()
-        {
-            continue;
-        }
-        if !options.dry_run {
-            write_as(
-                &dst,
-                &fs::read(seeds.join(&rel))?,
-                is_executable(&seeds.join(&rel)),
-            )?;
-        }
-        report.entries.push((rel, Outcome::Seeded));
-    }
+    let new_lock = write_managed(root, &managed, &files, &lock, options, &mut report)?;
+    remove_dropped(root, &lock, &file_set, options, &mut report)?;
+    write_seeds(root, &seeds, &file_set, options, &mut report)?;
 
     // after the seeds: a first sync merges into the settings it was just seeded with, written or not
     let seeded = report.outcome(entries::SETTINGS) == Some(Outcome::Seeded);
@@ -900,6 +842,104 @@ fn sync_from(root: &Path, source: &Path, options: &SyncOptions) -> Result<Report
     Ok(report)
 }
 
+/// Write the managed files of `managed` the project lacks or left as locked (all of them with `force`); returns the new
+/// file lock.
+fn write_managed(
+    root: &Path,
+    managed: &Path,
+    files: &[String],
+    lock: &BTreeMap<String, String>,
+    options: SyncOptions,
+    report: &mut Report,
+) -> Result<BTreeMap<String, String>> {
+    let mut new_lock = BTreeMap::new();
+    for rel in files {
+        let bytes = fs::read(managed.join(rel))?;
+        let executable = is_executable(&managed.join(rel));
+        let want = fingerprint(&bytes, executable);
+        let have = fingerprint_of(&root.join(rel));
+        let locked = lock.get(rel);
+        let outcome = match &have {
+            None => Outcome::Added,
+            Some(h) if *h == want => Outcome::Unchanged,
+            Some(h) if Some(h) == locked || options.force => Outcome::Updated,
+            Some(_) => Outcome::Conflict,
+        };
+        match outcome {
+            Outcome::Added | Outcome::Updated => {
+                if !options.dry_run {
+                    write_as(&root.join(rel), &bytes, executable)?;
+                }
+                new_lock.insert(rel.clone(), want);
+            }
+            Outcome::Unchanged => {
+                new_lock.insert(rel.clone(), want);
+            }
+            _ => {
+                if let Some(old) = locked {
+                    new_lock.insert(rel.clone(), old.clone());
+                }
+            }
+        }
+        report.entries.push((rel.clone(), outcome));
+    }
+    Ok(new_lock)
+}
+
+/// Remove the locked files the source dropped, unless the project changed them.
+fn remove_dropped(
+    root: &Path,
+    lock: &BTreeMap<String, String>,
+    file_set: &BTreeSet<&String>,
+    options: SyncOptions,
+    report: &mut Report,
+) -> Result<()> {
+    for (rel, locked) in lock.iter().filter(|(rel, _)| !file_set.contains(rel)) {
+        let path = root.join(rel);
+        match fingerprint_of(&path) {
+            None => {}
+            Some(h) if h == *locked => {
+                if !options.dry_run {
+                    fs::remove_file(&path)?;
+                }
+                report.entries.push((rel.clone(), Outcome::Removed));
+            }
+            Some(_) => report.entries.push((rel.clone(), Outcome::Kept)),
+        }
+    }
+    Ok(())
+}
+
+/// Copy the seeds of `seeds` the project does not have.
+fn write_seeds(
+    root: &Path,
+    seeds: &Path,
+    file_set: &BTreeSet<&String>,
+    options: SyncOptions,
+    report: &mut Report,
+) -> Result<()> {
+    for rel in list(seeds)? {
+        let dst = root.join(&rel);
+        // `symlink_metadata`: a dangling symlink is something the project has. A managed path is not a seed, nor the
+        // configuration, which `init` writes and the migration moves.
+        if file_set.contains(&rel)
+            || [CONFIG, OLD_CONFIG].contains(&rel.as_str())
+            || fs::symlink_metadata(&dst).is_ok()
+        {
+            continue;
+        }
+        if !options.dry_run {
+            write_as(
+                &dst,
+                &fs::read(seeds.join(&rel))?,
+                is_executable(&seeds.join(&rel)),
+            )?;
+        }
+        report.entries.push((rel, Outcome::Seeded));
+    }
+    Ok(())
+}
+
 /// What `update` did: the revision before and after, and the `sync` that followed.
 #[derive(Debug)]
 pub struct UpdateReport {
@@ -919,7 +959,7 @@ pub struct UpdateReport {
 /// # Errors
 /// When the source is a local directory, the revision is unknown, or the configuration or sync fails.
 pub fn update(root: &Path, rev: Option<&str>, options: &SyncOptions) -> Result<UpdateReport> {
-    let mut done = update_in(None, root, rev, options)?;
+    let mut done = update_in(None, root, rev, *options)?;
     if done.applied {
         let (source, _) = source_and_rev(root)?;
         done.sync.warnings.extend(prefetch(
@@ -936,7 +976,7 @@ fn update_in(
     cache: Option<&Path>,
     root: &Path,
     rev: Option<&str>,
-    options: &SyncOptions,
+    options: SyncOptions,
 ) -> Result<UpdateReport> {
     let (source, previous) = source_and_rev(root)?;
     if !is_git_url(&source) {
@@ -987,9 +1027,9 @@ fn update_in(
     let mut preview = sync_from(
         root,
         &dir,
-        &SyncOptions {
+        SyncOptions {
             dry_run: true,
-            ..*options
+            ..options
         },
     )?;
     preview

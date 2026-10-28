@@ -1,4 +1,4 @@
-//! `format-rust`, the PostToolUse hook (Edit|Write): run `cargo fmt --all` after a Rust file was edited, from the
+//! `format-rust`, the `PostToolUse` hook (Edit|Write): run `cargo fmt --all` after a Rust file was edited, from the
 //! directory of that file, so cargo formats the project holding it (an issue worktree, a crate in a subdirectory), not
 //! the session's.
 
@@ -12,7 +12,7 @@ pub(super) fn main(_args: &[String]) -> u8 {
     let event: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
     let Some(file) = event["tool_input"]["file_path"]
         .as_str()
-        .filter(|p| p.ends_with(".rs"))
+        .filter(|p| Path::new(p).extension().is_some_and(|e| e == "rs"))
     else {
         return 0;
     };

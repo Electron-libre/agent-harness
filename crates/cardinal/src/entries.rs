@@ -329,22 +329,21 @@ fn add(settings: &mut Value, entry: &Entry) {
             hook,
         } => {
             let groups = array(object(settings, "hooks"), event);
-            match groups
+            if let Some(group) = groups
                 .iter_mut()
                 .find(|group| matches(group, matcher.as_deref()))
             {
-                Some(group) => group["hooks"]
+                group["hooks"]
                     .as_array_mut()
                     .expect("checked by `entries`")
-                    .push(hook.clone()),
-                None => {
-                    let mut group = Map::new();
-                    if let Some(matcher) = matcher {
-                        group.insert("matcher".into(), Value::String(matcher.clone()));
-                    }
-                    group.insert("hooks".into(), json!([hook]));
-                    groups.push(Value::Object(group));
+                    .push(hook.clone());
+            } else {
+                let mut group = Map::new();
+                if let Some(matcher) = matcher {
+                    group.insert("matcher".into(), Value::String(matcher.clone()));
                 }
+                group.insert("hooks".into(), json!([hook]));
+                groups.push(Value::Object(group));
             }
         }
     }

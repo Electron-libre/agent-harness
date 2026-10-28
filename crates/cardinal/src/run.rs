@@ -125,6 +125,9 @@ fn cached(cache: &Path, commit: &str) -> PathBuf {
 ///
 /// # Errors
 /// When the downloaded asset does not match its digest, or it cannot be downloaded nor built.
+///
+/// # Panics
+/// Never: a cached binary always has a directory.
 pub fn binary_of(cache: &Path, source: &str, commit: &str, programs: &Programs) -> Result<PathBuf> {
     let binary = cached(cache, commit);
     if binary.is_file() {
@@ -132,10 +135,10 @@ pub fn binary_of(cache: &Path, source: &str, commit: &str, programs: &Programs) 
     }
     let dir = binary.parent().expect("a cached binary has a directory");
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
-    let staging = Staging::new(dir)?;
+    let staging = Staging::new(dir);
     let target = target();
     for url in asset_urls(source, commit, &target) {
-        if let Some(digest) = download(programs, &url, &staging.path)? {
+        if let Some(digest) = download(programs, &url, &staging.path) {
             let actual = hash(&fs::read(&staging.path)?);
             if digest != actual {
                 bail!("the cardinal binary of {commit} for {target} does not match its published SHA-256 ({actual} instead of {digest}): not installed");
@@ -143,7 +146,7 @@ pub fn binary_of(cache: &Path, source: &str, commit: &str, programs: &Programs) 
             return staging.install(&binary);
         }
     }
-    if build(programs, source, commit, &staging.path)? {
+    if build(programs, source, commit, &staging.path) {
         return staging.install(&binary);
     }
     bail!("no cardinal binary for {commit} on {target}: no release asset, and `cargo` is missing or failed to build it; run `cardinal update` to pin a published revision, or install Rust")
@@ -173,7 +176,7 @@ fn asset_urls(source: &str, commit: &str, target: &str) -> Vec<String> {
 }
 
 /// Download `url` to `to` and its digest from `<url>.sha256`; `None` when either cannot be downloaded.
-fn download(programs: &Programs, url: &str, to: &Path) -> Result<Option<String>> {
+fn download(programs: &Programs, url: &str, to: &Path) -> Option<String> {
     let curl = |extra: &[&std::ffi::OsStr], url: &str| {
         Command::new(&programs.curl)
             .args(["--fail", "--silent", "--location"])
@@ -184,15 +187,13 @@ fn download(programs: &Programs, url: &str, to: &Path) -> Result<Option<String>>
             .ok()
             .filter(|o| o.status.success())
     };
-    if curl(&["--output".as_ref(), to.as_os_str()], url).is_none() {
-        return Ok(None);
-    }
-    Ok(curl(&[], &format!("{url}.sha256")).and_then(|out| {
+    curl(&["--output".as_ref(), to.as_os_str()], url)?;
+    curl(&[], &format!("{url}.sha256")).and_then(|out| {
         String::from_utf8_lossy(&out.stdout)
             .split_whitespace()
             .next()
             .map(str::to_ascii_lowercase)
-    }))
+    })
 }
 
 /// The URL cargo reads for a git source: a scp-style `git@host:path` becomes `ssh://git@host/path`.
@@ -207,7 +208,7 @@ pub(crate) fn cargo_url(source: &str) -> String {
 
 /// Build the binary of `commit` with `cargo install` and put it at `to`; false when cargo is missing or fails. No crate
 /// is named: the source holds one package, `cardinal`, or `harness` before the rename.
-fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> Result<bool> {
+fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> bool {
     let root = to.with_extension("root");
     let url = cargo_url(source);
     let built = Command::new(&programs.cargo)
@@ -222,7 +223,7 @@ fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> Result<b
             .iter()
             .any(|name| fs::rename(root.join("bin").join(name), to).is_ok());
     let _ = fs::remove_dir_all(&root);
-    Ok(built)
+    built
 }
 
 /// A file being written next to its final place, removed unless installed.
@@ -231,13 +232,13 @@ struct Staging {
 }
 
 impl Staging {
-    fn new(dir: &Path) -> Result<Self> {
+    fn new(dir: &Path) -> Self {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
-        Ok(Self {
+        Self {
             path: dir.join(format!(".partial-{}-{nanos}", std::process::id())),
-        })
+        }
     }
 
     /// Make the staged file executable and rename it to `to`, so no reader sees it partly written (BIN-4).
@@ -315,7 +316,7 @@ fn keep(built: &Path, dir: &Path, last_good: &Path) -> Result<()> {
         return Ok(());
     }
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
-    let staging = Staging::new(dir)?;
+    let staging = Staging::new(dir);
     fs::copy(built, &staging.path).with_context(|| format!("copying {}", built.display()))?;
     staging.install(last_good).map(drop)
 }

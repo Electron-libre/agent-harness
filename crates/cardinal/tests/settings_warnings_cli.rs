@@ -95,7 +95,7 @@ fn check_warns_of_each_deny_rule_the_settings_lack() {
         SETTINGS,
         &settings(&record_hook(), &DENY_RULES),
     );
-    assert!(warnings(&check(&home, &root)).is_empty());
+    assert_eq!(warnings(&check(&home, &root)), [] as [&str; 0]);
     // no settings file: nothing to warn about
     fs::remove_file(root.path().join(SETTINGS)).unwrap();
     let run = home.harness(root.path(), &["check"]);
@@ -110,7 +110,7 @@ fn check_expects_no_deny_rule_without_the_review_gate() {
     home.git(root.path(), &["init", "--quiet", "-b", "main"]);
     home.ok(root.path(), &["sync"]);
     put(root.path(), SETTINGS, &settings(&json!({}), &[]));
-    assert!(warnings(&check(&home, &root)).is_empty());
+    assert_eq!(warnings(&check(&home, &root)), [] as [&str; 0]);
 }
 
 // spec: SYN-24, SYN-25, SYN-26

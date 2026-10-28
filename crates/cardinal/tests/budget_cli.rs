@@ -36,7 +36,7 @@ fn set_budget(root: &Path, value: &str) {
         .unwrap()
         .lines()
         .filter(|l| !l.starts_with("fixed_context_budget"))
-        .map(|l| format!("{l}\n"))
+        .map(|l| l.to_string() + "\n")
         .collect();
     let line = format!("fixed_context_budget = {value}\n");
     let config = if config.contains("[project]\n") {
@@ -274,7 +274,7 @@ const REPORTS_RULE: &str = ".claude/rules/reports-to-the-user.md";
 fn rules_bytes(root: &Path) -> usize {
     std::fs::read_dir(root.join(".claude/rules"))
         .unwrap()
-        .map(|e| std::fs::metadata(e.unwrap().path()).unwrap().len() as usize)
+        .map(|e| usize::try_from(std::fs::metadata(e.unwrap().path()).unwrap().len()).unwrap())
         .sum()
 }
 

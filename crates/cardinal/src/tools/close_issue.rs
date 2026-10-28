@@ -161,14 +161,13 @@ fn relink_target(
 
 /// The range of the link target starting at `start` of `line`, inside its `<...>` when it has them.
 fn target_span(line: &str, start: usize) -> std::ops::Range<usize> {
-    match line[start..].strip_prefix('<') {
-        Some(rest) => start + 1..start + 1 + rest.find('>').unwrap_or(0),
-        None => {
-            let len = line[start..]
-                .find(|c: char| c.is_whitespace() || c == ')')
-                .unwrap_or(line.len() - start);
-            start..start + len
-        }
+    if let Some(rest) = line[start..].strip_prefix('<') {
+        start + 1..start + 1 + rest.find('>').unwrap_or(0)
+    } else {
+        let len = line[start..]
+            .find(|c: char| c.is_whitespace() || c == ')')
+            .unwrap_or(line.len() - start);
+        start..start + len
     }
 }
 
@@ -288,7 +287,7 @@ fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option
         path.extend(parts.iter().map(|p| (*p).to_string()));
         path
     };
-    let moves: HashMap<RepoPath, RepoPath> = stems
+    let relocations: HashMap<RepoPath, RepoPath> = stems
         .iter()
         .map(|stem| {
             let name = format!("{stem}.md");
@@ -309,7 +308,7 @@ fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option
         }
         let updated = if file.extension().is_some_and(|e| e == "md") {
             let old_dir = if is_moved { issues } else { dir };
-            relink_text(&relink_links(&text, old_dir, dir, &moves), stems)
+            relink_text(&relink_links(&text, old_dir, dir, &relocations), stems)
         } else {
             relink_text(&text, stems)
         };
@@ -377,39 +376,65 @@ fn refuse_linked_worktree(dir: &Path) {
     }
 }
 
+/// `--relink`: rewrite the references to every issue of `issues/done`.
+fn relink_closed() -> u8 {
+    refuse_linked_worktree(Path::new("."));
+    let stems: HashSet<String> = std::fs::read_dir("issues/done")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "md"))
+        .filter_map(|p| p.file_stem().and_then(|s| s.to_str()).map(str::to_string))
+        .filter(|s| {
+            s.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+        })
+        .collect();
+    if stems.is_empty() {
+        return 0;
+    }
+    if let Some(root) = repo_root(Path::new(".")) {
+        let issues = under(&root, Path::new("issues"));
+        relink(&root, &issues, &stems, None);
+    } else {
+        eprintln!("not inside a git repository");
+        std::process::exit(1);
+    }
+    0
+}
+
+/// Drop the issue `stem` from the `queue.md` of `dir` so `next_issue.rs` never offers a closed one.
+fn drop_from_queue(dir: &Path, stem: &str) {
+    let queue = dir.join("queue.md");
+    if let Ok(text) = std::fs::read_to_string(&queue) {
+        let mut kept: Vec<&str> = text
+            .lines()
+            .filter(|l| !l.trim().starts_with(&format!("- [{stem}](")))
+            .collect();
+        if kept.len() != text.lines().count() {
+            // Closing the last entry would leave the blank line under the header: end with one newline.
+            while kept.last().is_some_and(|l| l.trim().is_empty()) {
+                kept.pop();
+            }
+            let rewritten = if kept.is_empty() {
+                String::new()
+            } else {
+                kept.join("\n") + "\n"
+            };
+            std::fs::write(&queue, rewritten).expect("queue is writable");
+            println!("removed {stem} from {}", queue.display());
+        }
+    }
+}
+
 pub(super) fn main(args: &[String]) -> u8 {
     let Some(arg) = args.first().cloned() else {
         eprintln!("usage: cardinal run close-issue issues/<name>.md | --relink");
         std::process::exit(2);
     };
     if arg == "--relink" {
-        refuse_linked_worktree(Path::new("."));
-        let stems: HashSet<String> = std::fs::read_dir("issues/done")
-            .into_iter()
-            .flatten()
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|e| e == "md"))
-            .filter_map(|p| p.file_stem().and_then(|s| s.to_str()).map(str::to_string))
-            .filter(|s| {
-                s.chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-            })
-            .collect();
-        if stems.is_empty() {
-            return 0;
-        }
-        match repo_root(Path::new(".")) {
-            Some(root) => {
-                let issues = under(&root, Path::new("issues"));
-                relink(&root, &issues, &stems, None);
-            }
-            None => {
-                eprintln!("not inside a git repository");
-                std::process::exit(1);
-            }
-        }
-        return 0;
+        return relink_closed();
     }
     let issue = Path::new(&arg);
     let (Some(dir), Some(name)) = (issue.parent(), issue.file_name()) else {
@@ -461,27 +486,7 @@ pub(super) fn main(args: &[String]) -> u8 {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or_default();
-    // Drop the issue from the queue so `next_issue.rs` never offers a closed one.
-    let queue = dir.join("queue.md");
-    if let Ok(text) = std::fs::read_to_string(&queue) {
-        let mut kept: Vec<&str> = text
-            .lines()
-            .filter(|l| !l.trim().starts_with(&format!("- [{stem}](")))
-            .collect();
-        if kept.len() != text.lines().count() {
-            // Closing the last entry would leave the blank line under the header: end with one newline.
-            while kept.last().is_some_and(|l| l.trim().is_empty()) {
-                kept.pop();
-            }
-            let rewritten = if kept.is_empty() {
-                String::new()
-            } else {
-                kept.join("\n") + "\n"
-            };
-            std::fs::write(&queue, rewritten).expect("queue is writable");
-            println!("removed {stem} from {}", queue.display());
-        }
-    }
+    drop_from_queue(dir, stem);
     // Last, so that a failure here never leaves the queue offering a closed issue.
     match repo_root(dir) {
         Some(root) => {

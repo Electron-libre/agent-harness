@@ -198,7 +198,7 @@ fn rules(tree: &impl Tree, dir: &str, layout: &Layout) -> Vec<String> {
     let mut rules: Vec<String> = tree
         .files(&under(dir, layout.rules))
         .into_iter()
-        .filter(|p| p.ends_with(".md"))
+        .filter(|p| Path::new(p).extension().is_some_and(|e| e == "md"))
         .collect();
     rules.sort();
     rules

@@ -1,10 +1,7 @@
 //! Behavior test for `harness tool audit-sources`: counts, typed-message filter, instruction files and memory.
 
-#[test]
-fn audit_sources() {
-    let dir = std::path::PathBuf::from("/tools");
-    let tmp = tempfile::tempdir().unwrap().keep();
-    let _ = std::fs::remove_dir_all(&tmp);
+/// The project `repo` under `tmp`, its instruction file, memory and transcripts; returns the project directory.
+fn fixture(tmp: &std::path::Path) -> std::path::PathBuf {
     let repo = tmp.join("repo");
     let proj = tmp.join("projects/-tmp-repo");
     std::fs::create_dir_all(proj.join("s1/subagents")).unwrap();
@@ -49,6 +46,15 @@ fn audit_sources() {
         line("user", "", "\"subagent prompt\""),
     )
     .unwrap();
+    repo
+}
+
+#[test]
+fn audit_sources() {
+    let dir = std::path::PathBuf::from("/tools");
+    let tmp = tempfile::tempdir().unwrap().keep();
+    let _ = std::fs::remove_dir_all(&tmp);
+    let repo = fixture(&tmp);
 
     let run = |args: &[&str]| {
         let out = tool_command(dir.join("audit_sources.rs"))

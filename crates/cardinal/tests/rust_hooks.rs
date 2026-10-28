@@ -68,56 +68,71 @@ fn commit_all(project: &Path, msg: &str) {
     );
 }
 
+/// A fake `cargo` first on the `PATH` of `env`: it counts its runs in `log`, passes while `pass` exists and fails with
+/// the diagnostics of `out` otherwise.
+struct FakeCargo {
+    out: PathBuf,
+    log: PathBuf,
+    pass: PathBuf,
+    env: [(&'static str, String); 1],
+}
+
+impl FakeCargo {
+    fn new(project: &Path) -> Self {
+        let bin = project.join("fake-bin");
+        fs::create_dir_all(&bin).unwrap();
+        let fake = FakeCargo {
+            out: project.join("fake-out.txt"),
+            log: project.join("fake-log.txt"),
+            pass: project.join("fake-pass"),
+            env: [(
+                "PATH",
+                format!(
+                    "{}:{}",
+                    bin.display(),
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            )],
+        };
+        let cargo = bin.join("cargo");
+        fs::write(
+            &cargo,
+            format!(
+                "#!/bin/sh\necho run >> '{}'\n[ -e '{}' ] && exit 0\ncat '{}' >&2\nexit 101\n",
+                fake.log.display(),
+                fake.pass.display(),
+                fake.out.display()
+            ),
+        )
+        .unwrap();
+        sh(project, "chmod", &["+x", cargo.to_str().unwrap()]);
+        fake
+    }
+
+    fn runs(&self) -> usize {
+        fs::read_to_string(&self.log).map_or(0, |l| l.lines().count())
+    }
+}
+
 // spec: CLG-1, CLG-2, CLG-3, CLG-4, CLG-5, CLG-6
 /// The clippy gate in one Cargo project, in order: the stamp of a passing run decides the runs that follow.
 fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> {
     let main_rs = project.join("src/main.rs");
     let mut checks = Vec::new();
-    // A fake `cargo` first on the PATH: it counts its runs, passes while `fake_pass` exists and fails with the
-    // diagnostics of `fake_out` otherwise.
-    let fake_bin = project.join("fake-bin");
-    fs::create_dir_all(&fake_bin).unwrap();
-    let fake_out = project.join("fake-out.txt");
-    let fake_log = project.join("fake-log.txt");
-    let fake_pass = project.join("fake-pass");
-    let fake_cargo = fake_bin.join("cargo");
-    fs::write(
-        &fake_cargo,
-        format!(
-            "#!/bin/sh\necho run >> '{}'\n[ -e '{}' ] && exit 0\ncat '{}' >&2\nexit 101\n",
-            fake_log.display(),
-            fake_pass.display(),
-            fake_out.display()
-        ),
-    )
-    .unwrap();
-    sh(project, "chmod", &["+x", fake_cargo.to_str().unwrap()]);
-    let fake_env = [(
-        "PATH",
-        format!(
-            "{}:{}",
-            fake_bin.display(),
-            std::env::var("PATH").unwrap_or_default()
-        ),
-    )];
-    let fake_runs = || {
-        fs::read_to_string(&fake_log)
-            .map(|l| l.lines().count())
-            .unwrap_or(0)
-    };
+    let fake = FakeCargo::new(project);
     fs::write(project.join(".gitignore"), "/target\n/fake-*\n").unwrap();
     commit_all(project, "ignore");
 
     checks.push((
         "gate passes with no Rust change",
-        run_hook_with(gate, project, "{}", &fake_env).code == 0,
+        run_hook_with(gate, project, "{}", &fake.env).code == 0,
     ));
-    checks.push(("gate runs no clippy with no Rust change", fake_runs() == 0));
+    checks.push(("gate runs no clippy with no Rust change", fake.runs() == 0));
     fs::create_dir_all(project.join("tools/.claude/hooks")).unwrap();
     fs::write(project.join("tools/.claude/hooks/hook.rs"), "").unwrap();
     checks.push((
         "gate runs no clippy for a changed harness script only",
-        run_hook_with(gate, project, "{}", &fake_env).code == 0 && fake_runs() == 0,
+        run_hook_with(gate, project, "{}", &fake.env).code == 0 && fake.runs() == 0,
     ));
     fs::remove_dir_all(project.join("tools")).unwrap();
 
@@ -137,19 +152,29 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
 
     checks.push((
         "gate lets go when stop_hook_active",
-        run_hook_with(gate, project, "{\"stop_hook_active\":true}", &fake_env).code == 0
-            && fake_runs() == 0,
+        run_hook_with(gate, project, "{\"stop_hook_active\":true}", &fake.env).code == 0
+            && fake.runs() == 0,
     ));
+    checks.extend(stamp_checks(gate, project, &fake));
+    checks.extend(diagnostic_checks(gate, project, &fake));
+    checks.extend(worktree_gate_checks(gate, project, &fake));
+    checks
+}
 
+/// The gate's report of many diagnostics, and the runs its stamp skips or not.
+fn stamp_checks(gate: &Path, project: &Path, fake: &FakeCargo) -> Vec<(&'static str, bool)> {
+    let main_rs = project.join("src/main.rs");
+    let mut checks = Vec::new();
     let many: String = (1..=45)
         .map(|i| format!("src/main.rs:{i}:1: error: problem {i}\n"))
-        .collect();
+        .collect::<Vec<_>>()
+        .concat();
     fs::write(
-        &fake_out,
+        &fake.out,
         format!("    Checking hooktest v0.1.0\n{many}error: could not compile `hooktest`\n"),
     )
     .unwrap();
-    let out = run_hook_with(gate, project, "{}", &fake_env);
+    let out = run_hook_with(gate, project, "{}", &fake.env);
     let reported = out
         .stderr
         .lines()
@@ -164,11 +189,11 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         out.stderr.contains("5 more"),
     ));
 
-    let before = fake_runs();
-    run_hook_with(gate, project, "{}", &fake_env);
+    let before = fake.runs();
+    run_hook_with(gate, project, "{}", &fake.env);
     checks.push((
         "gate runs clippy again after a failure with nothing changed",
-        fake_runs() == before + 1,
+        fake.runs() == before + 1,
     ));
 
     fs::write(&main_rs, "fn main() {}\n// edited\n").unwrap();
@@ -176,27 +201,27 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         "gate passes once fixed",
         run_hook(gate, project, "{}").code == 0,
     ));
-    let before = fake_runs();
+    let before = fake.runs();
     fs::write(project.join("README.md"), "edited\n").unwrap();
     checks.push((
         "gate skips clippy while the Rust state is unchanged",
-        run_hook_with(gate, project, "{}", &fake_env).code == 0 && fake_runs() == before,
+        run_hook_with(gate, project, "{}", &fake.env).code == 0 && fake.runs() == before,
     ));
 
     fs::write(&main_rs, "fn main() {}\n// edited again\n").unwrap();
     checks.push((
         "gate runs clippy again after a .rs edit",
-        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+        run_hook_with(gate, project, "{}", &fake.env).code == 2,
     ));
     fs::write(&main_rs, "fn main() {}\n// edited\n").unwrap();
     checks.push((
         "gate skips again once back to the passing state",
-        run_hook_with(gate, project, "{}", &fake_env).code == 0,
+        run_hook_with(gate, project, "{}", &fake.env).code == 0,
     ));
     fs::write(project.join("src/extra.rs"), "").unwrap();
     checks.push((
         "gate runs clippy again for a new untracked .rs file",
-        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+        run_hook_with(gate, project, "{}", &fake.env).code == 2,
     ));
     fs::remove_file(project.join("src/extra.rs")).unwrap();
     sh(project, "git", &["add", "README.md"]);
@@ -215,16 +240,22 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     );
     checks.push((
         "gate runs clippy again after HEAD moved",
-        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+        run_hook_with(gate, project, "{}", &fake.env).code == 2,
     ));
+    checks
+}
 
+/// The errors with no location, and the stamp read from the content of the files.
+fn diagnostic_checks(gate: &Path, project: &Path, fake: &FakeCargo) -> Vec<(&'static str, bool)> {
+    let main_rs = project.join("src/main.rs");
+    let mut checks = Vec::new();
     fs::write(
-        &fake_out,
+        &fake.out,
         "   Compiling dep v1.0.0\nsrc/main.rs:1:1: error: located\nerror: failed to run custom build command for `dep`\n\
          error: could not compile `hooktest`\n",
     )
     .unwrap();
-    let out = run_hook_with(gate, project, "{}", &fake_env);
+    let out = run_hook_with(gate, project, "{}", &fake.env);
     checks.push((
         "gate reports the errors that have no location",
         out.stderr.contains("src/main.rs:1:1: error: located")
@@ -235,11 +266,11 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         !out.stderr.contains("Compiling") && !out.stderr.contains("could not compile"),
     ));
     fs::write(
-        &fake_out,
+        &fake.out,
         "   Compiling dep v1.0.0\n    Checking hooktest\nerror: failed to parse manifest\n",
     )
     .unwrap();
-    let out = run_hook_with(gate, project, "{}", &fake_env);
+    let out = run_hook_with(gate, project, "{}", &fake.env);
     checks.push((
         "gate reports no build progress without any located diagnostic",
         out.code == 2
@@ -248,31 +279,41 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     ));
 
     // the stamp reads the content of the files, whatever their name or the diff settings
-    fs::write(&fake_pass, "").unwrap();
+    fs::write(&fake.pass, "").unwrap();
     let cafe = project.join("src/café.rs");
     fs::write(&cafe, "// one\n").unwrap();
-    run_hook_with(gate, project, "{}", &fake_env);
-    fs::remove_file(&fake_pass).unwrap();
+    run_hook_with(gate, project, "{}", &fake.env);
+    fs::remove_file(&fake.pass).unwrap();
     fs::write(&cafe, "// two\n").unwrap();
     checks.push((
         "gate runs clippy again after an edit of a non-ASCII file",
-        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+        run_hook_with(gate, project, "{}", &fake.env).code == 2,
     ));
     fs::remove_file(&cafe).unwrap();
     fs::write(project.join(".gitattributes"), "*.rs -diff\n").unwrap();
-    fs::write(&fake_pass, "").unwrap();
-    run_hook_with(gate, project, "{}", &fake_env);
-    fs::remove_file(&fake_pass).unwrap();
+    fs::write(&fake.pass, "").unwrap();
+    run_hook_with(gate, project, "{}", &fake.env);
+    fs::remove_file(&fake.pass).unwrap();
     fs::write(&main_rs, "fn main() {}\n// a -diff edit\n").unwrap();
     checks.push((
         "gate runs clippy again after an edit git shows no diff of",
-        run_hook_with(gate, project, "{}", &fake_env).code == 2,
+        run_hook_with(gate, project, "{}", &fake.env).code == 2,
     ));
+    checks
+}
 
+/// The project the gate checks: the worktree of the event's `cwd`, its crate subdirectory, or `CLAUDE_PROJECT_DIR`.
+fn worktree_gate_checks(
+    gate: &Path,
+    project: &Path,
+    fake: &FakeCargo,
+) -> Vec<(&'static str, bool)> {
+    let main_rs = project.join("src/main.rs");
+    let mut checks = Vec::new();
     // a session that entered an issue worktree: the gate checks the worktree of the event's `cwd`, not the passing
     // `CLAUDE_PROJECT_DIR`
-    fs::write(&fake_pass, "").unwrap();
-    run_hook_with(gate, project, "{}", &fake_env);
+    fs::write(&fake.pass, "").unwrap();
+    run_hook_with(gate, project, "{}", &fake.env);
     let worktree = project.with_file_name(format!(
         "{}-gate",
         project.file_name().unwrap().to_string_lossy()
@@ -293,12 +334,12 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         "fn main() {}\n// worktree edit\n",
     )
     .unwrap();
-    fs::remove_file(&fake_pass).unwrap();
-    let before = fake_runs();
+    fs::remove_file(&fake.pass).unwrap();
+    let before = fake.runs();
     let event = format!("{{\"cwd\":\"{}\"}}", worktree.join("src").display());
     checks.push((
         "gate checks the worktree of the event's cwd",
-        run_hook_with(gate, project, &event, &fake_env).code == 2 && fake_runs() == before + 1,
+        run_hook_with(gate, project, &event, &fake.env).code == 2 && fake.runs() == before + 1,
     ));
     sh(
         project,
@@ -333,12 +374,12 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
         "fn main() {}\n// worktree edit\n",
     )
     .unwrap();
-    let before = fake_runs();
+    let before = fake.runs();
     let event = format!("{{\"cwd\":\"{}\"}}", mono_tree.display());
     checks.push((
         "gate checks the crate's subdirectory in the worktree of the event's cwd",
-        run_hook_with(gate, &mono.join("backend"), &event, &fake_env).code == 2
-            && fake_runs() == before + 1,
+        run_hook_with(gate, &mono.join("backend"), &event, &fake.env).code == 2
+            && fake.runs() == before + 1,
     ));
     sh(
         &mono,
@@ -353,14 +394,20 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     ));
     fs::create_dir_all(&outside).unwrap();
     fs::write(&main_rs, "fn main() {}\n// outside edit\n").unwrap();
-    let before = fake_runs();
+    let before = fake.runs();
     let event = format!("{{\"cwd\":\"{}\"}}", outside.display());
     checks.push((
         "gate checks CLAUDE_PROJECT_DIR when the event's cwd is outside git",
-        run_hook_with(gate, project, &event, &fake_env).code == 2 && fake_runs() == before + 1,
+        run_hook_with(gate, project, &event, &fake.env).code == 2 && fake.runs() == before + 1,
     ));
     fs::remove_dir_all(&outside).unwrap();
+    checks.extend(fresh_repo_checks(gate, project, fake));
+    checks
+}
 
+/// A repository with no commit yet, and a project without `Cargo.toml`.
+fn fresh_repo_checks(gate: &Path, project: &Path, fake: &FakeCargo) -> Vec<(&'static str, bool)> {
+    let mut checks = Vec::new();
     // a repository with no commit yet: a staged file edited again
     let fresh = project.join("fake-fresh");
     fs::create_dir_all(fresh.join("src")).unwrap();
@@ -368,21 +415,20 @@ fn clippy_gate_checks(gate: &Path, project: &Path) -> Vec<(&'static str, bool)> 
     fs::write(fresh.join("Cargo.toml"), "").unwrap();
     fs::write(fresh.join("src/main.rs"), "fn main() {}\n").unwrap();
     sh(&fresh, "git", &["add", "-A"]);
-    fs::write(&fake_pass, "").unwrap();
-    run_hook_with(gate, &fresh, "{}", &fake_env);
-    fs::remove_file(&fake_pass).unwrap();
+    fs::write(&fake.pass, "").unwrap();
+    run_hook_with(gate, &fresh, "{}", &fake.env);
+    fs::remove_file(&fake.pass).unwrap();
     fs::write(fresh.join("src/main.rs"), "fn main() { let unused = 1; }\n").unwrap();
     checks.push((
         "gate runs clippy again after an edit of a staged file with no commit",
-        run_hook_with(gate, &fresh, "{}", &fake_env).code == 2,
+        run_hook_with(gate, &fresh, "{}", &fake.env).code == 2,
     ));
     fs::remove_file(fresh.join("Cargo.toml")).unwrap();
-    let before = fake_runs();
+    let before = fake.runs();
     checks.push((
         "gate runs no clippy in a project without Cargo.toml",
-        run_hook_with(gate, &fresh, "{}", &fake_env).code == 0 && fake_runs() == before,
+        run_hook_with(gate, &fresh, "{}", &fake.env).code == 0 && fake.runs() == before,
     ));
-
     checks
 }
 

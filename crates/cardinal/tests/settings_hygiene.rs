@@ -83,7 +83,12 @@ fn settings_hygiene() {
                 let script = cmd
                     .split_whitespace()
                     .rev()
-                    .find(|w| w.trim_matches('"').ends_with(".rs") && w.contains(".claude/"))
+                    .find(|w| {
+                        Path::new(w.trim_matches('"'))
+                            .extension()
+                            .is_some_and(|e| e == "rs")
+                            && w.contains(".claude/")
+                    })
                     .or(cmd.split_whitespace().last())
                     .unwrap_or("")
                     .replace("\"$CLAUDE_PROJECT_DIR\"", "");
@@ -121,8 +126,7 @@ fn settings_hygiene() {
         .args(["check-ignore", "-q", ".claude/settings.local.json"])
         .current_dir(&root)
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
+        .is_ok_and(|s| s.success());
     if !ignored {
         failures.push("`.claude/settings.local.json` is not git-ignored".into());
     }

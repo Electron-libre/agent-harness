@@ -40,7 +40,7 @@ fn problems(path: &Path, text: &str) -> Vec<String> {
     match headings.first() {
         None => out.push("no `# <Title>` heading".to_string()),
         Some(t) if t.trim() == "# Goal" => {
-            out.push("first heading must be the title, not `# Goal`".to_string())
+            out.push("first heading must be the title, not `# Goal`".to_string());
         }
         Some(_) => {}
     }

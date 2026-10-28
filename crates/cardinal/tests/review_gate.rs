@@ -275,6 +275,81 @@ fn native_run(hook: &Path, cwd: &Path, env: &[(&str, &Path)]) -> (i32, String) {
     )
 }
 
+/// The waiver under the native hook: honoured, unreadable, not UTF-8 or read-only.
+fn native_waiver_checks(hook: &Path, current: &Path) -> Vec<(&'static str, bool)> {
+    let mut out = Vec::new();
+    let waiver = current
+        .join(".git")
+        .join(["claude-review", "waived"].join("-"));
+    fs::write(&waiver, "").unwrap();
+    out.push((
+        "native honours the waiver",
+        native_run(hook, current, &[]).0 == 0,
+    ));
+    fs::remove_file(&waiver).unwrap();
+    // a waiver that cannot be read is ignored too: it is neither stamped nor dropped, and the user is told to fix it
+    fs::write(&waiver, "").unwrap();
+    fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o200)).unwrap();
+    // root reads a write-only file: the case cannot be built then
+    if fs::File::open(&waiver).is_err() {
+        let (code, stderr) = native_run(hook, current, &[]);
+        out.push((
+            "native refuses an unreviewed diff whose waiver it cannot read",
+            code == 2 && stderr.contains("/code-review low"),
+        ));
+        let path = waiver.canonicalize().unwrap();
+        out.push(("that refusal tells the agent to ask the user to fix the unreadable waiver, by its path", stderr.contains("could not be read") && stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
+        out.push((
+            "native leaves the unreadable waiver unstamped",
+            fs::metadata(&waiver).is_ok_and(|m| m.len() == 0),
+        ));
+        review_done(hook, current, "code-review");
+        out.push((
+            "native lets through a reviewed diff whose waiver it cannot read",
+            native_run(hook, current, &[]).0 == 0,
+        ));
+        // a file the review never saw, so the next cases judge an unreviewed diff again
+        fs::write(current.join("unseen.txt"), "x\n").unwrap();
+    }
+    fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
+    fs::remove_file(&waiver).unwrap();
+    // content that is not UTF-8 is read, not unreadable: it is no stamp, so it is dropped like a stale one
+    fs::write(&waiver, [0xff, 0xfe]).unwrap();
+    let (code, stderr) = native_run(hook, current, &[]);
+    out.push((
+        "native drops a waiver whose content is not UTF-8 and is no stamp",
+        code == 2 && !stderr.contains("could not be read") && !waiver.exists(),
+    ));
+    // a waiver that cannot be stamped is ignored: the review alone judges the commit, and the user is told to fix it
+    fs::write(&waiver, "").unwrap();
+    let mut readonly = fs::metadata(&waiver).unwrap().permissions();
+    readonly.set_readonly(true);
+    fs::set_permissions(&waiver, readonly.clone()).unwrap();
+    // root writes a read-only file: the case cannot be built then
+    if fs::OpenOptions::new().write(true).open(&waiver).is_err() {
+        let (code, stderr) = native_run(hook, current, &[]);
+        out.push((
+            "native refuses an unreviewed diff whose waiver it cannot stamp",
+            code == 2 && stderr.contains("/code-review low"),
+        ));
+        let path = waiver.canonicalize().unwrap();
+        out.push((
+            "that refusal tells the agent to ask the user to fix the waiver, by its path",
+            stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap()),
+        ));
+        review_done(hook, current, "code-review");
+        out.push((
+            "native lets through a reviewed diff whose waiver it cannot stamp",
+            native_run(hook, current, &[]).0 == 0,
+        ));
+    }
+    #[allow(clippy::permissions_set_readonly_false)]
+    readonly.set_readonly(false);
+    fs::set_permissions(&waiver, readonly).unwrap();
+    fs::remove_file(&waiver).unwrap();
+    out
+}
+
 // spec: REV-9, REV-10
 fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let (current, other) = target_fixture(hook, "rev9");
@@ -309,75 +384,7 @@ fn native_checks(hook: &Path) -> Vec<(&'static str, bool)> {
         "native refuses the unreviewed current directory",
         native_run(hook, &current, &[]).0 != 0,
     ));
-    let waiver = current
-        .join(".git")
-        .join(["claude-review", "waived"].join("-"));
-    fs::write(&waiver, "").unwrap();
-    out.push((
-        "native honours the waiver",
-        native_run(hook, &current, &[]).0 == 0,
-    ));
-    fs::remove_file(&waiver).unwrap();
-    // a waiver that cannot be read is ignored too: it is neither stamped nor dropped, and the user is told to fix it
-    fs::write(&waiver, "").unwrap();
-    fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o200)).unwrap();
-    // root reads a write-only file: the case cannot be built then
-    if fs::File::open(&waiver).is_err() {
-        let (code, stderr) = native_run(hook, &current, &[]);
-        out.push((
-            "native refuses an unreviewed diff whose waiver it cannot read",
-            code == 2 && stderr.contains("/code-review low"),
-        ));
-        let path = waiver.canonicalize().unwrap();
-        out.push(("that refusal tells the agent to ask the user to fix the unreadable waiver, by its path", stderr.contains("could not be read") && stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap())));
-        out.push((
-            "native leaves the unreadable waiver unstamped",
-            fs::metadata(&waiver).map(|m| m.len() == 0).unwrap_or(false),
-        ));
-        review_done(hook, &current, "code-review");
-        out.push((
-            "native lets through a reviewed diff whose waiver it cannot read",
-            native_run(hook, &current, &[]).0 == 0,
-        ));
-        // a file the review never saw, so the next cases judge an unreviewed diff again
-        fs::write(current.join("unseen.txt"), "x\n").unwrap();
-    }
-    fs::set_permissions(&waiver, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
-    fs::remove_file(&waiver).unwrap();
-    // content that is not UTF-8 is read, not unreadable: it is no stamp, so it is dropped like a stale one
-    fs::write(&waiver, [0xff, 0xfe]).unwrap();
-    let (code, stderr) = native_run(hook, &current, &[]);
-    out.push((
-        "native drops a waiver whose content is not UTF-8 and is no stamp",
-        code == 2 && !stderr.contains("could not be read") && !waiver.exists(),
-    ));
-    // a waiver that cannot be stamped is ignored: the review alone judges the commit, and the user is told to fix it
-    fs::write(&waiver, "").unwrap();
-    let mut readonly = fs::metadata(&waiver).unwrap().permissions();
-    readonly.set_readonly(true);
-    fs::set_permissions(&waiver, readonly.clone()).unwrap();
-    // root writes a read-only file: the case cannot be built then
-    if fs::OpenOptions::new().write(true).open(&waiver).is_err() {
-        let (code, stderr) = native_run(hook, &current, &[]);
-        out.push((
-            "native refuses an unreviewed diff whose waiver it cannot stamp",
-            code == 2 && stderr.contains("/code-review low"),
-        ));
-        let path = waiver.canonicalize().unwrap();
-        out.push((
-            "that refusal tells the agent to ask the user to fix the waiver, by its path",
-            stderr.contains("ask the user to fix") && stderr.contains(path.to_str().unwrap()),
-        ));
-        review_done(hook, &current, "code-review");
-        out.push((
-            "native lets through a reviewed diff whose waiver it cannot stamp",
-            native_run(hook, &current, &[]).0 == 0,
-        ));
-    }
-    #[allow(clippy::permissions_set_readonly_false)]
-    readonly.set_readonly(false);
-    fs::set_permissions(&waiver, readonly).unwrap();
-    fs::remove_file(&waiver).unwrap();
+    out.extend(native_waiver_checks(hook, &current));
     fs::remove_file(current.join("new.txt")).unwrap();
     let _ = fs::remove_file(current.join("unseen.txt"));
     fs::write(current.join("a.txt"), "one\n").unwrap();
@@ -762,6 +769,96 @@ fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+/// A repository whose issues commit without review, and the waiver of the rest.
+fn issues_only_checks(hook: &Path, project: &Path) -> Vec<(&'static str, bool)> {
+    let mut out = Vec::new();
+    let mut check = |name, ok| out.push((name, ok));
+    let judged = |dir: &Path| native_run(hook, dir, &[]).0;
+    let esc = project.join("esc");
+    fs::create_dir_all(esc.join("issues")).unwrap();
+    sh(&esc, &["init", "-q", "."]);
+    fs::write(esc.join("issues/i.md"), "one\n").unwrap();
+    fs::write(esc.join("code.txt"), "one\n").unwrap();
+    sh(&esc, &["add", "-A"]);
+    sh(&esc, &["commit", "-qm", "init"]);
+    fs::write(esc.join("issues/i.md"), "two\n").unwrap();
+    check(
+        "lets through a commit that only touches issues",
+        judged(&esc) == 0,
+    );
+    fs::write(esc.join("issues/j.md"), "new\n").unwrap();
+    check("lets through a new issue file", judged(&esc) == 0);
+    sh(&esc, &["mv", "code.txt", "issues/code.txt"]);
+    check("refuses a code file renamed into issues", judged(&esc) == 2);
+    sh(&esc, &["mv", "issues/code.txt", "code.txt"]);
+    fs::write(esc.join("code.txt"), "two\n").unwrap();
+    check("refuses issues mixed with code", judged(&esc) == 2);
+    fs::write(esc.join("docs.md"), "doc\n").unwrap();
+    fs::write(esc.join("code.txt"), "one\n").unwrap();
+    check("refuses documentation", judged(&esc) == 2);
+    let waiver = esc.join(".git/claude-review-waived");
+    fs::write(&waiver, "").unwrap();
+    check("lets through a commit the user waived", judged(&esc) == 0);
+    check(
+        "keeps the waiver while no commit happened",
+        waiver.exists() && judged(&esc) == 0,
+    );
+    sh(&esc, &["add", "-A"]);
+    sh(&esc, &["commit", "-qm", "waived"]);
+    fs::write(esc.join("docs.md"), "doc two\n").unwrap();
+    check(
+        "consumes the waiver once a commit happened",
+        judged(&esc) == 2 && !waiver.exists(),
+    );
+
+    // a waiver spent by a commit is gone at the next check, so the user's new one is not mistaken for it
+    fs::write(&waiver, "").unwrap();
+    check(
+        "lets through the commit of a waiver created again",
+        judged(&esc) == 0,
+    );
+    sh(&esc, &["add", "-A"]);
+    sh(&esc, &["commit", "-qm", "waived again"]);
+    fs::write(esc.join("issues/k.md"), "new\n").unwrap();
+    check(
+        "an issues-only check drops the waiver spent by a commit",
+        judged(&esc) == 0 && !waiver.exists(),
+    );
+    out
+}
+
+/// The first commit of a repository: refused, waived, reviewed.
+fn first_commit_checks(hook: &Path, project: &Path) -> Vec<(&'static str, bool)> {
+    let mut out = Vec::new();
+    let mut check = |name, ok| out.push((name, ok));
+    let judged = |dir: &Path| native_run(hook, dir, &[]).0;
+    let fresh = project.join("fresh");
+    fs::create_dir_all(&fresh).unwrap();
+    sh(&fresh, &["init", "-q", "."]);
+    fs::write(fresh.join("c.txt"), "x\n").unwrap();
+    check(
+        "refuses the first commit of a repository",
+        judged(&fresh) == 2,
+    );
+    let fresh_waiver = fresh.join(".git/claude-review-waived");
+    fs::write(&fresh_waiver, "").unwrap();
+    check(
+        "lets through the first commit the user waived",
+        judged(&fresh) == 0,
+    );
+    check(
+        "stamps the waiver of a repository without commit",
+        fs::read_to_string(&fresh_waiver).unwrap().trim() == "no-head",
+    );
+    fs::remove_file(&fresh_waiver).unwrap();
+    review_done(hook, &fresh, "code-review");
+    check(
+        "lets through the reviewed first commit",
+        judged(&fresh) == 0,
+    );
+    out
+}
+
 #[test]
 fn review_gate() {
     let hook = Path::new(env!("CARGO_BIN_EXE_cardinal")).to_path_buf();
@@ -847,81 +944,12 @@ fn review_gate() {
     run(&hook, "record", &project, &failed_review);
     check("does not record a failed review", judged(&project) == 2);
 
-    let esc = project.join("esc");
-    fs::create_dir_all(esc.join("issues")).unwrap();
-    sh(&esc, &["init", "-q", "."]);
-    fs::write(esc.join("issues/i.md"), "one\n").unwrap();
-    fs::write(esc.join("code.txt"), "one\n").unwrap();
-    sh(&esc, &["add", "-A"]);
-    sh(&esc, &["commit", "-qm", "init"]);
-    fs::write(esc.join("issues/i.md"), "two\n").unwrap();
-    check(
-        "lets through a commit that only touches issues",
-        judged(&esc) == 0,
-    );
-    fs::write(esc.join("issues/j.md"), "new\n").unwrap();
-    check("lets through a new issue file", judged(&esc) == 0);
-    sh(&esc, &["mv", "code.txt", "issues/code.txt"]);
-    check("refuses a code file renamed into issues", judged(&esc) == 2);
-    sh(&esc, &["mv", "issues/code.txt", "code.txt"]);
-    fs::write(esc.join("code.txt"), "two\n").unwrap();
-    check("refuses issues mixed with code", judged(&esc) == 2);
-    fs::write(esc.join("docs.md"), "doc\n").unwrap();
-    fs::write(esc.join("code.txt"), "one\n").unwrap();
-    check("refuses documentation", judged(&esc) == 2);
-    let waiver = esc.join(".git/claude-review-waived");
-    fs::write(&waiver, "").unwrap();
-    check("lets through a commit the user waived", judged(&esc) == 0);
-    check(
-        "keeps the waiver while no commit happened",
-        waiver.exists() && judged(&esc) == 0,
-    );
-    sh(&esc, &["add", "-A"]);
-    sh(&esc, &["commit", "-qm", "waived"]);
-    fs::write(esc.join("docs.md"), "doc two\n").unwrap();
-    check(
-        "consumes the waiver once a commit happened",
-        judged(&esc) == 2 && !waiver.exists(),
-    );
-
-    // a waiver spent by a commit is gone at the next check, so the user's new one is not mistaken for it
-    fs::write(&waiver, "").unwrap();
-    check(
-        "lets through the commit of a waiver created again",
-        judged(&esc) == 0,
-    );
-    sh(&esc, &["add", "-A"]);
-    sh(&esc, &["commit", "-qm", "waived again"]);
-    fs::write(esc.join("issues/k.md"), "new\n").unwrap();
-    check(
-        "an issues-only check drops the waiver spent by a commit",
-        judged(&esc) == 0 && !waiver.exists(),
-    );
-
-    let fresh = project.join("fresh");
-    fs::create_dir_all(&fresh).unwrap();
-    sh(&fresh, &["init", "-q", "."]);
-    fs::write(fresh.join("c.txt"), "x\n").unwrap();
-    check(
-        "refuses the first commit of a repository",
-        judged(&fresh) == 2,
-    );
-    let fresh_waiver = fresh.join(".git/claude-review-waived");
-    fs::write(&fresh_waiver, "").unwrap();
-    check(
-        "lets through the first commit the user waived",
-        judged(&fresh) == 0,
-    );
-    check(
-        "stamps the waiver of a repository without commit",
-        fs::read_to_string(&fresh_waiver).unwrap().trim() == "no-head",
-    );
-    fs::remove_file(&fresh_waiver).unwrap();
-    review_done(&hook, &fresh, "code-review");
-    check(
-        "lets through the reviewed first commit",
-        judged(&fresh) == 0,
-    );
+    for (name, ok) in issues_only_checks(&hook, &project)
+        .into_iter()
+        .chain(first_commit_checks(&hook, &project))
+    {
+        check(name, ok);
+    }
 
     for checks in [
         worktree_checks,

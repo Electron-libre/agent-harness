@@ -197,7 +197,7 @@ fn shell_words(command: &str) -> Vec<String> {
                     words.extend((!word.is_empty()).then(|| std::mem::take(&mut word)));
                 }
                 None if c.is_whitespace() || ";&|()<>`".contains(c) => {
-                    words.extend((!word.is_empty()).then(|| std::mem::take(&mut word)))
+                    words.extend((!word.is_empty()).then(|| std::mem::take(&mut word)));
                 }
                 None => word.push(c),
             }
@@ -241,8 +241,7 @@ impl Context {
 /// The work tree holding `cwd`: its git top level, else `cwd` itself (a removed worktree).
 fn worktree(cwd: &str) -> PathBuf {
     git(Path::new(cwd), &["rev-parse", "--show-toplevel"])
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(cwd))
+        .map_or_else(|| PathBuf::from(cwd), PathBuf::from)
 }
 
 #[derive(Default)]
@@ -262,6 +261,78 @@ impl Verdict {
         });
     }
 
+    /// The rules of a `Bash` call; `refused` is set while a commit refused for its review is not yet retried.
+    fn check_bash(&mut self, call: &Call, blocked: bool, refused: &mut bool) {
+        let has = |w: &str| call.has(w);
+        if has("git") && (has("commit") || has("push")) {
+            self.applied.insert("no-verify");
+            if has("--no-verify") {
+                self.add("no-verify", blocked, &call.location, String::new());
+            }
+        }
+        if call.commits() {
+            self.applied
+                .extend(["review-before-commit", "review-waiver"]);
+            if *refused && call.error == Some(false) {
+                self.add("review-before-commit", false, &call.location, String::new());
+                *refused = false;
+            }
+        }
+        if has("just") && has("waive-review") {
+            self.add("review-waiver", blocked, &call.location, String::new());
+        }
+    }
+
+    /// The rules of a call of the tool `name` that edits a file; `plan_proposed` once a plan awaits its validation.
+    fn check_edit(
+        &mut self,
+        call: &Call,
+        name: &str,
+        blocked: bool,
+        context: &Context,
+        main: bool,
+        plan_proposed: &mut bool,
+    ) {
+        let key = EDIT_TOOLS
+            .iter()
+            .find(|(tool, _)| *tool == name)
+            .map(|(_, key)| *key);
+        let path = key.and_then(|k| call.input[k].as_str()).unwrap_or_default();
+        if path.is_empty() {
+            return;
+        }
+        if Path::new(path)
+            .file_name()
+            .is_some_and(|n| n == "claude-review-waived")
+        {
+            self.add("review-waiver", blocked, &call.location, String::new());
+        }
+        let relative = context.relative(&call.cwd, path);
+        if let Some(managed) = &context.managed {
+            self.applied.insert("managed-copy");
+            if let Some(rel) = relative.as_ref().filter(|r| managed.contains(*r)) {
+                self.add("managed-copy", blocked, &call.location, rel.clone());
+            }
+        }
+        if main {
+            if let Some(rel) = relative
+                .as_ref()
+                .filter(|r| *plan_proposed && !PLAN_DIRS.iter().any(|d| r.starts_with(d)))
+            {
+                self.add("validation-stop", false, &call.location, rel.clone());
+            }
+            let text = [&call.input["new_string"], &call.input["content"]]
+                .into_iter()
+                .filter_map(Value::as_str)
+                .collect::<String>();
+            let issue = relative.is_some_and(|r| r.starts_with("issues/"));
+            if issue && text.contains("Plan: proposed") {
+                *plan_proposed = true;
+                self.applied.insert("validation-stop");
+            }
+        }
+    }
+
     /// The rules read from the tool calls and results of one transcript; `main` for the session's own one.
     fn check(&mut self, t: &Transcript, context: &Context, main: bool) {
         let mut flagged: HashSet<usize> = HashSet::new();
@@ -278,78 +349,16 @@ impl Verdict {
                     let blocked = call.error == Some(true);
                     let before = self.findings.len();
                     match call.name.as_str() {
-                        "Bash" => {
-                            let has = |w: &str| call.has(w);
-                            if has("git") && (has("commit") || has("push")) {
-                                self.applied.insert("no-verify");
-                                if has("--no-verify") {
-                                    self.add("no-verify", blocked, &call.location, String::new());
-                                }
-                            }
-                            if call.commits() {
-                                self.applied
-                                    .extend(["review-before-commit", "review-waiver"]);
-                                if refused && call.error == Some(false) {
-                                    self.add(
-                                        "review-before-commit",
-                                        false,
-                                        &call.location,
-                                        String::new(),
-                                    );
-                                    refused = false;
-                                }
-                            }
-                            if has("just") && has("waive-review") {
-                                self.add("review-waiver", blocked, &call.location, String::new());
-                            }
-                        }
+                        "Bash" => self.check_bash(call, blocked, &mut refused),
                         "Skill"
                             if call.input["skill"]
                                 .as_str()
                                 .is_some_and(|s| s.ends_with("code-review")) =>
                         {
-                            refused = false
+                            refused = false;
                         }
                         name => {
-                            let key = EDIT_TOOLS
-                                .iter()
-                                .find(|(tool, _)| *tool == name)
-                                .map(|(_, key)| *key);
-                            let path = key.and_then(|k| call.input[k].as_str()).unwrap_or_default();
-                            if path.is_empty() {
-                                continue;
-                            }
-                            if Path::new(path)
-                                .file_name()
-                                .is_some_and(|n| n == "claude-review-waived")
-                            {
-                                self.add("review-waiver", blocked, &call.location, String::new());
-                            }
-                            let relative = context.relative(&call.cwd, path);
-                            if let Some(managed) = &context.managed {
-                                self.applied.insert("managed-copy");
-                                if let Some(rel) =
-                                    relative.as_ref().filter(|r| managed.contains(*r))
-                                {
-                                    self.add("managed-copy", blocked, &call.location, rel.clone());
-                                }
-                            }
-                            if main {
-                                if let Some(rel) = relative.as_ref().filter(|r| {
-                                    plan_proposed && !PLAN_DIRS.iter().any(|d| r.starts_with(d))
-                                }) {
-                                    self.add("validation-stop", false, &call.location, rel.clone());
-                                }
-                                let text = [&call.input["new_string"], &call.input["content"]]
-                                    .into_iter()
-                                    .filter_map(Value::as_str)
-                                    .collect::<String>();
-                                let issue = relative.is_some_and(|r| r.starts_with("issues/"));
-                                if issue && text.contains("Plan: proposed") {
-                                    plan_proposed = true;
-                                    self.applied.insert("validation-stop");
-                                }
-                            }
+                            self.check_edit(call, name, blocked, context, main, &mut plan_proposed);
                         }
                     }
                     if self.findings.len() > before {
@@ -509,6 +518,57 @@ fn check_commits(repo: &Path, records: &mut [&mut Record]) {
     }
 }
 
+/// The record of the session of the transcript `path` (and its subagents), `None` outside a git repository or with no
+/// revision.
+fn record(path: &Path) -> Option<Record> {
+    let mut place = Place::default();
+    let id = path.file_stem().unwrap().to_string_lossy().into_owned();
+    let main_name = path.file_name().unwrap().to_string_lossy().into_owned();
+    let mut transcripts = vec![(Transcript::read(path, &main_name, true, &mut place), true)];
+    for sub in subagents(path) {
+        let name = format!("subagents/{}", sub.file_name().unwrap().to_string_lossy());
+        transcripts.push((Transcript::read(&sub, &name, false, &mut place), false));
+    }
+    let cwd = place.cwd.clone().unwrap_or_default();
+    let (Some((start, start_text)), Some(end)) = (place.start.clone(), place.end) else {
+        return None;
+    };
+    let repo = repository(&cwd, &place.issues).filter(|_| !cwd.is_empty())?;
+    let revision = revision(&repo, &start_text);
+    if revision.is_empty() {
+        return None;
+    }
+    let worktrees = transcripts
+        .iter()
+        .flat_map(|(t, _)| &t.calls)
+        .map(|c| c.cwd.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|c| (c.clone(), worktree(&c)))
+        .collect();
+    let config = committed_config(&repo, &start_text);
+    let language = config.as_ref().and_then(Language::of_config);
+    let context = Context {
+        worktrees,
+        managed: managed_paths(&repo, &start_text),
+        language,
+    };
+    let mut verdict = Verdict::default();
+    for (t, main) in &transcripts {
+        verdict.check(t, &context, *main);
+    }
+    let project = project_name(&cwd, Some(&repo));
+    Some(Record {
+        id,
+        project,
+        revision,
+        repo,
+        start,
+        end,
+        verdict,
+    })
+}
+
 pub(super) fn main(args: &[String]) -> u8 {
     const USAGE: &str = "usage: cardinal run rule-breaches [projects_dir] [--summary]";
     let (mut dir, mut summary) = (None, false);
@@ -531,57 +591,12 @@ pub(super) fn main(args: &[String]) -> u8 {
     };
     let mut records = Vec::new();
     for project in projects(&root) {
-        for path in sessions(&project) {
-            let mut place = Place::default();
-            let id = path.file_stem().unwrap().to_string_lossy().into_owned();
-            let main_name = path.file_name().unwrap().to_string_lossy().into_owned();
-            let mut transcripts =
-                vec![(Transcript::read(&path, &main_name, true, &mut place), true)];
-            for sub in subagents(&path) {
-                let name = format!("subagents/{}", sub.file_name().unwrap().to_string_lossy());
-                transcripts.push((Transcript::read(&sub, &name, false, &mut place), false));
-            }
-            let cwd = place.cwd.clone().unwrap_or_default();
-            let (Some((start, start_text)), Some(end)) = (place.start.clone(), place.end) else {
-                continue;
-            };
-            let Some(repo) = repository(&cwd, &place.issues).filter(|_| !cwd.is_empty()) else {
-                continue;
-            };
-            let revision = revision(&repo, &start_text);
-            if revision.is_empty() {
-                continue;
-            }
-            let worktrees = transcripts
+        records.extend(
+            sessions(&project)
                 .iter()
-                .flat_map(|(t, _)| &t.calls)
-                .map(|c| c.cwd.clone())
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .map(|c| (c.clone(), worktree(&c)))
-                .collect();
-            let config = committed_config(&repo, &start_text);
-            let language = config.as_ref().and_then(Language::of_config);
-            let context = Context {
-                worktrees,
-                managed: managed_paths(&repo, &start_text),
-                language,
-            };
-            let mut verdict = Verdict::default();
-            for (t, main) in &transcripts {
-                verdict.check(t, &context, *main);
-            }
-            let project = project_name(&cwd, Some(&repo));
-            records.push(Record {
-                id,
-                project,
-                revision,
-                repo,
-                start,
-                end,
-                verdict,
-            });
-        }
+                .map(PathBuf::as_path)
+                .filter_map(record),
+        );
     }
     let repos: BTreeSet<PathBuf> = records.iter().map(|r| r.repo.clone()).collect();
     for repo in repos {

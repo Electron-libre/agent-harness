@@ -112,6 +112,7 @@ fn print_changes(report: &Report) -> bool {
     report.conflicts() == 0
 }
 
+#[must_use]
 pub fn main() -> ExitCode {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,

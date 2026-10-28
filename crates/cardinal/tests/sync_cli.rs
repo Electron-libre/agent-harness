@@ -249,7 +249,8 @@ fn a_lock_path_outside_the_project_is_refused_by_sync_and_check() {
     let hash: String = Sha256::digest(b"precious")
         .iter()
         .map(|b| format!("{b:02x}"))
-        .collect();
+        .collect::<Vec<_>>()
+        .concat();
     let lock = get(root.path(), LOCK).unwrap();
     put(
         root.path(),
