@@ -1,6 +1,7 @@
 //! List the sources of the instruction audit: per project of the transcripts directory, the sessions, the
-//! messages typed by the user, the memory files and the instruction files of each working directory (AUD-1:
-//! the memory files a session loads at launch, `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules). With
+//! messages typed by the user, the memory files and the instruction files of each working directory and of its
+//! ancestors up to the repository root (AUD-1: the memory files a session loads at launch, `AGENTS.md`,
+//! `.claude/AGENTS.md` and the scoped rules). With
 //! `--messages`, print the typed messages as `project<TAB>session<TAB>text` (newlines escaped); subagent
 //! transcripts are skipped. Prints private content: never commit the output.
 //! Usage: `harness run audit-sources [projects_dir] [--messages]` (default `~/.claude/projects`).
@@ -8,6 +9,7 @@
 use super::transcripts;
 use crate::memory::{instruction_files, WorkTree};
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use transcripts::{for_each_line, projects, projects_root, sessions, sorted_entries, typed_text};
 
@@ -17,6 +19,27 @@ fn escape(text: &str) -> String {
         .replace('\n', "\\n")
         .replace('\r', "\\r")
         .replace('\t', "\\t")
+}
+
+/// The instruction files of `cwd` and of its ancestors up to the root of its repository (AUD-1), sorted: a session
+/// loads those above the repository too, but the audit reads nothing outside it. The user-level files of
+/// `~/.claude/` are left out.
+fn instructions(cwd: &Path) -> BTreeSet<PathBuf> {
+    // the working directory alone outside a repository
+    let depth = cwd
+        .ancestors()
+        .position(|d| d.join(".git").exists())
+        .unwrap_or(0);
+    let user = std::env::var_os("HOME").map(|h| Path::new(&h).join(".claude"));
+    cwd.ancestors()
+        .take(depth + 1)
+        .flat_map(|dir| {
+            instruction_files(&WorkTree(dir))
+                .into_iter()
+                .map(|f| dir.join(f))
+        })
+        .filter(|f| !user.as_ref().is_some_and(|u| f.starts_with(u)))
+        .collect()
 }
 
 pub(super) fn main(args: &[String]) -> u8 {
@@ -85,8 +108,8 @@ pub(super) fn main(args: &[String]) -> u8 {
             println!("  memory: {memory} files");
         }
         for cwd in &cwds {
-            for f in instruction_files(&WorkTree(Path::new(cwd))) {
-                println!("  instructions: {}", Path::new(cwd).join(f).display());
+            for file in instructions(Path::new(cwd)) {
+                println!("  instructions: {}", file.display());
             }
         }
     }

@@ -156,13 +156,64 @@ fn audit_sources_lists_every_instruction_file_once() {
         [
             ".claude/rules/a.md".into(),
             ".claude/rules/sub/b.md".into(),
+            "AGENTS.md".into(),
+            "docs/main.md".into(),
+            "docs/x.md".into(),
             std::fs::canonicalize(&shared)
                 .unwrap()
                 .display()
                 .to_string(),
-            "AGENTS.md".into(),
-            "docs/main.md".into(),
-            "docs/x.md".into(),
+        ]
+    );
+}
+
+// spec: AUD-1
+#[test]
+fn audit_sources_lists_the_ancestors_up_to_the_repository_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let outer = tmp.path().join("x");
+    let repo = outer.join("r");
+    let cwd = repo.join("a/b");
+    let proj = tmp.path().join("projects/-x-r-a-b");
+    std::fs::create_dir_all(&proj).unwrap();
+    std::fs::create_dir_all(repo.join(".git")).unwrap();
+    std::fs::create_dir_all(repo.join(".claude")).unwrap();
+    std::fs::create_dir_all(repo.join("a/.claude/rules")).unwrap();
+    std::fs::create_dir_all(&cwd).unwrap();
+    let write = |path: &std::path::Path, text: &str| std::fs::write(path, text).unwrap();
+    write(&outer.join("CLAUDE.md"), "above the repository\n");
+    write(&repo.join("CLAUDE.md"), "repository\n");
+    // the home directory: its `.claude/` holds the user-level files
+    write(&repo.join(".claude/CLAUDE.md"), "user level\n");
+    write(&repo.join("a/CLAUDE.md"), "ancestor\n");
+    write(&repo.join("a/.claude/rules/r.md"), "ancestor rule\n");
+    write(&cwd.join("CLAUDE.md"), "working directory\n");
+    let cwd_text = cwd.display().to_string();
+    std::fs::write(
+        proj.join("s1.jsonl"),
+        format!("{{\"type\":\"user\",\"cwd\":{cwd_text:?},\"message\":{{\"content\":\"hi\"}}}}\n"),
+    )
+    .unwrap();
+
+    let out = tool_command("audit_sources.rs")
+        .arg(tmp.path().join("projects"))
+        .env("HOME", &repo)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let listed: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.strip_prefix("  instructions: "))
+        .map(String::from)
+        .collect();
+    let under = |root: &std::path::Path, path: &str| root.join(path).display().to_string();
+    assert_eq!(
+        listed,
+        [
+            under(&repo, "CLAUDE.md"),
+            under(&repo, "a/.claude/rules/r.md"),
+            under(&repo, "a/CLAUDE.md"),
+            under(&cwd, "CLAUDE.md"),
         ]
     );
 }

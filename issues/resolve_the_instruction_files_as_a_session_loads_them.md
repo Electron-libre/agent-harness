@@ -51,7 +51,7 @@ approval Claude Code asks before loading an import outside the working directory
 1. [x] Linked imports: `memory.rs` resolves an import against the directory of the resolved file; amended REP-2
    (scenario of the linked `CLAUDE.md`); verified by a `fixed-context` test on a commit and an `audit-sources` test on
    a work tree; makes true REP-2, AUD-1. ~60 lines.
-2. [ ] Ancestors: `audit-sources` lists the instruction files of each ancestor of the working directory up to the
+2. [x] Ancestors: `audit-sources` lists the instruction files of each ancestor of the working directory up to the
    root of its repository, by absolute path, `~/.claude/` excepted; amended AUD-1; verified by an `audit-sources` test with `HOME` set to a
    temporary directory; makes true AUD-1. ~120 lines.
 
@@ -75,4 +75,21 @@ approval Claude Code asks before loading an import outside the working directory
 - red: REP-2, AUD-1: `fixed_context` counted 51 bytes instead of 54 for `r1`; `audit_sources_lists_every_instruction_file_once` lacked `docs/x.md`.
 - Code review: no findings
 - not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `audit-sources` lists the instruction files of each working directory and of its ancestors up to the
+  repository root (nearest `.git`), by absolute path, sorted, `~/.claude/` left out; the `audit-instructions` skill
+  says so.
+- | check | result |
+  |---|---|
+  | tests | pass |
+  | lint | pass |
+  | specs | pass |
+  | docs | updated: `files/.claude/skills/audit-instructions/SKILL.md` (synced) |
+  | code review | see below |
+- red: AUD-1: `audit_sources_lists_the_ancestors_up_to_the_repository_root` listed only the `CLAUDE.md` of the working directory.
+- Code review: no findings
+- not verified: a worktree nested in the main one (ADR 0011) stops the walk at its own `.git` file, though the session
+  also loads the main worktree's `CLAUDE.md`; not measured.
 - decisions needed: none
