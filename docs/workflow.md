@@ -1,6 +1,6 @@
 # Workflow
 
-How work goes from an idea to a merged change, with the skills and recipes of the harness. The skills hold the
+How work goes from an idea to a merged change, with the skills and recipes of Cardinal. The skills hold the
 procedure (`.claude/skills/<name>/SKILL.md`); this page shows how they fit together.
 
 ## The life of an issue
@@ -94,9 +94,9 @@ sequenceDiagram
 - The project's own tools run on `.` may read the nested worktrees: [usage.md](usage.md#parallel-issues-in-worktrees)
   says how to keep them out.
 
-## Evaluating the harness
+## Evaluating Cardinal
 
-`skill:evaluate-harness` reads the session transcripts and the git history and reports, per harness revision,
+`skill:evaluate-harness` reads the session transcripts and the git history and reports, per Cardinal revision,
 whether the agent got more efficient, the delivered work better and the rules better followed
 ([architecture](architecture.md#the-evaluation-from-the-transcripts)). A commit that changes `files/` names the
 effect it should have in an `Expected-effect: <metric> <up|down>` line (`CLAUDE.md`); the report gives each one a

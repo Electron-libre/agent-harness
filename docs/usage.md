@@ -15,7 +15,7 @@ harness run <tool> [args]
 
 | Command | What it does |
 |---|---|
-| `sync` | copies the managed files (`files/`), seeds the missing project-owned ones (`seed/`), adds the hooks and deny rules of the harness to `.claude/settings.json` (or removes those the source dropped), installs the git `pre-commit` review gate. A managed file edited locally is a conflict: fix it in the source, or `--force` to overwrite it. |
+| `sync` | copies the managed files (`files/`), seeds the missing project-owned ones (`seed/`), adds the hooks and deny rules of Cardinal to `.claude/settings.json` (or removes those the source dropped), installs the git `pre-commit` review gate. A managed file edited locally is a conflict: fix it in the source, or `--force` to overwrite it. |
 | `update` | git source only: resolves the revision (default: the head of the default branch), syncs to it, then pins the commit in `rev`. It refuses a revision whose hooks run a `harness` subcommand the installed one does not know, and names the `cargo install` to run first (see below). |
 | `check` | fails when a managed file was modified or deleted, the git review gate is missing, or a hook runs a `harness` subcommand the installed one refuses. It warns when `.claude/settings.json` lacks a deny rule of the review waiver, runs a missing hook or leaves the attribution on, and when Claude Code keeps the transcripts less than a year (`sync` and `update` warn too). |
 | `run` | runs a tool of the harness with the binary of the pinned revision, fetched (release asset) or built once into the cache; `harness run` alone lists the tools. |
@@ -30,9 +30,9 @@ revision whose hooks call a subcommand it does not know needs its `harness` inst
 the agent can run nothing, the install included. `harness update` refuses such a revision and prints the install to
 run; in this repository, `just check-harness` says so before an issue branch is merged (`issue-workflow`, "Merge back").
 
-## Evaluating the harness
+## Evaluating Cardinal
 
-The harness is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes
+Cardinal is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes
 them after 30 days by default, for every project at once: keep them a year in your user settings
 (`~/.claude/settings.json`, or `settings.json` in `CLAUDE_CONFIG_DIR`), which `harness` never writes:
 
@@ -50,11 +50,11 @@ projects directory given, they read the `projects/` of the configuration directo
 
 | Tool | Prints |
 |---|---|
-| `session-metrics [--archive <file>]` | one row of numbers per session (cost, user interventions, project, issue, harness revision, model, version), no message text; `--archive` also merges them into a file kept outside the repositories, so the history outlives the transcripts |
-| `rule-breaches [--summary]` | the breaches of the rules a program can see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue, the commit message format and no AI attribution, the conversation language), apart from what a gate blocked; `--summary` counts them per rule and harness revision |
-| `delivered-quality [repo] [--summary]` | one row per done issue: its commits and deliverables, the fixes inside it, the fixes and reverts of its files in the 30 days after its close, its reviews and their findings, the failed checks and typed messages of the sessions that made it; `--summary` sums them per harness revision |
-| `fixed-context` | per project and harness revision, the bytes of the memory files (`AGENTS.md` apart, counted only when loaded) and the skill descriptions that every session pays, and the skills the revision ships |
-| `harness-changes [repo] --sessions <file>` | one row per `Expected-effect: <metric> <up\|down>` line of a commit of the harness source that changes `files/`, with the revisions of the sessions that hold the change |
+| `session-metrics [--archive <file>]` | one row of numbers per session (cost, user interventions, project, issue, Cardinal revision, model, version), no message text; `--archive` also merges them into a file kept outside the repositories, so the history outlives the transcripts |
+| `rule-breaches [--summary]` | the breaches of the rules a program can see (no `--no-verify`, a review before each commit, no edit of a managed copy, the validation stop of an issue, the commit message format and no AI attribution, the conversation language), apart from what a gate blocked; `--summary` counts them per rule and Cardinal revision |
+| `delivered-quality [repo] [--summary]` | one row per done issue: its commits and deliverables, the fixes inside it, the fixes and reverts of its files in the 30 days after its close, its reviews and their findings, the failed checks and typed messages of the sessions that made it; `--summary` sums them per Cardinal revision |
+| `fixed-context` | per project and Cardinal revision, the bytes of the memory files (`AGENTS.md` apart, counted only when loaded) and the skill descriptions that every session pays, and the skills the revision ships |
+| `harness-changes [repo] --sessions <file>` | one row per `Expected-effect: <metric> <up\|down>` line of a commit of the Cardinal source that changes `files/`, with the revisions of the sessions that hold the change |
 | `harness-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--changes <file>]` | one markdown table per axis (efficiency, quality, rules, skills, fixed context), a row per group of consecutive revisions with enough sessions (`--min-sessions`, 10), the model, version and project mix next to the numbers (`--anonymous` keeps only the count of projects); with `--changes`, the verdict of each expected effect (`helped`, `hurt`, `no observed effect`, `confounded` when a group is too small or something else changed too, `no data`) |
 
 ## Parallel issues in worktrees

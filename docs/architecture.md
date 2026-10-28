@@ -51,7 +51,7 @@ revision. `check` compares the project with its lock and never reads the source.
 
 ## Tools and their binary
 
-The tools of the harness (hooks, checks, issue tools, transcript readers) are modules of the `harness` crate, one per
+The tools of Cardinal (hooks, checks, issue tools, transcript readers) are modules of the `harness` crate, one per
 tool under `crates/harness/src/tools/`, listed in `TOOLS`
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec
 [`specs/tool-binaries.md`](../specs/tool-binaries.md)). A hook, a recipe or a skill calls `harness run <tool> [args]`.
@@ -194,7 +194,7 @@ the project's `check` to print nothing on success.
 
 ## The evaluation from the transcripts
 
-The harness is judged by what it changes in the sessions, read after the fact from the Claude Code transcripts and the
+Cardinal is judged by what it changes in the sessions, read after the fact from the Claude Code transcripts and the
 git history of the projects. The readers are tools of `harness`; the skill `evaluate-harness` runs them into a
 temporary directory and reports the trend per axis next to the confounders.
 
@@ -236,7 +236,7 @@ The choices behind them:
 - **The revision in force**: the transcripts do not record it, so it is the `rev` of the `.claude/harness.toml`
   committed on the default branch of the project at the start of the session (`self:<commit>` for this repository, the
   last commit touching `files/`), EVA-8. An issue is measured with the revision in force before its first commit
-  (QUA-5), so an issue that changes the harness counts with the harness it was made with.
+  (QUA-5), so an issue that changes Cardinal counts with the Cardinal revision it was made with.
 - **No text**: no reader prints a message, a tool input or a commit text (EVA-10, BRE-11, QUA-10, REP-8), so
   `--archive` can keep the rows outside the repositories and the history outlives the retention of the transcripts.
 - **A moving format**: an unreadable line, an unknown type or a missing field counts in its own column rather than
@@ -277,7 +277,7 @@ the design:
 - **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as
   `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `harness run` takes the revision of the
   `harness.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,
-  so each worktree holds its own copy of the harness (a project that does not track it gets bare worktrees).
+  so each worktree holds its own copy of Cardinal's files (a project that does not track it gets bare worktrees).
 - **Queue**: edited only at merge time, in the main worktree (PAR-8).
 - **Cost**: each worktree has its own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a
   cold build in 4 s; a larger project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice).

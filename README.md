@@ -1,8 +1,8 @@
-# cardinal
+# Cardinal
 
-One agent harness for many projects. This repository holds the Claude Code skills, hooks, checks, `just` recipes and CI
-that a project needs to have an agent work its issues safely, plus `harness`, the tool that copies them into each
-project and tells when a copy drifted.
+Cardinal is one agent harness for many projects. This repository holds the Claude Code skills, hooks, checks, `just`
+recipes and CI that a project needs to have an agent work its issues safely, plus `harness`, the tool that copies them
+into each project and tells when a copy drifted.
 
 ## What a project gets
 
@@ -13,7 +13,7 @@ project and tells when a copy drifted.
 | Gates | no commit without a code review of the diff, no Rust turn ending on a clippy warning, a reply not in the `user_language` sent back once, `cargo fmt` after each edit; commit messages checked (Conventional Commits, no AI attribution) |
 | Recipes | `harness.just`: `next-issue`, `start-issue`, `close-issue`, `check-issue`, `check-specs`, `spec-coverage`, `check-commit`, `check-harness`… |
 | CI | `.github/workflows/harness.yml`: the copies and the specs checked on main and on each pull request, plus its commit messages |
-| Evaluation | `harness run session-metrics`, `rule-breaches`, `delivered-quality`…: did a harness revision make the agent better? |
+| Evaluation | `harness run session-metrics`, `rule-breaches`, `delivered-quality`…: did a Cardinal revision make the agent better? |
 
 ```mermaid
 flowchart LR
@@ -75,5 +75,5 @@ delivers. Details: [docs/workflow.md](docs/workflow.md).
 
 - [docs/usage.md](docs/usage.md): every command in detail, the evaluation, parallel worktrees.
 - [docs/workflow.md](docs/workflow.md): how an issue goes from idea to merge, alone or in parallel.
-- [docs/architecture.md](docs/architecture.md): how the harness is built.
+- [docs/architecture.md](docs/architecture.md): how Cardinal is built.
 - [specs/](specs/): what each capability must do; [docs/adr/](docs/adr/): why it is so.

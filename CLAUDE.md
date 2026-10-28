@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-The shared agent harness (skills, hooks, scripts, recipes, CI) of the user's projects, and the Rust tool
+Cardinal, the shared agent harness (skills, hooks, scripts, recipes, CI) of the user's projects, and the Rust tool
 `harness` that copies it into each of them. → Design: [docs/architecture.md](docs/architecture.md)
 
 ## Index
