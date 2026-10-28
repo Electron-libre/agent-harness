@@ -25,6 +25,7 @@ it. It reports trends, never a pass or a fail.
 - **REP-7** (deterministic) The skills table (`## Skills`) must give per group `calls` and `hook_refusals`, the `skills` and `hook_refusals` pairs of EVA-5 summed over its sessions (`name=n`, most frequent first, then by name), and, with `--context`, `unused`: the skills listed by the `fixed-context` rows of its revisions that no session of the group called (a call named `<skill>` or `<prefix>:<skill>` uses it), sorted and joined by `, `. With `--context`, the fixed context table (`## Fixed context`) must give per group the mean over the rows of its revisions whose byte columns are not empty of `claude_md_bytes`, `agents_md_bytes`, `skill_description_bytes` and their sum `total_bytes`, rounded half up to the unit (empty with no such row).
 - **REP-8** (deterministic) The output must hold no text of a message, of a commit or of an issue, and with `--anonymous` no project name nor issue stem either (only revisions, model and version names, skill and hook names, counts and ratios).
 - **REP-9** (deterministic) The efficiency table must give, after `input_tokens`, `main_context_peak`: the median (as REP-5) of the `main_context_peak` (EVA-16) of the group's sessions whose cell is not empty, empty when none is (an archived session read before the column, EVA-17, is left out rather than counted as 0).
+- **REP-10** (deterministic) The efficiency table must give, right after `main_context_peak`, `peak_sessions`: the count of the group's sessions whose `main_context_peak` cell is not empty, the sample its median is computed from (0 when none is).
 
 ## Scenarios
 
@@ -33,6 +34,7 @@ it. It reports trends, never a pass or a fail.
 - (REP-2) Given a `CLAUDE.md` of 100 bytes that names `AGENTS.md` in backticks and imports `@docs/rules.md` (50 bytes), when the row is printed, then `claude_md_bytes` is 150 and `agents_md_bytes` 0: Claude Code reads `AGENTS.md` only when imported or when there is no `CLAUDE.md`.
 - (REP-2) Given a `CLAUDE.md` that is a symbolic link to `docs/main.md`, which imports `@inc.md`, when the row is printed, then it counts `docs/inc.md`, not `inc.md`: Claude Code resolves the import against the directory of the file the link points to.
 - (REP-2) Given a project whose `harness.toml` moved from `r1` to `r2` in a commit that also grows `AGENTS.md`, when the row of `r2` is printed, then `agents_md_bytes` is the size in that commit.
+- (REP-10) Given a group of 12 sessions, 9 of them archived before `main_context_peak`, when the report is printed, then `peak_sessions` is 3 and `main_context_peak` the median of those 3.
 - (REP-6) Given a rule that applied in 8 sessions of `a` and 4 of `b`, broken in 1 of each, when `a..b` is a group, then its row reads `applied` 12, `breached` 2.
 
 ## Non-goals

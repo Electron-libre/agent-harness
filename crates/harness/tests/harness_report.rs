@@ -168,7 +168,7 @@ fn cell(table: Option<&Vec<Vec<String>>>, group: &str, column: &str) -> String {
         .unwrap_or_default()
 }
 
-// spec: REP-3, REP-4, REP-5, REP-8, REP-9
+// spec: REP-3, REP-4, REP-5, REP-8, REP-9, REP-10
 fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let rows: Vec<String> = sessions()
         .iter()
@@ -195,6 +195,7 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         "output_tokens",
         "input_tokens",
         "main_context_peak",
+        "peak_sessions",
         "validations",
         "other_messages",
     ]
@@ -263,8 +264,13 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             cell(eff, first, "main_context_peak") == "500",
         ),
         (
-            "a group with no peak has an empty main context peak",
+            "the sessions with a peak are counted next to its median",
+            cell(eff, first, "peak_sessions") == "9",
+        ),
+        (
+            "a group with no peak has an empty main context peak and 0 peak sessions",
             cell(small.get("Efficiency"), "r-c", "main_context_peak").is_empty()
+                && cell(small.get("Efficiency"), "r-c", "peak_sessions") == "0"
                 && cell(small.get("Efficiency"), "r-c", "turns") == "3",
         ),
         (
@@ -510,7 +516,7 @@ fn refusal_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: VRD-5, VRD-6, VRD-7
+// spec: VRD-5, VRD-6, VRD-7, VRD-9
 fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let hash = |c: char| c.to_string().repeat(40);
     let n = std::cell::Cell::new(0);
@@ -638,6 +644,15 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     mixed.extend(two("p1", "ra", 1, 10));
     mixed.extend(two("p1", "rb", 2, 5));
     mixed.extend(two("p1", "rc", 3, 5));
+    let unpeaked = |s: S<'static>| S { peak: None, ..s };
+    let peak_after: Vec<S> = pair(
+        two("p1", "ra", 1, 10),
+        vec![base("p1", "rb", 2, 5), unpeaked(base("p1", "rb", 2, 5))],
+    );
+    let peak_before: Vec<S> = pair(
+        vec![unpeaked(base("p1", "ra", 1, 10)), base("p1", "ra", 1, 10)],
+        two("p1", "rb", 2, 5),
+    );
     vec![
         (
             "the verdicts table comes last with a row per change and metric",
@@ -667,6 +682,20 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
                 pair(two("p1", "ra", 1, 10), two("p1", "rb", 2, 5)),
                 &[change('a', "turns", "rb"), change('b', "validations", "rb")],
             ) == ["confounded", "confounded"],
+        ),
+        (
+            "a main context peak held by fewer sessions than the threshold confounds, before or after",
+            one(&[], peak_after, &[change('a', "main_context_peak", "rb")]) == ["confounded"]
+                && one(&[], peak_before, &[change('a', "main_context_peak", "rb")])
+                    == ["confounded"],
+        ),
+        (
+            "a main context peak every session holds gets a verdict",
+            one(
+                &[],
+                pair(two("p1", "ra", 1, 10), two("p1", "rb", 2, 5)),
+                &[change('a', "main_context_peak", "rb")],
+            ) == ["helped"],
         ),
         (
             "an unchanged value is no observed effect",

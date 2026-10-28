@@ -223,6 +223,7 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
         "output_tokens",
         "input_tokens",
         "main_context_peak",
+        "peak_sessions",
         "validations",
         "other_messages",
     ];
@@ -250,6 +251,8 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
         let per_session =
             |f: &dyn Fn(&Row) -> u64| median(g.sessions.iter().map(|r| f(r)).collect()).to_string();
         let column = |c: &'static str| per_session(&move |r: &Row| number(r, c));
+        let peaks = main_context_peaks(&g.sessions);
+        let peak_sessions = peaks.len().to_string();
         vec![vec![
             issues.len().to_string(),
             projects,
@@ -263,24 +266,29 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
                     + number(r, "cache_read_tokens")
                     + number(r, "cache_creation_tokens")
             }),
-            main_context_peak(&g.sessions),
+            median_or_empty(peaks),
+            peak_sessions,
             column("validations"),
             column("other_messages"),
         ]]
     })
 }
 
-/// The median `main_context_peak` of the sessions that have one (REP-9): an archived row written before the column
-/// is left out rather than counted as 0; empty when no session has one.
-fn main_context_peak(sessions: &[&Row]) -> String {
-    let peaks: Vec<u64> = sessions
+/// The `main_context_peak` of the sessions that have one (REP-9, REP-10): an archived row written before the column
+/// is left out rather than counted as 0.
+fn main_context_peaks(sessions: &[&Row]) -> Vec<u64> {
+    sessions
         .iter()
         .filter_map(|r| value(r, "main_context_peak").parse().ok())
-        .collect();
-    if peaks.is_empty() {
+        .collect()
+}
+
+/// The median of `values`, empty when there is none.
+fn median_or_empty(values: Vec<u64>) -> String {
+    if values.is_empty() {
         String::new()
     } else {
-        median(peaks).to_string()
+        median(values).to_string()
     }
 }
 
@@ -499,8 +507,20 @@ fn dominant<'a>(group: &Group<'a>, column: &str) -> Option<&'a str> {
         .map(|(name, _)| name)
 }
 
-/// The verdict of each expectation of `changes` (VRD-5, VRD-6), from the groups before and after its change.
-fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row]) {
+/// Whether group `g` holds fewer sessions with a value of `metric` than `min` (VRD-9): only `main_context_peak` can be
+/// missing from a session row.
+fn too_few_values(tables: &[Table], g: usize, metric: &str, min: usize) -> bool {
+    metric == "main_context_peak"
+        && tables
+            .iter()
+            .find(|t| t.title == "Efficiency")
+            .and_then(|t| t.cell(g, "peak_sessions", None))
+            .and_then(|c| c.parse::<usize>().ok())
+            .is_some_and(|n| n < min)
+}
+
+/// The verdict of each expectation of `changes` (VRD-5, VRD-6, VRD-9), from the groups before and after its change.
+fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
     // Per row: the revisions holding its change, and the index of its after group.
     let placed: Vec<(HashSet<&str>, Option<usize>)> = changes
         .iter()
@@ -547,6 +567,8 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row]) {
                     .any(|(other, (_, i))| value(other, "change") != change && i == after_index);
                 // Only the last group can be too few, and the before group comes earlier.
                 if after.too_few
+                    || too_few_values(tables, b, metric, min)
+                    || too_few_values(tables, *a, metric, min)
                     || after.revisions.iter().any(|r| !held.contains(r))
                     || mix_changed
                     || other_change
@@ -671,7 +693,7 @@ pub(super) fn main(args: &[String]) -> u8 {
         tables.push(fixed_context(&groups, context));
     }
     if let Some(changes) = &changes {
-        verdicts(&groups, &tables, changes);
+        verdicts(&groups, &tables, changes, options.min_sessions);
     }
     0
 }

@@ -27,3 +27,44 @@ Measure first how many archived rows lack the peak; if the archive is young, 1 m
 # Resources
 * `crates/harness/src/tools/harness_report.rs` (`main_context_peak`, `verdicts`).
 * `specs/harness-report.md`, `specs/harness-verdicts.md`, `specs/evaluation.md` (EVA-16, EVA-17).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Show the sample behind the median `main_context_peak` (`peak_sessions`, REP-10) and make a verdict on that metric
+`confounded` when either group has fewer sessions with a peak than `--min-sessions` (VRD-9). Measured on
+2026-10-28: 298 sessions from the transcripts, 0 without a peak, no archive in use; both steps are kept since the
+second one is small and is the outcome the goal asks for.
+
+## Plan
+1. [x] Count and guard the peak sample: `peak_sessions` column after `main_context_peak`, verdict on
+   `main_context_peak` confounded when a group's `peak_sessions` is under `--min-sessions`; verified by tests of
+   `harness_report` through the binary; makes true REP-10, VRD-9 (~120 lines).
+
+## Decisions
+- Mode: autonomous
+- Scope: both steps (answer `1 a`)
+- Base commit: 3758a7d6502f9b4db77287412fe6d3a39f67830c
+
+## Deliverable 1
+
+done: `peak_sessions` column in the efficiency table; a `main_context_peak` verdict is `confounded` when either group
+has fewer sessions with a peak than `--min-sessions`; `evaluate-harness` and `docs/architecture.md` say so.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | REP-10, VRD-9 traced, both specs accepted |
+| docs | architecture, evaluate-harness skill |
+| code review | see below |
+
+red: REP-10, VRD-9: `FAIL - the sessions with a peak are counted next to its median`, `FAIL - a main context peak held by fewer sessions than the threshold confounds, before or after`
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none

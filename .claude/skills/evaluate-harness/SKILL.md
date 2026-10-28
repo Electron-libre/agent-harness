@@ -32,7 +32,8 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    - A trend is a change kept over two groups or more; one group out of line is noise.
    - Before naming a trend, compare the `models`, `versions` and `projects` of the groups it spans: when they
      changed too, say the change may come from them, not from the harness.
-   - A `too few` group supports no conclusion; say how many sessions it lacks.
+   - A `too few` group supports no conclusion; say how many sessions it lacks. The same holds for a
+     `main_context_peak` whose `peak_sessions` is under the threshold.
    - A skill `unused` over the last groups may be dropped or described better; a hook whose refusals grow, or a
      rule whose `breached_share` stays high, goes to `skill:audit-instructions` with its counts.
    - With no trend, say so: no change is a valid conclusion.
