@@ -29,7 +29,7 @@ measures; it does not judge.
 - **EVA-12** (deterministic) `audit-sources` and `session-metrics` must read the transcripts through the same module (`transcripts.rs` of the tools of the `harness` crate): the typed-message filter and the listing of projects and sessions are written once.
 - **EVA-13** (deterministic) withdrawn: the readers are modules of `harness` (ADR 0010), built with the module they use, so no hash line ties them to it.
 - **EVA-14** (deterministic) When `--archive` replaces a row whose `revision` was not empty with a new row whose `revision` is empty (the repository is gone or unreadable), the merged row must keep the archived `project` and `revision`.
-- **EVA-15** (deterministic) Without a projects directory given, `session-metrics`, `rule-breaches`, `audit-sources`, `fixed-context` and `delivered-quality` must read the `projects/` directory of the configuration directory (`CLAUDE_CONFIG_DIR` when set and not empty, else the `.claude/` directory of the home directory, as AUD-2); when neither `CLAUDE_CONFIG_DIR` nor `HOME` is set and not empty, each must fail with a message naming both variables, except `delivered-quality`, whose transcript columns are then empty (QUA-7).
+- **EVA-15** (deterministic) Without a projects directory given, `session-metrics`, `rule-breaches`, `audit-sources`, `fixed-context` and `delivered-quality` must read the `projects/` directory of the configuration directory (`CLAUDE_CONFIG_DIR` when set and not empty, else the `.claude/` directory of the home directory, as AUD-2); when neither `CLAUDE_CONFIG_DIR` nor `HOME` is set and not empty, each must fail with a message naming both variables, except `delivered-quality`, whose transcript columns are then empty (QUA-7); when that default `projects/` is not a directory, each must print on stderr a warning naming it, then its usual output with no session (`delivered-quality` its empty transcript columns, QUA-7) and exit as with no transcript.
 
 ## Scenarios
 
@@ -38,6 +38,7 @@ measures; it does not judge.
 - (EVA-8) Given a session run in a linked worktree on a branch that changed the pin, when the revision is read, then it is the pin of the default branch, since the branch may be gone.
 - (EVA-11) Given an archive holding sessions A and B, when the transcripts hold only B (changed) and C, then the archive holds A, the new B and C.
 - (EVA-15) Given `CLAUDE_CONFIG_DIR` naming a directory whose `projects/` holds a session and `HOME` one whose `.claude/projects/` holds another, when `session-metrics` runs with no argument, then it prints the session of `CLAUDE_CONFIG_DIR` only.
+- (EVA-15) Given `CLAUDE_CONFIG_DIR` naming a directory with no `projects/`, when `session-metrics` runs with no argument, then it prints its header only, warns on stderr naming that `projects/` and exits 0.
 
 ## Non-goals
 

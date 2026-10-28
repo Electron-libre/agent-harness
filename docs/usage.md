@@ -45,7 +45,8 @@ session pays (`CLAUDE.md`, `.claude/CLAUDE.md`, the rules without `paths`, the f
 `.claude/AGENTS.md` only when imported or when neither `CLAUDE.md` file exists, and the skill descriptions): `check`, `sync` and `update` warn when the work tree
 exceeds it, naming the largest part, and never fail because of it.
 
-The skill `evaluate-harness` runs the readers below and reports the trend per axis; each can also run alone.
+The skill `evaluate-harness` runs the readers below and reports the trend per axis; each can also run alone. With no
+projects directory given, they read the `projects/` of the configuration directory and warn when it is missing.
 
 | Tool | Prints |
 |---|---|

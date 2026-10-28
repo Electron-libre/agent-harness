@@ -21,16 +21,26 @@ pub fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
     paths
 }
 
-/// The projects directory: `arg` when given, else the `projects/` of the configuration directory (EVA-15).
+/// The projects directory: `arg` when given, else the `projects/` of the configuration directory (EVA-15), with a
+/// warning on stderr when that default is not a directory.
 pub fn projects_root(arg: Option<&String>) -> Result<PathBuf, String> {
     match arg {
         Some(dir) => Ok(PathBuf::from(dir)),
-        None => crate::config_dir()
-            .map(|dir| dir.join("projects"))
-            .ok_or_else(|| {
-                "the configuration directory cannot be located (set HOME or CLAUDE_CONFIG_DIR): pass the projects directory"
-                    .to_string()
-            }),
+        None => {
+            let root = crate::config_dir()
+                .map(|dir| dir.join("projects"))
+                .ok_or_else(|| {
+                    "the configuration directory cannot be located (set HOME or CLAUDE_CONFIG_DIR): pass the projects directory"
+                        .to_string()
+                })?;
+            if !root.is_dir() {
+                eprintln!(
+                    "warning: the projects directory {} is missing: no transcript read",
+                    root.display()
+                );
+            }
+            Ok(root)
+        }
     }
 }
 
