@@ -653,6 +653,13 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         vec![unpeaked(base("p1", "ra", 1, 10)), base("p1", "ra", 1, 10)],
         two("p1", "rb", 2, 5),
     );
+    let no_peak_before: Vec<S> = pair(
+        vec![
+            unpeaked(base("p1", "ra", 1, 10)),
+            unpeaked(base("p1", "ra", 1, 10)),
+        ],
+        two("p1", "rb", 2, 5),
+    );
     vec![
         (
             "the verdicts table comes last with a row per change and metric",
@@ -696,6 +703,10 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
                 pair(two("p1", "ra", 1, 10), two("p1", "rb", 2, 5)),
                 &[change('a', "main_context_peak", "rb")],
             ) == ["helped"],
+        ),
+        (
+            "a group with no main context peak at all gives no data",
+            one(&[], no_peak_before, &[change('a', "main_context_peak", "rb")]) == ["no data"],
         ),
         (
             "an unchanged value is no observed effect",

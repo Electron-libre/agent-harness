@@ -42,6 +42,9 @@ second one is small and is the outcome the goal asks for.
 1. [x] Count and guard the peak sample: `peak_sessions` column after `main_context_peak`, verdict on
    `main_context_peak` confounded when a group's `peak_sessions` is under `--min-sessions`; verified by tests of
    `harness_report` through the binary; makes true REP-10, VRD-9 (~120 lines).
+2. [x] Fixes of the `high` review: the guard counts the peaks from the group rather than parsing the printed cell;
+   VRD-9 states `no data` when a group has no peak at all; REP-5 names `peak_sessions`; verified by a
+   `harness_report` check for the `no data` case.
 
 ## Decisions
 - Mode: autonomous
@@ -62,6 +65,34 @@ has fewer sessions with a peak than `--min-sessions`; `evaluate-harness` and `do
 | code review | see below |
 
 red: REP-10, VRD-9: `FAIL - the sessions with a peak are counted next to its median`, `FAIL - a main context peak held by fewer sessions than the threshold confounds, before or after`
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none
+
+## Deliverable 2
+
+done: fixes of the `high` review of `3758a7d..c3a37e2`.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | VRD-9 amended (`no data` case), REP-5 names `peak_sessions` |
+| docs | architecture |
+| code review | see below |
+
+red: none (the `no data` case already held; the check pins it)
+
+High review: 6 findings
+1. guard read the printed cell back: fixed, counted from the group;
+2. stale comment on the before group: fixed;
+3. VRD-9 and the architecture promised `confounded` for a group with no peak: fixed, `no data`, with a check;
+4. hard-coded `main_context_peak` special case: not fixed, only that column can be empty (Findings);
+5. REP-5 column list missed `peak_sessions`: fixed;
+6. peaks computed for a `too few` group: not fixed, VRD-5 computes the values of a `too few` group too.
 
 Code review: no findings
 

@@ -507,16 +507,10 @@ fn dominant<'a>(group: &Group<'a>, column: &str) -> Option<&'a str> {
         .map(|(name, _)| name)
 }
 
-/// Whether group `g` holds fewer sessions with a value of `metric` than `min` (VRD-9): only `main_context_peak` can be
+/// Whether `group` holds fewer sessions with a value of `metric` than `min` (VRD-9): only `main_context_peak` can be
 /// missing from a session row.
-fn too_few_values(tables: &[Table], g: usize, metric: &str, min: usize) -> bool {
-    metric == "main_context_peak"
-        && tables
-            .iter()
-            .find(|t| t.title == "Efficiency")
-            .and_then(|t| t.cell(g, "peak_sessions", None))
-            .and_then(|c| c.parse::<usize>().ok())
-            .is_some_and(|n| n < min)
+fn too_few_values(group: &Group, metric: &str, min: usize) -> bool {
+    metric == "main_context_peak" && main_context_peaks(&group.sessions).len() < min
 }
 
 /// The verdict of each expectation of `changes` (VRD-5, VRD-6, VRD-9), from the groups before and after its change.
@@ -565,10 +559,11 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
                     .iter()
                     .zip(&placed)
                     .any(|(other, (_, i))| value(other, "change") != change && i == after_index);
-                // Only the last group can be too few, and the before group comes earlier.
+                // Only the last group can be too few in sessions, and the before group comes earlier; either can
+                // be too few in values of the metric.
                 if after.too_few
-                    || too_few_values(tables, b, metric, min)
-                    || too_few_values(tables, *a, metric, min)
+                    || too_few_values(before, metric, min)
+                    || too_few_values(after, metric, min)
                     || after.revisions.iter().any(|r| !held.contains(r))
                     || mix_changed
                     || other_change
