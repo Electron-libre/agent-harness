@@ -1,6 +1,6 @@
 # Written by `harness sync`: hashes of the managed files, then the managed settings entries. Do not edit.
 ae32a54ad3e59066328e1a2f7f5afff0ca4b13bf194272c376e23280e4a7ce4e  .claude/rules/reports-to-the-user.md
-6e64c998f56b77ec70cb2205360b18d5794a2a4e227f8fb134750196f723cfb6  .claude/skills/audit-instructions/SKILL.md
+efe5d7474b7bb8fcc96243e6730336fca2921c9e04d18b150235d1e1db6440e1  .claude/skills/audit-instructions/SKILL.md
 be8c82dbe5a8c2952f72a567d410f7cbeb96c7068b7131b5c789074b18c0db6c  .claude/skills/commit-message/SKILL.md
 6d2bbc79ab135d0eb300382475f7d5e5c110c3103a24357a22dde3ca6933fd2e  .claude/skills/create-issue/SKILL.md
 2c616b14e076ddb27ba2f2a175348e6ace7c8809f4c4238f6210c28664b10985  .claude/skills/evaluate-harness/SKILL.md

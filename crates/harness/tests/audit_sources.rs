@@ -126,6 +126,9 @@ fn audit_sources_lists_every_instruction_file_once() {
     write("docs/x.md", "imported\n");
     write("docs/y.md", "not imported\n");
     write(".claude/rules/a.md", "always\n");
+    // personal and kept out of git, loaded at launch with its imports
+    write("CLAUDE.local.md", "mine @docs/local.md\n");
+    write("docs/local.md", "imported by the local file\n");
     write(
         ".claude/rules/sub/b.md",
         "---\npaths: [\"src/**\"]\n---\nscoped\n",
@@ -157,6 +160,8 @@ fn audit_sources_lists_every_instruction_file_once() {
             ".claude/rules/a.md".into(),
             ".claude/rules/sub/b.md".into(),
             "AGENTS.md".into(),
+            "CLAUDE.local.md".into(),
+            "docs/local.md".into(),
             "docs/main.md".into(),
             "docs/x.md".into(),
             std::fs::canonicalize(&shared)

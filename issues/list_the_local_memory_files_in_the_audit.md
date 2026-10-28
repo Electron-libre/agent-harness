@@ -24,3 +24,42 @@ again. The audit should list it in each directory it reads, as it lists `CLAUDE.
 # Resources
 * `crates/harness/src/memory.rs`, `crates/harness/src/tools/audit_sources.rs`
 * `issues/done/count_every_always_loaded_memory_file.md`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+List `CLAUDE.local.md` and its imports among the instruction files of each directory the audit reads (AUD-1). Out of
+scope: the fixed-context measure (REP-2, SYN-38), unless the user chooses otherwise (question 1).
+
+## Measure (2026-10-28, Claude Code 2.1.312, `claude -p` in scratch repositories)
+* A session in `repo/a/b` loads the `CLAUDE.local.md` of `repo/a` and of `repo` at launch, as it loads `CLAUDE.md`.
+* A `CLAUDE.local.md` of the working directory importing `@inc.md` loads `inc.md`; from an ancestor, the import
+  waits for the approval a `-p` session never gives, as the imports of `CLAUDE.md` do.
+
+## Plan
+1. [x] Local memory in the audit: `memory.rs` adds `CLAUDE.local.md` to the roots of `instruction_files` for a
+   project directory, not to `measure`; amended AUD-1; verified by the `audit_sources` test of every instruction
+   file (a `CLAUDE.local.md` importing a file); makes true AUD-1. ~50 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: db029397fbf432c2aad9b0c23c2723732b0f0e29
+- `CLAUDE.local.md` listed by the audit only (AUD-1), never counted in REP-2 nor SYN-38 (user, 2026-10-28).
+
+## Deliverable 1
+- done: `audit-sources` lists `CLAUDE.local.md` and its imports in each directory it reads (`memory.rs`, a `local`
+  file of the layout read by `instruction_files` only); AUD-1, the module doc and `audit-instructions` say so.
+- | check | result |
+  |---|---|
+  | tests | pass |
+  | lint | pass |
+  | specs | pass |
+  | docs | AUD-1, `audit_sources.rs` doc, `audit-instructions` skill |
+  | code review | see below |
+- red: AUD-1: `audit_sources_lists_every_instruction_file_once` lacked `CLAUDE.local.md` and `docs/local.md`.
+- Code review: no findings
+- not verified: whether a `CLAUDE.local.md` keeps Claude Code from reading `AGENTS.md` in place of `CLAUDE.md`
+  (irrelevant to the audit, which lists `AGENTS.md` anyway).
+- decisions needed: none.

@@ -1,8 +1,8 @@
 //! List the sources of the instruction audit: per project of the transcripts directory, the sessions, the
 //! messages typed by the user, the memory files and the instruction files of each working directory and of its
-//! ancestors up to the repository root (AUD-1: the memory files a session loads at launch, `AGENTS.md`,
-//! `.claude/AGENTS.md` and the scoped rules), after the user-level instruction files of the configuration directory
-//! (AUD-2). With
+//! ancestors up to the repository root (AUD-1: the memory files a session loads at launch, `CLAUDE.local.md` and
+//! its imports, `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules), after the user-level instruction files of the
+//! configuration directory (AUD-2). With
 //! `--messages`, print the typed messages as `project<TAB>session<TAB>text` (newlines escaped); subagent
 //! transcripts are skipped. Prints private content: never commit the output.
 //! Usage: `harness run audit-sources [projects_dir] [--messages]` (default `~/.claude/projects`).
