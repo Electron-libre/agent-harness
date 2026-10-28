@@ -1,13 +1,16 @@
 //! Print the fixed context each harness revision costs a project in every session (`specs/harness-report.md`): one
-//! tab-separated row per project and revision used by a session of the transcripts, with the bytes of `CLAUDE.md`,
-//! `AGENTS.md` and the skill descriptions in the commit the revision came in force with, and the skills it ships.
+//! tab-separated row per project and revision used by a session of the transcripts, with the bytes of the memory files
+//! a session loads at launch (`memory.rs`, `AGENTS.md` apart) and of the skill descriptions in the commit the revision
+//! came in force with, and the skills it ships.
 //! Usage: `harness run fixed-context [projects_dir]` (default `~/.claude/projects`).
 
 use super::transcripts;
+use crate::memory::{measure, Tree};
 
 use chrono::{DateTime, FixedOffset};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use transcripts::{
     default_branch, for_each_line, git, pinned_revision, project_name, projects, projects_root,
     repository, revision, sessions, subagents, Place,
@@ -55,24 +58,57 @@ fn in_force_commit(pins: &[(String, Option<String>)], revision: &str) -> Option<
         .map(|(c, _)| c.clone())
 }
 
-/// The size of `path` in the tree of `commit`, a symbolic link counted as the file it points to; 0 when absent.
-fn size(repo: &Path, commit: &str, path: &str) -> u64 {
-    let link = git(repo, &["ls-tree", commit, "--", path])
-        .is_some_and(|entry| entry.starts_with("120000 "));
-    let target = if link {
-        git(repo, &["show", &format!("{commit}:{path}")]).map(|t| {
-            Path::new(path)
-                .with_file_name(t)
-                .to_string_lossy()
-                .into_owned()
-        })
-    } else {
-        Some(path.to_string())
-    };
-    target
-        .and_then(|t| git(repo, &["cat-file", "-s", &format!("{commit}:{t}")]))
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0)
+/// The tree of a commit, a symbolic link read as the file it points to in the same tree.
+struct CommitTree<'a> {
+    repo: &'a Path,
+    commit: &'a str,
+}
+
+impl CommitTree<'_> {
+    /// The content of the blob at `path`, as stored (the target of a symbolic link).
+    fn blob(&self, path: &str) -> Option<Vec<u8>> {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(self.repo)
+            .args(["cat-file", "blob", &format!("{}:{path}", self.commit)])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())?;
+        Some(out.stdout)
+    }
+}
+
+impl Tree for CommitTree<'_> {
+    fn read(&self, path: &str) -> Option<Vec<u8>> {
+        let blob = self.blob(path)?;
+        let link = git(self.repo, &["ls-tree", self.commit, "--", path])
+            .is_some_and(|entry| entry.starts_with("120000 "));
+        if !link {
+            return Some(blob);
+        }
+        let target = Path::new(path).with_file_name(String::from_utf8_lossy(&blob).as_ref());
+        self.blob(&target.to_string_lossy())
+    }
+
+    fn files(&self, dir: &str) -> Vec<String> {
+        git(
+            self.repo,
+            &[
+                "-c",
+                "core.quotePath=false",
+                "ls-tree",
+                "-r",
+                "--name-only",
+                self.commit,
+                "--",
+                dir,
+            ],
+        )
+        .unwrap_or_default()
+        .lines()
+        .map(String::from)
+        .collect()
+    }
 }
 
 /// The bytes of the top-level `name` and `description` values of a skill's front matter: surrounding quotes removed,
@@ -169,14 +205,14 @@ fn context(repo: &Path, pins: &[(String, Option<String>)], revision: &str) -> Ve
         })
         .map(|t| description_bytes(&t))
         .sum();
-    let (claude, agents) = (
-        size(repo, &commit, "CLAUDE.md"),
-        size(repo, &commit, "AGENTS.md"),
-    );
+    let memory = measure(&CommitTree {
+        repo,
+        commit: &commit,
+    });
     vec![
         commit,
-        claude.to_string(),
-        agents.to_string(),
+        memory.claude.to_string(),
+        memory.agents.to_string(),
         descriptions.to_string(),
         skills.join(","),
     ]

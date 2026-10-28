@@ -126,8 +126,8 @@ no separate file to own instead: Claude Code reads one shared settings file per 
 `.claude/hooks/` the project no longer has, an attribution left on (SYN-24 to SYN-27), and a transcript retention under
 a year outside CI (SYN-28, `settings::retention`), since the evaluation reads the transcripts of several revisions. They
 also warn when the fixed context of the work tree (the memory files a session loads at launch and their imports, the
-skill descriptions, measured by `memory.rs` as `fixed-context` measures a revision) exceeds the `fixed_context_budget` of the project (SYN-38, SYN-39, `budget.rs`):
-always-on text only grows unless something bounds it. A
+skill descriptions, measured by `memory.rs` as `fixed-context` measures a revision) exceeds the `fixed_context_budget`
+of the project (SYN-38, SYN-39, `budget.rs`): always-on text only grows unless something bounds it. A
 test of the crate (`every_tool_the_shared_harness_runs_exists`) fails when a declared hook, a recipe or a skill runs a
 tool `harness run` does not know.
 

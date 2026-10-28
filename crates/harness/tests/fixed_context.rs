@@ -103,7 +103,11 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         &[
             (".claude/harness.toml", &toml("r1")),
             ("AGENTS.md", "aaaa"),
-            ("CLAUDE.md", "cc"),
+            ("CLAUDE.md", "@AGENTS.md"),
+            (".claude/CLAUDE.md", "@../docs/x.md `@AGENTS.md`"),
+            ("docs/x.md", "xxx"),
+            (".claude/rules/r.md", "rrrrr"),
+            (".claude/rules/s.md", "---\npaths: src\n---\nSECRET scoped"),
             (".claude/skills/one/SKILL.md", &skill("one", "d1d1")),
         ],
     );
@@ -114,6 +118,7 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             (".claude/harness.toml", &toml("r2")),
             ("AGENTS.md", "aaaaaaaaaa"),
             ("CLAUDE.md", ""),
+            (".claude/CLAUDE.md", ""),
             (".claude/skills/two/SKILL.md", &skill("two", "\"d2\"")),
             (
                 ".claude/skills/three/SKILL.md",
@@ -193,11 +198,12 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let expected = [
         COLUMNS.to_string(),
         format!(
-            "harness\tself:{}\t{own}\t2\t2\t22\treview,review-pr",
+            "harness\tself:{}\t{own}\t2\t0\t22\treview,review-pr",
             full(&own)
         ),
-        format!("pinned\tr1\t{c1}\t2\t4\t7\tone"),
-        format!("pinned\tr2\t{c2}\t0\t10\t18\tone,three,two"),
+        // the memory files and their imports; AGENTS.md only when imported or in place of the CLAUDE.md files
+        format!("pinned\tr1\t{c1}\t44\t4\t7\tone"),
+        format!("pinned\tr2\t{c2}\t5\t10\t18\tone,three,two"),
     ];
     let lines: Vec<&str> = out.lines().collect();
     if lines != expected {

@@ -47,7 +47,7 @@ Measured on 2026-10-28 (both local consumers): `CLAUDE.md` 2120 and 4891 bytes, 
 1. [x] Shared memory measure + budget: a module reading the memory files through a reader (work tree or git tree),
    following imports; `budget.rs` uses it; verified by `tests/budget_cli.rs` (`.claude/CLAUDE.md`, rules with and
    without `paths`, import, `AGENTS.md` not imported, fallback); makes true SYN-38 (~500 lines).
-2. [ ] `fixed-context` on the shared measure: the git-tree reader (symbolic links as today); verified by
+2. [x] `fixed-context` on the shared measure: the git-tree reader (symbolic links as today); verified by
    `tests/fixed_context.rs`; makes true REP-2 (~300 lines).
 
 ## Decisions
@@ -65,4 +65,14 @@ Measured on 2026-10-28 (both local consumers): `CLAUDE.md` 2120 and 4891 bytes, 
   `CLAUDE.md` (183): `.claude/CLAUDE.md`, rules and imports not counted, an `AGENTS.md` no session loads counted.
 - Code review: no findings
 - not verified: the measure against `/context` of a real session (the doc of Claude Code is the reference).
+- decisions needed: none.
+
+## Deliverable 2
+
+- done: `fixed-context` reads the memory files of a commit through the shared measure (`CommitTree`), so REP-2 and
+  SYN-38 are one count; usage docs say what the columns hold.
+- red: REP-2: row `r1` read `10 4` instead of `44 4`, `r2` `0 10` instead of `5 10`, the harness row `2 2` instead of
+  `2 0`: `.claude/CLAUDE.md`, rules and imports not counted, an `AGENTS.md` no session loads counted.
+- Code review: no findings
+- not verified: none.
 - decisions needed: none.
