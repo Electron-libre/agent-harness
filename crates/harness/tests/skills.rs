@@ -85,6 +85,16 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
         "`red: ABC-3, ABC-4: <failure>`",
         "the red line names the traced ids delivered-quality reads",
     ),
+    (
+        "write-spec",
+        "just spec-coverage",
+        "the bootstrap of a spec starts from the report of the uncovered test files",
+    ),
+    (
+        "write-spec",
+        "## Bootstrap the spec of an existing capability",
+        "section reading a spec back from the code and the tests",
+    ),
 ];
 
 /// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.

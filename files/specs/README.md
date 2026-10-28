@@ -76,4 +76,5 @@ requirement with a vague word or not exactly one "must". On any spec it warns of
 the tests of the harness source. `skill:write-spec` writes and validates a spec.
 
 `just spec-coverage` lists the test files that cite no requirement of an `accepted` spec, largest first: the
-capabilities worth a spec read back from their code and tests. A report, it never fails.
+capabilities worth a spec read back from their code and tests (`skill:write-spec`, "Bootstrap the spec of an existing
+capability"). A report, it never fails.

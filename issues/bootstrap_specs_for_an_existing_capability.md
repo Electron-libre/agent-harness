@@ -36,7 +36,7 @@ Out of scope: writing the specs of the uncovered capabilities themselves (each i
 1. [x] Report: `harness run spec-coverage` and `just spec-coverage` list the test files with no citation of an
    `accepted` spec, largest first; verified by `crates/harness/tests/spec_coverage.rs` through the binary; makes true
    COV-1 to COV-8 (~350 lines).
-2. [ ] Procedure: a "Bootstrap from existing code" section in `write-spec` (pick with `just spec-coverage`, state only
+2. [x] Procedure: a "Bootstrap from existing code" section in `write-spec` (pick with `just spec-coverage`, state only
    what a test proves, cite the existing tests, untested behaviour becomes a follow-up issue via `skill:create-issue`,
    the user validates it like any spec, bugs included) and its pointer in `specs/README.md`; verified by a
    `REQUIRED_PASSAGES` entry of `crates/harness/tests/skills.rs` (~60 lines).
@@ -58,3 +58,14 @@ Out of scope: writing the specs of the uncovered capabilities themselves (each i
 - decisions needed: none.
 - Code review: no findings
 - Today's report: `skills.rs`, `settings_hygiene.rs`, `audit_sources.rs`, `check_issue.rs`, `src/tests.rs`.
+
+## Deliverable 2: procedure
+
+- done: section "Bootstrap the spec of an existing capability" in `write-spec` (pick with `just spec-coverage`, state
+  only what a test proves, bugs included, untested behaviour as a follow-up issue, cite the existing tests), its
+  description, and the pointers in `specs/README.md` and `docs/workflow.md`.
+- checks: tests ok, lint ok, specs ok, docs updated, code review low ran.
+- red: none (no spec: the skill text is proven by two `REQUIRED_PASSAGES`, which failed as missing before the text).
+- not verified: how an agent follows the procedure on a real capability (a model's behaviour).
+- decisions needed: none.
+- Code review: no findings

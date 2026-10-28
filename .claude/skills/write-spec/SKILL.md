@@ -1,6 +1,6 @@
 ---
 name: write-spec
-description: Write a new spec in `specs/` or amend an existing one (numbered requirements, scenarios, non-goals) with the repo's template and validate it with the traceability checker. Use when a change of behaviour needs its spec before the tests and the code, when the user asks to write, add or amend a spec, or when a requirement of an existing spec changes.
+description: Write a new spec in `specs/` or amend an existing one (numbered requirements, scenarios, non-goals) with the repo's template and validate it with the traceability checker. Use when a change of behaviour needs its spec before the tests and the code, when the user asks to write, add or amend a spec, when a requirement of an existing spec changes, or to write the spec of an existing capability from its code and tests.
 ---
 
 # Write a spec
@@ -45,6 +45,22 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    says. Prove a requirement through the binary when that test is cheap and stable; otherwise an internal test is
    the proof, its citation giving the reason (`// spec: ID (internal: <reason>)`): never write a long or fragile
    end-to-end test only to silence the boundary warning. When every requirement is traced, set `accepted`; `just check-specs` then enforces it.
+
+## Bootstrap the spec of an existing capability
+
+A capability that predates its spec has tests no spec states. Its spec is read back from the code and the tests, not
+from an intended change; it runs the procedure above with these differences:
+
+1. **Pick**: `just spec-coverage` lists the test files that cite no requirement of an `accepted` spec, largest first;
+   the user picks the capability (or names one).
+2. **Read** the code of the capability and every test that drives it.
+3. **State only what a test already proves**: one requirement per obligation a test checks, worded from the
+   behaviour the test asserts. A spec read back from the code states what the code does, bugs included: say so in
+   step 5, the user validates it like any spec and decides whether a bug becomes a requirement or an issue.
+4. **Untested behaviour is not a requirement**: list it, then file it as a follow-up issue (`skill:create-issue`)
+   whose tests will add the requirements.
+5. **Validate** (step 5 above), then **trace** by adding the `// spec: ID` to the existing tests, no new test: a test
+   under `src` gets its reason, `// spec: ID (internal: <reason>)`. Every requirement is then traced: set `accepted`.
 
 ## Rules
 

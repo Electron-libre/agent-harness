@@ -53,7 +53,9 @@ flowchart TD
   What it never lifts is in the skill, section "Autonomous mode".
 - **Size limit**: an issue too large for one session is split at step 2 (the limits are in step 1 of the skill).
 - **Specs**: when the issue changes what a capability does, `skill:write-spec` writes its requirements at step 1
-  and the tests of step 3.2 carry their `// spec: ID` ([specs/README.md](../specs/README.md)).
+  and the tests of step 3.2 carry their `// spec: ID` ([specs/README.md](../specs/README.md)). A capability older than its spec gets one
+  read back from its code and tests (`skill:write-spec`, "Bootstrap the spec of an existing capability"), picked from
+  `just spec-coverage`.
 - **Gates**: a commit fails while its diff holds a file the last review never saw; only the user can waive it, with
   `just waive-review` ([architecture](architecture.md#the-review-gate)).
 
