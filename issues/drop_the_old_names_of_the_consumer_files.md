@@ -24,7 +24,7 @@ tool loses the fallback and the migration code it keeps for them.
 
 # Resources
 * ADR 0014, ADR 0015, `docs/usage.md` (the migration paragraph)
-* `issues/rename_the_consumer_files_to_cardinal.md`
+* `issues/done/rename_the_consumer_files_to_cardinal.md`
 
 # Hints
 * After `drop_the_harness_alias`: both drop what a consumer of before the rename still needs.
