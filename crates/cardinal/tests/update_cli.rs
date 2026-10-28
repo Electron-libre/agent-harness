@@ -246,13 +246,16 @@ fn a_source_ending_in_dot_git_is_cloned_and_any_other_ending_is_a_local_director
         root
     };
 
-    let cloned = source_at(&format!("{}/.git", repo.path().display()));
+    let dot_git = format!("{}/.git", repo.path().display());
+    let cloned = source_at(&dot_git);
     let run = home.ok(cloned.path(), &["update"]);
     assert_eq!(
         run.lines()[0],
         format!("rev: (none) -> {second}"),
         "{run:?}"
     );
+    let initialized = tempdir().unwrap();
+    home.ok(initialized.path(), &["init", &dot_git, "--rev", "v1"]);
 
     let dirs = tempdir().unwrap();
     for local in ["x.git/", "X.GIT"] {

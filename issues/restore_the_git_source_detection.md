@@ -37,6 +37,7 @@ Out of scope: any new source form (e.g. `file://` already counts as git through 
 
 ## Plan
 1. [x] Restore and specify the git source rule: `is_git_url` back to `ends_with(".git")` under `#[allow(clippy::case_sensitive_file_extension_comparisons)]`; verified by a binary test of `update` (a source `<repo>/.git` is cloned, `<dir>/x.git/` and `<dir>/X.GIT` are refused as local directories) plus a unit test of the five forms; makes true SYN-49. ~60 lines.
+2. [x] Fixes of the `high` review: SYN-49 names `init`, the binary test runs `init` on `<repo>/.git`; the path git source faults go to `issues/normalize_a_path_git_source.md`; verified by `just check`; makes true SYN-49.
 
 ## Decisions
 - Mode: autonomous
@@ -47,4 +48,11 @@ Out of scope: any new source form (e.g. `file://` already counts as git through 
 - red: SYN-49: `update` on `<repo>/.git` failed with "`source` is a local directory, which has no revision to update".
 - Code review: no findings
 - not verified: the `git@` and `https://` forms through the binary (unit test only).
+- decisions needed: none
+
+## Deliverable 2
+- done: SYN-49 names `init` (it branches on `is_git_url` too) and its binary test runs `init` on `<repo>/.git`.
+- red: none (the rule was already fixed by deliverable 1; the added `init` call guards it).
+- Code review: no findings (`low`); `high` review, 8 findings: 1 fixed here (SYN-49 omitted `init`); 7 (relative clone cwd, cache key of the raw string, `cargo install --git <path>`, CI installer without `*.git`, test gaps and the altitude note on them) predate this issue and go to `issues/normalize_a_path_git_source.md`.
+- not verified: none
 - decisions needed: none
