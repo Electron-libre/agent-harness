@@ -12,7 +12,7 @@ could not be named apart from any other agent harness. The repository is already
 The product is Cardinal: "Cardinal, the shared agent harness of the user's projects". "harness" keeps its generic
 meaning (an agent harness). The rename goes in steps, each its own issue, so a consumer never breaks:
 
-1. The prose of the docs and the shared texts (this ADR).
+1. The prose of the docs and the shared texts (issue `name_the_product_cardinal`).
 2. The binary and crate `harness` become `cardinal`, with a transition for the consumers that have the old binary.
 3. The consumer files (`.claude/harness.toml`, `.claude/harness.lock`, `harness.just`), migrated by `sync`.
 4. The tools, skill, spec, commit scope, workflow and recipe still named after the product.
@@ -20,5 +20,5 @@ meaning (an agent harness). The rename goes in steps, each its own issue, so a c
 Until a step lands, the text names its commands, files and paths as they are (`harness sync`, `harness.toml`).
 
 ## Consequences
-The docs say "Cardinal" next to commands still named `harness` until step 2 and 3 land. A name that means the
-concept (an agent harness) may keep "harness" at step 4.
+The docs say "Cardinal" next to commands, files and tools still named after `harness` until steps 2 to 4 land. A
+name that means the concept (an agent harness) may keep "harness" at step 4.

@@ -27,6 +27,9 @@ Rename what still carries "harness" as the product name once the binary and file
 * `AGENTS.md`, `files/.github/workflows/harness.yml`, `justfile`
 
 # Hints
+* Also the product prose that `name_the_product_cardinal` left out of its scope: the specs (e.g. `specs/sync.md`
+  "keeps the shared harness", `specs/harness-verdicts.md` "harness source") and the doc comments of the crate
+  (`lib.rs`, `tools/harness_changes.rs`).
 * After `rename_the_consumer_files_to_cardinal`.
 * Renaming a skill changes the fixed context of every session and the skill names counted by `harness-report`:
   past sessions cite the old name.

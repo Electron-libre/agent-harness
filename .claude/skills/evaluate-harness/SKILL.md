@@ -3,7 +3,7 @@ name: evaluate-harness
 description: Report whether the recent Cardinal revisions made the agent more efficient, the delivered work better and the rules better followed, with the model, Claude Code version and project mix next to each number, plus the fixed context each revision costs and the skills nobody calls. Use when the user asks to evaluate or measure the harness (Cardinal), compare its revisions, or see what a skill, hook or rule change brought.
 ---
 
-# Evaluate the harness
+# Evaluate Cardinal
 
 Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and issues stay in English). Measure only:
 change nothing here. The sibling `skill:audit-instructions` proposes rules; this one measures what the rules

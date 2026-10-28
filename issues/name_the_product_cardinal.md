@@ -40,6 +40,9 @@ stays for the concept and in every command, file, path, tool, skill or metric na
    description; verified by `just check` and a reread of the remaining `harness` words; ~120 lines.
 2. [x] Shared texts: the product mentions of `files/` and `seed/` (skills, `harness.just` comments, seeded
    `harness.toml` comment), then `just sync`; verified by `just check` and `just check-harness`; ~60 lines.
+3. [x] Fixes of the `high` review: the missed mentions (`docs/usage.md` `run` row, `harness run --help`, the
+   `evaluate-harness` title), the ADR wording; the product prose of `specs/` and the doc comments handed to
+   `rename_the_harness_named_tools_to_cardinal`; verified by `just check`.
 
 ## Decisions
 - Mode: autonomous
@@ -76,6 +79,25 @@ stays for the concept and in every command, file, path, tool, skill or metric na
 | lint | pass |
 | specs | pass |
 | docs | `just check-harness` passes; the remaining `harness` words are commands, paths, tool names or the concept |
+| code review | low, see below |
+
+- red: none (docs only)
+- Code review: no findings
+- not verified: -
+- decisions needed: -
+
+## Deliverable 3 (high review of d314130..HEAD)
+- done: 7 findings. Fixed: the `run` row of `docs/usage.md`, the help of `harness run`, the `evaluate-harness`
+  title, the ADR step 1 label and its Consequences. Handed over: the product prose of `specs/` and of the crate doc
+  comments, as a hint of `rename_the_harness_named_tools_to_cardinal` (no later issue covered them). Not a fix: the
+  queue entry, removed by `just close-issue` at the close.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | `just check-harness` passes |
 | code review | low, see below |
 
 - red: none (docs only)
