@@ -30,14 +30,14 @@ stable, not required: an internal test is the proof when its citation gives the 
 
 ## Scenarios
 
-- (TRC-1) Given `SYN-2` cited only in `crates/harness/src/tests.rs`, when the checker runs, then stderr holds one line
+- (TRC-1) Given `SYN-2` cited only in `crates/cardinal/src/tests.rs`, when the checker runs, then stderr holds one line
   naming `specs/sync.md`, `1` and `SYN-2`, and the exit code is the one the other checks give.
-- (TRC-2) Given `SYN-1` cited in `crates/harness/src/tests.rs` and in `crates/harness/tests/sync_cli.rs`, when the
+- (TRC-2) Given `SYN-1` cited in `crates/cardinal/src/tests.rs` and in `crates/cardinal/tests/sync_cli.rs`, when the
   checker runs, then `SYN-1` is not in the warning.
 - (TRC-1) Given a spec whose cited requirements all have a test outside `src`, when the checker runs, then it prints
   no boundary warning for that spec.
-- (TRC-6) Given `SYN-2` cited in `crates/harness/src/a.rs` with `// spec: SYN-2 (internal: needs a fake clock)` and in
-  `crates/harness/src/b.rs` with `// spec: SYN-2`, when the checker runs, then `SYN-2` is in the warning.
+- (TRC-6) Given `SYN-2` cited in `crates/cardinal/src/a.rs` with `// spec: SYN-2 (internal: needs a fake clock)` and in
+  `crates/cardinal/src/b.rs` with `// spec: SYN-2`, when the checker runs, then `SYN-2` is in the warning.
 - (TRC-7) Given `// spec: SYN-2 (internal: )`, when the checker runs, then it fails naming the file and line.
 - (TRC-7) Given `// spec: SYN-2 (internal: slow) SYN-3`, `// spec: SYN-2 (internal: slow` or
   `// spec: (internal: slow)`, when the checker runs, then it fails naming the file and line.

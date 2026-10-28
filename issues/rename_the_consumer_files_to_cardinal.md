@@ -8,8 +8,8 @@ migrating a consumer that still has the old names.
 # Findings
 * `harness.toml` appears in 167 lines of 71 files, `harness.lock` in 14 lines, `harness.just` in 12, the `[harness]`
   table in 36 lines.
-* The paths are constants in `crates/harness/src/lib.rs` (`CONFIG`, `LOCK`); `run.rs` finds the project by the
-  nearest `.claude/harness.toml`; `install_harness.sh` and `gate.rs` read it too.
+* The paths are constants in `crates/cardinal/src/lib.rs` (`CONFIG`, `LOCK`); `run.rs` finds the project by the
+  nearest `.claude/harness.toml`; `install_cardinal.sh` and `gate.rs` read it too.
 * Each consumer's `justfile` holds `import 'harness.just'`; that file is project-owned, not managed.
 
 # Approach
@@ -23,8 +23,8 @@ migrating a consumer that still has the old names.
   `issue-workflow` step 1.
 
 # Resources
-* `crates/harness/src/lib.rs`, `run.rs`, `gate.rs`, `budget.rs`
-* `seed/.claude/harness.toml`, `files/harness.just`, `.github/install_harness.sh`
+* `crates/cardinal/src/lib.rs`, `run.rs`, `gate.rs`, `budget.rs`
+* `seed/.claude/harness.toml`, `files/harness.just`, `.github/install_cardinal.sh`
 * ADR 0001, ADR 0002 (rev pins the resolved commit)
 
 # Hints

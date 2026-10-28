@@ -54,7 +54,7 @@ fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refus
     assert!(problems[1].contains("`harness newcmd again`"), "{run:?}");
     // the install of the project's source, run from its root
     let install = format!(
-        "cargo install --path {}/crates/harness --locked",
+        "cargo install --path {}/crates/cardinal --locked",
         source.path().display()
     );
     assert!(problems.iter().all(|p| p.contains(&install)), "{run:?}");

@@ -27,7 +27,7 @@ flowchart LR
 
 | Kind | From | Examples | Owner |
 |---|---|---|---|
-| Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `harness.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_harness.sh` | the source: an edit in a project is a conflict |
+| Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `harness.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
 | Seeded | `seed/` | `.claude/harness.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md` | the project, from the first copy |
 | Entries | `entries/.claude/settings.json` | the hooks and the deny rules of the review waiver | the source, inside a file the project owns ("Hooks and their declaration") |
 
@@ -52,14 +52,14 @@ revision. `check` compares the project with its lock and never reads the source.
 ## Tools and their binary
 
 The tools of Cardinal (hooks, checks, issue tools, transcript readers) are modules of the `harness` crate, one per
-tool under `crates/harness/src/tools/`, listed in `TOOLS`
+tool under `crates/cardinal/src/tools/`, listed in `TOOLS`
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec
 [`specs/tool-binaries.md`](../specs/tool-binaries.md)). A hook, a recipe or a skill calls `harness run <tool> [args]`.
 A consumer needs `harness` and `just`, and Rust only for a commit with no published binary. The tests of the tools and
 of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`) are the `cargo test` of this repository;
 consumers run none.
 
-The installed `harness` is only a launcher (`crates/harness/src/run.rs`): it finds the pinned revision and replaces
+The installed `harness` is only a launcher (`crates/cardinal/src/run.rs`): it finds the pinned revision and replaces
 itself (`exec`) by that revision's binary, so input, output and exit code are the tool's.
 
 ```mermaid
@@ -95,12 +95,12 @@ ahead.
 
 The launcher itself is not of the pinned revision: a hook running a subcommand the installed `harness` does not know
 cannot run. `check` names the `cargo install` to run (BIN-15) and `update` refuses such a revision (BIN-16);
-`crates/harness/src/launcher.rs`.
+`crates/cardinal/src/launcher.rs`.
 
 This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): each push to the main
 branch builds `harness` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever the
 glibc) and `aarch64-apple-darwin`, and creates the release `harness-<commit>` with each binary and its `.sha256`. The CI
-of a consumer (`.github/install_harness.sh`) installs that asset, or builds it with `cargo` when there is none, so its
+of a consumer (`.github/install_cardinal.sh`) installs that asset, or builds it with `cargo` when there is none, so its
 jobs need no Rust when the source publishes the commit.
 
 ## Hooks and their declaration
@@ -117,7 +117,7 @@ jobs need no Rust when the source publishes the commit.
 Claude Code runs a hook only once declared in `.claude/settings.json`, which is seeded and then owned by the project.
 The source therefore declares what it manages in `entries/.claude/settings.json`: the hooks above and the
 `permissions.deny` rules of the review waiver ([ADR 0007](adr/0007-sync-manages-entries-of-the-seeded-settings.md),
-`crates/harness/src/entries.rs`). `sync` adds the entries the settings lack, removes those the source dropped when they
+`crates/cardinal/src/entries.rs`). `sync` adds the entries the settings lack, removes those the source dropped when they
 are unchanged, records them in the lock, and leaves every other key as the project wrote it (SYN-29 to SYN-36). There is
 no separate file to own instead: Claude Code reads one shared settings file per project, besides the personal
 `settings.local.json`.
@@ -141,7 +141,7 @@ No hook guards the attribution: the seeded settings turn it off (`"attribution":
 mistakes of a cooperative agent, not deliberate bypasses
 ([ADR 0005](adr/0005-the-gates-catch-mistakes-not-bypasses.md)); the judgement moved from the command text to the
 repository git resolves ([ADR 0004](adr/0004-review-gate-moves-from-the-command-to-the-repository.md),
-`crates/harness/src/gate.rs`).
+`crates/cardinal/src/gate.rs`).
 
 ```mermaid
 sequenceDiagram

@@ -13,8 +13,8 @@ rev=$(value rev)
 case "$source" in
   *://*|git@*) ;;
   *)
-    if [ -f "$source/crates/harness/Cargo.toml" ]; then
-      exec cargo install --quiet --path "$source/crates/harness" --locked
+    if [ -f "$source/crates/cardinal/Cargo.toml" ]; then
+      exec cargo install --quiet --path "$source/crates/cardinal" --locked
     fi
     echo "source '$source' is a local path outside this repository: harness not installed"
     exit 0 ;;

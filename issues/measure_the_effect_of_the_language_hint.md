@@ -21,7 +21,7 @@ or drop it.
 
 # Resources
 * `specs/language-hint.md`, `specs/rule-breaches.md` (BRE-10)
-* `crates/harness/src/tools/language_hint.rs`, `crates/harness/src/tools/language.rs`
+* `crates/cardinal/src/tools/language_hint.rs`, `crates/cardinal/src/tools/language.rs`
 * `skill:evaluate-harness`
 
 # Hints

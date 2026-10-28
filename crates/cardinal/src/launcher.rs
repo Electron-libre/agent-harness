@@ -55,7 +55,7 @@ pub fn refused(settings: &Value, harness: &OsStr) -> Vec<String> {
 /// The command that installs the `harness` of `rev` of `source`, run from the root of the project.
 pub fn install(source: &str, rev: Option<&str>) -> String {
     if !is_git_url(source) {
-        return format!("cargo install --path {source}/crates/harness --locked");
+        return format!("cargo install --path {source}/crates/cardinal --locked");
     }
     let rev = rev.map(|rev| format!(" --rev {rev}")).unwrap_or_default();
     format!("cargo install --git {}{rev} --locked", cargo_url(source))

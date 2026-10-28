@@ -23,7 +23,7 @@ Rename what still carries "harness" as the product name once the binary and file
   `issue-workflow` step 1.
 
 # Resources
-* `files/.claude/skills/evaluate-harness/`, `crates/harness/src/tools/harness_report.rs`, `harness_changes.rs`
+* `files/.claude/skills/evaluate-harness/`, `crates/cardinal/src/tools/harness_report.rs`, `harness_changes.rs`
 * `AGENTS.md`, `files/.github/workflows/harness.yml`, `justfile`
 
 # Hints

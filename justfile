@@ -24,7 +24,7 @@ test:
 
 # Install the `harness` binary to ~/.cargo/bin.
 install:
-    cargo install --path crates/harness --locked
+    cargo install --path crates/cardinal --locked
 
 # This repository is its own first consumer: check it with the binary just built.
 check-harness:
