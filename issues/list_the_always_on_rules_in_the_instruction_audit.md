@@ -7,7 +7,7 @@ audit no longer sees it, nor any rule a project keeps under `.claude/rules/`, so
 rule or a skill that already exists. List every memory file a session loads at launch instead.
 
 # Findings
-* 2026-10-28, high review of `issues/load_the_shared_agents_md_in_every_session.md`: `INSTRUCTION_FILES` in
+* 2026-10-28, high review of `issues/done/load_the_shared_agents_md_in_every_session.md`: `INSTRUCTION_FILES` in
   `crates/harness/src/tools/audit_sources.rs` holds `CLAUDE.md` and `AGENTS.md` only.
 * `crates/harness/src/memory.rs` already resolves the memory files loaded at launch (REP-2): `CLAUDE.md`,
   `.claude/CLAUDE.md`, the `.claude/rules/**/*.md` files without `paths`, their imports.
