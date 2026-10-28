@@ -21,6 +21,7 @@ mod repo_files;
 mod review_gate;
 mod rule_breaches;
 mod session_metrics;
+mod spec_coverage;
 mod transcripts;
 
 /// A tool: its name on the command line, a summary, and its entry point.
@@ -111,6 +112,11 @@ pub const TOOLS: &[Tool] = &[
         name: "session-metrics",
         about: "[projects_dir] [--archive <file>]: one row of numbers per session of every project",
         main: session_metrics::main,
+    },
+    Tool {
+        name: "spec-coverage",
+        about: "[root]: the test files that cite no requirement of an accepted spec, largest first",
+        main: spec_coverage::main,
     },
 ];
 

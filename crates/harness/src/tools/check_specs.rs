@@ -18,17 +18,17 @@ const SECTIONS: [&str; 4] = [
     "## Non-goals",
 ];
 
-struct Requirement {
-    id: String,
+pub(super) struct Requirement {
+    pub(super) id: String,
     /// Needs no test: withdrawn, or of the former `quality` kind.
     exempt: bool,
 }
 
-struct Spec {
+pub(super) struct Spec {
     file: String,
     id: String,
-    status: String,
-    requirements: Vec<Requirement>,
+    pub(super) status: String,
+    pub(super) requirements: Vec<Requirement>,
 }
 
 fn is_id_prefix(s: &str) -> bool {
@@ -86,7 +86,13 @@ fn question(after: &str) -> &str {
 
 /// An open question left in the spec: a problem once `accepted`, a warning while `draft`. A marker cited in a code
 /// span or a fenced code block is an example, not a question.
-fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<String>) {
+fn check_markers(
+    file: &str,
+    lines: &[&str],
+    accepted: bool,
+    out: &mut Vec<String>,
+    warn: &mut Vec<String>,
+) {
     for (i, (line, fenced)) in super::fenced(lines.iter().copied()).enumerate() {
         if fenced {
             continue;
@@ -102,7 +108,10 @@ fn check_markers(file: &str, lines: &[&str], accepted: bool, out: &mut Vec<Strin
                     i + 1
                 ));
             } else {
-                eprintln!("warning: {file}:{}: needs clarification: {question}", i + 1);
+                warn.push(format!(
+                    "warning: {file}:{}: needs clarification: {question}",
+                    i + 1
+                ));
             }
             rest = after;
         }
@@ -138,7 +147,7 @@ fn without_quotes(text: &str) -> String {
 
 /// Warns of a `draft` requirement whose wording is vague: a word of `VAGUE`, or not exactly one `must`. Warnings
 /// only: the word list has false positives.
-fn check_wording(file: &str, id: &str, statement: &str) {
+fn check_wording(file: &str, id: &str, statement: &str, warn: &mut Vec<String>) {
     // `shouldn't` holds `should` and `mustn't` a `must`
     let text = without_quotes(&without_code_spans(statement))
         .to_lowercase()
@@ -152,16 +161,26 @@ fn check_wording(file: &str, id: &str, statement: &str) {
     for word in words.iter().filter(|w| VAGUE.contains(w)) {
         if warned.insert(*word) {
             let shown = if *word == "etc" { "etc." } else { word };
-            eprintln!("warning: {file}: requirement {id}: vague word `{shown}`");
+            warn.push(format!(
+                "warning: {file}: requirement {id}: vague word `{shown}`"
+            ));
         }
     }
     let musts = words.iter().filter(|w| **w == "must").count();
     if musts != 1 {
-        eprintln!("warning: {file}: requirement {id}: holds {musts} `must`, expected 1");
+        warn.push(format!(
+            "warning: {file}: requirement {id}: holds {musts} `must`, expected 1"
+        ));
     }
 }
 
-fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
+fn parse(
+    root: &Path,
+    file: &str,
+    text: &str,
+    out: &mut Vec<String>,
+    warn: &mut Vec<String>,
+) -> Spec {
     let mut problem = |m: String| out.push(format!("{file}: {m}"));
     let mut spec = Spec {
         file: file.to_string(),
@@ -220,7 +239,9 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
     }
     // `implemented` was a status of its own, enforced like `accepted`: still read as such so older specs keep passing
     if spec.status == "implemented" {
-        eprintln!("warning: {file}: status `implemented` is deprecated, use `accepted`");
+        warn.push(format!(
+            "warning: {file}: status `implemented` is deprecated, use `accepted`"
+        ));
         spec.status = "accepted".to_string();
     }
     if !["draft", "accepted"].contains(&spec.status.as_str()) {
@@ -273,7 +294,7 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         let withdrawn = statement.starts_with("withdrawn:");
         // `quality` was a kind proved by a benchmark: still read, untraced, so older specs keep passing
         if kind == "quality" && !withdrawn {
-            eprintln!("warning: {file}: requirement {id}: kind `quality` is deprecated, reword it for a test or withdraw it");
+            warn.push(format!("warning: {file}: requirement {id}: kind `quality` is deprecated, reword it for a test or withdraw it"));
         } else if kind != "deterministic" && kind != "quality" {
             problem(format!(
                 "requirement {id}: kind must be `(deterministic)`, got `({kind})`"
@@ -281,14 +302,14 @@ fn parse(root: &Path, file: &str, text: &str, out: &mut Vec<String>) -> Spec {
         }
         // with no `(kind)`, the statement was not found: the format problem is enough
         if spec.status == "draft" && !withdrawn && !kind.is_empty() {
-            check_wording(file, id, statement);
+            check_wording(file, id, statement, warn);
         }
         spec.requirements.push(Requirement {
             id: id.to_string(),
             exempt: withdrawn || kind == "quality",
         });
     }
-    check_markers(file, &lines, spec.status == "accepted", out);
+    check_markers(file, &lines, spec.status == "accepted", out, warn);
     spec
 }
 
@@ -321,16 +342,8 @@ pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>)
     (ids, reason)
 }
 
-/// A file citing a requirement, and whether that citation gives the reason of an internal proof.
-struct Cite {
-    file: String,
-    reasoned: bool,
-}
-
-/// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them and whether the citation gives a
-/// reason. A citation sits right above a test: only attributes and other comments may come between it and the `fn`;
-/// any other place is a problem, and so is a reason that is blank, misplaced or unclosed (TRC-7).
-fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> {
+/// The `.rs` files under `crates/` and `.claude/` that may hold tests; a failure of git is a problem in `out`.
+pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
     // lists, so never those of a nested worktree (ADR 0008) nor the build output
     let dirs = [root.join("crates"), root.join(".claude")];
@@ -347,11 +360,26 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> 
             Vec::new()
         }
     };
-    let files = files.into_iter().filter(|f| {
-        f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d))
-    });
+    files
+        .into_iter()
+        .filter(|f| {
+            f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d))
+        })
+        .collect()
+}
+
+/// A file citing a requirement, and whether that citation gives the reason of an internal proof.
+struct Cite {
+    file: String,
+    reasoned: bool,
+}
+
+/// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them and whether the citation gives a
+/// reason. A citation sits right above a test: only attributes and other comments may come between it and the `fn`;
+/// any other place is a problem, and so is a reason that is blank, misplaced or unclosed (TRC-7).
+fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> {
     let mut cited: BTreeMap<String, Vec<Cite>> = BTreeMap::new();
-    for file in files {
+    for file in test_files(root, out) {
         let Ok(text) = std::fs::read_to_string(&file) else {
             continue;
         };
@@ -402,8 +430,8 @@ fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> 
     cited
 }
 
-fn problems(root: &Path, strict: bool) -> Vec<String> {
-    let mut out = Vec::new();
+/// The specs of `specs/`, by file name; their problems go to `out`, their warnings to `warn`.
+pub(super) fn read_specs(root: &Path, out: &mut Vec<String>, warn: &mut Vec<String>) -> Vec<Spec> {
     let mut names: Vec<String> = std::fs::read_dir(root.join("specs"))
         .into_iter()
         .flatten()
@@ -416,8 +444,16 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     for name in names {
         let file = format!("specs/{name}");
         let text = std::fs::read_to_string(root.join(&file)).unwrap_or_default();
-        specs.push(parse(root, &file, &text, &mut out));
+        specs.push(parse(root, &file, &text, out, warn));
     }
+    specs
+}
+
+fn problems(root: &Path, strict: bool) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut warnings = Vec::new();
+    let specs = read_specs(root, &mut out, &mut warnings);
+    warnings.iter().for_each(|w| eprintln!("{w}"));
     let mut ids: BTreeMap<&str, &str> = BTreeMap::new();
     for spec in specs.iter().filter(|s| !s.id.is_empty()) {
         if let Some(other) = ids.insert(&spec.id, &spec.file) {

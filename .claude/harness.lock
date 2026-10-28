@@ -11,8 +11,8 @@ fb2d21c5484dbad2bd0639f2a326a6385731bee3a4143fb8778807e1169d5e14  .claude/skills
 069c16cd72dfa2c1973363f9229d4a4d0ce2af94ab5d7539e016cf269cf70c99+x  .github/install_harness.sh
 2b97d7a8180410864f346bb576e743cabc626aeeb14de7b4d9023a00c0e9ae4f  .github/workflows/harness.yml
 2cab19ded8c81cdd2d52e207c210f42f2addcfe91ae5c5c353276a7a53e68dc5  AGENTS.md
-de7bf22e311216feb9a3746a263de6c5db5b2e9e631da1fe8d5fa1477c4af52b  harness.just
-028c99861d3c08eed01842327bd0e50f3bed4a8f3dbb7cdfc675d1811298e817  specs/README.md
+460af70e0d1a5b046b16b8517bf4523a7dfd7c8adba81e4cbb64dd412ade6521  harness.just
+fd175c3fd7a4dcf27487ef2edb830962f7547eaa3a0cc6e4a692040c519f4253  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}

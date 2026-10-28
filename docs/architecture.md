@@ -258,7 +258,7 @@ the design:
   `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and
   no file needs cleaning. A leftover branch with neither is listed `Stale:` for `finish-issue` to clean (PAR-4, PAR-6).
 - **Nesting**: `start-issue` makes git ignore `/.claude/worktrees/` (PAR-13), and the scanners (`close-issue`,
-  `check-specs`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
+  `check-specs`, `spec-coverage`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
   [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md)), which never lists a nested worktree.
   `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by name.
 - **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as

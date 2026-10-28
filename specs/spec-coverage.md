@@ -1,0 +1,42 @@
+---
+id: COV
+status: accepted
+adrs: [0009]
+---
+
+# Report of the tests no spec covers
+
+## Intent
+
+A capability gets a spec only when an issue changes it, so the older ones have tests that no spec states. The report
+lists the test files that cite no requirement of an `accepted` spec, largest first, so the user ranks the capabilities
+worth a spec read back from their code and tests (`skill:write-spec`).
+
+## Requirements
+
+- **COV-1** (deterministic) `harness run spec-coverage` must print one line for each test file, a `.rs` file under `crates/` or `.claude/` holding a `#[test]` attribute, that cites no requirement of an `accepted` spec.
+- **COV-2** (deterministic) The report must not list a test file holding a `// spec:` citation of a requirement of an `accepted` spec.
+- **COV-3** (deterministic) The report must read a citation of a requirement of a `draft` spec, or of an id no spec defines, as no citation.
+- **COV-4** (deterministic) Each line must give the line count of the file, a tab, then its path relative to the root.
+- **COV-5** (deterministic) The report must order its lines by line count, largest first, then by path.
+- **COV-6** (deterministic) In a git repository, the report must read only the files git lists, so never those of a nested worktree.
+- **COV-7** (deterministic) The report must print `no test file without an accepted spec` when it lists no file.
+- **COV-8** (deterministic) The report must exit 0 whatever it lists.
+
+## Scenarios
+
+- (COV-1) Given `crates/a/src/lib.rs` holding `fn helper() {}` and no `#[test]`, when the report runs, then it does not
+  list it.
+- (COV-2) Given `crates/a/tests/cli.rs` with two tests, one cited `// spec: RER-1` of an accepted spec and one not
+  cited, when the report runs, then it does not list the file: the report ranks files, not tests.
+- (COV-3) Given `crates/a/tests/cli.rs` citing only `// spec: DRF-1` of a `draft` spec, when the report runs, then it
+  lists the file.
+- (COV-6) Given a nested worktree `.claude/worktrees/x/crates/a/tests/t.rs` holding a `#[test]`, when the report runs
+  in the git repository, then it does not list it.
+
+## Non-goals
+
+- Mapping a source module to the tests that drive it: the test file is the unit.
+- Telling the tests of a file that a spec covers from those it does not.
+- Judging whether a citation states what its test proves.
+- Failing a check: the report ranks, it never blocks.

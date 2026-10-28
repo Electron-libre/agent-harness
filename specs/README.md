@@ -74,3 +74,6 @@ unknown id, an `accepted` spec has a requirement no test cites, or an `accepted`
 `[NEEDS CLARIFICATION: ...]` marker. On a `draft` it only warns (stderr): each marker with its question, and each
 requirement with a vague word or not exactly one "must". On any spec it warns of the requirements proven only by tests under `src` with no reason given, and fails on a citation whose reason is blank. `just check-specs --strict` (for the repository that ships managed tests; consumers stay lenient) also flags the citations of managed tests whose spec the project lacks. The checker is `harness run check-specs`, tested by
 the tests of the harness source. `skill:write-spec` writes and validates a spec.
+
+`just spec-coverage` lists the test files that cite no requirement of an `accepted` spec, largest first: the
+capabilities worth a spec read back from their code and tests. A report, it never fails.

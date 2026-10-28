@@ -41,6 +41,10 @@ check-issue issue:
 check-specs *args:
     @harness run check-specs {{args}}
 
+# List the test files that cite no requirement of an accepted spec, largest first: the capabilities worth a spec.
+spec-coverage *args:
+    @harness run spec-coverage {{args}}
+
 # Fail when a managed harness file was modified or deleted since the last `harness sync`.
 check-harness:
     harness check
