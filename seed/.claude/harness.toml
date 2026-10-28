@@ -16,3 +16,5 @@ test_conventions = "CLAUDE.md"
 confidential = "nothing is confidential"
 # Language of the conversation with the user (skills, code, docs and issues stay in English).
 user_language = "English"
+# Bytes of CLAUDE.md, AGENTS.md and skill descriptions every session loads; `check`, `sync` and `update` warn above it.
+# fixed_context_budget = 12000

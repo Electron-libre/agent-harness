@@ -36,9 +36,9 @@ hash differs from the lock was edited locally: `sync` reports a conflict instead
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/harness.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`); the skills tell the agent which key to read (`roadmap`,
-`architecture`, `test_conventions`, `confidential`, `user_language`); the change-to-documents table of `update-docs`
-is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
+(`commit_scopes`, `root_docs`, `skipped_dirs`), and `harness` its `fixed_context_budget`; the skills tell the agent
+which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
+change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
 
 ## Sources
@@ -124,7 +124,10 @@ no separate file to own instead: Claude Code reads one shared settings file per 
 
 `check`, `sync` and `update` warn of what the settings lack or run in vain: a deny rule of the waiver, a hook under
 `.claude/hooks/` the project no longer has, an attribution left on (SYN-24 to SYN-27), and a transcript retention under
-a year outside CI (SYN-28, `settings::retention`), since the evaluation reads the transcripts of several revisions. A
+a year outside CI (SYN-28, `settings::retention`), since the evaluation reads the transcripts of several revisions. They
+also warn when the fixed context of the work tree (`CLAUDE.md`, `AGENTS.md`, the skill descriptions, measured as
+`fixed-context` measures a revision) exceeds the `fixed_context_budget` of the project (SYN-38, SYN-39, `budget.rs`):
+always-on text only grows unless something bounds it. A
 test of the crate (`every_tool_the_shared_harness_runs_exists`) fails when a declared hook, a recipe or a skill runs a
 tool `harness run` does not know.
 

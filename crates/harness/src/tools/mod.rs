@@ -26,6 +26,8 @@ mod session_metrics;
 mod spec_coverage;
 mod transcripts;
 
+pub(crate) use fixed_context::description_bytes;
+
 /// A tool: its name on the command line, a summary, and its entry point.
 pub struct Tool {
     pub name: &'static str,

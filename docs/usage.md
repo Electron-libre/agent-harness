@@ -40,6 +40,10 @@ them after 30 days by default, for every project at once: keep them a year in yo
 { "cleanupPeriodDays": 365 }
 ```
 
+`fixed_context_budget = <bytes>` in the `[project]` table of `.claude/harness.toml` bounds the fixed context every
+session pays (`CLAUDE.md`, `AGENTS.md`, the skill descriptions): `check`, `sync` and `update` warn when the work tree
+exceeds it, naming the largest part, and never fail because of it.
+
 The skill `evaluate-harness` runs the readers below and reports the trend per axis; each can also run alone.
 
 | Tool | Prints |

@@ -6,8 +6,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use harness::{
-    check, init, retention_warnings, run, sync, tools, update, Outcome, Report, SyncOptions,
-    NOT_A_REFUSAL,
+    budget_warnings, check, init, retention_warnings, run, sync, tools, update, Outcome, Report,
+    SyncOptions, NOT_A_REFUSAL,
 };
 
 #[derive(Parser)]
@@ -158,7 +158,10 @@ fn main() -> ExitCode {
         }),
     };
     if warns_of_retention && result.is_ok() {
-        for warning in retention_warnings(&cli.root) {
+        for warning in retention_warnings(&cli.root)
+            .into_iter()
+            .chain(budget_warnings(&cli.root))
+        {
             eprintln!("{warning}");
         }
     }

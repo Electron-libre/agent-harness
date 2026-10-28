@@ -78,7 +78,7 @@ fn size(repo: &Path, commit: &str, path: &str) -> u64 {
 /// The bytes of the top-level `name` and `description` values of a skill's front matter: surrounding quotes removed,
 /// a value over several lines (a `>` or `|` block, or continuation lines), blank lines included, counted with one byte
 /// per line break.
-fn description_bytes(skill: &str) -> u64 {
+pub(crate) fn description_bytes(skill: &str) -> u64 {
     let mut lines = skill.lines();
     if lines.next().map(str::trim) != Some("---") {
         return 0;

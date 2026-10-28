@@ -32,3 +32,44 @@ skill descriptions) but nothing bounds it, so it can only grow. Let a project se
 # Hints
 * A warning, not a failure: the budget informs the user, it does not block a sync.
 * The measure must not count what Claude Code loads on demand (skill bodies).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+A `fixed_context_budget` (bytes) in `[project]` of `.claude/harness.toml`; `check`, `sync` and `update` warn, never
+fail, when the work tree's `CLAUDE.md` + `AGENTS.md` + skill descriptions exceed it (SYN-38, SYN-39), measured as
+`fixed-context` measures a revision. Out of scope: the repository-only test of approach 4, the report tools.
+Measured on 2026-10-28: this repository 7,667 bytes (CLAUDE.md 2,120, AGENTS.md 2,545, 8 skills ~3,000); the other
+local consumer ~10,700 bytes (CLAUDE.md 4,891, 10 skills ~3,300).
+
+## Plan
+1. [x] Budget warning: share the description measure of `tools/fixed_context.rs` with a work-tree measure, print the
+   warnings after `check`, `sync` and `update` (as the retention ones), document the key in `seed/.claude/harness.toml`
+   and the docs, set this repository's budget; verified by `tests/budget_cli.rs` through the binary (~350 lines);
+   makes true SYN-38, SYN-39.
+
+## Decisions
+- Mode: autonomous
+- Base commit: aeecae964dfff6f6ff8c49bf6b729aca43d1ded8
+- Budget of this repository: 10000 bytes (~30% over the 7,667 measured).
+- Seed: a commented `# fixed_context_budget = 12000` line in `seed/.claude/harness.toml`, no check by default.
+- No repository-only test bounding `files/` (approach 4): this repository's own budget covers what it ships.
+
+## Deliverable 1 summary
+- done: `budget.rs` measures the work tree (sharing `description_bytes` of `fixed-context`) and `check`, `sync`,
+  `update` print its warning after the retention ones; budget 10000 here, commented line in the seed; docs updated.
+
+| check | result |
+|---|---|
+| tests (`tests/budget_cli.rs`, 6) | pass |
+| `just check` (fmt, clippy, tests, specs --strict) | pass |
+| docs | `docs/architecture.md`, `docs/usage.md`, `seed/.claude/harness.toml` |
+| code review (low) | no findings |
+
+- red: SYN-38, SYN-39: `left: []` (no budget warning printed) against the expected warning line.
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+

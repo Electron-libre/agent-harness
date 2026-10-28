@@ -25,6 +25,8 @@ pub const LOCK: &str = ".claude/harness.lock";
 /// the refusal of a hook (BIN-7, BIN-14, BIN-17, SYN-37).
 pub const NOT_A_REFUSAL: u8 = 3;
 
+mod budget;
+pub use budget::warnings as budget_warnings;
 mod entries;
 mod gate;
 mod launcher;
