@@ -47,7 +47,7 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
 2. [x] Hook `language-hint`: the tool, its declaration under `Stop` in `entries/.claude/settings.json`, `just sync`,
    docs (architecture table); verified by `tests/language_hint.rs` through the binary; makes true LNG-1 to LNG-6,
    spec `accepted` (~350 lines).
-3. [ ] Follow-up issue to measure `breached_share` of `user-language` with `skill:evaluate-harness` once sessions ran
+3. [x] Follow-up issue to measure `breached_share` of `user-language` with `skill:evaluate-harness` once sessions ran
    with the hook (~40 lines, `issues/` only).
 
 ## Decisions
@@ -85,3 +85,8 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
 - not verified: the hook in a live session (the field `last_assistant_message` was read from the Claude Code 2.1.312
   bundle, not from a recorded event)
 - decisions needed: none
+
+## Deliverable 3
+- done: `issues/measure_the_effect_of_the_language_hint.md`, queued last (it needs sessions run with the hook).
+- red: none (an issue, no test)
+- Code review: no findings (a diff under `issues/` only needs no review)
