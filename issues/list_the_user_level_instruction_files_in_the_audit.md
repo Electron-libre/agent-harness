@@ -7,7 +7,7 @@ directory of the home directory. A rule the user keeps there is invisible to `au
 it again. List them once, apart from the projects.
 
 # Findings
-* 2026-10-28, step 2 of `issues/list_the_always_on_rules_in_the_instruction_audit.md`: left out of scope (decision
+* 2026-10-28, step 2 of `issues/done/list_the_always_on_rules_in_the_instruction_audit.md`: left out of scope (decision
   `1 a`), AUD-1 lists them among its non-goals.
 
 # Approach

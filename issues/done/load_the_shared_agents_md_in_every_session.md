@@ -114,7 +114,7 @@ red: none (fixes of a review, no new behaviour).
 
 High review: 7 findings.
 1. `audit-sources` misses `.claude/rules/`: outside this issue's requirements, opened as
-   `issues/list_the_always_on_rules_in_the_instruction_audit.md`.
+   `issues/done/list_the_always_on_rules_in_the_instruction_audit.md`.
 2. `issue-workflow` copy of the rule: fixed (pointer).
 3. Expected bytes assume one rule: fixed (sum of the synced rules).
 4. `AGENTS.md` exclusion not asserted: not fixed, REP-2 and SYN-38 tests already prove a named, unimported

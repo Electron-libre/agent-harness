@@ -10,7 +10,7 @@ loads, so the audit can miss a rule the user wrote and propose it again:
   of the file it points to.
 
 # Findings
-* 2026-10-28, `high` review of `issues/list_the_always_on_rules_in_the_instruction_audit.md`: both reported on
+* 2026-10-28, `high` review of `issues/done/list_the_always_on_rules_in_the_instruction_audit.md`: both reported on
   `audit_sources.rs` (one `WorkTree` per working directory) and `memory.rs` (`resolve(dir, …)` with `dir` the
   parent of the queued path).
 * Not measured: which directory Claude Code resolves the import of a linked memory file against.
