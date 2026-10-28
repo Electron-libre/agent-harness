@@ -5,7 +5,7 @@ description: Report whether the recent Cardinal revisions made the agent more ef
 
 # Evaluate Cardinal
 
-Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and issues stay in English). Measure only:
+Talk to the user in the `user_language` of `.claude/cardinal.toml` (skills, code, docs and issues stay in English). Measure only:
 change nothing here. The sibling `skill:audit-instructions` proposes rules; this one measures what the rules
 brought.
 
@@ -24,7 +24,7 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
      the sessions name that has an `issues/done/` directory (the current one at least);
    - `cardinal run fixed-context > <dir>/context.tsv`;
    - `cardinal run harness-changes <source> --sessions <dir>/sessions.tsv > <dir>/changes.tsv`, `<source>` a local
-     checkout of the Cardinal source (the `source` of `.claude/harness.toml` when it is a directory), for the
+     checkout of the Cardinal source (the `source` of `.claude/cardinal.toml` when it is a directory), for the
      `Expected-effect` lines of its commits; skip it, and `--changes`, when there is none;
    - `cardinal run harness-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv --changes <dir>/changes.tsv`,
      with `--min-sessions <n>` when the user asks for another sample size than 10.
@@ -45,4 +45,4 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    targets once shown. Leave out the rules at 0% and the metrics that did not move unless asked.
 4. **Keep**: the report stays in the conversation. When the user wants a copy, write it outside the repository and
    outside `/tmp` (e.g. `~/.local/state/`); anything that lands in a shared file or an issue comes from a report run
-   with `--anonymous` and follows the `confidential` note of `.claude/harness.toml`. Never commit it.
+   with `--anonymous` and follows the `confidential` note of `.claude/cardinal.toml`. Never commit it.

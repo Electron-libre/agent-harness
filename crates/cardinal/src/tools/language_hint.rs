@@ -1,5 +1,5 @@
 //! `language-hint`, a Stop hook: when the last reply of the agent is not in the `user_language` of
-//! `.claude/harness.toml`, as the test of rule `user-language` judges it (`language.rs`), exit 2 with a one-line hint
+//! `.claude/cardinal.toml`, as the test of rule `user-language` judges it (`language.rs`), exit 2 with a one-line hint
 //! so the agent gives it again in that language. It lets go when the agent already retried (`stop_hook_active`) and
 //! whenever the reply cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
@@ -77,7 +77,7 @@ pub(super) fn main(_args: &[String]) -> u8 {
     }
     let name = language.name;
     eprintln!(
-        "Your last reply is not in {name}, the user_language of .claude/harness.toml: give it again in {name}."
+        "Your last reply is not in {name}, the user_language of .claude/cardinal.toml: give it again in {name}."
     );
     2
 }

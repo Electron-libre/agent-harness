@@ -48,7 +48,7 @@ format-2 revision keeps the old names its tools read; readers without a source f
    `sync_cli`, `update_cli`, `run_cli`, `gate_cli` tests; makes true SYN-44, SYN-45, SYN-46, SYN-47, BIN-1, SYN-18.
 2. [x] History readers read both names at each commit: `transcripts`, `rule_breaches`, `delivered_quality`,
    `fixed_context` (~300 lines); verified by their CLI tests; makes true EVA-8, BRE-7, BRE-9, BRE-10, QUA-4, REP-2.
-3. [ ] Prose: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`), `seed/`, `docs/`, `README.md`,
+3. [x] Prose: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`), `seed/`, `docs/`, `README.md`,
    `CLAUDE.md`, then `just sync`; a follow-up issue to drop the old names with the format 2 (~300 lines); verified by
    `just check`, `just check-harness`, a grep for the old names.
 
@@ -101,3 +101,24 @@ format-2 revision keeps the old names its tools read; readers without a source f
 - Code review: no findings
 - not verified: the readers on the history of a real consumer migrated later.
 - decisions needed: none
+
+## Deliverable 3
+
+- done: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`, `specs/README.md`), `seed/`, `docs/`,
+  `README.md`, `CLAUDE.md` and the doc comments, synced; follow-up
+  `issues/drop_the_old_names_of_the_consumer_files.md`, queued after `drop_the_harness_alias`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | this deliverable; `just check-harness` passes |
+| code review | see below |
+
+- red: none
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+- left: the old names stay where they are meant (the fallback code, `docs/usage.md`, ADR 0015, the specs, the tests
+  of the old names).

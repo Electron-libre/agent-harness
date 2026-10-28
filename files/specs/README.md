@@ -79,4 +79,4 @@ the tests of the Cardinal source. `skill:write-spec` writes and validates a spec
 capabilities worth a spec read back from their code and tests (`skill:write-spec`, "Bootstrap the spec of an existing
 capability"). A report, it fails only when git cannot list the files. Both read the `.rs` files of the whole root,
 whatever the layout of the project (`crates/`, or `src/` and `tests/` at the root), but those under `.git`,
-`node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` of `.claude/harness.toml`.
+`node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` of `.claude/cardinal.toml`.

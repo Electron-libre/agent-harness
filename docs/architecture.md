@@ -2,13 +2,15 @@
 
 ## What is shared, and how
 
-A consumer project holds a `.claude/harness.toml`: the `[harness]` table (`source`, and `rev` for a git source) and
+A consumer project holds a `.claude/cardinal.toml`: the `[cardinal]` table (`source`, and `rev` for a git source) and
 its own values (`[project]`, read by the tools and the skills). `cardinal sync` reads the source, writes three kinds of
-files, records them in the lock and installs the review gate ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)):
+files, records them in the lock and installs the review gate ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)). A
+project on a source below the format 3 keeps the names before the rename, `.claude/harness.toml` and its lock, until
+the sync that migrates it ([ADR 0015](adr/0015-the-consumer-files-are-named-after-the-format.md)):
 
 ```mermaid
 flowchart LR
-  toml[".claude/harness.toml<br/>source, rev"] --> sync["cardinal sync"]
+  toml[".claude/cardinal.toml<br/>source, rev"] --> sync["cardinal sync"]
   subgraph source
     files["files/"]
     seed["seed/"]
@@ -21,22 +23,22 @@ flowchart LR
   sync -->|"copied once, if missing<br/>(SYN-4)"| owned["project-owned files"]
   sync -->|"entries merged<br/>(SYN-29 to SYN-36)"| settings[".claude/settings.json"]
   sync -->|"installed<br/>(SYN-18 to SYN-23)"| gate[".git/hooks/pre-commit"]
-  sync --> lock[".claude/harness.lock"]
+  sync --> lock[".claude/cardinal.lock"]
   lock -.->|hashes compared| check["cardinal check"]
 ```
 
 | Kind | From | Examples | Owner |
 |---|---|---|---|
-| Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `harness.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
-| Seeded | `seed/` | `.claude/harness.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md` | the project, from the first copy |
+| Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `cardinal.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
+| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md` | the project, from the first copy |
 | Entries | `entries/.claude/settings.json` | the hooks, the deny rules of the review waiver and the allow rule of `cardinal run` | the source, inside a file the project owns ("Hooks and their declaration") |
 
-`.claude/harness.lock` records the hash of each managed file and each managed entry as written, and the format of
+`.claude/cardinal.lock` records the hash of each managed file and each managed entry as written, and the format of
 the source it was synced from, which an older `cardinal` refuses to read (SYN-42). A managed file whose
 hash differs from the lock was edited locally: `sync` reports a conflict instead of overwriting it and `check` fails.
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
-Everything that differs between projects is a value, not code. The tools read lists from `.claude/harness.toml`
+Everything that differs between projects is a value, not code. The tools read lists from `.claude/cardinal.toml`
 (`commit_scopes`, `root_docs`, `skipped_dirs`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
@@ -67,7 +69,7 @@ project synced before the rename keep running until its next sync.
 
 ```mermaid
 flowchart TD
-  hook["hook, recipe or skill:<br/>cardinal run TOOL"] --> find["nearest .claude/harness.toml<br/>(else CLAUDE_PROJECT_DIR)"]
+  hook["hook, recipe or skill:<br/>cardinal run TOOL"] --> find["nearest .claude/cardinal.toml<br/>(else CLAUDE_PROJECT_DIR)"]
   find -->|git source| cached{"binary of the<br/>commit cached?"}
   cached -->|yes| exec["exec the binary:<br/>tool TOOL args"]
   cached -->|no| download["release asset and its .sha256 (curl):<br/>cardinal-COMMIT, else harness-COMMIT"]
@@ -244,7 +246,7 @@ The choices behind them:
 - **One reading of the transcripts**: projects, sessions, sub-agents, the typed-message filter and the project and
   revision a session resolves to live once in `transcripts.rs` (EVA-12,
   [ADR 0006](adr/0006-transcript-readers-are-managed-scripts.md), its script form superseded by ADR 0010).
-- **The revision in force**: the transcripts do not record it, so it is the `rev` of the `.claude/harness.toml`
+- **The revision in force**: the transcripts do not record it, so it is the `rev` of the `.claude/cardinal.toml`
   committed on the default branch of the project at the start of the session (`self:<commit>` for this repository, the
   last commit touching `files/`), EVA-8. An issue is measured with the revision in force before its first commit
   (QUA-5), so an issue that changes Cardinal counts with the Cardinal revision it was made with.
@@ -282,12 +284,12 @@ the design:
 - **Nesting**: `start-issue` makes git ignore `/.claude/worktrees/` (PAR-13), and the scanners (`close-issue`,
   `check-specs`, `spec-coverage`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
   [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md)), which never lists a nested worktree.
-  `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by name;
+  `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/cardinal.toml` by name;
   `check-specs` and `spec-coverage` read every `.rs` file of the root whatever its layout, but those under `.git`,
   `node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` (TRC-9, TRC-10).
 - **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as
   `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `cardinal run` takes the revision of the
-  `harness.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,
+  `cardinal.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,
   so each worktree holds its own copy of Cardinal's files (a project that does not track it gets bare worktrees).
 - **Queue**: edited only at merge time, in the main worktree (PAR-8).
 - **Cost**: each worktree has its own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a

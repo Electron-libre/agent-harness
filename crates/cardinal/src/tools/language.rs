@@ -1,4 +1,4 @@
-//! Whether a reply is in the conversation language (`user_language` of `.claude/harness.toml`): the test of rule
+//! Whether a reply is in the conversation language (`user_language` of `.claude/cardinal.toml`): the test of rule
 //! `user-language` (BRE-10, `specs/rule-breaches.md`), shared by `rule-breaches` and the `language-hint` hook
 //! (`specs/language-hint.md`) so the measure and the hook agree on what a breach is.
 
@@ -43,7 +43,7 @@ impl Language {
         }
     }
 
-    /// The language named by the `user_language` of the `[project]` table of a `.claude/harness.toml`.
+    /// The language named by the `user_language` of the `[project]` table of a `.claude/cardinal.toml`.
     pub(super) fn of_config(config: &toml::Table) -> Option<Language> {
         Language::named(config.get("project")?.get("user_language")?.as_str()?)
     }

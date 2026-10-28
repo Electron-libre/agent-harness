@@ -1,20 +1,20 @@
 # Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.
 format 3
 ae32a54ad3e59066328e1a2f7f5afff0ca4b13bf194272c376e23280e4a7ce4e  .claude/rules/reports-to-the-user.md
-4b9c74884d807a490d35e67018a5c981431fa3bf14da70b5c43143d64e8430d0  .claude/skills/audit-instructions/SKILL.md
-7a89df35224f9599902b1137d2906dfbc213c95c42f2593bd63f94cf36025f56  .claude/skills/commit-message/SKILL.md
-6515be9e80c786c1333f0dfe9ff2bb3a1f0a3dce3d9abe97e88d72fffa534eb5  .claude/skills/create-issue/SKILL.md
-db2a89ac971dfb48e4c6af3ed0712f7fa1aefd9e9e5d3f6bfa00c3dd7c471dd0  .claude/skills/evaluate-harness/SKILL.md
-e9545fbee1b4b0de58ab6e8e6cb253ea8fcd1ca2bca81baaac6edb9fc20824cb  .claude/skills/issue-workflow/SKILL.md
-4760c7e8914ac7b18886aaa8fc5c70cbb165f9b15ff8aaf17f959787f08fc7c1  .claude/skills/issue-workflow/details.md
-54f3b95264e60821cb53008c1fc4ed5c90b3bb1b1651df527ff24363ce6c81a9  .claude/skills/prioritize-issues/SKILL.md
-1c6335a86d6fcc1a24bc4b229986c5bf89bc385c2fbfc41eaf9870e7fd220713  .claude/skills/update-docs/SKILL.md
+c3b88f2d59233b045460e7d6dfa7095f33bacaa727eb75f6319b16e4ec41dd0a  .claude/skills/audit-instructions/SKILL.md
+62e77f126f444e4c4e85623d044235473d36db43bd61877acdaf7bab565a7fb0  .claude/skills/commit-message/SKILL.md
+39be44eb1cc9c4caf23cd919dd41f1da9d2941348ad7b324f55e6106cab79491  .claude/skills/create-issue/SKILL.md
+2821203e91430f6147eb7f1d85679978a693434c0a7f0dc5f2efbf96ddb43181  .claude/skills/evaluate-harness/SKILL.md
+07ec3d631d386feff4af627ee926bcf0d41e4d8b7a9e7aa587ee5df3c87eedbf  .claude/skills/issue-workflow/SKILL.md
+3eecc593122a44169c7901835284c4d6a669d5eec4cdf557376885afc4c4542c  .claude/skills/issue-workflow/details.md
+28f9767ec4bf136a3d50a1bac3b2d86215ff56156997a67fd83beee9a930469b  .claude/skills/prioritize-issues/SKILL.md
+b627b1f62d4611948416cd01e935d79fb2898692162c09cfc2b50d30000f88af  .claude/skills/update-docs/SKILL.md
 8e77a3c231b051e1553dce195bfe1458a14d8aca9cd7867ede28e77996589d0f  .claude/skills/write-spec/SKILL.md
 bc8a07e5b2d6d1163686aa2939889c51804c4032350d237f8b7a326eedb505f4+x  .github/install_cardinal.sh
 b62476023e1d6aea7b55d3d30ac81cd750d60d3e263a8e4b0784a5335664fb5f  .github/workflows/harness.yml
-1391ccc8946ad1f0e9f60e299d02e16bec53eca994c851535a9243f00dcd8711  AGENTS.md
-bb5364191f1020fc237c1c516c6030d553aa80cc1fe7da9e0fa2fdf73ffac1ac  cardinal.just
-6fcb30f4bc1309ae99269fde9cacb6bf9256cdc9cfe03d4950eeca1bb26aba22  specs/README.md
+a2ba458ca6a840c15f98e95a80e01c10ca3b0dd43f2aed4280ad23ca21f1f906  AGENTS.md
+b5048d02d96f53e34e1bba56f3c8d630bcf1d4212eac478c95b9fdb9f7c18f60  cardinal.just
+06f900c7d03de7d7ba67fb8f2a648d52b78f3d9a905b002536bee49795420d17  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"allow":"Bash(cardinal run *)"}
 entry  {"deny":"Bash(just waive-review)"}

@@ -348,13 +348,13 @@ pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>)
 
 /// The `.rs` files of the root that may hold tests, whatever the layout of the project (TRC-9): all but those under
 /// `.git`, `node_modules`, a `target` beside a `Cargo.toml` (the build output) or a directory named like one of the
-/// `skipped_dirs` of `.claude/harness.toml` (TRC-10); a failure of git, or a `harness.toml` that does not parse, is a
+/// `skipped_dirs` of `.claude/cardinal.toml` (TRC-10); a failure of git, or a `cardinal.toml` that does not parse, is a
 /// problem in `out`.
 pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     let mut names = vec![".git".to_string(), "node_modules".to_string()];
     match super::config_list(root, "skipped_dirs") {
         Ok(dirs) => names.extend(dirs),
-        // a project with no `harness.toml` skips nothing more
+        // a project with no `cardinal.toml` skips nothing more
         Err(e) if crate::config_of(root).exists() => out.push(e),
         Err(_) => {}
     }

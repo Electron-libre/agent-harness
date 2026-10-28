@@ -24,14 +24,14 @@ Cardinal, the shared agent harness (skills, hooks, scripts, recipes, CI) of the 
 - `AGENTS.md`: commit message format (Conventional Commits, enforced by `just check-commit`);
   `.claude/rules/reports-to-the-user.md`: the output rule for the reports to the user, loaded in every session.
 
-This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `harness.just`, `script/` and
+This repository is its own first consumer: its `.claude/`, `AGENTS.md`, `cardinal.just`, `script/` and
 `specs/README.md` are copies of `files/`. After changing `files/`, run `just sync`; `just check-harness`
 fails when a copy drifted.
 
 Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability) before
 committing (it runs the tests of the tools and of the shared content too); no `Co-Authored-By` or AI attribution in commits;
 everything in English; the shared files hold nothing specific to one project (project values go through
-`.claude/harness.toml`). A commit that changes `files/` may add `Expected-effect: <metric> <up|down>` to its
+`.claude/cardinal.toml`). A commit that changes `files/` may add `Expected-effect: <metric> <up|down>` to its
 footer, one line per metric of `harness-report` it should move: a direction, never a target; `skill:evaluate-harness`
 gives it a verdict ([specs/harness-verdicts.md](specs/harness-verdicts.md)). A change of the meaning of
 the managed content (fragment keys, lock lines, source layout) that an older `cardinal` would misread raises

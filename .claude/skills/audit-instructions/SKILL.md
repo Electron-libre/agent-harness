@@ -5,7 +5,7 @@ description: Read the instructions the user gave the agent over time (CLAUDE.md,
 
 # Audit the instructions
 
-Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and issues stay in English).
+Talk to the user in the `user_language` of `.claude/cardinal.toml` (skills, code, docs and issues stay in English).
 Propose only: create nothing here. What an adopted proposal brought is measured by `skill:evaluate-harness`.
 
 Show the user your results as `.claude/rules/reports-to-the-user.md` says.
@@ -43,4 +43,4 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    never a project's private content. The report stays in the conversation; a copy the user asks for goes outside
    the repository and `/tmp` (e.g. `~/.local/state/`), never committed.
 5. **Create** only what the user validates, one issue per proposal through `skill:create-issue`, in generic
-   wording per the `confidential` note of `.claude/harness.toml` (no project name, no raw quote).
+   wording per the `confidential` note of `.claude/cardinal.toml` (no project name, no raw quote).

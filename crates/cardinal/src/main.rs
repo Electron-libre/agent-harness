@@ -22,7 +22,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Create `.claude/harness.toml` pointing at a source (a directory, or a git URL with `--rev`).
+    /// Create `.claude/cardinal.toml` pointing at a source (a directory, or a git URL with `--rev`).
     Init {
         source: String,
         /// Branch, tag or commit of a git source.

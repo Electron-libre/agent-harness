@@ -1,7 +1,7 @@
 //! Print one tab-separated row of numbers per session of the Claude Code transcripts (`specs/evaluation.md`): cost,
 //! user interventions, and what may explain a difference (project, issue, harness revision, model, version). The
 //! sub-agent transcripts count with their session; the harness revision comes from the git history of the
-//! project's `.claude/harness.toml`. No text of a message is printed, so the rows can be archived.
+//! project's `.claude/cardinal.toml`. No text of a message is printed, so the rows can be archived.
 //! With `--archive <file>`, also merge the rows into that file, so the history outlives the transcripts.
 //! Usage: `cardinal run session-metrics [projects_dir] [--archive <file>]`
 //! (default the `projects/` of the configuration directory, EVA-15).

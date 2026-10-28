@@ -29,7 +29,7 @@ worktree: commit the issue with its queue line (`start-issue` refuses an issue n
 --worktree`, nor `EnterWorktree` from another session: Claude Code then isolates the session and refuses every
 command it cannot prove stays in the worktree. While the branch or worktree exists, `just next-issue` skips the issue.
 The hooks act on the work tree of their `cwd` (`clippy-gate`, `review-gate`; `format-rust` formats the project of the
-edited file); `cardinal run` finds the `harness.toml` of the worktree and runs the tools of the revision it pins (with
+edited file); `cardinal run` finds the `cardinal.toml` of the worktree and runs the tools of the revision it pins (with
 a local source, those of the worktree's own crate). The session's project is the worktree: its hooks are declared by
 the worktree's own `.claude/settings.json`, so a hook a branch adds runs at once in that session.
 

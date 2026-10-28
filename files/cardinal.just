@@ -1,5 +1,5 @@
 # Recipes of Cardinal, the shared agent harness. Managed by `cardinal sync`: change them in the Cardinal repository.
-# The tools they run are those of `cardinal run`, the binary of the revision `.claude/harness.toml` pins.
+# The tools they run are those of `cardinal run`, the binary of the revision `.claude/cardinal.toml` pins.
 
 # For the user only, never the agent: waive the code review of the next commit of this worktree (creates its waiver file and prints the path).
 waive-review:

@@ -37,7 +37,7 @@ Use one of:
 
 ### Scope
 
-- The crate or area touched, from the `commit_scopes` list of `.claude/harness.toml`. Two scopes always exist:
+- The crate or area touched, from the `commit_scopes` list of `.claude/cardinal.toml`. Two scopes always exist:
   `docs` (the `docs/` folder, README, CLAUDE.md) and `harness` (`.claude/`, `justfile`, CI).
 - Omit the scope (`fix: …`) when the change spans the whole workspace.
 
