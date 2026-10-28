@@ -9,7 +9,7 @@ Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code,
 change nothing here. The sibling `skill:audit-instructions` proposes rules; this one measures what the rules
 brought.
 
-Show the user your results as `AGENTS.md` section "Reports to the user" says.
+Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 ## Procedure
 

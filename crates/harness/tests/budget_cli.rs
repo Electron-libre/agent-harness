@@ -265,3 +265,33 @@ fn a_budget_that_is_not_a_whole_number_is_warned_of_once_without_failing() {
         }
     }
 }
+
+/// The shared rule of the reports to the user, managed in `files/`.
+const REPORTS_RULE: &str = ".claude/rules/reports-to-the-user.md";
+
+#[test]
+fn a_project_synced_from_this_harness_loads_the_shared_rule_of_the_reports_at_launch() {
+    let home = Home::new();
+    let root = tempdir().unwrap();
+    let harness = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    home.ok(root.path(), &["init", harness.to_str().unwrap()]);
+    home.ok(root.path(), &["sync"]);
+    // a project's CLAUDE.md that names AGENTS.md without importing it, larger than the skill descriptions
+    put(
+        root.path(),
+        "CLAUDE.md",
+        &format!("See `AGENTS.md`.\n{}", "c".repeat(19_983)),
+    );
+    set_budget(root.path(), "0");
+    let rule = get(root.path(), REPORTS_RULE).expect("the rule is synced");
+    assert!(rule.contains("Reports to the user"), "{rule}");
+    let run = home.ok(root.path(), &["check"]);
+    let part = format!(
+        "the largest part is CLAUDE.md ({} bytes)",
+        20_000 + rule.len()
+    );
+    assert!(
+        budget(&run).iter().any(|w| w.ends_with(&part)),
+        "the rule loads at launch with no import: {run:?}"
+    );
+}

@@ -8,7 +8,7 @@ description: Write a commit message that follows the repo's Conventional Commits
 The rules live in `AGENTS.md` (single source of truth: don't restate or drift from them here). This
 skill is the procedure; `harness run commit-check` enforces the mechanical rules.
 
-Show the user your results as `AGENTS.md` section "Reports to the user" says.
+Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 ## Procedure
 

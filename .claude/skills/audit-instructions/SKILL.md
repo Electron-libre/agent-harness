@@ -8,7 +8,7 @@ description: Read the instructions the user gave the agent over time (CLAUDE.md,
 Talk to the user in the `user_language` of `.claude/harness.toml` (skills, code, docs and issues stay in English).
 Propose only: create nothing here. What an adopted proposal brought is measured by `skill:evaluate-harness`.
 
-Show the user your results as `AGENTS.md` section "Reports to the user" says.
+Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 ## Procedure
 

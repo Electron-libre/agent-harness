@@ -1,5 +1,5 @@
 //! Structural check of the project skills: frontmatter is valid, `name` matches the directory,
-//! and every skill (`skill:<name>`), repo doc (`` `AGENTS.md` ``, `` `docs/….md` ``) or section of `AGENTS.md`
+//! and every skill (`skill:<name>`), repo doc (`` `AGENTS.md` ``, `` `docs/….md` ``, `` `.claude/rules/….md` ``) or section of `AGENTS.md`
 //! (`` `AGENTS.md` section "<heading>" ``) a skill references actually exists, as does every file of its own
 //! directory it links (`[x](details.md)`); every markdown file of a skill is checked, not only `SKILL.md`.
 
@@ -166,7 +166,7 @@ fn is_doc_path(s: &str, root_docs: &[String]) -> bool {
     path_chars
         && (BUILT_IN_ROOT_DOCS.contains(&s)
             || root_docs.iter().any(|d| d == s)
-            || (s.starts_with("docs/") && s.ends_with(".md")))
+            || ((s.starts_with("docs/") || s.starts_with(".claude/rules/")) && s.ends_with(".md")))
 }
 
 #[test]

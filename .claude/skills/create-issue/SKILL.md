@@ -8,7 +8,7 @@ description: Write a new issue file in `issues/` with the repo's template (Goal,
 An issue is a Markdown file `issues/<snake_case_name>.md` that `skill:issue-workflow` can later pick up.
 This skill writes it; `harness run check-issue` (`just check-issue`) enforces the mechanical rules. Don't implement anything here.
 
-Show the user your results as `AGENTS.md` section "Reports to the user" says.
+Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 ## Procedure
 
