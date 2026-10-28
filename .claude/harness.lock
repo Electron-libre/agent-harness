@@ -21,4 +21,4 @@ entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command"
 entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"harness run review-gate record"}}
 entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"harness run format-rust"}}
 entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"harness run clippy-gate","timeout":600}}
-entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"harness run language-hint"}}
+entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"harness run language-hint","timeout":600}}

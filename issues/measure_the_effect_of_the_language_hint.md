@@ -27,3 +27,6 @@ or drop it.
 # Hints
 * A breach the hook caught and the agent then fixed still shows in the transcript as a breach of BRE-10: count the
   final replies apart, or the hook looks useless.
+* Found by the review of the hook (2026-10-28): the English list of BRE-10 holds `an` and `as`, also French words
+  (`un an`, `tu as`), and `Language::named` knows only the exact strings `French` and `English` (`french` turns the
+  rule off silently). Both skew the measure and the hook alike.

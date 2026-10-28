@@ -49,6 +49,9 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
    spec `accepted` (~350 lines).
 3. [x] Follow-up issue to measure `breached_share` of `user-language` with `skill:evaluate-harness` once sessions ran
    with the hook (~40 lines, `issues/` only).
+4. [x] Fixes of the `high` review: the transcript fallback stops at a typed message, the config falls back to
+   `CLAUDE_PROJECT_DIR` when the cwd's work tree has none, a 600 s timeout, the git and config lookups shared;
+   verified by `tests/language_hint.rs`; amends LNG-2, LNG-3.
 
 ## Decisions
 - Mode: autonomous
@@ -90,3 +93,28 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
 - done: `issues/measure_the_effect_of_the_language_hint.md`, queued last (it needs sessions run with the hook).
 - red: none (an issue, no test)
 - Code review: no findings (a diff under `issues/` only needs no review)
+
+## Deliverable 4 (fixes of the `high` review of fddf3f4..4020f75, 10 findings)
+- done: LNG-2 and LNG-3 amended and fixed, `timeout: 600` on the hook (a `harness run` with a local source builds
+  first, like clippy-gate), `transcripts::git` and `Language::of_config` reused instead of copies.
+- | check | result |
+  |---|---|
+  | tests | `tests/language_hint.rs` green, `cargo test` green |
+  | lint | clippy -D warnings clean |
+  | specs | `just check-specs` ok |
+  | docs | spec amended (LNG-2, LNG-3, non-goal on `stop_hook_active`) |
+  | code review | low, no findings |
+- red: LNG-2, LNG-3: the English reply of the previous turn was judged (exit 2), and the nested clone with no config
+  read no language (exit 0)
+- Findings of the `high` review not fixed here:
+  - `stop_hook_active` is shared by every Stop hook, so a clippy-gate block turns the hint off for that turn: a
+    non-goal of the spec now, the flag is what prevents a loop.
+  - The hook judges the joined blocks of the last line, BRE-10 each block: `last_assistant_message` is one joined
+    text already; the measure issue counts final replies apart.
+  - `an`/`as` in the English list, exact language names: outside this issue's requirements, recorded in
+    `issues/measure_the_effect_of_the_language_hint.md`.
+  - The seed's `user_language = "English"` now becomes a gate: by design, the key declares the language; the
+    user's projects set French.
+- Code review: no findings
+- not verified: none
+- decisions needed: none

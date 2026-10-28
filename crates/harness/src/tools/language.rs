@@ -17,9 +17,10 @@ const ENGLISH_WORDS: &[&str] = &[
 /// The fewest words a text needs for its language to be judged.
 const MIN_WORDS: usize = 20;
 
-/// A conversation language: its stop words, then those of the other language.
+/// A conversation language: its name in `user_language`, its stop words, then those of the other language.
 #[derive(Clone, Copy)]
 pub(super) struct Language {
+    pub(super) name: &'static str,
     own: &'static [&'static str],
     other: &'static [&'static str],
 }
@@ -29,15 +30,22 @@ impl Language {
     pub(super) fn named(name: &str) -> Option<Language> {
         match name {
             "French" => Some(Language {
+                name: "French",
                 own: FRENCH_WORDS,
                 other: ENGLISH_WORDS,
             }),
             "English" => Some(Language {
+                name: "English",
                 own: ENGLISH_WORDS,
                 other: FRENCH_WORDS,
             }),
             _ => None,
         }
+    }
+
+    /// The language named by the `user_language` of the `[project]` table of a `.claude/harness.toml`.
+    pub(super) fn of_config(config: &toml::Table) -> Option<Language> {
+        Language::named(config.get("project")?.get("user_language")?.as_str()?)
     }
 
     /// Whether `text` holds more stop words of the other language than of this one; `None` when it holds fewer

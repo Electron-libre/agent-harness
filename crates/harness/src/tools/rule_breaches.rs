@@ -560,12 +560,7 @@ pub(super) fn main(args: &[String]) -> u8 {
                 .map(|c| (c.clone(), worktree(&c)))
                 .collect();
             let config = committed_config(&repo, &start_text);
-            let language = config
-                .as_ref()
-                .and_then(|c| c.get("project"))
-                .and_then(|p| p.get("user_language"))
-                .and_then(toml::Value::as_str)
-                .and_then(Language::named);
+            let language = config.as_ref().and_then(Language::of_config);
             let context = Context {
                 worktrees,
                 managed: managed_paths(&repo, &start_text),

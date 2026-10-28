@@ -48,7 +48,8 @@
           },
           {
             "type": "command",
-            "command": "harness run language-hint"
+            "command": "harness run language-hint",
+            "timeout": 600
           }
         ]
       }

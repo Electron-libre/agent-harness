@@ -4,60 +4,52 @@
 //! whenever the reply cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
 use super::language::Language;
+use super::transcripts::{git, typed_text};
 use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-/// The root of the work tree holding `dir`; `None` outside git.
-fn work_tree(dir: &Path) -> Option<PathBuf> {
-    let out = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .current_dir(dir)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())?;
-    let root = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (!root.is_empty()).then(|| root.into())
+/// The `.claude/harness.toml` at the root of the work tree holding `dir`, when there is one.
+fn config_at(dir: &Path) -> Option<PathBuf> {
+    let root = git(dir, &["rev-parse", "--show-toplevel"]).filter(|r| !r.is_empty())?;
+    Some(Path::new(&root).join(crate::CONFIG)).filter(|c| c.exists())
 }
 
-/// The `user_language` of the `.claude/harness.toml` of the work tree of the event's `cwd`, else of
-/// `CLAUDE_PROJECT_DIR` (LNG-3).
-fn user_language(event: &Value) -> Option<String> {
-    let project = || {
-        let dir = std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
-        work_tree(Path::new(&dir)).unwrap_or_else(|| dir.into())
-    };
-    let root = event["cwd"]
+/// The language of the config of the work tree of the event's `cwd`, else of `CLAUDE_PROJECT_DIR` (LNG-3).
+fn user_language(event: &Value) -> Option<Language> {
+    let project = std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
+    let config = event["cwd"]
         .as_str()
-        .and_then(|cwd| work_tree(Path::new(cwd)))
-        .unwrap_or_else(project);
-    let text = std::fs::read_to_string(root.join(crate::CONFIG)).ok()?;
-    let table: toml::Table = text.parse().ok()?;
-    Some(
-        table
-            .get("project")?
-            .get("user_language")?
-            .as_str()?
-            .to_string(),
-    )
+        .and_then(|cwd| config_at(Path::new(cwd)))
+        .or_else(|| config_at(Path::new(&project)))?;
+    Language::of_config(&std::fs::read_to_string(config).ok()?.parse().ok()?)
 }
 
-/// The text blocks of the last assistant line holding text in the transcript, joined by a blank line (LNG-2).
+/// The text blocks of the last assistant line holding text in the transcript, joined by a blank line; `None` when a
+/// message the user typed comes after it (LNG-2).
 fn last_text(transcript: &str) -> Option<String> {
-    transcript.lines().rev().find_map(|line| {
-        let line: Value = serde_json::from_str(line).ok()?;
-        if line["type"] != "assistant" {
+    for line in transcript.lines().rev() {
+        let Ok(line) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if typed_text(&line).is_some() {
             return None;
         }
+        if line["type"] != "assistant" {
+            continue;
+        }
         let texts: Vec<&str> = line["message"]["content"]
-            .as_array()?
-            .iter()
+            .as_array()
+            .into_iter()
+            .flatten()
             .filter(|b| b["type"] == "text")
             .filter_map(|b| b["text"].as_str())
             .collect();
-        (!texts.is_empty()).then(|| texts.join("\n\n"))
-    })
+        if !texts.is_empty() {
+            return Some(texts.join("\n\n"));
+        }
+    }
+    None
 }
 
 /// The reply to judge: the event's `last_assistant_message`, else the last text of its transcript.
@@ -77,15 +69,13 @@ pub(super) fn main(_args: &[String]) -> u8 {
     if event["stop_hook_active"].as_bool().unwrap_or(false) {
         return 0;
     }
-    let Some(name) = user_language(&event) else {
+    let Some(language) = user_language(&event) else {
         return 0;
     };
-    let breach = Language::named(&name)
-        .zip(reply(&event))
-        .and_then(|(language, text)| language.breached_by(&text));
-    if breach != Some(true) {
+    if reply(&event).and_then(|text| language.breached_by(&text)) != Some(true) {
         return 0;
     }
+    let name = language.name;
     eprintln!(
         "Your last reply is not in {name}, the user_language of .claude/harness.toml: give it again in {name}."
     );

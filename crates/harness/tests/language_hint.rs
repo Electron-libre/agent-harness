@@ -139,6 +139,15 @@ fn with_no_last_message_the_last_assistant_text_of_the_transcript_is_judged() {
     let french_last: String = lines[..2].iter().map(|l| format!("{l}\n")).collect();
     put(dir.path(), "t.jsonl", &french_last);
     assert!(silent_pass(&hook(dir.path(), &event)));
+
+    // a new turn with no text yet: the English reply of the turn before is not judged again
+    let new_turn: String = [&lines[2], &lines[0], &lines[3]]
+        .iter()
+        .map(|l| format!("{l}\n"))
+        .collect();
+    put(dir.path(), "t.jsonl", &new_turn);
+    let run = hook(dir.path(), &event);
+    assert!(silent_pass(&run), "{run:?}");
 }
 
 // spec: LNG-3
@@ -161,5 +170,11 @@ fn the_config_is_read_at_the_root_of_the_work_tree_of_the_cwd_else_of_the_projec
     // a cwd outside git: CLAUDE_PROJECT_DIR
     let outside = tempdir().unwrap();
     let run = hook(other.path(), &stop(outside.path(), FRENCH));
+    assert!(run.stderr.contains("English"), "{run:?}");
+    // a cwd in a work tree with no config (a nested clone): CLAUDE_PROJECT_DIR
+    let bare = tempdir().unwrap();
+    repo(bare.path(), None);
+    std::fs::remove_file(bare.path().join(".claude/harness.toml")).unwrap();
+    let run = hook(other.path(), &stop(bare.path(), FRENCH));
     assert!(run.stderr.contains("English"), "{run:?}");
 }
