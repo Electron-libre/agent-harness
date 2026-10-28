@@ -7,7 +7,7 @@ tree). Claude Code loads other project memory in every session too, so a project
 under-counted and its budget never warns. Make the shared measure count what a session actually loads.
 
 # Findings
-* Raised by the `high` review of `issues/budget_the_fixed_context_of_a_project.md`: a project whose instructions sit
+* Raised by the `high` review of `issues/done/budget_the_fixed_context_of_a_project.md`: a project whose instructions sit
   in `.claude/CLAUDE.md` measures 0 for `CLAUDE.md`.
 * Claude Code documents `.claude/CLAUDE.md` and `CLAUDE.local.md` as project memory, and `@path` imports in a memory
   file; not yet checked which of them this repository's consumers use.
