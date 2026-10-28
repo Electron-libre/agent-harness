@@ -49,7 +49,7 @@ thresholds, expectations outside the commit messages. Spec: `specs/harness-verdi
 1. [x] Record the expectation: `Expected-effect` line checked by `commit-check`, `harness run harness-changes`
    (rows of the expectations and the revisions holding each change); verified by tests through the binary on a
    temp git repository; makes true VRD-1, VRD-2, VRD-3, VRD-4, VRD-7, VRD-8; ~600 lines.
-2. [ ] Verdict table: `harness-report --changes` prints `## Verdicts` (groups before and after, values, verdict);
+2. [x] Verdict table: `harness-report --changes` prints `## Verdicts` (groups before and after, values, verdict);
    verified by tests through the binary on TSV fixtures; makes true VRD-5, VRD-6, REP-3 (amended); ~500 lines.
 3. [ ] Skill and docs: `evaluate-harness` collects `harness-changes`, passes `--changes` and reads the verdicts
    (`confounded` and `too few` are no conclusion); `AGENTS.md` names the footer line; verified by new
@@ -82,5 +82,26 @@ left: 0, right: 1` (`commit-check` accepted `Expected-effect: speed up`).
 Code review: no findings
 
 not verified: a run on the real history (no commit carries an expectation yet).
+
+decisions needed: none
+
+## Deliverable 2
+done: `harness-report --changes <file>` prints a last `## Verdicts` table (groups before and after, values,
+verdict); the axis tables return their cells, computed for a `too few` group too; VRD and REP back to `accepted`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass; VRD-5 says the values of a `too few` group are computed (so it reads `confounded`, not `no data`) |
+| docs | `docs/usage.md`, `docs/architecture.md` (diagram, reader table) |
+| code review | low, see below |
+
+red: VRD-5, VRD-6, VRD-7: the 6 verdict checks failed (`unknown argument --changes`, no `Verdicts` table).
+
+Code review: 1 finding, not fixed: the skills table is left out of the verdict lookup, which no VRD-1 metric
+reads (`calls`, `hook_refusals`, `unused` are no metric).
+
+not verified: a report on real transcripts with a recorded change (none recorded yet).
 
 decisions needed: none

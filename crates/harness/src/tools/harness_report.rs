@@ -3,16 +3,20 @@
 //! mix and the sample size next to the numbers. Reads the outputs of the other transcript readers, never the
 //! transcripts; it reports trends, never a pass or a fail.
 //! Usage: `harness run harness-report --sessions <session-metrics rows> [--breaches <rule-breaches --summary>]
-//! [--quality <delivered-quality --summary>]... [--context <fixed-context rows>] [--min-sessions <n>] [--anonymous]`.
+//! [--quality <delivered-quality --summary>]... [--context <fixed-context rows>] [--changes <harness-changes rows>]
+//! [--min-sessions <n>] [--anonymous]`. With `--changes`, a last table gives each recorded change of the harness a
+//! verdict from the groups before and after it (`specs/harness-verdicts.md`).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+
+use super::harness_changes::{HEADER as CHANGES, RULE_METRIC};
 
 const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
 const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
-const USAGE: &str = "usage: harness run harness-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--min-sessions <n>] [--anonymous]";
+const USAGE: &str = "usage: harness run harness-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--changes <file>] [--min-sessions <n>] [--anonymous]";
 const TOO_FEW: &str = "too few";
 
 type Row = HashMap<String, String>;
@@ -146,22 +150,47 @@ fn sorted_pairs(counts: BTreeMap<&str, u64>) -> String {
         .join(", ")
 }
 
+/// The cells of a printed table: its columns, and per group its rows, computed for a `too few` group too.
+struct Table {
+    columns: Vec<String>,
+    rows: Vec<Vec<Vec<String>>>,
+}
+
+impl Table {
+    /// The cell of `column` in the first row of group `g` whose `key` column is `key` (any row with no key).
+    fn cell(&self, g: usize, column: &str, key: Option<(&str, &str)>) -> Option<&str> {
+        let at = |name: &str| self.columns.iter().position(|c| c == name);
+        let index = at(column)?;
+        let key = match key {
+            Some((name, value)) => Some((at(name)?, value)),
+            None => None,
+        };
+        self.rows
+            .get(g)?
+            .iter()
+            .find(|row| key.is_none_or(|(i, v)| row.get(i).is_some_and(|c| c == v)))?
+            .get(index)
+            .map(String::as_str)
+    }
+}
+
 /// A markdown table under `## <title>`: `group`, `sessions`, then `columns`, one row or more per group; a group with
-/// too few sessions is one row showing only its size.
+/// too few sessions is one row showing only its size. Returns the cells, for the verdicts.
 fn table(
     title: &str,
     columns: &[&str],
     groups: &[Group],
     cells: impl Fn(&Group) -> Vec<Vec<String>>,
-) {
+) -> Table {
     println!("## {title}\n");
     println!("| group | sessions | {} |", columns.join(" | "));
     println!("|{}", "---|".repeat(columns.len() + 2));
-    for group in groups {
+    let computed: Vec<Vec<Vec<String>>> = groups.iter().map(&cells).collect();
+    for (group, cells) in groups.iter().zip(&computed) {
         let rows = if group.too_few {
             vec![vec![TOO_FEW.to_string(); columns.len()]]
         } else {
-            cells(group)
+            cells.clone()
         };
         for row in rows {
             println!(
@@ -173,9 +202,13 @@ fn table(
         }
     }
     println!();
+    Table {
+        columns: columns.iter().map(|c| (*c).to_string()).collect(),
+        rows: computed,
+    }
 }
 
-fn efficiency(groups: &[Group], anonymous: bool) {
+fn efficiency(groups: &[Group], anonymous: bool) -> Table {
     let columns = [
         "issues",
         "projects",
@@ -228,7 +261,7 @@ fn efficiency(groups: &[Group], anonymous: bool) {
             column("validations"),
             column("other_messages"),
         ]]
-    });
+    })
 }
 
 /// The `name=n;name=n` pairs of `column` summed over `sessions`, as `name=n, …`, most frequent first, then by name.
@@ -271,7 +304,7 @@ fn of_group<'a>(inputs: impl IntoIterator<Item = &'a Row>, group: &Group) -> Vec
         .collect()
 }
 
-fn quality(groups: &[Group], files: &[Vec<Row>]) {
+fn quality(groups: &[Group], files: &[Vec<Row>]) -> Table {
     let summed = [
         "issues",
         "deliverables",
@@ -309,10 +342,10 @@ fn quality(groups: &[Group], files: &[Vec<Row>]) {
         cells.push(ratio(total("fixes_after"), total("issues")));
         cells.push(ratio(total("review_findings"), total("reviews")));
         vec![cells]
-    });
+    })
 }
 
-fn rules(groups: &[Group], breaches: &[Row]) {
+fn rules(groups: &[Group], breaches: &[Row]) -> Table {
     let columns = [
         "rule",
         "applied",
@@ -349,10 +382,10 @@ fn rules(groups: &[Group], breaches: &[Row]) {
                 ]
             })
             .collect()
-    });
+    })
 }
 
-fn skills(groups: &[Group], context: Option<&[Row]>) {
+fn skills(groups: &[Group], context: Option<&[Row]>) -> Table {
     let mut columns = vec!["calls", "hook_refusals"];
     if context.is_some() {
         columns.push("unused");
@@ -384,10 +417,10 @@ fn skills(groups: &[Group], context: Option<&[Row]>) {
             );
         }
         vec![cells]
-    });
+    })
 }
 
-fn fixed_context(groups: &[Group], context: &[Row]) {
+fn fixed_context(groups: &[Group], context: &[Row]) -> Table {
     let bytes = [
         "claude_md_bytes",
         "agents_md_bytes",
@@ -416,7 +449,106 @@ fn fixed_context(groups: &[Group], context: &[Row]) {
             .collect();
         cells.push(mean(&|r: &Row| bytes.iter().map(|c| number(r, c)).sum()));
         vec![cells]
-    });
+    })
+}
+
+/// The value of `metric` for group `g` in the tables, as a number (`breached_share` of the rule's row, its `%`
+/// dropped); `None` when it has no table, no cell or an empty one.
+fn metric_value(tables: &[&Table], g: usize, metric: &str) -> Option<String> {
+    let cell = match metric.strip_prefix(RULE_METRIC) {
+        Some(rule) => tables
+            .iter()
+            .find_map(|t| t.cell(g, "breached_share", Some(("rule", rule))))?,
+        None => tables.iter().find_map(|t| t.cell(g, metric, None))?,
+    };
+    let cell = cell.trim_end_matches('%');
+    cell.parse::<f64>().is_ok().then(|| cell.to_string())
+}
+
+/// The most frequent name of `column` over the sessions of a group.
+fn dominant<'a>(group: &Group<'a>, column: &str) -> String {
+    let pairs = mix(&group.sessions, column);
+    pairs.split('=').next().unwrap_or_default().to_string()
+}
+
+/// The verdict of each expectation of `changes` (VRD-5, VRD-6), from the groups before and after its change.
+fn verdicts(groups: &[Group], tables: &[&Table], changes: &[Row]) {
+    let held = |row: &Row| -> HashSet<String> {
+        value(row, "revisions")
+            .split(',')
+            .filter(|r| !r.is_empty())
+            .map(str::to_string)
+            .collect()
+    };
+    let after_of = |row: &Row| {
+        let held = held(row);
+        groups
+            .iter()
+            .position(|g| g.revisions.iter().any(|r| held.contains(*r)))
+    };
+    let columns = [
+        "change",
+        "metric",
+        "expected",
+        "before",
+        "after",
+        "before_value",
+        "after_value",
+        "verdict",
+    ];
+    println!("## Verdicts\n");
+    println!("| {} |", columns.join(" | "));
+    println!("|{}", "---|".repeat(columns.len()));
+    for row in changes {
+        let change = value(row, "change");
+        let (metric, direction) = (value(row, "metric"), value(row, "direction"));
+        let after_index = after_of(row);
+        let before_index = after_index.and_then(|i| i.checked_sub(1));
+        let name = |i: Option<usize>| i.map(|i| groups[i].name.clone()).unwrap_or_default();
+        let at = |i: Option<usize>| i.and_then(|i| metric_value(tables, i, metric));
+        let (before_value, after_value) = (at(before_index), at(after_index));
+        let verdict = match (before_index, after_index, &before_value, &after_value) {
+            (Some(b), Some(a), Some(bv), Some(av)) => {
+                let (before, after) = (&groups[b], &groups[a]);
+                let held = held(row);
+                let mix_changed = ["models", "versions", "project"]
+                    .iter()
+                    .any(|c| dominant(before, c) != dominant(after, c));
+                let other_change = changes
+                    .iter()
+                    .any(|other| value(other, "change") != change && after_of(other) == Some(a));
+                if before.too_few
+                    || after.too_few
+                    || after.revisions.iter().any(|r| !held.contains(*r))
+                    || mix_changed
+                    || other_change
+                {
+                    "confounded"
+                } else {
+                    let (bv, av): (f64, f64) =
+                        (bv.parse().unwrap_or(0.0), av.parse().unwrap_or(0.0));
+                    let up = direction == "up";
+                    if av == bv {
+                        "no observed effect"
+                    } else if (av > bv) == up {
+                        "helped"
+                    } else {
+                        "hurt"
+                    }
+                }
+            }
+            _ => "no data",
+        };
+        let short_change: String = change.chars().take(7).collect();
+        println!(
+            "| {short_change} | {metric} | {direction} | {} | {} | {} | {} | {verdict} |",
+            name(before_index),
+            name(after_index),
+            before_value.unwrap_or_default(),
+            after_value.unwrap_or_default(),
+        );
+    }
+    println!();
 }
 
 struct Options {
@@ -424,6 +556,7 @@ struct Options {
     breaches: Option<String>,
     quality: Vec<String>,
     context: Option<String>,
+    changes: Option<String>,
     min_sessions: usize,
     anonymous: bool,
 }
@@ -435,6 +568,7 @@ fn options(args: &[String]) -> Result<Options, String> {
         breaches: None,
         quality: Vec::new(),
         context: None,
+        changes: None,
         min_sessions: 10,
         anonymous: false,
     };
@@ -445,6 +579,7 @@ fn options(args: &[String]) -> Result<Options, String> {
             "--breaches" => options.breaches = Some(file()?),
             "--quality" => options.quality.push(file()?),
             "--context" => options.context = Some(file()?),
+            "--changes" => options.changes = Some(file()?),
             "--min-sessions" => {
                 let n = args
                     .next()
@@ -490,17 +625,26 @@ pub(super) fn main(args: &[String]) -> u8 {
         .map(|f| read(f, CONTEXT))
         .transpose()
         .unwrap_or_else(|e| fail(e));
+    let changes = options
+        .changes
+        .as_deref()
+        .map(|f| read(f, CHANGES))
+        .transpose()
+        .unwrap_or_else(|e| fail(e));
     let groups = groups(&sessions, options.min_sessions);
-    efficiency(&groups, options.anonymous);
+    let mut tables = vec![efficiency(&groups, options.anonymous)];
     if !quality_files.is_empty() {
-        quality(&groups, &quality_files);
+        tables.push(quality(&groups, &quality_files));
     }
     if let Some(breaches) = &breaches {
-        rules(&groups, breaches);
+        tables.push(rules(&groups, breaches));
     }
     skills(&groups, context.as_deref());
     if let Some(context) = &context {
-        fixed_context(&groups, context);
+        tables.push(fixed_context(&groups, context));
+    }
+    if let Some(changes) = &changes {
+        verdicts(&groups, &tables.iter().collect::<Vec<_>>(), changes);
     }
     0
 }

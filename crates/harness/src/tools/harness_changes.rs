@@ -10,7 +10,7 @@ use std::path::Path;
 use super::session_metrics::HEADER as SESSIONS;
 use super::transcripts::{default_branch, git};
 
-const HEADER: &str = "change\tmetric\tdirection\trevisions";
+pub(super) const HEADER: &str = "change\tmetric\tdirection\trevisions";
 const USAGE: &str = "usage: harness run harness-changes [repo] --sessions <file>";
 const PREFIX: &str = "Expected-effect:";
 /// The metrics an expectation can name: columns of the `harness-report` tables (`breached_share:<rule>` apart).

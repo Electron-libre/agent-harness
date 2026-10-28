@@ -9,6 +9,7 @@ const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
 const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
+const CHANGES: &str = "change\tmetric\tdirection\trevisions";
 const SELF: &str = "self:1111111111111111111111111111111111111111";
 
 /// A session row: the columns that vary, the others fixed (input 1, output 10, cache read 2, cache creation 3).
@@ -476,8 +477,186 @@ fn refusal_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             refused(&["--sessions".as_ref(), good.as_os_str(), "--bogus".as_ref()]),
         ),
         (
+            "a changes file with another header is refused",
+            refused(&[
+                "--sessions".as_ref(),
+                good.as_os_str(),
+                "--changes".as_ref(),
+                bad.as_os_str(),
+            ]),
+        ),
+        (
             "a readable input is accepted",
             run(dir, &["--sessions".as_ref(), good.as_os_str()]).0,
+        ),
+    ]
+}
+
+// spec: VRD-5, VRD-6, VRD-7
+fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let hash = |c: char| c.to_string().repeat(40);
+    let n = std::cell::Cell::new(0);
+    // The rows of the `Verdicts` table, header apart, for these sessions and changes (and the extra arguments).
+    let verdicts = |sessions: &[S], changes: &[String], extra: &[&str]| -> Vec<Vec<String>> {
+        n.set(n.get() + 1);
+        let rows: Vec<String> = sessions.iter().enumerate().map(|(i, s)| s.row(i)).collect();
+        let sessions = write(
+            &tmp.join(format!("v-sessions-{}.tsv", n.get())),
+            SESSIONS,
+            &rows,
+        );
+        let changes = write(
+            &tmp.join(format!("v-changes-{}.tsv", n.get())),
+            CHANGES,
+            changes,
+        );
+        let breaches = write(
+            &tmp.join(format!("v-breaches-{}.tsv", n.get())),
+            BREACHES,
+            &[
+                "x-rule\tra\t4\t2\t2\t0".into(),
+                "x-rule\trb\t4\t1\t1\t0".into(),
+            ],
+        );
+        let mut args: Vec<&std::ffi::OsStr> = vec![
+            "--sessions".as_ref(),
+            sessions.as_os_str(),
+            "--changes".as_ref(),
+            changes.as_os_str(),
+            "--breaches".as_ref(),
+            breaches.as_os_str(),
+            "--min-sessions".as_ref(),
+            "2".as_ref(),
+        ];
+        args.extend(extra.iter().map(std::ffi::OsStr::new));
+        let (ok, out, err) = run(dir, &args);
+        if !ok {
+            println!("{err}");
+        }
+        let last = out.rfind("## ").map_or("", |i| &out[i..]);
+        tables(&out)
+            .remove("Verdicts")
+            .filter(|_| last.starts_with("## Verdicts"))
+            .unwrap_or_default()
+            .into_iter()
+            .skip(1)
+            .collect()
+    };
+    let two = |project: &'static str, revision: &'static str, day: u32, turns: u64| {
+        vec![
+            base(project, revision, day, turns),
+            base(project, revision, day, turns),
+        ]
+    };
+    // Groups `ra` (turns 10), `rb` (5), `rc` (8), `rd` (one session: too few).
+    let plain: Vec<S> = [
+        two("p1", "ra", 1, 10),
+        two("p1", "rb", 2, 5),
+        two("p1", "rc", 3, 8),
+        vec![base("p1", "rd", 4, 3)],
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let main = verdicts(
+        &plain,
+        &[
+            format!("{}\tturns\tdown\trb,rc,rd", hash('a')),
+            format!("{}\tbreached_share:x-rule\tdown\trb,rc,rd", hash('a')),
+            format!("{}\tturns\tdown\trc,rd", hash('b')),
+            format!("{}\tturns\tdown\trd", hash('c')),
+            format!("{}\tturns\tdown\t", hash('d')),
+            format!("{}\tturns\tup\tra,rb,rc,rd", hash('e')),
+        ],
+        &[],
+    );
+    let row = |change: char, metric: &str, rest: &[&str]| -> Vec<String> {
+        [&hash(change)[..7], metric]
+            .iter()
+            .copied()
+            .chain(rest.iter().copied())
+            .map(str::to_string)
+            .collect()
+    };
+    let expected = vec![
+        row('a', "turns", &["down", "ra", "rb", "10", "5", "helped"]),
+        row(
+            'a',
+            "breached_share:x-rule",
+            &["down", "ra", "rb", "50", "25", "helped"],
+        ),
+        row('b', "turns", &["down", "rb", "rc", "5", "8", "hurt"]),
+        row('c', "turns", &["down", "rc", "rd", "8", "3", "confounded"]),
+        row('d', "turns", &["down", "", "", "", "", "no data"]),
+        row('e', "turns", &["up", "", "ra", "", "10", "no data"]),
+    ];
+    let verdict = |rows: &[Vec<String>]| rows.iter().map(|r| r[7].clone()).collect::<Vec<_>>();
+    let pair = |a: Vec<S<'static>>, b: Vec<S<'static>>| a.into_iter().chain(b).collect::<Vec<_>>();
+    let one = |extra: &[&str], sessions: Vec<S<'static>>, changes: &[String]| {
+        verdict(&verdicts(&sessions, changes, extra))
+    };
+    let change = |c: char, metric: &str, revisions: &str| {
+        format!("{}\t{metric}\tdown\t{revisions}", hash(c))
+    };
+    let models: Vec<S> = pair(
+        two("p1", "ra", 1, 10),
+        vec![
+            S {
+                models: "m2",
+                ..base("p1", "rb", 2, 5)
+            },
+            S {
+                models: "m2",
+                ..base("p1", "rb", 2, 5)
+            },
+        ],
+    );
+    let anonymous = verdicts(
+        &pair(two("p1", "ra", 1, 10), two("secret-project", "rb", 2, 5)),
+        &[change('a', "turns", "rb")],
+        &["--anonymous"],
+    );
+    let mut mixed = two("p1", "ra", 1, 10);
+    mixed.extend(two("p1", "ra", 1, 10));
+    mixed.extend(two("p1", "rb", 2, 5));
+    mixed.extend(two("p1", "rc", 3, 5));
+    vec![
+        (
+            "the verdicts table comes last with a row per change and metric",
+            main == expected,
+        ),
+        (
+            "a change of the most frequent model confounds",
+            one(&[], models, &[change('a', "turns", "rb")]) == ["confounded"],
+        ),
+        (
+            "a change of the most frequent project confounds, and --anonymous names none",
+            verdict(&anonymous) == ["confounded"]
+                && !anonymous.concat().iter().any(|c| c.contains("secret")),
+        ),
+        (
+            "an after group holding a revision without the change confounds",
+            one(
+                &["--min-sessions", "4"],
+                mixed,
+                &[change('a', "turns", "rc")],
+            ) == ["confounded"],
+        ),
+        (
+            "two changes with the same after group confound each other",
+            one(
+                &[],
+                pair(two("p1", "ra", 1, 10), two("p1", "rb", 2, 5)),
+                &[change('a', "turns", "rb"), change('b', "validations", "rb")],
+            ) == ["confounded", "confounded"],
+        ),
+        (
+            "an unchanged value is no observed effect",
+            one(
+                &[],
+                pair(two("p1", "ra", 1, 5), two("p1", "rb", 2, 5)),
+                &[change('a', "turns", "rb")],
+            ) == ["no observed effect"],
         ),
     ]
 }
@@ -490,6 +669,7 @@ fn harness_report() {
         .into_iter()
         .chain(axes_checks(&dir, temp.path()))
         .chain(refusal_checks(&dir, temp.path()))
+        .chain(verdict_checks(&dir, temp.path()))
         .collect();
     let mut failed = false;
     for (name, ok) in checks {
