@@ -186,15 +186,15 @@ fn repo_root() -> Result<PathBuf, String> {
         .output()
         .map_err(|e| format!("cannot run git to find the repository root: {e}"))?;
     if !out.status.success() {
-        return Err("not inside a git repository: cannot locate .claude/harness.toml".into());
+        return Err("not inside a git repository: cannot locate .claude/cardinal.toml".into());
     }
     let root = String::from_utf8_lossy(&out.stdout);
     Ok(root.strip_suffix('\n').unwrap_or(&root).into())
 }
 
-/// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when the key is absent.
+/// Strings of `key = ["a", "b"]` in the `[project]` table of the configuration (`crate::config_of`); empty when the key is absent.
 fn config_list(root: &Path, key: &str) -> Result<Vec<String>, String> {
-    let path = root.join(crate::CONFIG);
+    let path = crate::config_of(root);
     let text = std::fs::read_to_string(&path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let table: toml::Table = text

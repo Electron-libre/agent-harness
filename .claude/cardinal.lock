@@ -1,5 +1,5 @@
 # Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.
-format 2
+format 3
 ae32a54ad3e59066328e1a2f7f5afff0ca4b13bf194272c376e23280e4a7ce4e  .claude/rules/reports-to-the-user.md
 4b9c74884d807a490d35e67018a5c981431fa3bf14da70b5c43143d64e8430d0  .claude/skills/audit-instructions/SKILL.md
 7a89df35224f9599902b1137d2906dfbc213c95c42f2593bd63f94cf36025f56  .claude/skills/commit-message/SKILL.md
@@ -10,10 +10,10 @@ e9545fbee1b4b0de58ab6e8e6cb253ea8fcd1ca2bca81baaac6edb9fc20824cb  .claude/skills
 54f3b95264e60821cb53008c1fc4ed5c90b3bb1b1651df527ff24363ce6c81a9  .claude/skills/prioritize-issues/SKILL.md
 1c6335a86d6fcc1a24bc4b229986c5bf89bc385c2fbfc41eaf9870e7fd220713  .claude/skills/update-docs/SKILL.md
 8e77a3c231b051e1553dce195bfe1458a14d8aca9cd7867ede28e77996589d0f  .claude/skills/write-spec/SKILL.md
-a2ed18cf19450baa29a7a659ca6e1a53b91d6edbe03a1edda2519d53c3ad70c7+x  .github/install_cardinal.sh
+bc8a07e5b2d6d1163686aa2939889c51804c4032350d237f8b7a326eedb505f4+x  .github/install_cardinal.sh
 b62476023e1d6aea7b55d3d30ac81cd750d60d3e263a8e4b0784a5335664fb5f  .github/workflows/harness.yml
 1391ccc8946ad1f0e9f60e299d02e16bec53eca994c851535a9243f00dcd8711  AGENTS.md
-bb5364191f1020fc237c1c516c6030d553aa80cc1fe7da9e0fa2fdf73ffac1ac  harness.just
+bb5364191f1020fc237c1c516c6030d553aa80cc1fe7da9e0fa2fdf73ffac1ac  cardinal.just
 6fcb30f4bc1309ae99269fde9cacb6bf9256cdc9cfe03d4950eeca1bb26aba22  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"allow":"Bash(cardinal run *)"}

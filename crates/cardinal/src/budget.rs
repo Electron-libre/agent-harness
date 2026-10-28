@@ -1,13 +1,18 @@
 //! The budget of the fixed context (`specs/sync.md`, SYN-38, SYN-39): what every session of the project pays before
 //! any work, measured on the work tree as `fixed-context` measures a revision (REP-2), against the
-//! `fixed_context_budget` of the project's `.claude/harness.toml`.
+//! `fixed_context_budget` of the project's configuration (`config_of`).
 
 use std::fs;
 use std::path::Path;
 
 use crate::memory::{measure, WorkTree};
 use crate::tools::description_bytes;
-use crate::{read_config, CONFIG};
+use crate::{read_config, Names};
+
+/// The configuration of the project, relative to its root.
+fn name(root: &Path) -> &'static str {
+    Names::read(root).config
+}
 
 /// The key of the `[project]` table that holds the budget, in bytes.
 const KEY: &str = "fixed_context_budget";
@@ -23,7 +28,8 @@ pub fn warnings(root: &Path) -> Vec<String> {
     };
     let Some(budget) = value.as_integer().and_then(|b| u64::try_from(b).ok()) else {
         return vec![format!(
-            "warning: {KEY} in {CONFIG} is not a whole number of bytes"
+            "warning: {KEY} in {} is not a whole number of bytes",
+            name(root)
         )];
     };
     let parts = parts(root);
@@ -38,7 +44,8 @@ pub fn warnings(root: &Path) -> Vec<String> {
         .max_by_key(|(_, bytes)| bytes)
         .expect("three parts");
     vec![format!(
-        "warning: the fixed context is {total} bytes, over the budget of {budget} ({KEY} in {CONFIG}); the largest part is {part} ({bytes} bytes)"
+        "warning: the fixed context is {total} bytes, over the budget of {budget} ({KEY} in {}); the largest part is {part} ({bytes} bytes)",
+        name(root)
     )]
 }
 

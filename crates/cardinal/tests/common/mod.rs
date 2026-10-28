@@ -14,8 +14,30 @@ use std::process::{Command, Stdio};
 
 use tempfile::{tempdir, TempDir};
 
+/// The configuration and the lock of a source below the format 3, which the fixtures declare (SYN-44).
 pub const CONFIG: &str = ".claude/harness.toml";
 pub const LOCK: &str = ".claude/harness.lock";
+/// Their names from the format 3 on.
+pub const NEW_CONFIG: &str = ".claude/cardinal.toml";
+pub const NEW_LOCK: &str = ".claude/cardinal.lock";
+
+/// The configuration `root` has: the new name when that file exists, else the old one (SYN-47).
+pub fn config_of(root: &Path) -> &'static str {
+    if root.join(NEW_CONFIG).is_file() {
+        NEW_CONFIG
+    } else {
+        CONFIG
+    }
+}
+
+/// The lock `root` has, as `config_of`.
+pub fn lock_of(root: &Path) -> &'static str {
+    if root.join(NEW_LOCK).is_file() {
+        NEW_LOCK
+    } else {
+        LOCK
+    }
+}
 
 /// The programs of the system the binary and the fakes run.
 const SYSTEM: [&str; 6] = ["git", "cat", "cp", "mkdir", "chmod", "pwd"];

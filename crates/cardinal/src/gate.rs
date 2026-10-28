@@ -39,7 +39,7 @@ legacy=.claude/hooks/require_code_review.rs
 if command -v cardinal >/dev/null 2>&1; then launcher=cardinal; else launcher=harness; fi
 if [ -f "$legacy" ] && command -v rust-script >/dev/null 2>&1; then
     rust-script "$legacy" native || exit $?
-elif [ ! -f "$legacy" ] && [ -f .claude/harness.toml ] && "$launcher" help run >/dev/null 2>&1; then
+elif [ ! -f "$legacy" ] && { [ -f .claude/cardinal.toml ] || [ -f .claude/harness.toml ]; } && "$launcher" help run >/dev/null 2>&1; then
     "$launcher" run review-gate native
     code=$?
     if [ "$code" -eq 3 ]; then

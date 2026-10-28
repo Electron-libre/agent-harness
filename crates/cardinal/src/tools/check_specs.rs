@@ -355,7 +355,7 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     match super::config_list(root, "skipped_dirs") {
         Ok(dirs) => names.extend(dirs),
         // a project with no `harness.toml` skips nothing more
-        Err(e) if root.join(crate::CONFIG).exists() => out.push(e),
+        Err(e) if crate::config_of(root).exists() => out.push(e),
         Err(_) => {}
     }
     let skipped = |dir: &Path| {

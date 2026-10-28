@@ -315,7 +315,7 @@ fn run_exits_3_when_it_cannot_get_the_tool() {
         .unwrap();
     assert_eq!(out.status.code(), Some(3));
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("harness.toml"), "{stderr}");
+    assert!(stderr.contains("cardinal.toml"), "{stderr}");
 }
 
 // spec: BIN-17, BIN-18

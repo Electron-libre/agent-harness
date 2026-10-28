@@ -31,7 +31,7 @@ mistakes of a cooperative agent, not deliberate bypasses (ADR 0005).
 - **REV-14** (deterministic) withdrawn: see REV-13.
 - **REV-15** (deterministic) The path `git rev-parse --git-path claude-review-waived` gives from a linked worktree must be the waiver `native` reads for that worktree, not the one of the main worktree.
 - **REV-16** (deterministic) withdrawn: see REV-1.
-- **REV-17** (deterministic) The recipe `waive-review` of `harness.just` must create the waiver at the path `git rev-parse --git-path claude-review-waived` gives from the directory it runs in, so that `native` finds it for that worktree (the main one or a linked one, as REV-15), and must print that path. It must change nothing else in the repository.
+- **REV-17** (deterministic) The recipe `waive-review` of `cardinal.just` must create the waiver at the path `git rev-parse --git-path claude-review-waived` gives from the directory it runs in, so that `native` finds it for that worktree (the main one or a linked one, as REV-15), and must print that path. It must change nothing else in the repository.
 - **REV-18** (deterministic) withdrawn: see REV-13.
 - **REV-19** (deterministic) The managed entries of `.claude/settings.json` (`entries/.claude/settings.json` of the source, SYN-29) must hold the `permissions.deny` rules `Bash(just waive-review)`, `Bash(just waive-review *)` and `Edit(//**/claude-review-waived)`, so that Claude Code refuses the agent the recipe and an edit of the waiver.
 

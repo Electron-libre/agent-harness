@@ -164,6 +164,24 @@ fn the_hook_warns_and_lets_the_commit_through_without_the_harness() {
     assert_eq!(calls(&old), "help run\n");
 }
 
+// spec: SYN-18, SYN-47
+#[test]
+fn the_hook_runs_the_review_in_a_work_tree_of_the_new_configuration() {
+    let home = Home::new();
+    let (_source, root) = synced(&home);
+    let config = get(root.path(), CONFIG).unwrap();
+    fs::remove_file(root.path().join(CONFIG)).unwrap();
+    put(
+        root.path(),
+        ".claude/cardinal.toml",
+        &config.replace("[harness]", "[cardinal]"),
+    );
+    let bin = fake_launcher("cardinal", 2);
+    let hook = run_hook(&home, &root, bin.path(), &[]);
+    assert_eq!(hook.code, Some(2), "{hook:?}");
+    assert_eq!(calls(&bin), "help run\nrun review-gate native\n");
+}
+
 // spec: BIN-9
 #[test]
 fn the_hook_runs_the_gate_through_cardinal_else_through_harness() {

@@ -31,3 +31,54 @@ migrating a consumer that still has the old names.
 * After `rename_the_binary_to_cardinal`.
 * A consumer pinned to an old revision still runs the old binary, which knows only `harness.toml`: the migration
   must not leave a project that the old binary can no longer read before its `update`.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Rename the consumer files to `cardinal.toml` (`[cardinal]`), `cardinal.lock`, `cardinal.just`, with `sync`/`update`
+migrating an old project. Means: the names follow the source format, raised to 3 (ADR 0015): a project pinned to a
+format-2 revision keeps the old names its tools read; readers without a source fall back to the old names.
+
+## Plan
+1. [x] Names by format and migration: `FORMAT` and `cardinal-format` 3, `init`/`sync`/`update` name and migrate,
+   `check`/`run`/tools/gate/`install_cardinal.sh` read either, `git mv` of `files/harness.just` and
+   `seed/.claude/harness.toml`, the `import` lines, `just sync` migrating this repository (~800 lines); verified by
+   `sync_cli`, `update_cli`, `run_cli`, `gate_cli` tests; makes true SYN-44, SYN-45, SYN-46, SYN-47, BIN-1, SYN-18.
+2. [ ] History readers read both names at each commit: `transcripts`, `rule_breaches`, `delivered_quality`,
+   `fixed_context` (~300 lines); verified by their CLI tests; makes true EVA-8, BRE-7, BRE-9, BRE-10, QUA-4, REP-2.
+3. [ ] Prose: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`), `seed/`, `docs/`, `README.md`,
+   `CLAUDE.md`, then `just sync`; a follow-up issue to drop the old names with the format 2 (~300 lines); verified by
+   `just check`, `just check-harness`, a grep for the old names.
+
+## Decisions
+- Mode: autonomous
+- Base commit: c6b95b18aab6955bb847253767653cc75b7fbf3e
+
+## Deliverable 1
+
+- done: the names follow the source format (3 from now on), `sync`/`update` migrate an old project, `check`, `run`,
+  the tools, the gate and `install_cardinal.sh` read either name; this repository migrated by its own `just sync`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass; `sync.md` back to `accepted` |
+| docs | `docs/usage.md` (migration), ADR 0015 |
+| code review | see below |
+
+- red: SYN-44, SYN-45, SYN-46, SYN-47, BIN-1, SYN-18: `needs a cardinal that reads the format 3, this one reads up
+  to 2`, `no .claude/harness.toml in . or above`, `review gate skipped`
+- Code review: 3 findings
+  - `update` writes the configuration before its sync, which then skips the migration: refuted, it writes it after
+    (`update_to_a_revision_of_the_format_3_migrates_and_pins_it_in_the_new_configuration`).
+  - the migration is applied before the conflicts are known: kept, `sync` writes past a conflict by contract (SYN-3),
+    and `update` applies nothing on one (SYN-13).
+  - the errors of `set_rev` no longer named the file: fixed, they name the configuration.
+- Code review (again, after a commit that held only the `git mv`, amended): 1 finding
+  - a migration interrupted after the move of the configuration left `.claude/harness.lock` for good: fixed, a sync
+    writing the new lock drops the old one.
+- not verified: the migration of a consumer other than this repository; the CI run of `install_cardinal.sh`.
+- decisions needed: none

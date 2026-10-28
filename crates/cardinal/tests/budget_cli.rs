@@ -5,7 +5,7 @@ mod common;
 
 use std::path::Path;
 
-use common::{get, project, put, Home, Run, CONFIG};
+use common::{config_of, get, project, put, Home, Run, CONFIG};
 use tempfile::tempdir;
 
 /// A skill whose front matter counts 1 + 9 = 10 bytes, with a body loaded on demand that counts for nothing.
@@ -31,7 +31,8 @@ const NOT_A_NUMBER: &str =
 /// Sets `fixed_context_budget = <value>` in the `[project]` table of the project's `harness.toml`, replacing the
 /// previous value.
 fn set_budget(root: &Path, value: &str) {
-    let config: String = get(root, CONFIG)
+    let name = config_of(root);
+    let config: String = get(root, name)
         .unwrap()
         .lines()
         .filter(|l| !l.starts_with("fixed_context_budget"))
@@ -43,7 +44,7 @@ fn set_budget(root: &Path, value: &str) {
     } else {
         format!("{config}\n[project]\n{line}")
     };
-    put(root, CONFIG, &config);
+    put(root, name, &config);
 }
 
 /// A `CLAUDE.md` of `bytes` bytes that imports `AGENTS.md`.

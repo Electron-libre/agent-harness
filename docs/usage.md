@@ -6,7 +6,7 @@ tools) say the same from the binary.
 ## Commands
 
 ```sh
-cardinal init <source> [--rev <rev>]  # writes .claude/harness.toml; <source>: a directory (relative to the project) or a git URL
+cardinal init <source> [--rev <rev>]  # writes .claude/cardinal.toml; <source>: a directory (relative to the project) or a git URL
 cardinal sync [--dry-run] [--force]
 cardinal update [--rev <tag|branch|commit>] [--dry-run] [--force]
 cardinal check
@@ -38,6 +38,14 @@ A source also declares the format of its managed content in `cardinal-format`, a
 run, instead of misreading it (SYN-40); `check`, `sync` and `update` refuse in the same way a lock synced from a
 source of a newer format (SYN-42).
 
+From the format 3 on, the files of a project are `.claude/cardinal.toml` (table `[cardinal]`), `.claude/cardinal.lock`
+and `cardinal.just`; below it they keep their names before the rename, `.claude/harness.toml` (`[harness]`),
+`.claude/harness.lock` and `harness.just`, which the tools of those revisions read (ADR 0015). The `sync` or `update`
+that brings a project to a source of the format 3 migrates it: it moves the configuration and renames its table,
+writes the lock under its new name and rewrites the `import 'harness.just'` line of the `justfile` (SYN-45).
+`check`, `run` and the tools read the new name, else the old one. A `cardinal` of the format 2 finds no configuration
+in a migrated project: install the one of its revision.
+
 ## Evaluating Cardinal
 
 Cardinal is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes
@@ -48,7 +56,7 @@ them after 30 days by default, for every project at once: keep them a year in yo
 { "cleanupPeriodDays": 365 }
 ```
 
-`fixed_context_budget = <bytes>` in the `[project]` table of `.claude/harness.toml` bounds the fixed context every
+`fixed_context_budget = <bytes>` in the `[project]` table of `.claude/cardinal.toml` bounds the fixed context every
 session pays (`CLAUDE.md`, `.claude/CLAUDE.md`, the rules without `paths`, the files they import, `AGENTS.md` and
 `.claude/AGENTS.md` only when imported or when neither `CLAUDE.md` file exists, and the skill descriptions): `check`, `sync` and `update` warn when the work tree
 exceeds it, naming the largest part, and never fail because of it.

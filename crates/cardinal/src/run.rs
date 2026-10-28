@@ -17,7 +17,7 @@ use anyhow::{bail, Context, Result};
 
 use crate::{
     cache_dir, clone_dir, fetch, hash, is_full_hash, is_git_url, resolve_in, set_executable,
-    source_and_rev, CONFIG,
+    source_and_rev, CONFIG, OLD_CONFIG,
 };
 
 /// The external programs the launcher runs, replaced by fakes in the tests.
@@ -47,13 +47,13 @@ pub fn target() -> String {
     format!("{}-{os}", std::env::consts::ARCH)
 }
 
-/// The nearest directory from `start` up that holds `.claude/harness.toml`, else from `fallback` up (the project of the
+/// The nearest directory from `start` up that holds `.claude/cardinal.toml` or `.claude/harness.toml` (SYN-47), else from `fallback` up (the project of the
 /// session, when the agent left it).
 fn project_root(start: &Path, fallback: Option<&Path>) -> Result<PathBuf> {
     let nearest = |from: &Path| {
         let from = fs::canonicalize(from).ok()?;
         from.ancestors()
-            .find(|dir| dir.join(CONFIG).is_file())
+            .find(|dir| dir.join(CONFIG).is_file() || dir.join(OLD_CONFIG).is_file())
             .map(Path::to_path_buf)
     };
     nearest(start)

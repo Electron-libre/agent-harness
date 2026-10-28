@@ -6,7 +6,7 @@ mod common;
 
 use std::path::Path;
 
-use common::{get, project, put, snapshot, Home, CONFIG, LOCK};
+use common::{get, lock_of, project, put, snapshot, Home, CONFIG, LOCK};
 use tempfile::{tempdir, TempDir};
 
 /// The format the `cardinal` under test reads: the one of its own revision (SYN-43).
@@ -156,7 +156,7 @@ fn sync_of_an_unpinned_git_source_names_the_commit_it_checked_out() {
 
 /// The `format` lines of the lock of `root`.
 fn format_lines(root: &Path) -> Vec<String> {
-    get(root, LOCK)
+    get(root, lock_of(root))
         .unwrap()
         .lines()
         .filter(|l| l.starts_with("format "))
@@ -174,7 +174,7 @@ fn the_lock_records_the_format_of_its_source_before_every_other_line() {
     put(source.path(), "cardinal-format", &format!("{}\n", format()));
     home.ok(root.path(), &["sync"]);
     assert_eq!(format_lines(root.path()), [format!("format {}", format())]);
-    let lock = get(root.path(), LOCK).unwrap();
+    let lock = get(root.path(), lock_of(root.path())).unwrap();
     let first = lock.lines().find(|l| !l.starts_with('#')).unwrap();
     assert_eq!(first, format!("format {}", format()), "{lock}");
 }

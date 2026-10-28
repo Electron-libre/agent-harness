@@ -18,9 +18,9 @@ use std::process::Command;
 
 const SKIPPED_DIRS: [&str; 3] = [".git", "target", "node_modules"];
 
-/// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.
+/// Strings of `key = ["a", "b"]` in the `[project]` table of the configuration (`crate::config_of`); empty when absent.
 fn config_list(root: &std::path::Path, key: &str) -> Vec<String> {
-    let text = std::fs::read_to_string(root.join(".claude/harness.toml")).unwrap_or_default();
+    let text = std::fs::read_to_string(crate::config_of(root)).unwrap_or_default();
     let table: toml::Table = text.parse().unwrap_or_default();
     let list = table
         .get("project")

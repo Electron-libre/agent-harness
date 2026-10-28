@@ -1,12 +1,14 @@
 #!/usr/bin/env sh
-# Put on the CI path the `cardinal` of the revision `.claude/harness.toml` pins, and its `harness` alias, without Rust
+# Put on the CI path the `cardinal` of the revision `.claude/cardinal.toml` (else `.claude/harness.toml`) pins, and its `harness` alias, without Rust
 # when the source publishes it (ADR 0010): the release asset of the commit, checked against its SHA-256, goes where
 # `cardinal run` looks for it (`~/.cache/cardinal/bin/<commit>/<target>`). Otherwise `cargo install`: from the git
 # source at `rev` (into that same place when `rev` is a commit, so `cardinal run` does not build it again), or from the
 # crate of a local source in this repository. Run from the top of the work tree by the jobs of `harness.yml`.
 set -eu
 
-value() { sed -n "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" .claude/harness.toml | head -n 1; }
+config=.claude/cardinal.toml
+[ -f "$config" ] || config=.claude/harness.toml
+value() { sed -n "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" "$config" | head -n 1; }
 source=$(value source)
 rev=$(value rev)
 

@@ -152,9 +152,12 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
 ];
 
-/// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/harness.toml`; empty when absent.
+/// Strings of `key = ["a", "b"]` in the `[project]` table of `.claude/cardinal.toml` (else `.claude/harness.toml`);
+/// empty when absent.
 fn config_list(root: &std::path::Path, key: &str) -> Vec<String> {
-    let text = std::fs::read_to_string(root.join(".claude/harness.toml")).unwrap_or_default();
+    let text = std::fs::read_to_string(root.join(".claude/cardinal.toml"))
+        .or_else(|_| std::fs::read_to_string(root.join(".claude/harness.toml")))
+        .unwrap_or_default();
     let table: toml::Table = text.parse().unwrap_or_default();
     let list = table
         .get("project")

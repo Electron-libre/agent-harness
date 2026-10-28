@@ -9,10 +9,10 @@ use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// The `.claude/harness.toml` at the root of the work tree holding `dir`, when there is one.
+/// The configuration at the root of the work tree holding `dir` (`crate::config_of`), when there is one.
 fn config_at(dir: &Path) -> Option<PathBuf> {
     let root = git(dir, &["rev-parse", "--show-toplevel"]).filter(|r| !r.is_empty())?;
-    Some(Path::new(&root).join(crate::CONFIG)).filter(|c| c.exists())
+    Some(crate::config_of(Path::new(&root))).filter(|c| c.exists())
 }
 
 /// The language of the config of the work tree of the event's `cwd`, else of `CLAUDE_PROJECT_DIR` (LNG-3).

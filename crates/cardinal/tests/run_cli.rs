@@ -192,7 +192,7 @@ fn a_working_directory_outside_any_project_falls_back_to_the_project_dir() {
 
     let run = l.run_in(elsewhere.path(), None, &["t", "0"], "");
     assert_eq!(run.code, Some(3), "{run:?}");
-    assert!(run.stderr.contains("harness.toml"), "{run:?}");
+    assert!(run.stderr.contains("cardinal.toml"), "{run:?}");
 
     // inside a project, its own pin wins over the project dir: the binary of the other pin is not there
     let other = tempdir().unwrap();
@@ -206,6 +206,33 @@ fn a_working_directory_outside_any_project_falls_back_to_the_project_dir() {
     );
     let run = l.run_in(root.path(), Some(other.path()), &["t", "0"], "");
     assert_eq!(run.code, Some(0), "{run:?}");
+    assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
+}
+
+// spec: BIN-1, SYN-47
+#[test]
+fn run_finds_the_project_by_its_new_configuration_first() {
+    let l = Launcher::new();
+    script(&l.cached(COMMIT), TOOL);
+    let root = tempdir().unwrap();
+    put(
+        root.path(),
+        ".claude/cardinal.toml",
+        &format!("[cardinal]\nsource = \"{SOURCE}\"\nrev = \"{COMMIT}\"\n"),
+    );
+    let run = l.run(root.path());
+    assert_eq!(run.code, Some(0), "{run:?}");
+    assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
+    // a stale old configuration beside it pins nothing
+    put(
+        root.path(),
+        CONFIG,
+        &format!(
+            "[harness]\nsource = \"{SOURCE}\"\nrev = \"{}\"\n",
+            "f".repeat(40)
+        ),
+    );
+    let run = l.run(root.path());
     assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
 }
 
