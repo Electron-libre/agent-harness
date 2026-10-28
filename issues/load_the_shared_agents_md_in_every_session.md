@@ -63,8 +63,11 @@ the whole `AGENTS.md` would add 2,545 bytes for a commit format already enforced
 ## Plan
 1. [x] Managed rule file: move the section "Reports to the user" from `files/AGENTS.md` to
    `files/.claude/rules/reports-to-the-user.md` (no front matter), leave a one-line pointer in `AGENTS.md`, repoint the
-   skills that cite the section, `CLAUDE.md`, `docs/architecture.md`; `just sync`; verified by a test that measures the
-   `files/` tree with `memory::measure` and finds the rule counted as loaded at launch, and by `just check-harness`.
+   skills that cite the section, `CLAUDE.md`, `docs/architecture.md`; `just sync`; verified by a test that syncs a
+   project from this harness and finds the rule in the fixed context its `check` reports, and by `just check-harness`.
+
+2. [x] Fixes of the high review: `issue-workflow` points to the rule instead of copying it; the budget test computes
+   its bytes from what it wrote and every synced rule; verified by `just check`.
 
 ## Decisions
 - Mode: autonomous
@@ -91,5 +94,37 @@ Code review: no findings
 
 not verified: a live Claude Code session in another consumer showing the rule in its context (Claude Code documents
 the loading of `.claude/rules/` files without `paths`; the measure counts it).
+
+decisions needed: none
+
+## Deliverable 2 (high review of `4c9d16f..151a4fe`)
+
+done: `issue-workflow` cites the rule file instead of its own copy; the budget test derives its expected bytes; the
+plan line states the test as written.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | none needed |
+| code review | low, see below |
+
+red: none (fixes of a review, no new behaviour).
+
+High review: 7 findings.
+1. `audit-sources` misses `.claude/rules/`: outside this issue's requirements, opened as
+   `issues/list_the_always_on_rules_in_the_instruction_audit.md`.
+2. `issue-workflow` copy of the rule: fixed (pointer).
+3. Expected bytes assume one rule: fixed (sum of the synced rules).
+4. `AGENTS.md` exclusion not asserted: not fixed, REP-2 and SYN-38 tests already prove a named, unimported
+   `AGENTS.md` counts nothing (`specs/harness-report.md`, scenario of REP-2).
+5. Other agents lose the format: not fixed, decided at validation (pointer, no copy).
+6. Plan states another test: fixed (plan line reworded).
+7. Magic number `19_983`: fixed (length of the written text).
+
+Code review: no findings
+
+not verified: none
 
 decisions needed: none

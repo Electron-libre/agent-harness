@@ -269,6 +269,14 @@ fn a_budget_that_is_not_a_whole_number_is_warned_of_once_without_failing() {
 /// The shared rule of the reports to the user, managed in `files/`.
 const REPORTS_RULE: &str = ".claude/rules/reports-to-the-user.md";
 
+/// The bytes of the rules a session loads at launch, all of them managed: none of this harness has `paths`.
+fn rules_bytes(root: &Path) -> usize {
+    std::fs::read_dir(root.join(".claude/rules"))
+        .unwrap()
+        .map(|e| std::fs::metadata(e.unwrap().path()).unwrap().len() as usize)
+        .sum()
+}
+
 #[test]
 fn a_project_synced_from_this_harness_loads_the_shared_rule_of_the_reports_at_launch() {
     let home = Home::new();
@@ -277,19 +285,14 @@ fn a_project_synced_from_this_harness_loads_the_shared_rule_of_the_reports_at_la
     home.ok(root.path(), &["init", harness.to_str().unwrap()]);
     home.ok(root.path(), &["sync"]);
     // a project's CLAUDE.md that names AGENTS.md without importing it, larger than the skill descriptions
-    put(
-        root.path(),
-        "CLAUDE.md",
-        &format!("See `AGENTS.md`.\n{}", "c".repeat(19_983)),
-    );
+    let claude_md = format!("See `AGENTS.md`.\n{}", "c".repeat(20_000));
+    put(root.path(), "CLAUDE.md", &claude_md);
     set_budget(root.path(), "0");
     let rule = get(root.path(), REPORTS_RULE).expect("the rule is synced");
     assert!(rule.contains("Reports to the user"), "{rule}");
     let run = home.ok(root.path(), &["check"]);
-    let part = format!(
-        "the largest part is CLAUDE.md ({} bytes)",
-        20_000 + rule.len()
-    );
+    let bytes = claude_md.len() + rules_bytes(root.path());
+    let part = format!("the largest part is CLAUDE.md ({bytes} bytes)");
     assert!(
         budget(&run).iter().any(|w| w.ends_with(&part)),
         "the rule loads at launch with no import: {run:?}"

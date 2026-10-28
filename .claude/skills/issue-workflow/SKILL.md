@@ -9,12 +9,7 @@ The user hands over an issue file in `issues/`. Talk to the user in the `user_la
 commits stay in English). Never skip a validation stop: they are what makes the autonomy safe. The only ones the user can lift are those of
 step 3.6 and 3.8, through the Autonomous mode.
 
-Reports to the user (stops, summaries, final report) are read at a glance:
-
-- Facts go in a table or a checklist, one fact per line; prose only for a decision the user must take.
-- No narration of the steps: show the result, not the path.
-- Don't repeat what the diff, the issue, a spec or the validated plan already shows.
-- Keep what a stop must show; shorten the form, not the content.
+Reports to the user (stops, summaries, final report) follow `.claude/rules/reports-to-the-user.md`.
 
 ## 0. Resume or start
 
