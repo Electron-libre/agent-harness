@@ -51,6 +51,9 @@ format-2 revision keeps the old names its tools read; readers without a source f
 3. [x] Prose: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`), `seed/`, `docs/`, `README.md`,
    `CLAUDE.md`, then `just sync`; a follow-up issue to drop the old names with the format 2 (~300 lines); verified by
    `just check`, `just check-harness`, a grep for the old names.
+4. [x] Fixes of the `high` review: refuse a source below the format 3 for a migrated project, migrate the
+   justfile before moving the configuration, read `Justfile` and `.justfile`, name the old lock in `check`; verified by
+   `names_cli` tests; makes true SYN-45, SYN-48.
 
 ## Decisions
 - Mode: autonomous
@@ -122,3 +125,36 @@ format-2 revision keeps the old names its tools read; readers without a source f
 - decisions needed: none
 - left: the old names stay where they are meant (the fallback code, `docs/usage.md`, ADR 0015, the specs, the tests
   of the old names).
+
+## Deliverable 4
+
+- done: the fixes of the `high` review of `c6b95b1..3ee89a0` (10 findings, below).
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass; SYN-48 added, `sync.md` back to `accepted` |
+| docs | `docs/usage.md` |
+| code review | see below |
+
+- red: SYN-48, SYN-45, SYN-47: `Run { code: Some(0), stdout: "updated: a.txt\n" }` (no refusal), no
+  `updated: .justfile`, `no .claude/cardinal.lock` for a project of the old names
+- High review: 10 findings
+  - a migrated project synced to a source of the format 2 broke its tools and recipes: fixed, refused (SYN-48).
+  - the justfile was rewritten after the configuration moved, so a failure left it for good: fixed, it goes first.
+  - `Justfile` and `.justfile` were not migrated: fixed.
+  - `import './harness.just'` and other spellings are not migrated: kept, the seeded justfile writes
+    `import 'harness.just'`; another spelling is the project's own.
+  - a stray `.claude/cardinal.lock` beside the old configuration is read: kept, the lock is read on its own (SYN-47)
+    so that a migration interrupted before its lock still finds it; the stray file arises only by hand.
+  - the old lock is dropped beside two configurations: kept, an older `cardinal` pinned through the old
+    configuration of a migrated project is not a supported setup.
+  - `check` named the new lock for a project of the old names: fixed.
+  - the language hint names `.claude/cardinal.toml`: kept, its binary runs only for a project pinned on a revision of
+    the format 3, migrated by then.
+  - `update` computes the migration besides its two syncs: kept, the reads are of the same files within one command.
+  - the helper `budget::name` duplicated `Names::read`: fixed, removed.
+- Code review: no findings
+- not verified: none
+- decisions needed: none

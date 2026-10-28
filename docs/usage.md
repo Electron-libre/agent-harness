@@ -42,9 +42,10 @@ From the format 3 on, the files of a project are `.claude/cardinal.toml` (table 
 and `cardinal.just`; below it they keep their names before the rename, `.claude/harness.toml` (`[harness]`),
 `.claude/harness.lock` and `harness.just`, which the tools of those revisions read (ADR 0015). The `sync` or `update`
 that brings a project to a source of the format 3 migrates it: it moves the configuration and renames its table,
-writes the lock under its new name and rewrites the `import 'harness.just'` line of the `justfile` (SYN-45).
+writes the lock under its new name and rewrites the `import 'harness.just'` line of the justfile (SYN-45).
 `check`, `run` and the tools read the new name, else the old one. A `cardinal` of the format 2 finds no configuration
-in a migrated project: install the one of its revision.
+in a migrated project: install the one of its revision. A migrated project refuses a source below the format 3
+(SYN-48), whose tools read only the old names.
 
 ## Evaluating Cardinal
 

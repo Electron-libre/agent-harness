@@ -53,7 +53,8 @@ fn sync_refuses_a_source_of_a_newer_format_and_writes_nothing() {
 fn sync_reads_a_source_of_the_same_or_an_older_format() {
     let home = Home::new();
     let (source, root) = project(&home);
-    for declared in [format(), "1".to_string()] {
+    // the lower format first: a project the current one migrated refuses it (SYN-48)
+    for declared in ["1".to_string(), format()] {
         put(source.path(), "cardinal-format", &format!("{declared}\n"));
         put(source.path(), "files/a.txt", &declared);
         home.ok(root.path(), &["sync"]);

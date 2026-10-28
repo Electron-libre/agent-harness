@@ -9,11 +9,6 @@ use crate::memory::{measure, WorkTree};
 use crate::tools::description_bytes;
 use crate::{read_config, Names};
 
-/// The configuration of the project, relative to its root.
-fn name(root: &Path) -> &'static str {
-    Names::read(root).config
-}
-
 /// The key of the `[project]` table that holds the budget, in bytes.
 const KEY: &str = "fixed_context_budget";
 
@@ -29,7 +24,7 @@ pub fn warnings(root: &Path) -> Vec<String> {
     let Some(budget) = value.as_integer().and_then(|b| u64::try_from(b).ok()) else {
         return vec![format!(
             "warning: {KEY} in {} is not a whole number of bytes",
-            name(root)
+            Names::read(root).config
         )];
     };
     let parts = parts(root);
@@ -45,7 +40,7 @@ pub fn warnings(root: &Path) -> Vec<String> {
         .expect("three parts");
     vec![format!(
         "warning: the fixed context is {total} bytes, over the budget of {budget} ({KEY} in {}); the largest part is {part} ({bytes} bytes)",
-        name(root)
+        Names::read(root).config
     )]
 }
 

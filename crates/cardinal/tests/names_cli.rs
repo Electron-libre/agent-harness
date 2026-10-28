@@ -276,3 +276,53 @@ fn the_new_configuration_and_lock_are_read_before_the_old_ones() {
         Some("[harness]\nsource = \"/nowhere\"\n")
     );
 }
+
+// spec: SYN-48
+#[test]
+fn a_migrated_project_refuses_a_source_below_the_format_3_and_writes_nothing() {
+    let home = Home::new();
+    let (source, root) = project(&home);
+    put(source.path(), "cardinal-format", "3\n");
+    home.ok(root.path(), &["sync"]);
+    put(source.path(), "cardinal-format", "2\n");
+    put(source.path(), "files/a.txt", "a2");
+    let before = snapshot(root.path());
+    for args in [&["sync"][..], &["sync", "--dry-run"]] {
+        let run = home.harness(root.path(), args);
+        assert_eq!(run.code, Some(3), "{args:?} {run:?}");
+        assert!(
+            run.stderr.contains(&format!(
+                "{NEW_CONFIG} needs a source of the format 3 or higher, {} has the format 2",
+                source.path().display()
+            )),
+            "{run:?}"
+        );
+        assert_eq!(snapshot(root.path()), before);
+    }
+}
+
+// spec: SYN-45
+#[test]
+fn the_migration_rewrites_a_justfile_of_another_name() {
+    let home = Home::new();
+    let (_source, root) = old_project(&home);
+    let text = get(root.path(), "justfile").unwrap();
+    std::fs::remove_file(root.path().join("justfile")).unwrap();
+    put(root.path(), ".justfile", &text);
+    let run = home.ok(root.path(), &["sync"]);
+    assert!(run.lines().contains(&"updated: .justfile"), "{run:?}");
+    assert!(get(root.path(), ".justfile")
+        .unwrap()
+        .starts_with("import 'cardinal.just'\n"));
+    assert!(get(root.path(), "justfile").is_none());
+}
+
+// spec: SYN-47
+#[test]
+fn check_of_a_project_never_synced_names_the_lock_of_its_configuration() {
+    let home = Home::new();
+    let (_source, root) = project(&home);
+    let run = home.harness(root.path(), &["check"]);
+    assert_eq!(run.code, Some(3), "{run:?}");
+    assert!(run.stderr.contains(&format!("no {LOCK}")), "{run:?}");
+}

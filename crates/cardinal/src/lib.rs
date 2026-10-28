@@ -27,8 +27,9 @@ pub const OLD_CONFIG: &str = ".claude/harness.toml";
 pub const OLD_LOCK: &str = ".claude/harness.lock";
 /// The first format whose project files carry the new names (SYN-44, ADR 0015).
 const NEW_NAMES: u32 = 3;
-/// The project-owned file whose `import` lines the migration rewrites (SYN-45).
-const JUSTFILE: &str = "justfile";
+/// The names of the project-owned justfile whose `import` lines the migration rewrites, in the order `just` looks for
+/// them (SYN-45).
+const JUSTFILES: [&str; 3] = ["justfile", "Justfile", ".justfile"];
 /// The exit code of a failure that is not the verdict of a hook: `run` that cannot get the tool or does not know it,
 /// the launcher that cannot parse its arguments, an error of the other subcommands. Not 2, which Claude Code reads as
 /// the refusal of a hook (BIN-7, BIN-14, BIN-17, SYN-37).
@@ -564,8 +565,8 @@ struct Migration {
     config: String,
     /// Whether the project has a lock of the old name.
     lock: bool,
-    /// The `justfile`, when it imports `harness.just`.
-    justfile: Option<String>,
+    /// The justfile and its new text, when it imports `harness.just`.
+    justfile: Option<(&'static str, String)>,
 }
 
 impl Migration {
@@ -576,9 +577,13 @@ impl Migration {
         }
         let text = fs::read_to_string(root.join(OLD_CONFIG))
             .with_context(|| format!("reading {OLD_CONFIG}"))?;
-        let justfile = fs::read_to_string(root.join(JUSTFILE))
-            .ok()
-            .and_then(|text| Some(imports_renamed(&text)).filter(|new| *new != text));
+        let justfile = JUSTFILES
+            .iter()
+            .find_map(|name| Some((*name, fs::read_to_string(root.join(name)).ok()?)))
+            .and_then(|(name, text)| {
+                let new = imports_renamed(&text);
+                (new != text).then_some((name, new))
+            });
         Ok(Some(Self {
             config: table_renamed(&text)?,
             lock: root.join(OLD_LOCK).is_file(),
@@ -586,13 +591,14 @@ impl Migration {
         }))
     }
 
-    /// Move the configuration and rewrite the `justfile`; the lock is written under its new name by the sync.
+    /// Rewrite the justfile, then move the configuration, whose new name ends the migration (a failure before leaves
+    /// it to the next sync); the lock is written under its new name by the sync.
     fn apply(&self, root: &Path) -> Result<()> {
+        if let Some((name, text)) = &self.justfile {
+            write(&root.join(name), text.as_bytes())?;
+        }
         write(&root.join(CONFIG), self.config.as_bytes())?;
         fs::remove_file(root.join(OLD_CONFIG))?;
-        if let Some(text) = &self.justfile {
-            write(&root.join(JUSTFILE), text.as_bytes())?;
-        }
         Ok(())
     }
 
@@ -601,8 +607,8 @@ impl Migration {
         if self.lock {
             outcomes.push((format!("{OLD_LOCK} -> {LOCK}"), Outcome::Renamed));
         }
-        if self.justfile.is_some() {
-            outcomes.push((JUSTFILE.to_string(), Outcome::Updated));
+        if let Some((name, _)) = &self.justfile {
+            outcomes.push(((*name).to_string(), Outcome::Updated));
         }
         outcomes
     }
@@ -668,11 +674,15 @@ fn format_of(dir: &Path) -> Result<u32> {
     }
 }
 
-/// An error when the source `name` in `dir` needs a newer `cardinal`, which `install` installs (SYN-40).
-fn readable(dir: &Path, name: &str, install: &str) -> Result<()> {
+/// An error when the source `name` in `dir` needs a newer `cardinal`, which `install` installs (SYN-40), or has the old
+/// names while the project at `root` has the new ones (SYN-48).
+fn readable(root: &Path, dir: &Path, name: &str, install: &str) -> Result<()> {
     let format = format_of(dir)?;
     if format > FORMAT {
         bail!("{name} needs a cardinal that reads the format {format}, this one reads up to {FORMAT}: install it with `{install}`");
+    }
+    if format < NEW_NAMES && root.join(CONFIG).is_file() {
+        bail!("{CONFIG} needs a source of the format {NEW_NAMES} or higher, {name} has the format {format}");
     }
     Ok(())
 }
@@ -725,6 +735,7 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
         (root.join(&source), None)
     };
     readable(
+        root,
         &dir,
         &source,
         &launcher::install(&source, commit.as_deref()),
@@ -938,6 +949,7 @@ fn update_in(
     let commit = resolve_in(&dir, &source, rev)?;
     git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
     readable(
+        root,
         &dir,
         &format!("{source} at {commit}"),
         &launcher::install(&source, Some(&commit)),
@@ -1058,7 +1070,7 @@ fn config_dir_of(config_dir: Option<OsString>, home: Option<OsString>) -> Option
 
 fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
-        bail!("no {LOCK}: run `cardinal sync` first");
+        bail!("no {}: run `cardinal sync` first", Names::read(root).lock);
     };
     let gated = gate::manages(&lock.entries, lock.files.keys());
     let text = fs::read_to_string(root.join(entries::SETTINGS)).ok();
