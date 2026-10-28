@@ -313,15 +313,18 @@ fn parse(
     spec
 }
 
-/// Every file under `dir` (outside a git repository, where no worktree can nest).
-fn all_files(dir: &Path, found: &mut Vec<PathBuf>) {
+/// Every file under `dir` (outside a git repository, where no worktree can nest), but those of the directories
+/// `skipped` says to leave.
+fn all_files(dir: &Path, skipped: &dyn Fn(&Path) -> bool, found: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            all_files(&path, found);
+            if !skipped(&path) {
+                all_files(&path, skipped, found);
+            }
         } else {
             found.push(path);
         }
@@ -342,16 +345,24 @@ pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>)
     (ids, reason)
 }
 
-/// The `.rs` files under `crates/` and `.claude/` that may hold tests; a failure of git is a problem in `out`.
+/// The `.rs` files of the root that may hold tests, whatever the layout of the project (TRC-9): all but those under
+/// `.git`, `node_modules`, a `target` beside a `Cargo.toml` (the build output) or a directory named like one of the
+/// `skipped_dirs` of `.claude/harness.toml` (TRC-10); a failure of git is a problem in `out`.
 pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
-    // the tests of the crates, and those of the harness scripts, hooks and skills; in a git repository the files git
-    // lists, so never those of a nested worktree (ADR 0008) nor the build output
-    let dirs = [root.join("crates"), root.join(".claude")];
-    let files: Vec<PathBuf> = match repo_files::repo_files(root, &["crates", ".claude"]) {
+    let mut names = vec![".git".to_string(), "node_modules".to_string()];
+    names.extend(super::config_list(root, "skipped_dirs").unwrap_or_default());
+    let skipped = |dir: &Path| {
+        dir.file_name().is_some_and(|name| {
+            names.iter().any(|n| name == n.as_str())
+                || (name == "target" && dir.with_file_name("Cargo.toml").is_file())
+        })
+    };
+    // in a git repository the files git lists, so never those of a nested worktree (ADR 0008) nor the ignored ones
+    let files: Vec<PathBuf> = match repo_files::repo_files(root, &[]) {
         Ok(Some(files)) => files,
         Ok(None) => {
             let mut files = Vec::new();
-            dirs.iter().for_each(|dir| all_files(dir, &mut files));
+            all_files(root, &skipped, &mut files);
             files
         }
         // never fall back to the disk, which holds the nested worktrees
@@ -363,7 +374,13 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     files
         .into_iter()
         .filter(|f| {
-            f.extension().is_some_and(|e| e == "rs") && dirs.iter().any(|d| f.starts_with(d))
+            f.extension().is_some_and(|e| e == "rs")
+                && !f
+                    .strip_prefix(root)
+                    .unwrap_or(f)
+                    .ancestors()
+                    .skip(1)
+                    .any(|dir| !dir.as_os_str().is_empty() && skipped(&root.join(dir)))
         })
         .collect()
 }

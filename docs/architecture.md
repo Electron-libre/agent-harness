@@ -260,7 +260,9 @@ the design:
 - **Nesting**: `start-issue` makes git ignore `/.claude/worktrees/` (PAR-13), and the scanners (`close-issue`,
   `check-specs`, `spec-coverage`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
   [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md)), which never lists a nested worktree.
-  `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by name.
+  `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml` by name;
+  `check-specs` and `spec-coverage` read every `.rs` file of the root whatever its layout, but those under `.git`,
+  `node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` (TRC-9, TRC-10).
 - **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as
   `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `harness run` takes the revision of the
   `harness.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,

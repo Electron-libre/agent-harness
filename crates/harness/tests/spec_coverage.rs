@@ -45,7 +45,7 @@ fn lists_each_test_file_with_its_line_count() {
         (".claude/hooks/test_h.rs", "use x;\n\n#[test]\nfn t() {}\n"),
         ("crates/a/src/lib.rs", "fn helper() {}\n"),
         ("crates/a/tests/run.rs", "#[tokio::test]\nasync fn t() {}\n"),
-        ("docs/t.rs", "#[test]\nfn t() {}\n"),
+        ("node_modules/x/t.rs", "#[test]\nfn t() {}\n"),
     ]);
     let (_, stdout) = report(dir.path());
     assert_eq!(
@@ -174,10 +174,20 @@ fn says_so_when_it_finds_no_test_file() {
     let dir = root(&[("crates/a/src/lib.rs", "fn helper() {}\n")]);
     assert_eq!(
         report(dir.path()),
-        (
-            Some(0),
-            "no test file under crates/ or .claude/\n".to_string()
-        )
+        (Some(0), "no test file found\n".to_string())
+    );
+}
+
+// spec: COV-11
+#[test]
+fn lists_the_tests_of_a_crate_at_the_root() {
+    let dir = root(&[
+        ("src/lib.rs", "#[test]\nfn t() {}\n"),
+        ("tests/cli.rs", "#[test]\nfn t() {}\n"),
+    ]);
+    assert_eq!(
+        report(dir.path()),
+        (Some(0), "2\tsrc/lib.rs\n2\ttests/cli.rs\n".to_string())
     );
 }
 

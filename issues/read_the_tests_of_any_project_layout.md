@@ -31,3 +31,43 @@ tests of any layout, or say which directories hold them.
 # Hints
 * Reading every `.rs` file also reads the build scripts and the examples: a `// spec:` there must still sit above a
   test `fn`.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+`check-specs` and `spec-coverage` read every `.rs` file of the root (git's list, or the disk outside git), except
+under `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml`, so a crate at the root is
+traced and reported. Means: candidate 2.1 of the issue (no `test_dirs` key); `skipped_dirs` is the existing escape.
+
+## Plan
+1. [x] Read the tests of any layout: `check_specs::test_files` lists every `.rs` file of the root minus the skipped
+   directories, `spec-coverage` prints `no test file found`; verified by binary tests on a root crate (`src/`,
+   `tests/`, `build.rs`, `target/`, `vendor/` skipped) in `tests/check_specs.rs` and `tests/spec_coverage.rs`; makes
+   true TRC-9, TRC-10, COV-1, COV-9, COV-11, PAR-16 (reworded).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 083f6e21e633cbba5483d953425f866be5d04ad7
+- COV-9 prints `no test file found`.
+- `skipped_dirs` applies in a git repository too, not only on the disk walk.
+- A `target` directory is skipped only beside a `Cargo.toml`: a test module named `target` (`crates/a/tests/target/`) stays read, as before.
+
+## Deliverable 1
+- done: `check-specs` and `spec-coverage` read every `.rs` file of the root, but `.git`, `node_modules`, a `target`
+  beside a `Cargo.toml` and the `skipped_dirs`; `spec-coverage` prints `no test file found`; TRC, COV, PAR accepted again.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | `docs/architecture.md`, `files/specs/README.md` (synced) |
+| code review | low: no findings |
+
+- red: TRC-9, TRC-10, COV-9, COV-11: `FAIL - a crate at the root is traced`, `FAIL - a citation in a build script
+  must sit above a test fn`; spec-coverage printed `no test file under crates/ or .claude/` for a root crate.
+- Code review: no findings (low)
+- not verified: a real consumer with a root crate (only temp roots).
+- decisions needed: none.

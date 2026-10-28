@@ -79,7 +79,7 @@ pub(super) fn main(args: &[String]) -> u8 {
     }
     let root = PathBuf::from(args.first().map_or(".", String::as_str));
     match uncovered(&root) {
-        Ok(Found::NoTest) => println!("no test file under crates/ or .claude/"),
+        Ok(Found::NoTest) => println!("no test file found"),
         Ok(Found::Uncovered(found)) if found.is_empty() => {
             println!("no test file without an accepted spec");
         }

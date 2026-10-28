@@ -208,6 +208,7 @@ fn check_specs() {
         Some("RER-9"),
     );
     outside_git(&case);
+    any_layout(&case, &report);
 
     case(
         "a test of a harness script under .claude traces a requirement",
@@ -347,7 +348,71 @@ fn outside_git(case: &Case) {
     );
 }
 
-// spec: PAR-14
+// spec: TRC-9, TRC-10
+/// A crate at the root is read like one under `crates/`; the build output and the skipped directories are not.
+fn any_layout(case: &Case, report: &dyn Fn(&str, bool)) {
+    let cited = |id: &str| format!("// spec: {id}\n#[test]\nfn t() {{}}\n");
+    let stderr = case(
+        "a crate at the root is traced",
+        SPEC,
+        "",
+        &[
+            ("src/lib.rs", &cited("RER-1")),
+            ("tests/cli.rs", &cited("RER-2")),
+        ],
+        None,
+    );
+    report(
+        "a test under the root src is internal, one under the root tests is not",
+        boundary_lines(&stderr) == [warning("1 requirement", "RER-1")],
+    );
+    case(
+        "a citation in a build script must sit above a test fn",
+        SPEC,
+        TESTS,
+        &[("build.rs", "// spec: RER-1\nconst X: u8 = 1;\n")],
+        Some("build.rs:1:"),
+    );
+    case(
+        "a citation in an example is checked",
+        SPEC,
+        TESTS,
+        &[("examples/e.rs", &cited("RER-9"))],
+        Some("RER-9"),
+    );
+    case(
+        "the build output beside a Cargo.toml is not read",
+        SPEC,
+        &cited("RER-1"),
+        &[
+            ("Cargo.toml", "[workspace]\n"),
+            ("target/debug/build/x/out/t.rs", &cited("RER-2")),
+        ],
+        Some("RER-2"),
+    );
+    case(
+        "node_modules is not read",
+        SPEC,
+        TESTS,
+        &[("node_modules/x/t.rs", &cited("RER-9"))],
+        None,
+    );
+    case(
+        "the skipped_dirs of harness.toml are not read",
+        SPEC,
+        TESTS,
+        &[
+            (
+                ".claude/harness.toml",
+                "[project]\nskipped_dirs = [\"vendor\"]\n",
+            ),
+            ("vendor/a/tests/t.rs", &cited("RER-9")),
+        ],
+        None,
+    );
+}
+
+// spec: PAR-14, TRC-10
 /// In a git repository the files come from git: a worktree nested in the scanned one is never read, ignored by
 /// `info/exclude` or seen as an embedded repository, while an untracked test is still traced.
 fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
@@ -361,6 +426,11 @@ fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
     write("specs/rerun.md", SPEC);
     write("crates/a/src/t.rs", "// spec: RER-1\nfn t() {}\n");
     write("crates/a/src/worktrees/w.rs", "fn w() {}\n");
+    write(
+        ".claude/harness.toml",
+        "[project]\nskipped_dirs = [\"vendor\"]\n",
+    );
+    write("vendor/a/t.rs", "// spec: RER-9\nfn t() {}\n");
     let git = |args: &[&str]| {
         let ok = Command::new("git")
             .args([
@@ -404,7 +474,7 @@ fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
         }
         out.status.success() && stdout.is_empty()
     };
-    report("in git, the nested worktrees git does not ignore are not read, an untracked test is traced", run());
+    report("in git, the nested worktrees git does not ignore and the skipped_dirs are not read, an untracked test is traced", run());
     write(".git/info/exclude", "/.claude/worktrees/\n");
     report("in git, the nested worktree git ignores is not read", run());
     std::fs::write(root.join(".git/index"), "corrupt").unwrap();
