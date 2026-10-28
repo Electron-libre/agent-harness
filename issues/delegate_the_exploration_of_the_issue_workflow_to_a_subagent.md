@@ -52,3 +52,46 @@ running `skill:update-docs`. The spec, the plan, the implementation and the comm
 * Only read-only subagents are safe in parallel: two that write in the same worktree conflict.
 * A wrong or partial conclusion of the subagent is taken as is by the main thread, which never saw the raw files:
   the instruction should ask for the paths and lines behind each conclusion.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Measure the size of the main context (`main_context_peak`: the largest input + cache of one main-thread turn), then
+tell `issue-workflow` to hand a broad exploration to an `Explore` subagent, and record the expected drop for a
+verdict. Out of scope: subagents for the tests or `update-docs`, a custom agent definition.
+
+## Plan
+1. [x] Main-context metric: `session-metrics` column `main_context_peak` (old archives upgraded), its median in the
+   efficiency table, a metric of `Expected-effect:`; verified by tests of `session_metrics`, `harness_report`,
+   `harness_changes`/`commit_check`; makes true EVA-16, EVA-17, REP-9, VRD-1 (~250 lines).
+2. [ ] Delegated exploration: `issue-workflow` steps 1 and 3.1 hand a broad exploration (many files, history,
+   conventions) to a read-only `Explore` subagent asking for the conclusion with the paths and lines behind it; a
+   targeted read stays in the main thread; `just sync`; commit with `Expected-effect: main_context_peak down`;
+   verified by `just check` and `just check-harness` (~20 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: de1b6477b7422422655a96e3ec0a5007a17d1ea9
+- Metric: the peak of one main-thread turn (input + cache), not the main-thread sum, which grows with the session length.
+- Archives of the previous header are upgraded with an empty cell, which the median leaves out (EVA-17, REP-9).
+- No `Expected-effect: input_tokens`: its direction is unknown (each subagent starts cold).
+
+## Deliverable 1: main-context metric
+
+- done: `session-metrics` prints `main_context_peak` and upgrades the archives written before it; `harness-report`
+  shows its median in `## Efficiency`; `Expected-effect: main_context_peak <up|down>` is accepted.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass (EVA, REP, VRD back to `accepted`) |
+| docs | `docs/architecture.md`, `.claude/update-docs-map.md` |
+| code review | low, see below |
+
+- red: EVA-16, EVA-17, REP-9, VRD-1: `FAIL - header names every column` (no `main_context_peak` column); `FAIL - the median main context peak leaves out the sessions with no peak`; `commit_check_refuses_an_expected_effect_it_cannot_read` panicked on `main context peak`.
+- Code review: no findings
+- not verified: the column on the real transcripts.
+- decisions needed: none.

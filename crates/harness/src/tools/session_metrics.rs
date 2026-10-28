@@ -16,7 +16,11 @@ use transcripts::{
     result_text, revision, sessions, subagents, typed_text, Place,
 };
 
-pub(super) const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+pub(super) const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+
+/// The column added after `cache_creation_tokens` (EVA-16), and its place: an archive written before it is upgraded.
+const PEAK_COLUMN: &str = "\tmain_context_peak";
+const PEAK_INDEX: usize = 15;
 
 /// The line types seen in the transcripts; any other is counted in `unknown_lines`, since the format moves.
 const KNOWN_TYPES: &[&str] = &[
@@ -54,6 +58,7 @@ struct Session {
     thinking: u64,
     cache_read: u64,
     cache_creation: u64,
+    main_peak: u64,
     hooks: BTreeMap<String, u64>,
     skills: BTreeMap<String, u64>,
     validations: u64,
@@ -116,13 +121,13 @@ impl Session {
         }
         push_distinct(&mut self.versions, line["version"].as_str());
         match kind {
-            "assistant" => self.assistant(&line["message"]),
+            "assistant" => self.assistant(&line["message"], main),
             "user" => self.user(line, main),
             _ => {}
         }
     }
 
-    fn assistant(&mut self, message: &Value) {
+    fn assistant(&mut self, message: &Value, main: bool) {
         let blocks = message["content"]
             .as_array()
             .map(Vec::as_slice)
@@ -156,6 +161,12 @@ impl Session {
         self.output += tokens("output_tokens");
         self.cache_read += tokens("cache_read_input_tokens");
         self.cache_creation += tokens("cache_creation_input_tokens");
+        if main {
+            let context = tokens("input_tokens")
+                + tokens("cache_read_input_tokens")
+                + tokens("cache_creation_input_tokens");
+            self.main_peak = self.main_peak.max(context);
+        }
         self.thinking += usage["output_tokens_details"]["thinking_tokens"]
             .as_u64()
             .unwrap_or(0);
@@ -209,6 +220,7 @@ impl Session {
             self.thinking.to_string(),
             self.cache_read.to_string(),
             self.cache_creation.to_string(),
+            self.main_peak.to_string(),
             pairs(&self.hooks),
             pairs(&self.skills),
             self.validations.to_string(),
@@ -233,8 +245,16 @@ fn keep_resolved(old: &str, new: &str) -> String {
     new.join("\t")
 }
 
+/// An archived row written before `main_context_peak`, given an empty one (EVA-17).
+fn with_empty_peak(row: &str) -> String {
+    let mut cells: Vec<&str> = row.split('\t').collect();
+    cells.insert(PEAK_INDEX.min(cells.len()), "");
+    cells.join("\t")
+}
+
 /// Merges `rows` into the archive at `path`: a session already there is replaced, one absent from `rows` is kept, and
-/// the file stays one header then rows sorted by start. An archive with another header is left unchanged.
+/// the file stays one header then rows sorted by start. An archive written before `main_context_peak` is upgraded;
+/// one with another header is left unchanged.
 fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
     let existing = match std::fs::read_to_string(path) {
         Ok(text) => text,
@@ -242,17 +262,29 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
         Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
     };
     let mut lines = existing.lines();
-    if lines.next().is_some_and(|header| header != HEADER) {
-        return Err(format!(
-            "{} has other columns than this script: archive elsewhere",
-            path.display()
-        ));
-    }
+    let before_peak = HEADER.replacen(PEAK_COLUMN, "", 1);
+    let upgrade = match lines.next() {
+        Some(header) if header == before_peak => true,
+        Some(header) if header != HEADER => {
+            return Err(format!(
+                "{} has other columns than this script: archive elsewhere",
+                path.display()
+            ))
+        }
+        _ => false,
+    };
     let session = |row: &str| row.split('\t').next().unwrap_or_default().to_string();
     let start = |row: &str| row.split('\t').nth(6).unwrap_or_default().to_string();
     let mut merged: BTreeMap<String, String> = lines
         .filter(|l| !l.is_empty())
-        .map(|l| (session(l), l.to_string()))
+        .map(|l| {
+            let row = if upgrade {
+                with_empty_peak(l)
+            } else {
+                l.to_string()
+            };
+            (session(&row), row)
+        })
         .collect();
     for row in rows {
         let new = match merged.get(&session(row)) {

@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
 const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
@@ -12,7 +12,8 @@ const CONTEXT: &str =
 const CHANGES: &str = "change\tmetric\tdirection\trevisions";
 const SELF: &str = "self:1111111111111111111111111111111111111111";
 
-/// A session row: the columns that vary, the others fixed (input 1, output 10, cache read 2, cache creation 3).
+/// A session row: the columns that vary, the others fixed (input 1, output 10, cache read 2, cache creation 3); the
+/// main context peak is 100 per turn unless `peak` is `None` (an archived row written before the column).
 struct S<'a> {
     project: &'a str,
     issues: &'a str,
@@ -20,6 +21,7 @@ struct S<'a> {
     models: &'a str,
     day: u32,
     turns: u64,
+    peak: Option<u64>,
     others: u64,
     hooks: &'a str,
     skills: &'a str,
@@ -44,6 +46,7 @@ impl S<'_> {
             "0".into(),
             "2".into(),
             "3".into(),
+            self.peak.map(|p| p.to_string()).unwrap_or_default(),
             self.hooks.into(),
             self.skills.into(),
             "1".into(),
@@ -64,6 +67,7 @@ fn base<'a>(project: &'a str, revision: &'a str, day: u32, turns: u64) -> S<'a> 
         models: "m1",
         day,
         turns,
+        peak: Some(turns * 100),
         others: 0,
         hooks: "",
         skills: "",
@@ -71,12 +75,13 @@ fn base<'a>(project: &'a str, revision: &'a str, day: u32, turns: u64) -> S<'a> 
 }
 
 /// The sessions: `SELF` 6 (p1, issue i1, turns 1 to 6), `r-b` 5 (3 of p2 on i1 with two models, 2 of p1; turns 7 to
-/// 11), `r-c` 4 (turns 1 to 4, other messages 0, 0, 1, 1), and one with no revision, the earliest, left out. `r-c` is
-/// written first: the order is the order of use.
+/// 11, the 2 of p1 with no peak), `r-c` 4 (turns 1 to 4, other messages 0, 0, 1, 1, no peak), and one with no
+/// revision, the earliest, left out. `r-c` is written first: the order is the order of use.
 fn sessions() -> Vec<S<'static>> {
     let mut list: Vec<S> = (1..=4)
         .map(|t| S {
             others: u64::from(t > 2),
+            peak: None,
             ..base("p1", "r-c", 20, t)
         })
         .collect();
@@ -93,7 +98,10 @@ fn sessions() -> Vec<S<'static>> {
         skills: "files:commit-message=1",
         ..base("p2", "r-b", 10, t)
     }));
-    list.extend((10..=11).map(|t| base("p1", "r-b", 11, t)));
+    list.extend((10..=11).map(|t| S {
+        peak: None,
+        ..base("p1", "r-b", 11, t)
+    }));
     list
 }
 
@@ -160,7 +168,7 @@ fn cell(table: Option<&Vec<Vec<String>>>, group: &str, column: &str) -> String {
         .unwrap_or_default()
 }
 
-// spec: REP-3, REP-4, REP-5, REP-8
+// spec: REP-3, REP-4, REP-5, REP-8, REP-9
 fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let rows: Vec<String> = sessions()
         .iter()
@@ -186,6 +194,7 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         "tool_calls",
         "output_tokens",
         "input_tokens",
+        "main_context_peak",
         "validations",
         "other_messages",
     ]
@@ -248,6 +257,15 @@ fn efficiency_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
                 && cell(eff, first, "tool_calls") == "2"
                 && cell(eff, first, "output_tokens") == "10"
                 && cell(eff, first, "input_tokens") == "6",
+        ),
+        (
+            "the median main context peak leaves out the sessions with no peak",
+            cell(eff, first, "main_context_peak") == "500",
+        ),
+        (
+            "a group with no peak has an empty main context peak",
+            cell(small.get("Efficiency"), "r-c", "main_context_peak").is_empty()
+                && cell(small.get("Efficiency"), "r-c", "turns") == "3",
         ),
         (
             "an even count takes the mean of the middle values, rounded half up",

@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const COLUMNS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+/// The columns before `main_context_peak` (EVA-17): an archive written then is upgraded.
+const OLD_COLUMNS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+const COLUMNS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
 fn sh(dir: &Path, args: &[&str]) {
     let ok = Command::new("git")
@@ -254,7 +256,7 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
     (projects, repo)
 }
 
-// spec: EVA-1, EVA-2, EVA-3, EVA-4, EVA-5, EVA-6, EVA-7, EVA-9, EVA-10
+// spec: EVA-1, EVA-2, EVA-3, EVA-4, EVA-5, EVA-6, EVA-7, EVA-9, EVA-10, EVA-16
 fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let (projects, _) = fixture(tmp);
     let out = tool_command(dir.join("session_metrics.rs"))
@@ -279,6 +281,8 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ("tokens are added once per message, sub-agent included", col(s1, "input_tokens") == "1011" && col(s1, "output_tokens") == "22"),
         ("thinking tokens come from output_tokens_details", col(s1, "thinking_tokens") == "5"),
         ("cache tokens are added once per message", col(s1, "cache_read_tokens") == "103" && col(s1, "cache_creation_tokens") == "11"),
+        ("the main context peak is the largest main turn, sub-agents excluded", col(s1, "main_context_peak") == "117"),
+        ("a session with no assistant message has a peak of 0", col(s2, "main_context_peak") == "0"),
         ("models in order of first appearance, sub-agent included", col(s1, "models") == "model-a,model-b,model-c"),
         ("versions in order of first appearance", col(s1, "versions") == "2.1.1,2.1.2"),
         ("issues are the branches other than main", col(s1, "issues") == "my_issue"),
@@ -507,7 +511,7 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: EVA-11, EVA-14
+// spec: EVA-11, EVA-14, EVA-17
 fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let tmp = tmp.join("archive");
     let projects = tmp.join("projects/-p");
@@ -539,11 +543,11 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let first = run();
     let created = std::fs::read_to_string(&archive).unwrap_or_default();
     let old_row = |id: &str, start: &str| {
-        format!("{id}\tp\t\t\t\t\t{start}\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n")
+        format!("{id}\tp\t\t\t\t\t{start}\t0\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n")
     };
     std::fs::create_dir_all(archive.parent().unwrap()).unwrap();
     let resolved =
-        "c\tkeep\t\trrr\t\t\t2026-01-01T12:00:00.000Z\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n";
+        "c\tkeep\t\trrr\t\t\t2026-01-01T12:00:00.000Z\t0\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n";
     std::fs::write(
         &archive,
         format!(
@@ -569,6 +573,14 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             .unwrap_or_default()
     };
     let b_validations = cell("b", "validations");
+    let before_peak = format!(
+        "{OLD_COLUMNS}\nold\tp\t\t\t\t\t2026-01-01T00:00:00.000Z\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t9\t0\t0\t0\t0\n"
+    );
+    std::fs::write(&archive, before_peak).unwrap();
+    let upgraded = run();
+    let upgraded_text = std::fs::read_to_string(&archive).unwrap_or_default();
+    let upgraded_rows = rows(&upgraded_text).unwrap_or_default();
+    let old = upgraded_rows.get("old");
     let foreign = "session\tsomething_else\na\tx\n";
     std::fs::write(&archive, foreign).unwrap();
     let refused = run();
@@ -594,6 +606,17 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             cell("c", "project") == "keep"
                 && cell("c", "revision") == "rrr"
                 && cell("c", "validations") == "1",
+        ),
+        (
+            "an archive written before main_context_peak is upgraded, its rows given an empty peak",
+            upgraded.status.success()
+                && upgraded_rows.len() == 3
+                && old
+                    .and_then(|r| r.get("main_context_peak"))
+                    .is_some_and(|p| p.is_empty())
+                && old
+                    .and_then(|r| r.get("validations"))
+                    .is_some_and(|v| v == "9"),
         ),
         (
             "an archive with another header is refused and left unchanged",

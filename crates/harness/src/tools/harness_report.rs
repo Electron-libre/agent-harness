@@ -222,6 +222,7 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
         "tool_calls",
         "output_tokens",
         "input_tokens",
+        "main_context_peak",
         "validations",
         "other_messages",
     ];
@@ -262,10 +263,25 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
                     + number(r, "cache_read_tokens")
                     + number(r, "cache_creation_tokens")
             }),
+            main_context_peak(&g.sessions),
             column("validations"),
             column("other_messages"),
         ]]
     })
+}
+
+/// The median `main_context_peak` of the sessions that have one (REP-9): an archived row written before the column
+/// is left out rather than counted as 0; empty when no session has one.
+fn main_context_peak(sessions: &[&Row]) -> String {
+    let peaks: Vec<u64> = sessions
+        .iter()
+        .filter_map(|r| value(r, "main_context_peak").parse().ok())
+        .collect();
+    if peaks.is_empty() {
+        String::new()
+    } else {
+        median(peaks).to_string()
+    }
 }
 
 /// The `name=n;name=n` pairs of `column` summed over `sessions`, as `name=n, …`, most frequent first, then by name.

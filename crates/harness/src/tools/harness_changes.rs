@@ -14,11 +14,12 @@ pub(super) const HEADER: &str = "change\tmetric\tdirection\trevisions";
 const USAGE: &str = "usage: harness run harness-changes [repo] --sessions <file>";
 const PREFIX: &str = "Expected-effect:";
 /// The metrics an expectation can name: columns of the `harness-report` tables (`breached_share:<rule>` apart).
-pub(super) const METRICS: [&str; 9] = [
+pub(super) const METRICS: [&str; 10] = [
     "turns",
     "tool_calls",
     "output_tokens",
     "input_tokens",
+    "main_context_peak",
     "validations",
     "other_messages",
     "fixes_after_per_issue",
