@@ -33,3 +33,61 @@ Rename what still carries "harness" as the product name once the binary and file
 * After `rename_the_consumer_files_to_cardinal`.
 * Renaming a skill changes the fixed context of every session and the skill names counted by `harness-report`:
   past sessions cite the old name.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Rename to `cardinal-…` what names the product: the tools `harness-report`/`harness-changes` (and their modules,
+tests, specs `harness-report.md`/`harness-verdicts.md`, ids REP/VRD kept), the commit scope, the CI workflow, the
+recipe `check-harness`, and the product prose of the specs and doc comments. Out of scope: the `harness` binary
+alias and the old-name fallbacks (`drop_the_harness_alias`), the gate mark `# harness: native review gate`.
+No `FORMAT` raise: no fragment key, lock line or source layout changes meaning; `sync` deletes the old copies (SYN-5).
+
+## Plan
+1. [x] Moves: `git mv` of `specs/harness-{report,verdicts}.md` to `specs/cardinal-{report,verdicts}.md`,
+   `tools/harness_{report,changes}.rs` and `tests/harness_{report,changes}.rs` to `cardinal_*`,
+   `files/.github/workflows/harness.yml` to `cardinal.yml`, with only the `mod`/`use` lines and links that keep
+   `just check` green, then `just sync`; verified by `just check`, `just check-harness`; ~60 lines + renames.
+2. [ ] Tool names: `cardinal run cardinal-report` and `cardinal-changes` (registry, usage strings, skills, docs,
+   CLAUDE.md `Expected-effect`); verified by the tools CLI test through the new names and `tests/skills.rs`;
+   makes true REP-3, VRD-3, VRD-5, VRD-7, VRD-8 amended; ~150 lines.
+3. [ ] Commit scope `cardinal`: `commit-check` built-in scopes `docs` and `cardinal`; `rule-breaches` reads
+   `docs`, `cardinal` and `harness` (past commits); AGENTS.md, the `cardinal.toml` comments; verified by a
+   commit-check test (`cardinal` accepted, `harness` refused) and a rule-breaches test (a past `harness` commit is no
+   breach); makes true BRE-9 amended; ~80 lines.
+4. [ ] CI and recipe: workflow `Cardinal` (job, concurrency group), recipe `check-cardinal`, `ci.yml`,
+   `install_cardinal.sh`, README, docs, skills; verified by `just check-cardinal`, `just check-harness` (alias);
+   ~80 lines.
+5. [ ] Product prose: "the harness" meaning Cardinal becomes "Cardinal" in the specs (`sync.md`, REP, VRD, EVA,
+   BIN titles and intents) and the crate doc comments and tool about strings; the generic "agent harness" stays;
+   verified by `just check`; ~120 lines.
+
+Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names) in deliverable 2, BRE-9 (scope
+`cardinal`, `harness` still read) in deliverable 3; prose only in deliverable 5.
+
+## Decisions
+- Mode: autonomous
+- Base commit: e4cd7fcb4252a4e1989cdbe2768d983af7d15124
+- `evaluate-harness` kept (the generic noun; its skill counts stay whole).
+- `commit-check` refuses the scope `harness` (only `docs` and `cardinal`); `rule-breaches` still reads it.
+- Workflow `cardinal.yml`, named `Cardinal`, job `cardinal`; a consumer's required check `harness` must be renamed (final report).
+- Recipe `check-cardinal`, `alias check-harness` kept until `drop_the_harness_alias`.
+- No alias for the old tool names (skills and binary are pinned together).
+
+## Deliverable 1: moves
+- done: the specs, tool modules, tool tests and the CI workflow moved to their `cardinal` names; links and `mod`
+  lines follow; `sync` replaced `.github/workflows/harness.yml` by `cardinal.yml` (SYN-5).
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| copies | `just check-harness` passes |
+| docs | spec paths updated (CLAUDE.md, architecture, update-docs map, doc comments) |
+| code review | low, see below |
+
+- red: none (moves only, no behaviour)
+- Code review: no findings
+- not verified: the GitHub run of the renamed workflow (runs on push)
+- decisions needed: none

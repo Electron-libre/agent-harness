@@ -1,4 +1,4 @@
-//! List the expected effects recorded in the history of the harness source (`specs/harness-verdicts.md`): one row
+//! List the expected effects recorded in the history of the harness source (`specs/cardinal-verdicts.md`): one row
 //! per `Expected-effect: <metric> <up|down>` line of a commit that changes `files/`, with the revisions in use (read
 //! from the `session-metrics` rows) that hold the change, so `harness-report --changes` can give each a verdict.
 //! Prints no commit text but the metric and the direction.

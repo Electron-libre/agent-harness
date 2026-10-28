@@ -5,7 +5,7 @@
 
 use std::io::Read;
 
-use super::harness_changes::{expectation, METRICS, RULE_METRIC};
+use super::cardinal_changes::{expectation, METRICS, RULE_METRIC};
 use super::{config_list, repo_root};
 
 const TYPES: [&str; 9] = [

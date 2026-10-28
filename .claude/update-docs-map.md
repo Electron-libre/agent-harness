@@ -12,4 +12,4 @@ Read by `skill:update-docs`.
 | Project-owned file added under `seed/` | `docs/architecture.md` |
 | Hook added, renamed or dropped (a `cardinal run` tool or a script under `files/.claude/hooks/`), or an allow or deny rule of the harness | `entries/.claude/settings.json`, `docs/architecture.md` (Hooks and their declaration), `README.md` (What a project gets, Gates), then `just sync` |
 | Meaning of the managed content an older `cardinal` would misread (a key of `entries/`, a line of the lock, a directory of the source) | `cardinal-format` and `FORMAT` in `crates/cardinal/src/lib.rs`, raised together (ADR 0014), `specs/sync.md` |
-| Column or metric of a transcript reader (`session-metrics`, `harness-report`, `Expected-effect:` metrics) | its spec (`specs/evaluation.md`, `harness-report.md`, `harness-verdicts.md`), `docs/architecture.md` (the readers table) |
+| Column or metric of a transcript reader (`session-metrics`, `harness-report`, `Expected-effect:` metrics) | its spec (`specs/evaluation.md`, `cardinal-report.md`, `cardinal-verdicts.md`), `docs/architecture.md` (the readers table) |

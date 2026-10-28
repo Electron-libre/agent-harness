@@ -1,4 +1,4 @@
-//! The memory files a Claude Code session of a project loads at launch (`specs/harness-report.md`, REP-2), measured
+//! The memory files a Claude Code session of a project loads at launch (`specs/cardinal-report.md`, REP-2), measured
 //! in one way for a commit (`fixed-context`) and for the work tree (the budget, SYN-38).
 
 use std::collections::{BTreeSet, HashMap, VecDeque};

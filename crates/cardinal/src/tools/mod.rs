@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod audit_sources;
+mod cardinal_changes;
+mod cardinal_report;
 mod check_commits;
 mod check_issue;
 mod check_specs;
@@ -14,8 +16,6 @@ mod commit_check;
 mod delivered_quality;
 mod fixed_context;
 mod format_rust;
-mod harness_changes;
-mod harness_report;
 mod issue_worktree;
 mod language;
 mod language_hint;
@@ -91,12 +91,12 @@ pub const TOOLS: &[Tool] = &[
     Tool {
         name: "harness-changes",
         about: "[repo] --sessions <file>: the expected effects of the harness changes, with the revisions holding each",
-        main: harness_changes::main,
+        main: cardinal_changes::main,
     },
     Tool {
         name: "harness-report",
         about: "--sessions <file> [...]: the markdown report of the readers, by group of revisions",
-        main: harness_report::main,
+        main: cardinal_report::main,
     },
     Tool {
         name: "issue-worktree",

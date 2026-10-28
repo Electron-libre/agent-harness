@@ -1,15 +1,15 @@
-//! Print the evolution of the harness by revision (`specs/harness-report.md`): one markdown table per axis, one row
+//! Print the evolution of the harness by revision (`specs/cardinal-report.md`): one markdown table per axis, one row
 //! per group of consecutive revisions holding at least `--min-sessions` sessions, with the model, version and project
 //! mix and the sample size next to the numbers. Reads the outputs of the other transcript readers, never the
 //! transcripts; it reports trends, never a pass or a fail.
 //! Usage: `cardinal run harness-report --sessions <session-metrics rows> [--breaches <rule-breaches --summary>]
 //! [--quality <delivered-quality --summary>]... [--context <fixed-context rows>] [--changes <harness-changes rows>]
 //! [--min-sessions <n>] [--anonymous]`. With `--changes`, a last table gives each recorded change of the harness a
-//! verdict from the groups before and after it (`specs/harness-verdicts.md`).
+//! verdict from the groups before and after it (`specs/cardinal-verdicts.md`).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::harness_changes::{HEADER as CHANGES, RULE_METRIC};
+use super::cardinal_changes::{HEADER as CHANGES, RULE_METRIC};
 use super::session_metrics::HEADER as SESSIONS;
 
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";

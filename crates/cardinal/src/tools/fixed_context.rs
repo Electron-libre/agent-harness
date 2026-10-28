@@ -1,4 +1,4 @@
-//! Print the fixed context each harness revision costs a project in every session (`specs/harness-report.md`): one
+//! Print the fixed context each harness revision costs a project in every session (`specs/cardinal-report.md`): one
 //! tab-separated row per project and revision used by a session of the transcripts, with the bytes of the memory files
 //! a session loads at launch (`memory.rs`, `AGENTS.md` apart) and of the skill descriptions in the commit the revision
 //! came in force with, and the skills it ships.
