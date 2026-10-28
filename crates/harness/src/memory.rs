@@ -63,7 +63,7 @@ pub(crate) struct Memory {
 /// Measures the memory files of `tree` (REP-2).
 pub(crate) fn measure(tree: &impl Tree) -> Memory {
     let mut memory = Memory::default();
-    for file in loaded(tree) {
+    for file in loaded(tree, "") {
         if file.agents {
             memory.agents += file.bytes;
         } else {
@@ -82,25 +82,26 @@ struct Loaded {
     bytes: u64,
 }
 
-/// The memory files of `tree` loaded at launch (REP-2): each file once, however many paths name it, the imports
-/// followed breadth first so that a file counts at its fewest hops.
-fn loaded(tree: &impl Tree) -> Vec<Loaded> {
+/// The memory files of the directory `dir` of `tree` (`""` for its root) loaded at launch (REP-2): each file once,
+/// however many paths name it, the imports followed breadth first so that a file counts at its fewest hops.
+fn loaded(tree: &impl Tree, dir: &str) -> Vec<Loaded> {
     let mut read: HashMap<String, Option<(String, Vec<u8>)>> = HashMap::new();
     let mut read = |path: &str| {
         read.entry(path.to_string())
             .or_insert_with(|| tree.read(path))
             .clone()
     };
+    let agents = AGENTS.map(|p| under(dir, p));
     let mut roots: Vec<String> = ["CLAUDE.md", ".claude/CLAUDE.md"]
+        .map(|p| under(dir, p))
         .into_iter()
         .filter(|p| read(p).is_some())
-        .map(String::from)
         .collect();
     if roots.is_empty() {
-        roots.extend(AGENTS.map(String::from));
+        roots.extend(agents.clone());
     }
     roots.extend(
-        rules(tree)
+        rules(tree, dir)
             .into_iter()
             .filter(|p| read(p).is_some_and(|(_, text)| !scoped(&String::from_utf8_lossy(&text)))),
     );
@@ -126,26 +127,38 @@ fn loaded(tree: &impl Tree) -> Vec<Loaded> {
         }
         loaded.push(Loaded {
             path: file,
-            agents: AGENTS.contains(&path.as_str()),
+            agents: agents.contains(&path),
             bytes: text.len() as u64,
         });
     }
     loaded
 }
 
-/// The instruction files of `tree` the user wrote (AUD-1): the memory files loaded at launch, plus `AGENTS.md`,
-/// `.claude/AGENTS.md` and the scoped rules, each once, sorted by path.
-pub(crate) fn instruction_files(tree: &impl Tree) -> BTreeSet<String> {
-    let mut files: BTreeSet<String> = loaded(tree).into_iter().map(|f| f.path).collect();
-    let extra = AGENTS.into_iter().map(String::from).chain(rules(tree));
+/// The instruction files of the directory `dir` of `tree` the user wrote (AUD-1): the memory files loaded at launch,
+/// plus `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules, each once, sorted by path.
+pub(crate) fn instruction_files(tree: &impl Tree, dir: &str) -> BTreeSet<String> {
+    let mut files: BTreeSet<String> = loaded(tree, dir).into_iter().map(|f| f.path).collect();
+    let extra = AGENTS
+        .map(|p| under(dir, p))
+        .into_iter()
+        .chain(rules(tree, dir));
     files.extend(extra.filter_map(|p| tree.read(&p)).map(|(file, _)| file));
     files
 }
 
-/// The `.claude/rules/**/*.md` files of `tree`, sorted.
-fn rules(tree: &impl Tree) -> Vec<String> {
+/// The path `path` of the directory `dir` of a tree (`""` for its root).
+fn under(dir: &str, path: &str) -> String {
+    if dir.is_empty() {
+        path.to_string()
+    } else {
+        format!("{dir}/{path}")
+    }
+}
+
+/// The `.claude/rules/**/*.md` files of the directory `dir` of `tree`, sorted.
+fn rules(tree: &impl Tree, dir: &str) -> Vec<String> {
     let mut rules: Vec<String> = tree
-        .files(".claude/rules")
+        .files(&under(dir, ".claude/rules"))
         .into_iter()
         .filter(|p| p.ends_with(".md"))
         .collect();

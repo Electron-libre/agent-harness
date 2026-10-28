@@ -14,7 +14,7 @@ hooks and rules that do not exist yet.
 
 ## Requirements
 
-- **AUD-1** (deterministic) Without `--messages`, `audit-sources` must print, for each working directory of a project's sessions, one line `  instructions: <cwd>/<path>` per instruction file of that directory and of each of its ancestor directories up to the root of its repository (the nearest one holding `.git`; none without one), sorted, each file once however many paths name it (a symbolic link printed as the file it points to, and a file outside the working directory by its absolute path): in each of these directories, the memory files a session loads at launch as REP-2 defines them (imports included), plus `AGENTS.md`, `.claude/AGENTS.md` and the `.claude/rules/**/*.md` files whose front matter has a `paths` key, when they exist, the `.claude/` directory of the home directory excepted.
+- **AUD-1** (deterministic) Without `--messages`, `audit-sources` must print, for each working directory of a project's sessions, one line `  instructions: <file>` per instruction file of that directory and of each of its ancestor directories up to the root of its repository (the nearest one holding `.git`; none without one), `<file>` its absolute path, sorted, each file once however many paths name it (a symbolic link printed as the file it points to): in each of these directories, the memory files a session loads at launch as REP-2 defines them (imports included, resolved in the tree of the repository), plus `AGENTS.md`, `.claude/AGENTS.md` and the `.claude/rules/**/*.md` files whose front matter has a `paths` key, when they exist, the `.claude/` directory of the home directory excepted.
 
 ## Scenarios
 

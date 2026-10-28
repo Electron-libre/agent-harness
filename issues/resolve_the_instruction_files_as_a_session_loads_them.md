@@ -31,7 +31,7 @@ loads, so the audit can miss a rule the user wrote and propose it again:
 
 # Tracking
 
-Plan: validated
+Plan: validated (done)
 
 ## Understanding
 Make the audit list the instruction files of the ancestors of each working directory, and resolve the imports of a
@@ -54,6 +54,9 @@ approval Claude Code asks before loading an import outside the working directory
 2. [x] Ancestors: `audit-sources` lists the instruction files of each ancestor of the working directory up to the
    root of its repository, by absolute path, `~/.claude/` excepted; amended AUD-1; verified by an `audit-sources` test with `HOME` set to a
    temporary directory; makes true AUD-1. ~120 lines.
+3. [x] Fixes of the `high` review: the ancestors read in the tree of the repository (an import may climb to any of
+   its directories), `~/.claude/` left out only from the listing of the home directory, AUD-1 worded with absolute
+   paths; verified by the ancestors test of `audit_sources`; makes true AUD-1.
 
 ## Decisions
 - Mode: autonomous
@@ -92,4 +95,24 @@ approval Claude Code asks before loading an import outside the working directory
 - Code review: no findings
 - not verified: a worktree nested in the main one (ADR 0011) stops the walk at its own `.git` file, though the session
   also loads the main worktree's `CLAUDE.md`; not measured.
+- decisions needed: none
+
+## Deliverable 3 (fixes of the `high` review)
+- done: `memory.rs` reads the memory files of a directory inside a tree; `audit-sources` reads every ancestor in the
+  tree of the repository; the `~/.claude/` filter only applies to the home directory's own listing; AUD-1 states the
+  absolute paths.
+- | check | result |
+  |---|---|
+  | tests | pass |
+  | lint | pass |
+  | specs | pass |
+  | docs | n/a: the skill already says "ancestors up to the repository root" |
+  | code review | see below |
+- red: AUD-1: the ancestors test lacked `docs/up.md` (imported with `../../`) and the rule linked into `.claude/shared/`.
+- Code review: no findings
+- High review, not fixed: the walk stops at the `.git` file of a nested worktree (decision: the repository bounds the
+  walk); the imports of a linked target outside the repository count nothing (REP-2); the ancestors are printed
+  again for each working directory (AUD-1 lists per working directory); a relative `cwd` (transcripts record absolute
+  ones); `CLAUDE.local.md` never listed (`issues/list_the_local_memory_files_in_the_audit.md`).
+- not verified: none
 - decisions needed: none

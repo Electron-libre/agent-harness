@@ -22,23 +22,31 @@ fn escape(text: &str) -> String {
 }
 
 /// The instruction files of `cwd` and of its ancestors up to the root of its repository (AUD-1), sorted: a session
-/// loads those above the repository too, but the audit reads nothing outside it. The user-level files of
-/// `~/.claude/` are left out.
+/// loads those above the repository too, but the audit walks no directory above it. The ancestors are read in the
+/// tree of the repository, so that an import may climb to any of its directories. The user-level files, in the
+/// `.claude/` of the home directory, are left out.
 fn instructions(cwd: &Path) -> BTreeSet<PathBuf> {
     // the working directory alone outside a repository
-    let depth = cwd
+    let root = cwd
         .ancestors()
-        .position(|d| d.join(".git").exists())
-        .unwrap_or(0);
-    let user = std::env::var_os("HOME").map(|h| Path::new(&h).join(".claude"));
+        .find(|d| d.join(".git").exists())
+        .unwrap_or(cwd);
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let tree = WorkTree(root);
     cwd.ancestors()
-        .take(depth + 1)
+        .take_while(|d| d.starts_with(root))
         .flat_map(|dir| {
-            instruction_files(&WorkTree(dir))
+            let rel = dir
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            let user = (home.as_deref() == Some(dir)).then(|| Path::new(&rel).join(".claude"));
+            instruction_files(&tree, &rel)
                 .into_iter()
-                .map(|f| dir.join(f))
+                .filter(move |f| !user.as_ref().is_some_and(|u| Path::new(f).starts_with(u)))
         })
-        .filter(|f| !user.as_ref().is_some_and(|u| f.starts_with(u)))
+        .map(|f| root.join(f))
         .collect()
 }
 

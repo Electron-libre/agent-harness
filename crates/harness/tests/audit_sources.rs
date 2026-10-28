@@ -187,7 +187,21 @@ fn audit_sources_lists_the_ancestors_up_to_the_repository_root() {
     write(&repo.join(".claude/CLAUDE.md"), "user level\n");
     write(&repo.join("a/CLAUDE.md"), "ancestor\n");
     write(&repo.join("a/.claude/rules/r.md"), "ancestor rule\n");
-    write(&cwd.join("CLAUDE.md"), "working directory\n");
+    // an import above the working directory, inside the repository
+    write(
+        &cwd.join("CLAUDE.md"),
+        "working directory @../../docs/up.md\n",
+    );
+    std::fs::create_dir_all(repo.join("docs")).unwrap();
+    write(&repo.join("docs/up.md"), "imported from below\n");
+    // a project rule linked into the home directory's `.claude/` is the project's
+    std::fs::create_dir_all(repo.join(".claude/shared")).unwrap();
+    write(&repo.join(".claude/shared/s.md"), "shared\n");
+    std::os::unix::fs::symlink(
+        "../../../.claude/shared/s.md",
+        repo.join("a/.claude/rules/s.md"),
+    )
+    .unwrap();
     let cwd_text = cwd.display().to_string();
     std::fs::write(
         proj.join("s1.jsonl"),
@@ -210,10 +224,12 @@ fn audit_sources_lists_the_ancestors_up_to_the_repository_root() {
     assert_eq!(
         listed,
         [
+            under(&repo, ".claude/shared/s.md"),
             under(&repo, "CLAUDE.md"),
             under(&repo, "a/.claude/rules/r.md"),
             under(&repo, "a/CLAUDE.md"),
             under(&cwd, "CLAUDE.md"),
+            under(&repo, "docs/up.md"),
         ]
     );
 }
