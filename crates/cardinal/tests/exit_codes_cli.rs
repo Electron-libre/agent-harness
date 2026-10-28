@@ -9,7 +9,7 @@ use tempfile::tempdir;
 
 /// The exit code and stderr of `harness <args>` run in `root`.
 fn harness(root: &Path, args: &[&str]) -> (Option<i32>, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(args)
         .arg("--root")
         .arg(root)

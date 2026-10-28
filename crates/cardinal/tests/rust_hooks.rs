@@ -16,7 +16,7 @@ fn run_hook(script: &Path, project: &Path, stdin: &str) -> Outcome {
 }
 
 fn run_hook_with(script: &Path, project: &Path, stdin: &str, env: &[(&str, String)]) -> Outcome {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .arg("tool")
         .arg(script)
         .env("CLAUDE_PROJECT_DIR", project)

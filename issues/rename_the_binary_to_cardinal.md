@@ -55,10 +55,19 @@ own issues).
    - Code review: no findings.
    - not verified: the CI jobs that run `install_cardinal.sh` (after the push).
    - decisions needed: none.
-2. [ ] Rename the package and binary: package `cardinal` with the bins `cardinal` and `harness`, cache
+2. [x] Rename the package and binary: package `cardinal` with the bins `cardinal` and `harness`, cache
    `<cache>/cardinal/bin/<commit>/<target>/cardinal`, release `cardinal-<commit>` then `harness-<commit>`, a cargo
    build naming no crate, the local build of `cardinal`, the messages; verified by `run_cli.rs`, `launcher_cli.rs`;
    makes true BIN-1 to BIN-6, BIN-11, BIN-12, BIN-17, BIN-18.
+   - done: package `cardinal` with the bins `cardinal` and `harness` (`src/bin/harness.rs` runs the same `main`),
+     cache and clone under `<cache>/cardinal/`, releases `cardinal-<commit>` then `harness-<commit>`, `cargo install`
+     naming no crate, local build `-p cardinal`, hints naming `cardinal`; `just install` takes `--force`.
+   - check | result: tests, lint, specs pass (`just check`); docs: architecture, README, CLAUDE.md, justfile.
+   - red: BIN-3: `a_commit_from_before_the_rename_downloads_the_harness_release` panicked, `NotFound` (no binary
+     cached under `cardinal/bin`); the other `run_cli` tests failed on the cache path and the release names.
+   - Code review: no findings.
+   - not verified: a real `cargo install --git` of a pre-rename commit naming no crate (faked in the tests).
+   - decisions needed: none. The lock header still says `harness sync` (consumer files issue).
 3. [ ] Hook transition: the git gate runs `cardinal`, else `harness`; the review gate is found under both commands;
    `check` and `update` judge the `cardinal` hooks and print the install with `--force`; verified by `gate_cli.rs`,
    `launcher_cli.rs`, `update_cli.rs`; makes true BIN-9, BIN-15, BIN-16, SYN-23.

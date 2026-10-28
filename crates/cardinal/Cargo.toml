@@ -1,9 +1,19 @@
 [package]
-name = "harness"
+name = "cardinal"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
+default-run = "cardinal"
 description = "Cardinal: synchronise the shared agent harness (skills, hooks, scripts) into a project"
+
+[[bin]]
+name = "cardinal"
+path = "src/main.rs"
+
+# The name of the binary before the rename, so the hooks of a project synced before it keep running (BIN-18).
+[[bin]]
+name = "harness"
+path = "src/bin/harness.rs"
 
 [dependencies]
 anyhow = "1"

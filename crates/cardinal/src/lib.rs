@@ -249,7 +249,7 @@ fn read_config(root: &Path) -> Result<toml::Table> {
     let path = root.join(CONFIG);
     let text = fs::read_to_string(&path).with_context(|| {
         format!(
-            "no {CONFIG} in {}: run `harness init <source>`",
+            "no {CONFIG} in {}: run `cardinal init <source>`",
             root.display()
         )
     })?;
@@ -314,7 +314,7 @@ fn cache_or_default(cache: Option<&Path>) -> Result<PathBuf> {
 
 /// Where the clone of the git source `url` lives in `cache`.
 fn clone_dir(cache: &Path, url: &str) -> PathBuf {
-    cache.join("harness").join(&hash(url.as_bytes())[..12])
+    cache.join("cardinal").join(&hash(url.as_bytes())[..12])
 }
 
 /// Clone (first time) or fetch the git source in `cache`, and return its local directory.
@@ -352,7 +352,7 @@ fn resolve_in(dir: &Path, url: &str, rev: Option<&str>) -> Result<String> {
     // on whether they serve it; a refusal is reported below).
     let _ = git(Some(dir), &["fetch", "--quiet", "origin", rev]);
     if !resolves(dir, rev) {
-        bail!("{url}: the pinned commit {rev} is gone from the source (or the source is unreachable: see git's message above); run `harness update` to pin a current revision");
+        bail!("{url}: the pinned commit {rev} is gone from the source (or the source is unreachable: see git's message above); run `cardinal update` to pin a current revision");
     }
     git_output(dir, &["rev-parse", &format!("{rev}^{{commit}}")])
 }
@@ -799,7 +799,7 @@ fn config_dir_of(config_dir: Option<OsString>, home: Option<OsString>) -> Option
 
 fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
-        bail!("no {LOCK}: run `harness sync` first");
+        bail!("no {LOCK}: run `cardinal sync` first");
     };
     let gated = gate::manages(&lock.entries, lock.files.keys());
     let text = fs::read_to_string(root.join(entries::SETTINGS)).ok();

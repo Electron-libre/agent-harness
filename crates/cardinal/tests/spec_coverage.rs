@@ -26,7 +26,7 @@ fn root(files: &[(&str, &str)]) -> tempfile::TempDir {
 
 /// The exit code and stdout of the report run on `root`.
 fn report(root: &Path) -> (Option<i32>, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(["tool", "spec-coverage"])
         .arg(root)
         .output()
@@ -198,7 +198,7 @@ fn fails_when_git_cannot_list_the_files() {
     git(dir.path(), &["init", "-q", "-b", "trunk", "."]);
     git(dir.path(), &["add", "-A"]);
     std::fs::write(dir.path().join(".git/index"), "corrupt").unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(["tool", "spec-coverage"])
         .arg(dir.path())
         .output()

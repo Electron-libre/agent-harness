@@ -71,7 +71,7 @@ fn sessions(path: &Path, rows: &[(&str, u32)]) {
 }
 
 fn run(cwd: &Path, args: &[&str]) -> (i32, String, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(["tool", "harness-changes"])
         .args(args)
         .current_dir(cwd)

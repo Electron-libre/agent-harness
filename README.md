@@ -39,7 +39,7 @@ flowchart LR
 ## Install
 
 ```sh
-cargo install --path crates/cardinal --locked   # from a clone of this repository
+cargo install --force --path crates/cardinal --locked   # from a clone (--force: over a `harness` of before)
 cd my-project
 harness init <git-url-or-path> [--rev main]    # writes .claude/harness.toml
 harness sync                                   # copies, seeds, merges the settings, installs the review gate

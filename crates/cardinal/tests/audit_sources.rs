@@ -313,7 +313,7 @@ fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
         .unwrap()
         .to_string_lossy()
         .replace('_', "-");
-    let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_harness"));
+    let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_cardinal"));
     // no user-level file of the machine running the tests
     cmd.arg("tool")
         .arg(stem)

@@ -111,7 +111,7 @@ impl Home {
 
     /// The binary, with this home: its cache, its user settings, its `PATH`, outside CI and any session.
     pub fn command(&self) -> Command {
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_harness"));
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_cardinal"));
         cmd.env("PATH", self.path_var())
             .env("XDG_CACHE_HOME", self.cache())
             .env("CLAUDE_CONFIG_DIR", self.dir.path().join("config"))

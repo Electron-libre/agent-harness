@@ -22,18 +22,18 @@ test:
     #!/usr/bin/env sh
     out=$(cargo test -q --workspace 2>&1) || { printf '%s\n' "$out"; exit 1; }
 
-# Install the `harness` binary to ~/.cargo/bin.
+# Install the `cardinal` binary and its `harness` alias to ~/.cargo/bin (`--force`: over a `harness` of before).
 install:
-    cargo install --path crates/cardinal --locked
+    cargo install --force --path crates/cardinal --locked
 
 # This repository is its own first consumer: check it with the binary just built.
 check-harness:
-    cargo run -q -p harness -- check
+    cargo run -q -p cardinal -- check
 
 # The spec checker of the working tree, whatever `harness` is installed (CI installs none for this repository).
 check-specs *args:
-    @cargo run -q -p harness -- run check-specs {{args}}
+    @cargo run -q -p cardinal -- run check-specs {{args}}
 
 # Bring this repository in step with its own `files/` and `seed/`.
 sync *args:
-    cargo run -q -p harness -- sync {{args}}
+    cargo run -q -p cardinal -- sync {{args}}

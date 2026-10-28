@@ -764,7 +764,7 @@ fn untracked_content_checks(hook: &Path) -> Vec<(&'static str, bool)> {
 
 #[test]
 fn review_gate() {
-    let hook = Path::new(env!("CARGO_BIN_EXE_harness")).to_path_buf();
+    let hook = Path::new(env!("CARGO_BIN_EXE_cardinal")).to_path_buf();
     let project = tempfile::tempdir().unwrap().keep();
     let _ = fs::remove_dir_all(&project);
     fs::create_dir_all(&project).unwrap();

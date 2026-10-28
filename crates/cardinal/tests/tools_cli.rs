@@ -10,7 +10,7 @@ use tempfile::{tempdir, TempDir};
 
 /// Exit code, stdout and stderr of `harness tool <args>` run in `cwd` with `stdin`.
 fn tool(cwd: &Path, args: &[&str], stdin: &str) -> (i32, String, String) {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .arg("tool")
         .args(args)
         .current_dir(cwd)
@@ -306,7 +306,7 @@ fn check_commits_validates_every_non_merge_commit_of_the_range() {
 #[test]
 fn run_exits_3_when_it_cannot_get_the_tool() {
     let dir = tempdir().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+    let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(["run", "commit-check"])
         .current_dir(dir.path())
         .env_remove("CLAUDE_PROJECT_DIR")
@@ -317,32 +317,41 @@ fn run_exits_3_when_it_cannot_get_the_tool() {
     assert!(stderr.contains("harness.toml"), "{stderr}");
 }
 
-// spec: BIN-17
+// spec: BIN-17, BIN-18
 #[test]
-fn the_launcher_exits_3_when_it_cannot_parse_its_arguments() {
+fn the_launcher_and_its_alias_exit_3_when_they_cannot_parse_their_arguments() {
     let dir = tempdir().unwrap();
-    let launch = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_harness"))
-            .args(args)
-            .current_dir(dir.path())
-            .output()
-            .unwrap()
-    };
-    for args in [
-        &["newcmd"][..],
-        &["check", "--no-such-flag"],
-        &["init"],
-        &[],
-    ] {
-        let out = launch(args);
-        assert_eq!(out.status.code(), Some(3), "{args:?}");
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(stderr.contains("Usage:"), "{args:?}: {stderr}");
-    }
-    for args in [&["--help"][..], &["--version"], &["help", "check"]] {
-        let out = launch(args);
-        assert_eq!(out.status.code(), Some(0), "{args:?}");
-        assert!(!out.stdout.is_empty(), "{args:?}: nothing printed");
+    let alias = Path::new(env!("CARGO_BIN_EXE_cardinal")).with_file_name("harness");
+    for bin in [Path::new(env!("CARGO_BIN_EXE_cardinal")), &alias] {
+        let launch = |args: &[&str]| {
+            Command::new(bin)
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .unwrap()
+        };
+        for args in [
+            &["newcmd"][..],
+            &["check", "--no-such-flag"],
+            &["init"],
+            &[],
+        ] {
+            let out = launch(args);
+            assert_eq!(out.status.code(), Some(3), "{bin:?} {args:?}");
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            assert!(stderr.contains("Usage:"), "{bin:?} {args:?}: {stderr}");
+        }
+        for args in [
+            &["--help"][..],
+            &["--version"],
+            &["help", "check"],
+            &["help", "run"],
+            &["help", "update"],
+        ] {
+            let out = launch(args);
+            assert_eq!(out.status.code(), Some(0), "{bin:?} {args:?}");
+            assert!(!out.stdout.is_empty(), "{bin:?} {args:?}: nothing printed");
+        }
     }
 }
 
@@ -366,7 +375,7 @@ fn every_tool_the_shared_harness_runs_exists() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut sources = files_under(&repo.join("files"));
     sources.push(repo.join("entries/.claude/settings.json"));
-    let tools: Vec<&str> = harness::tools::TOOLS.iter().map(|t| t.name).collect();
+    let tools: Vec<&str> = cardinal::tools::TOOLS.iter().map(|t| t.name).collect();
     let mut runs = 0;
     for path in sources {
         let Ok(text) = fs::read_to_string(&path) else {

@@ -1,11 +1,12 @@
-//! `harness run <tool>`: run a tool of the harness with the `harness` binary of the revision the project pins
+//! `cardinal run <tool>`: run a tool of the harness with the `cardinal` binary of the revision the project pins
 //! (spec `specs/tool-binaries.md`, ADR 0010).
 //!
-//! The installed `harness` is only a launcher. With a git source it executes the binary cached for the pinned commit and
-//! the platform, `<cache>/harness/bin/<commit>/<target>/harness`, fetched once: the release asset of the commit
-//! (GitHub sources, SHA-256 checked), else built by `cargo install`. With a local directory source (the repository
-//! that develops the tools) it builds that directory's crate with `cargo build`, and keeps a copy of the last good build
-//! so that a working tree that does not compile does not block every hook. The binary then runs `harness tool <name>`.
+//! The installed `cardinal` is only a launcher. With a git source it executes the binary cached for the pinned commit
+//! and the platform, `<cache>/cardinal/bin/<commit>/<target>/cardinal`, fetched once: the release asset of the commit
+//! (GitHub sources, SHA-256 checked; the `harness` release of a commit from before the rename), else built by `cargo
+//! install`. With a local directory source (the repository that develops the tools) it builds that directory's crate
+//! with `cargo build`, and keeps a copy of the last good build so that a working tree that does not compile does not
+//! block every hook. The binary then runs `cardinal tool <name>`.
 
 use std::ffi::OsString;
 use std::fs;
@@ -59,7 +60,7 @@ fn project_root(start: &Path, fallback: Option<&Path>) -> Result<PathBuf> {
         .or_else(|| fallback.and_then(nearest))
         .with_context(|| {
             format!(
-                "no {CONFIG} in {} or above: run `harness init <source>`",
+                "no {CONFIG} in {} or above: run `cardinal init <source>`",
                 start.display()
             )
         })
@@ -113,11 +114,11 @@ pub fn command(
 /// Where the binary of `commit` for this platform is cached.
 fn cached(cache: &Path, commit: &str) -> PathBuf {
     cache
-        .join("harness")
+        .join("cardinal")
         .join("bin")
         .join(commit)
         .join(target())
-        .join("harness")
+        .join("cardinal")
 }
 
 /// The cached binary of `commit`, downloaded or built first when missing (BIN-2 to BIN-5, BIN-10, BIN-11).
@@ -133,11 +134,11 @@ pub fn binary_of(cache: &Path, source: &str, commit: &str, programs: &Programs) 
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     let staging = Staging::new(dir)?;
     let target = target();
-    if let Some(url) = asset_url(source, commit, &target) {
+    for url in asset_urls(source, commit, &target) {
         if let Some(digest) = download(programs, &url, &staging.path)? {
             let actual = hash(&fs::read(&staging.path)?);
             if digest != actual {
-                bail!("the harness binary of {commit} for {target} does not match its published SHA-256 ({actual} instead of {digest}): not installed");
+                bail!("the cardinal binary of {commit} for {target} does not match its published SHA-256 ({actual} instead of {digest}): not installed");
             }
             return staging.install(&binary);
         }
@@ -145,20 +146,30 @@ pub fn binary_of(cache: &Path, source: &str, commit: &str, programs: &Programs) 
     if build(programs, source, commit, &staging.path)? {
         return staging.install(&binary);
     }
-    bail!("no harness binary for {commit} on {target}: no release asset, and `cargo` is missing or failed to build it; run `harness update` to pin a published revision, or install Rust")
+    bail!("no cardinal binary for {commit} on {target}: no release asset, and `cargo` is missing or failed to build it; run `cardinal update` to pin a published revision, or install Rust")
 }
 
-/// `https://github.com/<owner>/<repo>/releases/download/harness-<commit>/harness-<target>` for a GitHub source.
-fn asset_url(source: &str, commit: &str, target: &str) -> Option<String> {
-    let path = source
+/// The names of the binary, its release and its asset: `cardinal`, then `harness` for a commit from before the rename.
+const NAMES: [&str; 2] = ["cardinal", "harness"];
+
+/// `https://github.com/<owner>/<repo>/releases/download/<name>-<commit>/<name>-<target>` of each of the `NAMES` for a
+/// GitHub source, none for another source.
+fn asset_urls(source: &str, commit: &str, target: &str) -> Vec<String> {
+    let Some(path) = source
         .strip_prefix("https://github.com/")
         .or_else(|| source.strip_prefix("git@github.com:"))
-        .or_else(|| source.strip_prefix("ssh://git@github.com/"))?;
+        .or_else(|| source.strip_prefix("ssh://git@github.com/"))
+    else {
+        return Vec::new();
+    };
     let path = path.trim_end_matches('/');
     let path = path.strip_suffix(".git").unwrap_or(path);
-    Some(format!(
-        "https://github.com/{path}/releases/download/harness-{commit}/harness-{target}"
-    ))
+    NAMES
+        .iter()
+        .map(|name| {
+            format!("https://github.com/{path}/releases/download/{name}-{commit}/{name}-{target}")
+        })
+        .collect()
 }
 
 /// Download `url` to `to` and its digest from `<url>.sha256`; `None` when either cannot be downloaded.
@@ -194,7 +205,8 @@ pub(crate) fn cargo_url(source: &str) -> String {
     }
 }
 
-/// Build `harness` of `commit` with `cargo install` and put it at `to`; false when cargo is missing or fails.
+/// Build the binary of `commit` with `cargo install` and put it at `to`; false when cargo is missing or fails. No crate
+/// is named: the source holds one package, `cardinal`, or `harness` before the rename.
 fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> Result<bool> {
     let root = to.with_extension("root");
     let url = cargo_url(source);
@@ -203,11 +215,12 @@ fn build(programs: &Programs, source: &str, commit: &str, to: &Path) -> Result<b
             "install", "--quiet", "--locked", "--git", &url, "--rev", commit, "--root",
         ])
         .arg(&root)
-        .arg("harness")
         .stdout(Stdio::null())
         .status()
         .is_ok_and(|s| s.success())
-        && fs::rename(root.join("bin").join("harness"), to).is_ok();
+        && NAMES
+            .iter()
+            .any(|name| fs::rename(root.join("bin").join(name), to).is_ok());
     let _ = fs::remove_dir_all(&root);
     Ok(built)
 }
@@ -246,18 +259,18 @@ impl Drop for Staging {
 fn local_binary(source: &Path, cache: &Path, programs: &Programs) -> Result<PathBuf> {
     let source = fs::canonicalize(source)
         .with_context(|| format!("reading the source {}", source.display()))?;
-    let dir = cache.join("harness").join("bin").join(format!(
+    let dir = cache.join("cardinal").join("bin").join(format!(
         "local-{}",
         &hash(source.as_os_str().as_encoded_bytes())[..12]
     ));
-    let last_good = dir.join("harness");
+    let last_good = dir.join("cardinal");
     let out = Command::new(&programs.cargo)
         .args([
             "build",
             "--quiet",
             "--message-format=json-render-diagnostics",
             "-p",
-            "harness",
+            "cardinal",
             "--manifest-path",
         ])
         .arg(source.join("Cargo.toml"))
@@ -271,7 +284,7 @@ fn local_binary(source: &Path, cache: &Path, programs: &Programs) -> Result<Path
             String::from_utf8_lossy(&o.stdout)
                 .lines()
                 .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
-                .filter(|m| m["target"]["name"] == "harness")
+                .filter(|m| m["target"]["name"] == "cardinal")
                 .find_map(|m| m["executable"].as_str().map(PathBuf::from))
         });
     if let Some(built) = built {
@@ -284,7 +297,7 @@ fn local_binary(source: &Path, cache: &Path, programs: &Programs) -> Result<Path
     };
     if last_good.is_file() {
         eprintln!(
-            "harness: the build of {} failed, running its last good build",
+            "cardinal: the build of {} failed, running its last good build",
             source.display()
         );
         return Ok(last_good);

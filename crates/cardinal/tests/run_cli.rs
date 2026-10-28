@@ -1,4 +1,4 @@
-//! `harness run`, run as the binary with fake `curl` and `cargo` on no network (spec `specs/tool-binaries.md`), and
+//! `cardinal run`, run as the binary with fake `curl` and `cargo` on no network (spec `specs/tool-binaries.md`), and
 //! the prefetch of `sync` and `update`.
 #![cfg(unix)]
 
@@ -13,7 +13,7 @@ use tempfile::{tempdir, TempDir};
 const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
 const SOURCE: &str = "https://github.com/owner/repo.git";
 
-/// A fake tools binary (`harness tool <name> <code> ...`): prints its arguments, its working directory, stdin and its
+/// A fake tools binary (`cardinal tool <name> <code> ...`): prints its arguments, its working directory, stdin and its
 /// own path to stdout, a line to stderr, and exits with `<code>`.
 const TOOL: &str =
     "echo \"args: $*\"; pwd; cat; echo \"bin: $0\"; echo \"to stderr\" >&2; exit \"$3\"\n";
@@ -29,7 +29,7 @@ fn target() -> String {
 }
 
 /// A test home whose `curl` serves the files of `<home>/served` by the last part of the URL and whose `cargo install`
-/// writes `TOOL` under `--root` (with `cargo`), each logging its call to `<home>/log`.
+/// writes `TOOL` as `<root>/bin/<bin>` (with `cargo`), each logging its call to `<home>/log`.
 struct Launcher {
     home: Home,
 }
@@ -56,12 +56,17 @@ if [ -n "$out" ]; then cat "$file" > "$out"; else cat "$file"; fi
     }
 
     fn with_cargo(self) -> Self {
+        self.with_cargo_building("cardinal")
+    }
+
+    /// A `cargo install` that builds `bin`: `harness` for a commit from before the rename.
+    fn with_cargo_building(self, bin: &str) -> Self {
         self.home.program(
             "cargo",
             &format!(
                 r#"echo "$*" >> '{home}/log'
 root=""; while [ $# -gt 0 ]; do case "$1" in --root) root="$2"; shift 2;; *) shift;; esac; done
-mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"
+mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/{bin}"
 "#,
                 home = self.home.path().display()
             ),
@@ -69,9 +74,10 @@ mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"
         self
     }
 
-    /// Publish `binary` as the asset of the platform, with the digest `digest` (its own when `None`).
-    fn publish(&self, binary: &str, digest: Option<&str>) {
-        let asset = format!("harness-{}", target());
+    /// Publish `binary` as the asset `<name>-<target>` of the platform, with the digest `digest` (its own when
+    /// `None`).
+    fn publish(&self, name: &str, binary: &str, digest: Option<&str>) {
+        let asset = format!("{name}-{}", target());
         let served = self.home.path().join("served");
         fs::write(served.join(&asset), binary).unwrap();
         let digest = digest.map_or_else(|| sha256(binary.as_bytes()), str::to_string);
@@ -90,10 +96,10 @@ mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"
     fn cached(&self, commit: &str) -> PathBuf {
         self.home
             .cache()
-            .join("harness/bin")
+            .join("cardinal/bin")
             .join(commit)
             .join(target())
-            .join("harness")
+            .join("cardinal")
     }
 
     /// What the directory of the cached binary of `COMMIT` holds besides the binary.
@@ -103,13 +109,13 @@ mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"
             |_| Vec::new(),
             |d| {
                 d.map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-                    .filter(|n| n != "harness")
+                    .filter(|n| n != "cardinal")
                     .collect()
             },
         )
     }
 
-    /// `harness run <args>` in `cwd` with `stdin`, with `CLAUDE_PROJECT_DIR` set to `project` if any.
+    /// `cardinal run <args>` in `cwd` with `stdin`, with `CLAUDE_PROJECT_DIR` set to `project` if any.
     fn run_in(&self, cwd: &Path, project: Option<&Path>, args: &[&str], stdin: &str) -> Run {
         let mut cmd = self.home.command();
         cmd.arg("run").args(args).current_dir(cwd);
@@ -119,7 +125,7 @@ mkdir -p "$root/bin"; printf '#!/bin/sh\n{TOOL}' > "$root/bin/harness"
         output(cmd, stdin)
     }
 
-    /// `harness run t 0` in `root`.
+    /// `cardinal run t 0` in `root`.
     fn run(&self, root: &Path) -> Run {
         self.run_in(root, None, &["t", "0"], "")
     }
@@ -225,7 +231,7 @@ fn a_rev_that_is_no_hash_resolves_in_the_clone_sync_left_without_fetching() {
 #[test]
 fn a_missing_binary_is_downloaded_with_its_digest_and_installed_whole() {
     let l = Launcher::new();
-    l.publish(&format!("#!/bin/sh\n{TOOL}"), None);
+    l.publish("cardinal", &format!("#!/bin/sh\n{TOOL}"), None);
     let root = pinned(SOURCE);
 
     let run = l.run(root.path());
@@ -234,7 +240,7 @@ fn a_missing_binary_is_downloaded_with_its_digest_and_installed_whole() {
     assert!(run.stdout.starts_with("args: tool t 0\n"), "{run:?}");
     assert!(executable(&l.cached(COMMIT)));
     let asset = format!(
-        "https://github.com/owner/repo/releases/download/harness-{COMMIT}/harness-{}",
+        "https://github.com/owner/repo/releases/download/cardinal-{COMMIT}/cardinal-{}",
         target()
     );
     assert_eq!(l.log(), format!("{asset}\n{asset}.sha256\n"));
@@ -244,11 +250,31 @@ fn a_missing_binary_is_downloaded_with_its_digest_and_installed_whole() {
     assert_eq!(l.log().lines().count(), 2);
 }
 
+// spec: BIN-3
+#[test]
+fn a_commit_from_before_the_rename_downloads_the_harness_release() {
+    let l = Launcher::new();
+    l.publish("harness", &format!("#!/bin/sh\n{TOOL}"), None);
+    let root = pinned(SOURCE);
+
+    let run = l.run(root.path());
+
+    assert_eq!(run.code, Some(0), "{run:?}");
+    assert!(executable(&l.cached(COMMIT)));
+    let release = "https://github.com/owner/repo/releases/download";
+    let (new, old) = (
+        format!("{release}/cardinal-{COMMIT}/cardinal-{}", target()),
+        format!("{release}/harness-{COMMIT}/harness-{}", target()),
+    );
+    assert_eq!(l.log(), format!("{new}\n{old}\n{old}.sha256\n"));
+    assert!(l.leftovers().is_empty(), "{:?}", l.leftovers());
+}
+
 // spec: BIN-10
 #[test]
 fn an_asset_that_does_not_match_its_digest_is_not_installed() {
     let l = Launcher::new().with_cargo();
-    l.publish("tampered", Some(&sha256(b"genuine")));
+    l.publish("cardinal", "tampered", Some(&sha256(b"genuine")));
     let root = pinned(SOURCE);
 
     let run = l.run(root.path());
@@ -279,23 +305,27 @@ fn with_no_asset_the_binary_is_built_with_cargo_install() {
             false,
         ),
     ] {
-        let l = Launcher::new().with_cargo();
-        let root = pinned(source);
+        for bin in ["cardinal", "harness"] {
+            let l = Launcher::new().with_cargo_building(bin);
+            let root = pinned(source);
 
-        let run = l.run(root.path());
+            let run = l.run(root.path());
 
-        assert_eq!(run.code, Some(0), "{source}: {run:?}");
-        assert!(run.stdout.starts_with("args: tool t 0\n"), "{run:?}");
-        assert!(executable(&l.cached(COMMIT)), "{source}");
-        let log = l.log();
-        let install = log.lines().find(|l| l.starts_with("install")).unwrap();
-        assert!(
-            install.contains(&format!("--locked --git {url} --rev {COMMIT} --root")),
-            "{install}"
-        );
-        // a source not on GitHub is built without a download
-        assert_eq!(!log.starts_with("install"), downloads, "{source}: {log}");
-        assert!(l.leftovers().is_empty(), "{:?}", l.leftovers());
+            assert_eq!(run.code, Some(0), "{source}: {run:?}");
+            assert!(run.stdout.starts_with("args: tool t 0\n"), "{run:?}");
+            assert!(executable(&l.cached(COMMIT)), "{source}");
+            let log = l.log();
+            let install = log.lines().find(|l| l.starts_with("install")).unwrap();
+            assert!(
+                install.contains(&format!("--locked --git {url} --rev {COMMIT} --root")),
+                "{install}"
+            );
+            // no crate named: the single package of the commit, `harness` before the rename
+            assert!(install.ends_with(".root"), "{install}");
+            // a source not on GitHub is built without a download
+            assert_eq!(!log.starts_with("install"), downloads, "{source}: {log}");
+            assert!(l.leftovers().is_empty(), "{:?}", l.leftovers());
+        }
     }
 }
 
@@ -316,7 +346,7 @@ fn with_no_asset_nor_a_build_the_fetch_fails_naming_the_commit_the_platform_and_
         assert!(
             run.stderr.contains(COMMIT)
                 && run.stderr.contains(&target())
-                && run.stderr.contains("harness update"),
+                && run.stderr.contains("cardinal update"),
             "{run:?}"
         );
         assert!(!l.cached(COMMIT).exists());
@@ -333,7 +363,7 @@ fn local_project(l: &Launcher) -> (TempDir, TempDir, PathBuf) {
         CONFIG,
         &format!("[harness]\nsource = \"{}\"\n", source.path().display()),
     );
-    let built = l.home.path().join("target-harness");
+    let built = l.home.path().join("target-cardinal");
     (source, root, built)
 }
 
@@ -343,7 +373,7 @@ fn cargo_build(l: &Launcher, built: Option<&Path>) {
         Some(built) => {
             script(built, TOOL);
             format!(
-                "echo \"$*\" >> '{log}'\necho '{{\"reason\":\"compiler-artifact\",\"target\":{{\"name\":\"harness\"}},\"executable\":\"{exe}\"}}'\n",
+                "echo \"$*\" >> '{log}'\necho '{{\"reason\":\"compiler-artifact\",\"target\":{{\"name\":\"cardinal\"}},\"executable\":\"{exe}\"}}'\n",
                 log = l.home.path().join("log").display(),
                 exe = built.display()
             )
@@ -367,7 +397,9 @@ fn a_local_source_runs_the_crate_it_builds() {
     let build = l.log();
     let manifest = fs::canonicalize(source.path()).unwrap().join("Cargo.toml");
     assert!(
-        build.starts_with("build ") && build.contains(&manifest.display().to_string()),
+        build.starts_with("build ")
+            && build.contains("-p cardinal ")
+            && build.contains(&manifest.display().to_string()),
         "{build}"
     );
 }

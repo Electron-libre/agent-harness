@@ -1,14 +1,14 @@
-//! `harness`: copy the shared agent harness into a project and tell when a managed file drifted.
+//! `cardinal`: copy the shared agent harness into a project and tell when a managed file drifted.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
-use harness::{
+use cardinal::{
     budget_warnings, check, init, retention_warnings, run, sync, tools, update, Outcome, Report,
     SyncOptions, NOT_A_REFUSAL,
 };
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -78,7 +78,7 @@ fn run(root: &Path, tool: &[OsString]) -> ExitCode {
     let mut cmd = match found {
         Ok(cmd) => cmd,
         Err(e) => {
-            eprintln!("harness run: {e:#}");
+            eprintln!("cardinal run: {e:#}");
             return ExitCode::from(NOT_A_REFUSAL);
         }
     };
@@ -86,14 +86,14 @@ fn run(root: &Path, tool: &[OsString]) -> ExitCode {
     {
         use std::os::unix::process::CommandExt;
         let e = cmd.exec();
-        eprintln!("harness run: cannot run the harness binary: {e}");
+        eprintln!("cardinal run: cannot run the cardinal binary: {e}");
         ExitCode::from(NOT_A_REFUSAL)
     }
     #[cfg(not(unix))]
     match cmd.status() {
         Ok(status) => ExitCode::from(status.code().map_or(NOT_A_REFUSAL, |c| c as u8)),
         Err(e) => {
-            eprintln!("harness run: cannot run the harness binary: {e}");
+            eprintln!("cardinal run: cannot run the cardinal binary: {e}");
             ExitCode::from(NOT_A_REFUSAL)
         }
     }
@@ -112,7 +112,7 @@ fn print_changes(report: &Report) -> bool {
     report.conflicts() == 0
 }
 
-fn main() -> ExitCode {
+pub fn main() -> ExitCode {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         // `--help` and `--version` print to stdout and exit 0; a real parse error goes to stderr.

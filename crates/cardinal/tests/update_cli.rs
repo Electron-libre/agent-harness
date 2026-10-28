@@ -309,7 +309,7 @@ fn a_pinned_hash_the_source_does_not_serve_fails_naming_update_and_changes_nothi
             run.stderr.contains("gone from the source"),
             "{args:?}: {run:?}"
         );
-        assert!(run.stderr.contains("harness update"), "{args:?}: {run:?}");
+        assert!(run.stderr.contains("cardinal update"), "{args:?}: {run:?}");
         assert_eq!(snapshot(root.path()), before);
     }
     // an abbreviated hash or a name is not fetched by hash: the error stays the plain one

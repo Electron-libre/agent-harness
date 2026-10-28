@@ -14,7 +14,8 @@ Cardinal, the shared agent harness (skills, hooks, scripts, recipes, CI) of the 
 - `seed/`: project-owned starting points, copied once.
 - `entries/.claude/settings.json`: the hooks and deny rules `sync` keeps in each project's `.claude/settings.json`
   (declare a new hook here).
-- `crates/cardinal/`: the `harness` binary (`init`, `sync`, `check`, `run` for the tools of `src/tools/`).
+- `crates/cardinal/`: the `cardinal` binary (`init`, `sync`, `check`, `run` for the tools of `src/tools/`), and its
+  `harness` alias, the name before the rename.
 - `specs/`: what the tool and its shared hooks must do (one file per capability, see `specs/README.md`), traced to
   its tests by `// spec: ID`.
 - `issues/`: open issues, ordered in `issues/queue.md` (`just next-issue`); `docs/adr/`: decisions.

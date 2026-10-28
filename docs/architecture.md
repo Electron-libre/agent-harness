@@ -51,7 +51,7 @@ revision. `check` compares the project with its lock and never reads the source.
 
 ## Tools and their binary
 
-The tools of Cardinal (hooks, checks, issue tools, transcript readers) are modules of the `harness` crate, one per
+The tools of Cardinal (hooks, checks, issue tools, transcript readers) are modules of the `cardinal` crate, one per
 tool under `crates/cardinal/src/tools/`, listed in `TOOLS`
 ([ADR 0010](adr/0010-the-tools-ship-in-the-harness-binary.md), spec
 [`specs/tool-binaries.md`](../specs/tool-binaries.md)). A hook, a recipe or a skill calls `harness run <tool> [args]`.
@@ -59,20 +59,22 @@ A consumer needs `harness` and `just`, and Rust only for a commit with no publis
 of the shared content (`tests/skills.rs`, `tests/settings_hygiene.rs`) are the `cargo test` of this repository;
 consumers run none.
 
-The installed `harness` is only a launcher (`crates/cardinal/src/run.rs`): it finds the pinned revision and replaces
-itself (`exec`) by that revision's binary, so input, output and exit code are the tool's.
+The installed `cardinal` is only a launcher (`crates/cardinal/src/run.rs`): it finds the pinned revision and replaces
+itself (`exec`) by that revision's binary, so input, output and exit code are the tool's. The binary was named `harness`
+before: the crate also installs a `harness` binary that does the same (BIN-18), so the hooks, recipes and git gate of a
+project synced before the rename keep running until its next sync.
 
 ```mermaid
 flowchart TD
   hook["hook, recipe or skill:<br/>harness run TOOL"] --> find["nearest .claude/harness.toml<br/>(else CLAUDE_PROJECT_DIR)"]
   find -->|git source| cached{"binary of the<br/>commit cached?"}
   cached -->|yes| exec["exec the binary:<br/>tool TOOL args"]
-  cached -->|no| download["release asset<br/>and its .sha256 (curl)"]
+  cached -->|no| download["release asset and its .sha256 (curl):<br/>cardinal-COMMIT, else harness-COMMIT"]
   download -->|digest matches| exec
   download -->|"digest differs (BIN-10)"| fail["fails,<br/>installs nothing"]
   download -->|"any other failure:<br/>no release, not GitHub, no network"| cargo["cargo install --git<br/>--rev COMMIT"]
   cargo -->|built| exec
-  find -->|local directory| build["cargo build -p harness<br/>(last good build if it fails)"]
+  find -->|local directory| build["cargo build -p cardinal<br/>(last good build if it fails)"]
   build --> exec
   find -->|none found| exit3["exit 3:<br/>never blocks the agent"]
   cargo -->|fails| exit3
@@ -88,9 +90,11 @@ flowchart TD
 A binary pinned before BIN-7 exits 2 instead of 3 on a tool it does not know, and a launcher installed before BIN-17
 on a subcommand it does not know: the hook then refuses, and with an old launcher every hook does.
 
-The binaries live in `<cache>/harness/bin/<commit>/<target>/harness`, or `<cache>/harness/bin/local-<hash of the
-path>/harness` for a local source, written next to their place and renamed (BIN-4). A `rev` that is no commit hash (a
-branch, from `init --rev`) resolves in the clone `sync` left, without a fetch. `sync` and `update` fetch the binary
+The binaries live in `<cache>/cardinal/bin/<commit>/<target>/cardinal`, or `<cache>/cardinal/bin/local-<hash of the
+path>/cardinal` for a local source, written next to their place and renamed (BIN-4). A `rev` that is no commit hash (a
+branch, from `init --rev`) resolves in the clone `sync` left (`<cache>/cardinal/<hash of the URL>`), without a fetch.
+A commit from before the rename is fetched from its `harness-<commit>` release, or built by a `cargo install` that
+names no crate, which builds the single package of the commit whatever its name. `sync` and `update` fetch the binary
 ahead.
 
 The launcher itself is not of the pinned revision: a hook running a subcommand the installed `harness` does not know

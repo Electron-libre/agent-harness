@@ -35,7 +35,7 @@ fn hook(project: &Path, event: &Value) -> Run {
 }
 
 fn hook_raw(project: &Path, stdin: &str) -> Run {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_harness"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_cardinal"));
     cmd.args(["tool", "language-hint"])
         .env("CLAUDE_PROJECT_DIR", project);
     output(cmd, stdin)
