@@ -1,13 +1,14 @@
 //! List the sources of the instruction audit: per project of the transcripts directory, the sessions, the
 //! messages typed by the user, the memory files and the instruction files of each working directory and of its
 //! ancestors up to the repository root (AUD-1: the memory files a session loads at launch, `AGENTS.md`,
-//! `.claude/AGENTS.md` and the scoped rules). With
+//! `.claude/AGENTS.md` and the scoped rules), after the user-level instruction files of the configuration directory
+//! (AUD-2). With
 //! `--messages`, print the typed messages as `project<TAB>session<TAB>text` (newlines escaped); subagent
 //! transcripts are skipped. Prints private content: never commit the output.
 //! Usage: `harness run audit-sources [projects_dir] [--messages]` (default `~/.claude/projects`).
 
 use super::transcripts;
-use crate::memory::{instruction_files, WorkTree};
+use crate::memory::{instruction_files, WorkTree, PROJECT, USER};
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -42,11 +43,22 @@ fn instructions(cwd: &Path) -> BTreeSet<PathBuf> {
                 .to_string_lossy()
                 .into_owned();
             let user = (home.as_deref() == Some(dir)).then(|| Path::new(&rel).join(".claude"));
-            instruction_files(&tree, &rel)
+            instruction_files(&tree, &rel, &PROJECT)
                 .into_iter()
                 .filter(move |f| !user.as_ref().is_some_and(|u| Path::new(f).starts_with(u)))
         })
         .map(|f| root.join(f))
+        .collect()
+}
+
+/// The user-level instruction files (AUD-2): `CLAUDE.md`, the rules and their imports in the configuration directory.
+fn user_instructions() -> BTreeSet<PathBuf> {
+    let Some(config) = crate::config_dir() else {
+        return BTreeSet::new();
+    };
+    instruction_files(&WorkTree(&config), "", &USER)
+        .into_iter()
+        .map(|f| config.join(f))
         .collect()
 }
 
@@ -69,6 +81,11 @@ pub(super) fn main(args: &[String]) -> u8 {
             std::process::exit(2);
         }
     };
+    if !print_messages {
+        for file in user_instructions() {
+            println!("instructions: {}", file.display());
+        }
+    }
     for project in projects(&root) {
         let name = project.file_name().unwrap().to_string_lossy().into_owned();
         let (mut session_count, mut messages, mut cwds) = (0, 0, Vec::<String>::new());

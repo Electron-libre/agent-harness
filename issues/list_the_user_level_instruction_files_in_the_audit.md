@@ -21,3 +21,40 @@ it again. List them once, apart from the projects.
 # Resources
 * `crates/harness/src/tools/audit_sources.rs`, `crates/harness/src/memory.rs`
 * `files/.claude/skills/audit-instructions/SKILL.md` (step "Collect")
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+`audit-sources` prints the user-level instruction files (`CLAUDE.md`, `rules/**/*.md` of the configuration directory,
+imports included) once, before the projects (approach 1). Out of scope: the managed policy files, imports leaving the
+configuration directory.
+
+## Plan
+1. [x] User-level files: `memory.rs` reads a configuration directory's layout (`CLAUDE.md`, `rules/`), `audit-sources`
+   prints them before the projects, the "Collect" step of `audit-instructions` names them; verified by the binary
+   test of `tests/audit_sources.rs` (`CLAUDE_CONFIG_DIR` set, then unset with `HOME`); makes true AUD-2 (~150 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 700a7cd5a59c53e6cd9146fdbe5b1432180aab8e
+- 1 a: an import leaving the configuration directory is not listed, as AUD-1 reads nothing outside the repository.
+- 2 a: the rules scoped by `paths` are listed too.
+
+## Deliverable 1
+- done: `audit-sources` prints the user-level instruction files before the projects (`memory::Layout`, `config_dir`
+  shared with the retention warnings); "Collect" of `audit-instructions` and `docs/architecture.md` name them.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass (AUD-2 traced) |
+| docs | skill, architecture |
+| code review | low, see below |
+
+- red: AUD-2: `assertion left == right failed, left: [] right: [<config>/CLAUDE.md, <config>/notes.md, <config>/rules/a.md, <config>/rules/sub/b.md]`
+- Code review: no findings
+- not verified: none
+- decisions needed: none

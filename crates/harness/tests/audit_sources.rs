@@ -234,6 +234,65 @@ fn audit_sources_lists_the_ancestors_up_to_the_repository_root() {
     );
 }
 
+// spec: AUD-2
+#[test]
+fn audit_sources_lists_the_user_level_files_before_the_projects() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = tmp.path().join("config");
+    let proj = tmp.path().join("projects/-tmp-repo");
+    std::fs::create_dir_all(&proj).unwrap();
+    std::fs::create_dir_all(config.join("rules/sub")).unwrap();
+    let write = |path: &str, text: &str| std::fs::write(config.join(path), text).unwrap();
+    write("CLAUDE.md", "see @notes.md and @~/elsewhere.md\n");
+    write("notes.md", "imported\n");
+    write("unread.md", "not imported\n");
+    write("rules/a.md", "always\n");
+    write("rules/sub/b.md", "---\npaths: [\"src/**\"]\n---\nscoped\n");
+    write("rules/c.txt", "not a rule\n");
+    let cwd = tmp.path().join("repo").display().to_string();
+    std::fs::write(
+        proj.join("s1.jsonl"),
+        format!("{{\"type\":\"user\",\"cwd\":{cwd:?},\"message\":{{\"content\":\"hi\"}}}}\n"),
+    )
+    .unwrap();
+    let user_level = |cmd: &mut std::process::Command| {
+        let out = cmd.arg(tmp.path().join("projects")).output().unwrap();
+        assert!(out.status.success());
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let first: Vec<String> = stdout
+            .lines()
+            .map_while(|l| l.strip_prefix("instructions: "))
+            .map(String::from)
+            .collect();
+        assert!(stdout
+            .lines()
+            .nth(first.len())
+            .unwrap()
+            .starts_with("-tmp-repo:"));
+        first
+    };
+    let expected = |dir: &std::path::Path| {
+        ["CLAUDE.md", "notes.md", "rules/a.md", "rules/sub/b.md"]
+            .map(|p| dir.join(p).display().to_string())
+    };
+
+    let set = user_level(
+        tool_command("audit_sources.rs")
+            .env("CLAUDE_CONFIG_DIR", &config)
+            .env("HOME", tmp.path().join("nowhere")),
+    );
+    assert_eq!(set, expected(&config));
+
+    let home_config = tmp.path().join(".claude");
+    std::fs::rename(&config, &home_config).unwrap();
+    let unset = user_level(
+        tool_command("audit_sources.rs")
+            .env_remove("CLAUDE_CONFIG_DIR")
+            .env("HOME", tmp.path()),
+    );
+    assert_eq!(unset, expected(&home_config));
+}
+
 /// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script

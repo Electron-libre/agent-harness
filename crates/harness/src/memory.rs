@@ -11,6 +11,28 @@ const AGENTS: [&str; 2] = ["AGENTS.md", ".claude/AGENTS.md"];
 /// The hops of imports Claude Code follows from a memory file.
 const HOPS: usize = 4;
 
+/// Where a directory keeps its memory files and rules.
+pub(crate) struct Layout {
+    claude: &'static [&'static str],
+    rules: &'static str,
+    /// Whether `AGENTS.md` and `.claude/AGENTS.md` are read in place of the `CLAUDE.md` files.
+    agents: bool,
+}
+
+/// A directory of a project.
+pub(crate) const PROJECT: Layout = Layout {
+    claude: &["CLAUDE.md", ".claude/CLAUDE.md"],
+    rules: ".claude/rules",
+    agents: true,
+};
+
+/// The configuration directory of the user (AUD-2).
+pub(crate) const USER: Layout = Layout {
+    claude: &["CLAUDE.md"],
+    rules: "rules",
+    agents: false,
+};
+
 /// A tree the memory files are read from; paths are relative and `/`-separated.
 pub(crate) trait Tree {
     /// The path of the file `path` names, a symbolic link followed, and its content; `None` when absent.
@@ -63,7 +85,7 @@ pub(crate) struct Memory {
 /// Measures the memory files of `tree` (REP-2).
 pub(crate) fn measure(tree: &impl Tree) -> Memory {
     let mut memory = Memory::default();
-    for file in loaded(tree, "") {
+    for file in loaded(tree, "", &PROJECT) {
         if file.agents {
             memory.agents += file.bytes;
         } else {
@@ -84,24 +106,25 @@ struct Loaded {
 
 /// The memory files of the directory `dir` of `tree` (`""` for its root) loaded at launch (REP-2): each file once,
 /// however many paths name it, the imports followed breadth first so that a file counts at its fewest hops.
-fn loaded(tree: &impl Tree, dir: &str) -> Vec<Loaded> {
+fn loaded(tree: &impl Tree, dir: &str, layout: &Layout) -> Vec<Loaded> {
     let mut read: HashMap<String, Option<(String, Vec<u8>)>> = HashMap::new();
     let mut read = |path: &str| {
         read.entry(path.to_string())
             .or_insert_with(|| tree.read(path))
             .clone()
     };
-    let agents = AGENTS.map(|p| under(dir, p));
-    let mut roots: Vec<String> = ["CLAUDE.md", ".claude/CLAUDE.md"]
+    let agents = agents(dir, layout);
+    let mut roots: Vec<String> = layout
+        .claude
+        .iter()
         .map(|p| under(dir, p))
-        .into_iter()
         .filter(|p| read(p).is_some())
         .collect();
     if roots.is_empty() {
         roots.extend(agents.clone());
     }
     roots.extend(
-        rules(tree, dir)
+        rules(tree, dir, layout)
             .into_iter()
             .filter(|p| read(p).is_some_and(|(_, text)| !scoped(&String::from_utf8_lossy(&text)))),
     );
@@ -134,14 +157,17 @@ fn loaded(tree: &impl Tree, dir: &str) -> Vec<Loaded> {
     loaded
 }
 
-/// The instruction files of the directory `dir` of `tree` the user wrote (AUD-1): the memory files loaded at launch,
-/// plus `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules, each once, sorted by path.
-pub(crate) fn instruction_files(tree: &impl Tree, dir: &str) -> BTreeSet<String> {
-    let mut files: BTreeSet<String> = loaded(tree, dir).into_iter().map(|f| f.path).collect();
-    let extra = AGENTS
-        .map(|p| under(dir, p))
+/// The instruction files of the directory `dir` of `tree` the user wrote (AUD-1, AUD-2): the memory files loaded at
+/// launch, plus `AGENTS.md`, `.claude/AGENTS.md` where the layout reads them and the scoped rules, each once, sorted
+/// by path.
+pub(crate) fn instruction_files(tree: &impl Tree, dir: &str, layout: &Layout) -> BTreeSet<String> {
+    let mut files: BTreeSet<String> = loaded(tree, dir, layout)
         .into_iter()
-        .chain(rules(tree, dir));
+        .map(|f| f.path)
+        .collect();
+    let extra = agents(dir, layout)
+        .into_iter()
+        .chain(rules(tree, dir, layout));
     files.extend(extra.filter_map(|p| tree.read(&p)).map(|(file, _)| file));
     files
 }
@@ -155,10 +181,19 @@ fn under(dir: &str, path: &str) -> String {
     }
 }
 
-/// The `.claude/rules/**/*.md` files of the directory `dir` of `tree`, sorted.
-fn rules(tree: &impl Tree, dir: &str) -> Vec<String> {
+/// The paths of `AGENTS.md` and `.claude/AGENTS.md` in the directory `dir`, where the layout reads them.
+fn agents(dir: &str, layout: &Layout) -> Vec<String> {
+    if layout.agents {
+        AGENTS.iter().map(|p| under(dir, p)).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// The `**/*.md` files of the rules directory of `dir` in `tree`, sorted.
+fn rules(tree: &impl Tree, dir: &str, layout: &Layout) -> Vec<String> {
     let mut rules: Vec<String> = tree
-        .files(&under(dir, ".claude/rules"))
+        .files(&under(dir, layout.rules))
         .into_iter()
         .filter(|p| p.ends_with(".md"))
         .collect();

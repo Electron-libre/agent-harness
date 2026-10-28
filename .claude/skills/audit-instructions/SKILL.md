@@ -15,7 +15,8 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 1. **Collect**: `harness run audit-sources` lists, per project of `~/.claude/projects`, the sessions, typed
    messages, memory files and instruction files (the memory files a session loads at launch, `AGENTS.md`,
    `.claude/AGENTS.md` and the scoped rules, of each working directory and its ancestors up to the repository
-   root); read them project by project (`harness run audit-sources
+   root), after the user-level instruction files (`CLAUDE.md`, `rules/` and their imports in the configuration
+   directory), listed once; read them project by project (`harness run audit-sources
    --messages` through `grep -P '^<project>\t'`), keeping the private content in the conversation, never in the
    repository.
    `harness run rule-breaches --summary` gives, per rule and revision, the sessions where it applied, where the

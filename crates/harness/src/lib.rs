@@ -773,10 +773,7 @@ fn in_ci() -> bool {
 /// Kept out of `check` and `sync`, which read the project only: these read the user settings too.
 #[must_use]
 pub fn retention_warnings(root: &Path) -> Vec<String> {
-    let user = user_settings(
-        std::env::var_os("CLAUDE_CONFIG_DIR"),
-        std::env::var_os("HOME"),
-    );
+    let user = config_dir().map(|dir| dir.join("settings.json"));
     retention_with(root, in_ci(), user.as_deref())
 }
 
@@ -787,13 +784,17 @@ fn retention_with(root: &Path, ci: bool, user: Option<&Path>) -> Vec<String> {
     settings::retention(root, user)
 }
 
-/// The user settings of Claude Code: `settings.json` in `config_dir` (`CLAUDE_CONFIG_DIR`), or else in `~/.claude`;
-/// `None` when neither is set.
-fn user_settings(config_dir: Option<OsString>, home: Option<OsString>) -> Option<PathBuf> {
+/// The configuration directory of Claude Code: `CLAUDE_CONFIG_DIR`, or else `~/.claude`; `None` when neither is set.
+pub(crate) fn config_dir() -> Option<PathBuf> {
+    config_dir_of(
+        std::env::var_os("CLAUDE_CONFIG_DIR"),
+        std::env::var_os("HOME"),
+    )
+}
+
+fn config_dir_of(config_dir: Option<OsString>, home: Option<OsString>) -> Option<PathBuf> {
     let set = |var: Option<OsString>| var.filter(|v| !v.is_empty()).map(PathBuf::from);
-    set(config_dir)
-        .or_else(|| set(home).map(|h| h.join(".claude")))
-        .map(|dir| dir.join("settings.json"))
+    set(config_dir).or_else(|| set(home).map(|h| h.join(".claude")))
 }
 
 fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
