@@ -5,9 +5,6 @@ use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
 use std::path::{Component, Path};
 
-/// The files read in place of the `CLAUDE.md` files when neither exists, counted apart.
-const AGENTS: [&str; 2] = ["AGENTS.md", ".claude/AGENTS.md"];
-
 /// The hops of imports Claude Code follows from a memory file.
 const HOPS: usize = 4;
 
@@ -15,22 +12,22 @@ const HOPS: usize = 4;
 pub(crate) struct Layout {
     claude: &'static [&'static str],
     rules: &'static str,
-    /// Whether `AGENTS.md` and `.claude/AGENTS.md` are read in place of the `CLAUDE.md` files.
-    agents: bool,
+    /// The files read in place of the `CLAUDE.md` files when none exists, counted apart.
+    agents: &'static [&'static str],
 }
 
 /// A directory of a project.
 pub(crate) const PROJECT: Layout = Layout {
     claude: &["CLAUDE.md", ".claude/CLAUDE.md"],
     rules: ".claude/rules",
-    agents: true,
+    agents: &["AGENTS.md", ".claude/AGENTS.md"],
 };
 
 /// The configuration directory of the user (AUD-2).
 pub(crate) const USER: Layout = Layout {
     claude: &["CLAUDE.md"],
     rules: "rules",
-    agents: false,
+    agents: &[],
 };
 
 /// A tree the memory files are read from; paths are relative and `/`-separated.
@@ -181,13 +178,9 @@ fn under(dir: &str, path: &str) -> String {
     }
 }
 
-/// The paths of `AGENTS.md` and `.claude/AGENTS.md` in the directory `dir`, where the layout reads them.
+/// The paths of the agents files of the layout in the directory `dir`.
 fn agents(dir: &str, layout: &Layout) -> Vec<String> {
-    if layout.agents {
-        AGENTS.iter().map(|p| under(dir, p)).collect()
-    } else {
-        Vec::new()
-    }
+    layout.agents.iter().map(|p| under(dir, p)).collect()
 }
 
 /// The `**/*.md` files of the rules directory of `dir` in `tree`, sorted.

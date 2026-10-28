@@ -73,7 +73,7 @@ fn audit_sources() {
     );
     check(
         "summary lists the instruction file of the project",
-        summary.contains("CLAUDE.md"),
+        summary.contains(&format!("  instructions: {}/CLAUDE.md", repo.display())),
     );
     check(
         "summary lists the memory files",
@@ -209,20 +209,25 @@ fn audit_sources_lists_the_ancestors_up_to_the_repository_root() {
     )
     .unwrap();
 
-    let out = tool_command("audit_sources.rs")
-        .arg(tmp.path().join("projects"))
-        .env("HOME", &repo)
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let listed: Vec<String> = String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .filter_map(|l| l.strip_prefix("  instructions: "))
-        .map(String::from)
-        .collect();
+    let listed = |cmd: &mut std::process::Command| -> Vec<String> {
+        let out = cmd
+            .arg(tmp.path().join("projects"))
+            .env("HOME", &repo)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|l| l.strip_prefix("  instructions: "))
+            .map(String::from)
+            .collect()
+    };
     let under = |root: &std::path::Path, path: &str| root.join(path).display().to_string();
+    // another configuration directory: the `.claude/` of the home directory is a project's
+    let other = listed(tool_command("audit_sources.rs").env("CLAUDE_CONFIG_DIR", tmp.path()));
+    assert!(other.contains(&under(&repo, ".claude/CLAUDE.md")));
     assert_eq!(
-        listed,
+        listed(tool_command("audit_sources.rs").env_remove("CLAUDE_CONFIG_DIR")),
         [
             under(&repo, ".claude/shared/s.md"),
             under(&repo, "CLAUDE.md"),
@@ -276,9 +281,11 @@ fn audit_sources_lists_the_user_level_files_before_the_projects() {
             .map(|p| dir.join(p).display().to_string())
     };
 
+    // a relative configuration directory is printed absolute
     let set = user_level(
         tool_command("audit_sources.rs")
-            .env("CLAUDE_CONFIG_DIR", &config)
+            .current_dir(tmp.path())
+            .env("CLAUDE_CONFIG_DIR", "config")
             .env("HOME", tmp.path().join("nowhere")),
     );
     assert_eq!(set, expected(&config));
@@ -302,6 +309,9 @@ fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
         .to_string_lossy()
         .replace('_', "-");
     let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_harness"));
-    cmd.arg("tool").arg(stem);
+    // no user-level file of the machine running the tests
+    cmd.arg("tool")
+        .arg(stem)
+        .env("CLAUDE_CONFIG_DIR", "/nonexistent-claude-config");
     cmd
 }

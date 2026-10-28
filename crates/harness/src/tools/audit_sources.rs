@@ -11,6 +11,7 @@ use super::transcripts;
 use crate::memory::{instruction_files, WorkTree, PROJECT, USER};
 
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 use transcripts::{for_each_line, projects, projects_root, sessions, sorted_entries, typed_text};
 
@@ -24,15 +25,14 @@ fn escape(text: &str) -> String {
 
 /// The instruction files of `cwd` and of its ancestors up to the root of its repository (AUD-1), sorted: a session
 /// loads those above the repository too, but the audit walks no directory above it. The ancestors are read in the
-/// tree of the repository, so that an import may climb to any of its directories. The user-level files, in the
-/// `.claude/` of the home directory, are left out.
-fn instructions(cwd: &Path) -> BTreeSet<PathBuf> {
+/// tree of the repository, so that an import may climb to any of its directories. The user-level files, when the
+/// configuration directory `config` is the `.claude/` of one of these directories, are left out: AUD-2 lists them.
+fn instructions(cwd: &Path, config: Option<&Path>) -> BTreeSet<PathBuf> {
     // the working directory alone outside a repository
     let root = cwd
         .ancestors()
         .find(|d| d.join(".git").exists())
         .unwrap_or(cwd);
-    let home = std::env::var_os("HOME").map(PathBuf::from);
     let tree = WorkTree(root);
     cwd.ancestors()
         .take_while(|d| d.starts_with(root))
@@ -42,7 +42,8 @@ fn instructions(cwd: &Path) -> BTreeSet<PathBuf> {
                 .unwrap()
                 .to_string_lossy()
                 .into_owned();
-            let user = (home.as_deref() == Some(dir)).then(|| Path::new(&rel).join(".claude"));
+            let user = (config == fs::canonicalize(dir.join(".claude")).ok().as_deref())
+                .then(|| Path::new(&rel).join(".claude"));
             instruction_files(&tree, &rel, &PROJECT)
                 .into_iter()
                 .filter(move |f| !user.as_ref().is_some_and(|u| Path::new(f).starts_with(u)))
@@ -51,12 +52,13 @@ fn instructions(cwd: &Path) -> BTreeSet<PathBuf> {
         .collect()
 }
 
-/// The user-level instruction files (AUD-2): `CLAUDE.md`, the rules and their imports in the configuration directory.
-fn user_instructions() -> BTreeSet<PathBuf> {
-    let Some(config) = crate::config_dir() else {
+/// The user-level instruction files (AUD-2): `CLAUDE.md`, the rules and their imports in the configuration directory
+/// `config`.
+fn user_instructions(config: Option<&Path>) -> BTreeSet<PathBuf> {
+    let Some(config) = config else {
         return BTreeSet::new();
     };
-    instruction_files(&WorkTree(&config), "", &USER)
+    instruction_files(&WorkTree(config), "", &USER)
         .into_iter()
         .map(|f| config.join(f))
         .collect()
@@ -81,8 +83,10 @@ pub(super) fn main(args: &[String]) -> u8 {
             std::process::exit(2);
         }
     };
+    // canonical, so that the paths printed are absolute and compare with the working directories
+    let config = crate::config_dir().and_then(|dir| fs::canonicalize(dir).ok());
     if !print_messages {
-        for file in user_instructions() {
+        for file in user_instructions(config.as_deref()) {
             println!("instructions: {}", file.display());
         }
     }
@@ -133,7 +137,7 @@ pub(super) fn main(args: &[String]) -> u8 {
             println!("  memory: {memory} files");
         }
         for cwd in &cwds {
-            for file in instructions(Path::new(cwd)) {
+            for file in instructions(Path::new(cwd), config.as_deref()) {
                 println!("  instructions: {}", file.display());
             }
         }
