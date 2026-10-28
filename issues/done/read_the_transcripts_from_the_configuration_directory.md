@@ -60,7 +60,7 @@ it. Out of scope: `rule-breaches` and `audit-sources` specs, which name no defau
   CLAUDE_CONFIG_DIR nor HOME is set`.
 - `high` review, 6 findings: wording (2 findings) and test gap fixed here; scenario order fixed; a missing default
   directory printing an empty result with no warning becomes
-  `issues/warn_when_the_default_projects_directory_is_missing.md`; the double `config_dir()` lookup of
+  `issues/done/warn_when_the_default_projects_directory_is_missing.md`; the double `config_dir()` lookup of
   `audit-sources` is kept: both read the same variables in one process, a `projects_dir` argument is meant to differ
   from the configuration directory.
 - Code review: no findings.
