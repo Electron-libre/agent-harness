@@ -11,7 +11,7 @@ use super::{config_list, repo_root};
 const TYPES: [&str; 9] = [
     "feat", "fix", "refactor", "docs", "test", "perf", "build", "ci", "chore",
 ];
-const BUILT_IN_SCOPES: [&str; 2] = ["docs", "cardinal"];
+pub(super) const BUILT_IN_SCOPES: [&str; 2] = ["docs", "cardinal"];
 const ATTRIBUTION: [&str; 3] = ["co-authored-by", "generated with", "noreply@anthropic.com"];
 
 /// The built-in scopes plus the project's `commit_scopes`, read once from the repository root.

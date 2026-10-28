@@ -17,7 +17,7 @@ one binary.
 1. Measure first: list the consumers whose lock still records a `harness run` hook or whose machine has no
    `cardinal`; drop nothing while one is left.
 2. Remove the `harness` bin, the `harness-<commit>` publication and link, and the `harness` fallbacks of the gate,
-   `check`, `update` and `REVIEW_TOOLS`, with their tests, and the recipe alias `check-harness` of `cardinal.just`
+   `check`, `update` and `REVIEW_TOOLS`, with their tests, and the recipe `check-harness` of `cardinal.just`
    (renamed `check-cardinal`).
 3. Keep reading the `harness-<commit>` releases of the commits from before the rename (BIN-3) and the `harness run`
    refusals of old transcripts (EVA-5): old pins and old sessions stay readable.

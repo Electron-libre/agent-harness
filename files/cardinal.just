@@ -49,5 +49,6 @@ spec-coverage *args:
 check-cardinal:
     cardinal check
 
-# The name of `check-cardinal` before the rename, kept until the `harness` alias is dropped.
-alias check-harness := check-cardinal
+# The name of `check-cardinal` before the rename, kept until the `harness` alias is dropped; a recipe, not an
+# alias, so a project's justfile may still override it.
+check-harness: check-cardinal

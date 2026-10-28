@@ -63,6 +63,8 @@ No `FORMAT` raise: no fragment key, lock line or source layout changes meaning; 
 5. [x] Product prose: "the harness" meaning Cardinal becomes "Cardinal" in the specs (`sync.md`, REP, VRD, EVA,
    BIN titles and intents) and the crate doc comments and tool about strings; the generic "agent harness" stays;
    verified by `just check`; ~120 lines.
+6. [x] Fixes of the `high` review: `check-harness` a recipe depending on `check-cardinal` (an alias broke a
+   justfile overriding it); `rule-breaches` reuses the built-in scopes of `commit-check` plus the old one.
 
 Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names) in deliverable 2, BRE-9 (scope
 `cardinal`, `harness` still read) in deliverable 3; prose only in deliverable 5.
@@ -158,5 +160,26 @@ Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names
 
 - red: none (prose only)
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 6: fixes of the high review
+- done: `check-harness` is a recipe running `check-cardinal`, not an alias (just refuses an alias a consumer's
+  justfile redefines as a recipe, even under `allow-duplicate-recipes`); `rule-breaches` reads
+  `commit_check::BUILT_IN_SCOPES` plus `OLD_SCOPE` instead of a copy.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| recipes | `just check-cardinal`, `just check-harness` pass; a justfile overriding `check-harness` parses |
+| docs | `drop_the_harness_alias` names the recipe |
+| code review | high on `e4cd7fc..HEAD`, then low on the fixes |
+
+- red: none (the collision reproduced by hand: `recipe check-harness ... is redefined as an alias`)
+- Code review: 9 findings (high). Fixed: the alias collision, the duplicated scope list. Kept, decided at step 2:
+  `check-commits` refuses `harness` in an open PR's older commits (decision 2), `rule-breaches` accepts both scopes
+  in every revision (Approach 2). Outside this issue: 5 findings on `e5352ff` (clippy pedantic, not of this
+  issue: `is_git_url`, `total_cmp`, `check_specs` closure, `review_gate` concat, `budget` let-else), reported to
+  the user. Low review of the fixes: no findings.
 - not verified: none
 - decisions needed: none

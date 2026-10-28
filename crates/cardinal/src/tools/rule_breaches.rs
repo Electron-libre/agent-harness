@@ -7,6 +7,7 @@
 //! Usage: `cardinal run rule-breaches [projects_dir] [--summary]`
 //! (default the `projects/` of the configuration directory, EVA-15).
 
+use super::commit_check::BUILT_IN_SCOPES;
 use super::language::Language;
 use super::transcripts;
 
@@ -422,8 +423,8 @@ fn attributed(message: &str) -> bool {
     })
 }
 
-/// The scopes every project has: `harness`, the name of `cardinal` before the rename, is still read in the past commits.
-const BUILT_IN_SCOPES: [&str; 3] = ["docs", "cardinal", "harness"];
+/// The built-in scope `cardinal` before the rename, still read in the past commits.
+const OLD_SCOPE: &str = "harness";
 
 /// Whether a subject follows `<type>(<scope>): <description>` (scope optional) with one of `scopes`.
 fn conventional(subject: &str, scopes: &[String]) -> bool {
@@ -439,7 +440,9 @@ fn conventional(subject: &str, scopes: &[String]) -> bool {
     };
     subject.chars().count() <= 72
         && COMMIT_TYPES.contains(&kind)
-        && scope.is_none_or(|s| BUILT_IN_SCOPES.contains(&s) || scopes.iter().any(|k| k == s))
+        && scope.is_none_or(|s| {
+            s == OLD_SCOPE || BUILT_IN_SCOPES.contains(&s) || scopes.iter().any(|k| k == s)
+        })
         && !description.is_empty()
         && !description.starts_with(char::is_uppercase)
         && !description.ends_with('.')
