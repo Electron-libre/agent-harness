@@ -111,6 +111,7 @@ jobs need no Rust when the source publishes the commit.
 | `PostToolUse` | `Skill` | `review-gate record` | records what the code review saw | [`review-gate.md`](../specs/review-gate.md) |
 | `PostToolUse` | `Edit\|Write` | `format-rust` | `cargo fmt` the project of an edited `.rs` file | |
 | `Stop` | | `clippy-gate` | blocks the end of a turn while clippy reports a problem | [`clippy-gate.md`](../specs/clippy-gate.md) |
+| `Stop` | | `language-hint` | sends the agent back once when its last reply is not in the `user_language`, judged as rule `user-language` of `rule-breaches` (`tools/language.rs`) | [`language-hint.md`](../specs/language-hint.md) |
 | git `pre-commit` | | `review-gate native` | refuses a commit whose diff the review never saw | [`review-gate.md`](../specs/review-gate.md) REV-9 |
 
 Claude Code runs a hook only once declared in `.claude/settings.json`, which is seeded and then owned by the project.

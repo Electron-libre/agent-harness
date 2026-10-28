@@ -44,7 +44,7 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
 ## Plan
 1. [x] Shared language test: move `stop_words`, `prose_words` and the 20-word floor of `rule_breaches.rs` into
    `tools/language.rs`, one function judging a text; verified by the `rule_breaches` tests unchanged (~120 lines).
-2. [ ] Hook `language-hint`: the tool, its declaration under `Stop` in `entries/.claude/settings.json`, `just sync`,
+2. [x] Hook `language-hint`: the tool, its declaration under `Stop` in `entries/.claude/settings.json`, `just sync`,
    docs (architecture table); verified by `tests/language_hint.rs` through the binary; makes true LNG-1 to LNG-6,
    spec `accepted` (~350 lines).
 3. [ ] Follow-up issue to measure `breached_share` of `user-language` with `skill:evaluate-harness` once sessions ran
@@ -68,4 +68,20 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
 - red: none (pure refactor under the existing BRE-10 test)
 - Code review: no findings
 - not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: tool `language-hint` (`tools/language_hint.rs`), declared under `Stop` in `entries/.claude/settings.json` and
+  synced; spec `language-hint.md` accepted; README (Gates), architecture (hooks table) and the docs map updated.
+- | check | result |
+  |---|---|
+  | tests | `tests/language_hint.rs` 6 tests green, `cargo test` green |
+  | lint | clippy -D warnings clean |
+  | specs | `just check-specs` ok, LNG-1 to LNG-6 traced |
+  | docs | README, `docs/architecture.md`, `.claude/update-docs-map.md` |
+  | code review | low, no findings |
+- red: LNG-1, LNG-2, LNG-3, LNG-4, LNG-5, LNG-6: harness: unknown tool `language-hint` (exit 3, the 6 tests failed)
+- Code review: no findings
+- not verified: the hook in a live session (the field `last_assistant_message` was read from the Claude Code 2.1.312
+  bundle, not from a recorded event)
 - decisions needed: none

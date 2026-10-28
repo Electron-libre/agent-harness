@@ -9,7 +9,7 @@ project and tells when a copy drifted.
 | | |
 |---|---|
 | Skills | `issue-workflow` (an issue driven to done in validated deliverables), `create-issue`, `prioritize-issues`, `write-spec`, `update-docs`, `commit-message`, `evaluate-harness`, `audit-instructions` |
-| Gates | no commit without a code review of the diff, no Rust turn ending on a clippy warning, `cargo fmt` after each edit; commit messages checked (Conventional Commits, no AI attribution) |
+| Gates | no commit without a code review of the diff, no Rust turn ending on a clippy warning, a reply not in the `user_language` sent back once, `cargo fmt` after each edit; commit messages checked (Conventional Commits, no AI attribution) |
 | Recipes | `harness.just`: `next-issue`, `start-issue`, `close-issue`, `check-issue`, `check-specs`, `spec-coverage`, `check-commit`, `check-harness`… |
 | CI | `.github/workflows/harness.yml`: the copies and the specs checked on main and on each pull request, plus its commit messages |
 | Evaluation | `harness run session-metrics`, `rule-breaches`, `delivered-quality`…: did a harness revision make the agent better? |

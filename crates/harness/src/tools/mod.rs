@@ -17,6 +17,7 @@ mod format_rust;
 mod harness_report;
 mod issue_worktree;
 mod language;
+mod language_hint;
 mod next_issue;
 mod repo_files;
 mod review_gate;
@@ -93,6 +94,11 @@ pub const TOOLS: &[Tool] = &[
         name: "issue-worktree",
         about: "start <issue> | finish <stem> [--force]: the worktree and branch of an issue",
         main: issue_worktree::main,
+    },
+    Tool {
+        name: "language-hint",
+        about: "Stop hook: send the agent back once when its last reply is not in the user_language",
+        main: language_hint::main,
     },
     Tool {
         name: "next-issue",
