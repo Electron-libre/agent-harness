@@ -42,6 +42,9 @@ scope: the fixed-context measure (REP-2, SYN-38), unless the user chooses otherw
 1. [x] Local memory in the audit: `memory.rs` adds `CLAUDE.local.md` to the roots of `instruction_files` for a
    project directory, not to `measure`; amended AUD-1; verified by the `audit_sources` test of every instruction
    file (a `CLAUDE.local.md` importing a file); makes true AUD-1. ~50 lines.
+2. [x] Fixes of the `high` review: one setting for the personal files (`measure` uses the project layout without
+   them), REP-2 proved to leave a committed `CLAUDE.local.md` out, wrapping and skill wording; verified by
+   `tests/fixed_context.rs` and `tests/audit_sources.rs`; makes true REP-2, AUD-1.
 
 ## Decisions
 - Mode: autonomous
@@ -62,4 +65,21 @@ scope: the fixed-context measure (REP-2, SYN-38), unless the user chooses otherw
 - Code review: no findings
 - not verified: whether a `CLAUDE.local.md` keeps Claude Code from reading `AGENTS.md` in place of `CLAUDE.md`
   (irrelevant to the audit, which lists `AGENTS.md` anyway).
+- decisions needed: none.
+
+## Deliverable 2
+- done: `Layout::local` alone decides (the `local` flag of `loaded` removed); `fixed_context` commits a
+  `CLAUDE.local.md` and its row stays the same; the doc comment and the `audit-instructions` text name the imports.
+- | check | result |
+  |---|---|
+  | tests | pass |
+  | lint | pass |
+  | specs | pass |
+  | docs | `memory.rs` doc comments, `audit-instructions` skill |
+  | code review | see below |
+- red: none: a guard test, it passes before and after the fix.
+- Code review: 6 findings (`high`): 4 fixed (flag, REP-2 test, wrapping, skill wording); not fixed: the `~`
+  imports of `CLAUDE.local.md` (AUD-1 and the user's decision read nothing outside the repository), a
+  `.claude/CLAUDE.local.md` (measured: Claude Code 2.1.312 does not load it).
+- not verified: none.
 - decisions needed: none.

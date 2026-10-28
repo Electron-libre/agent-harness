@@ -14,7 +14,7 @@ pub(crate) struct Layout {
     rules: &'static str,
     /// The files read in place of the `CLAUDE.md` files when none exists, counted apart.
     agents: &'static [&'static str],
-    /// The personal memory files, kept out of git: loaded at launch, listed by the audit but never measured.
+    /// The personal memory files, kept out of git: loaded at launch, listed by the audit, never measured (`measure`).
     local: &'static [&'static str],
 }
 
@@ -86,7 +86,12 @@ pub(crate) struct Memory {
 /// Measures the memory files of `tree` (REP-2).
 pub(crate) fn measure(tree: &impl Tree) -> Memory {
     let mut memory = Memory::default();
-    for file in loaded(tree, "", &PROJECT, false) {
+    // the personal memory files are never measured
+    let layout = Layout {
+        local: &[],
+        ..PROJECT
+    };
+    for file in loaded(tree, "", &layout) {
         if file.agents {
             memory.agents += file.bytes;
         } else {
@@ -106,9 +111,8 @@ struct Loaded {
 }
 
 /// The memory files of the directory `dir` of `tree` (`""` for its root) loaded at launch (REP-2): each file once,
-/// however many paths name it, the imports followed breadth first so that a file counts at its fewest hops; the
-/// personal memory files of the layout and their imports only when `local`.
-fn loaded(tree: &impl Tree, dir: &str, layout: &Layout, local: bool) -> Vec<Loaded> {
+/// however many paths name it, the imports followed breadth first so that a file counts at its fewest hops.
+fn loaded(tree: &impl Tree, dir: &str, layout: &Layout) -> Vec<Loaded> {
     let mut read: HashMap<String, Option<(String, Vec<u8>)>> = HashMap::new();
     let mut read = |path: &str| {
         read.entry(path.to_string())
@@ -125,9 +129,7 @@ fn loaded(tree: &impl Tree, dir: &str, layout: &Layout, local: bool) -> Vec<Load
     if roots.is_empty() {
         roots.extend(agents.clone());
     }
-    if local {
-        roots.extend(layout.local.iter().map(|p| under(dir, p)));
-    }
+    roots.extend(layout.local.iter().map(|p| under(dir, p)));
     roots.extend(
         rules(tree, dir, layout)
             .into_iter()
@@ -163,10 +165,10 @@ fn loaded(tree: &impl Tree, dir: &str, layout: &Layout, local: bool) -> Vec<Load
 }
 
 /// The instruction files of the directory `dir` of `tree` the user wrote (AUD-1, AUD-2): the memory files loaded at
-/// launch, `CLAUDE.local.md` and its imports included, plus `AGENTS.md`, `.claude/AGENTS.md` where the layout reads them and the scoped rules, each once, sorted
-/// by path.
+/// launch, `CLAUDE.local.md` and its imports included, plus `AGENTS.md`, `.claude/AGENTS.md` where the layout reads
+/// them and the scoped rules, each once, sorted by path.
 pub(crate) fn instruction_files(tree: &impl Tree, dir: &str, layout: &Layout) -> BTreeSet<String> {
-    let mut files: BTreeSet<String> = loaded(tree, dir, layout, true)
+    let mut files: BTreeSet<String> = loaded(tree, dir, layout)
         .into_iter()
         .map(|f| f.path)
         .collect();

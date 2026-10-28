@@ -114,6 +114,8 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             ("shared/rule.md", "@inc.md"),
             ("shared/inc.md", "iii"),
             (".claude/rules/r.md", "rrrrr"),
+            // personal memory, loaded at launch but never measured, even when committed
+            ("CLAUDE.local.md", "local"),
             (".claude/rules/s.md", "---\npaths: src\n---\nSECRET scoped"),
             (".claude/skills/one/SKILL.md", &skill("one", "d1d1")),
         ],
