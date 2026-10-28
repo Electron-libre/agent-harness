@@ -50,7 +50,7 @@ local consumer ~10,700 bytes (CLAUDE.md 4,891, 10 skills ~3,300).
    and the docs, set this repository's budget; verified by `tests/budget_cli.rs` through the binary (~350 lines);
    makes true SYN-38, SYN-39.
 2. [x] Fixes of the `high` review: `budget.rs` reads the configuration through `read_config`; the finding outside
-   this issue's requirements filed as `issues/count_every_always_loaded_memory_file.md`.
+   this issue's requirements filed as `issues/done/count_every_always_loaded_memory_file.md`.
 
 ## Decisions
 - Mode: autonomous
@@ -90,7 +90,7 @@ local consumer ~10,700 bytes (CLAUDE.md 4,891, 10 skills ~3,300).
      work tree measure is the truer one; REP-2's counting of the front matter is what SYN-38 shares.
   2. The key outside `[project]` is ignored silently: kept, SYN-38 names `[project]` like the other project keys.
   3. `.claude/CLAUDE.md` and `CLAUDE.local.md` not counted: outside this issue, filed as
-     `issues/count_every_always_loaded_memory_file.md` (both measures must change together).
+     `issues/done/count_every_always_loaded_memory_file.md` (both measures must change together).
   4. Second parser of `harness.toml`: fixed, `read_config` reused.
   5. A SKILL.md that is not UTF-8 counts 0: kept, as `fixed-context` does; Claude Code would not parse it either.
 - not verified: none

@@ -7,7 +7,7 @@ no `CLAUDE.md` or a `CLAUDE.md` imports it. Its rules reach the context only whe
 file. Make the shared rules part of what every session loads, or decide where they belong instead.
 
 # Findings
-* 2026-10-28, measured for `issues/count_every_always_loaded_memory_file.md`: both local consumers (this repository
+* 2026-10-28, measured for `issues/done/count_every_always_loaded_memory_file.md`: both local consumers (this repository
   included) have a root `CLAUDE.md` that names `AGENTS.md` in backticks only, no `@AGENTS.md` import; neither has a
   `.claude/CLAUDE.md`, `CLAUDE.local.md` nor `.claude/rules/`.
 * Claude Code documentation (memory page, read with v2.1.312): with the default `instructionFiles` setting
