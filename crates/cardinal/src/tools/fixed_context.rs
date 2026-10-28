@@ -13,13 +13,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use transcripts::{
     default_branch, for_each_line, git, git_bytes, pinned_revision, project_name, projects,
-    projects_root, repository, revision, sessions, subagents, Place,
+    projects_root, repository, revision, sessions, shown, subagents, Place, CONFIGS,
 };
 
 const HEADER: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
 
-/// The commits of the first-parent history of the default branch touching `.claude/harness.toml`, oldest first,
+/// The commits of the first-parent history of the default branch touching the configuration, oldest first,
 /// with the revision each pins (`None` for a `self:` revision, matched by its own commit).
 fn pins(repo: &Path) -> Vec<(String, Option<String>)> {
     let Some(branch) = default_branch(repo) else {
@@ -34,15 +34,14 @@ fn pins(repo: &Path) -> Vec<(String, Option<String>)> {
             "--format=%H",
             branch,
             "--",
-            ".claude/harness.toml",
+            CONFIGS[0],
+            CONFIGS[1],
         ],
     )
     .unwrap_or_default();
     log.lines()
         .filter_map(|c| {
-            let config: toml::Table = git(repo, &["show", &format!("{c}:.claude/harness.toml")])?
-                .parse()
-                .ok()?;
+            let config: toml::Table = shown(repo, c, &CONFIGS)?.parse().ok()?;
             Some((c.to_string(), pinned_revision(&config)))
         })
         .collect()

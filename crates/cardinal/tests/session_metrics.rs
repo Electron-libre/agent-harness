@@ -469,8 +469,25 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "[harness]\nsource = \"https://example.org/harness\"\n",
         )],
     );
+    let migrated = new_repo(&tmp.join("migrated"));
+    commit_at(
+        &migrated,
+        "2026-01-01T10:00:00Z",
+        &[(".claude/harness.toml", &toml("old"))],
+    );
+    std::fs::remove_file(migrated.join(".claude/harness.toml")).unwrap();
+    commit_at(
+        &migrated,
+        "2026-01-01T12:00:00Z",
+        &[(
+            ".claude/cardinal.toml",
+            &toml("new").replace("[harness]", "[cardinal]"),
+        )],
+    );
     let projects = tmp.join("projects");
-    let sessions: [(&str, &Path, &str); 8] = [
+    let sessions: [(&str, &Path, &str); 10] = [
+        ("before_migration", &migrated, "2026-01-01T11:00:00.000Z"),
+        ("after_migration", &migrated, "2026-01-01T13:00:00.000Z"),
         ("before", &pinned, "2026-01-01T09:00:00.000Z"),
         ("first", &pinned, "2026-01-01T11:00:00.000Z"),
         ("second", &pinned, "2026-01-01T13:00:00.000Z"),
@@ -529,6 +546,14 @@ fn revision_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         (
             "an unreadable project gives an empty revision",
             rev("gone").is_empty(),
+        ),
+        (
+            "the old configuration pins before the migration",
+            rev("before_migration") == "old",
+        ),
+        (
+            "the new configuration pins after the migration",
+            rev("after_migration") == "new",
         ),
     ]
 }

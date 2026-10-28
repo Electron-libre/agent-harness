@@ -16,7 +16,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use transcripts::{
     committed_config, committed_file, for_each_numbered_line, git, project_name, projects,
-    projects_root, repository, result_text, revision, sessions, subagents, typed_text, Place,
+    projects_root, repository, result_text, revision, sessions, shown, subagents, typed_text,
+    Place, CONFIGS, LOCKS,
 };
 
 const HEADER: &str = "session\tproject\trevision\trule\tkind\tlocation\tdetail";
@@ -386,9 +387,9 @@ impl Verdict {
     }
 }
 
-/// The managed paths of `.claude/harness.lock` (`<hash>[+x]  <path>` lines) committed at `start`.
+/// The managed paths of the lock (`<hash>[+x]  <path>` lines) committed at `start`.
 fn managed_paths(repo: &Path, start: &str) -> Option<HashSet<String>> {
-    let lock = committed_file(repo, start, ".claude/harness.lock")?;
+    let lock = committed_file(repo, start, &LOCKS)?;
     Some(
         lock.lines()
             .filter(|l| !l.starts_with('#'))
@@ -432,10 +433,9 @@ fn conventional(subject: &str, scopes: &[String]) -> bool {
         && !description.ends_with('.')
 }
 
-/// The `commit_scopes` of the `.claude/harness.toml` of `commit` in `repo`, the one `just check-commit` read.
+/// The `commit_scopes` of the configuration of `commit` in `repo`, the one `just check-commit` read.
 fn commit_scopes(repo: &Path, commit: &str) -> Vec<String> {
-    let config = git(repo, &["show", &format!("{commit}:.claude/harness.toml")])
-        .and_then(|t| t.parse::<toml::Table>().ok());
+    let config = shown(repo, commit, &CONFIGS).and_then(|t| t.parse::<toml::Table>().ok());
     let list = config
         .as_ref()
         .and_then(|c| c.get("project"))

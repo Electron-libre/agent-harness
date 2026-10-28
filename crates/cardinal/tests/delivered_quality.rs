@@ -96,6 +96,7 @@ fn fixture(tmp: &Path) -> PathBuf {
             ("src/a.rs", Some("a")),
             ("docs/arch.md", Some("a")),
             (".claude/harness.lock", Some("a")),
+            (".claude/cardinal.lock", Some("a")),
             ("issues/alpha.md", Some(ALPHA)),
         ],
     );
@@ -142,6 +143,7 @@ fn fixture(tmp: &Path) -> PathBuf {
         &[
             ("docs/arch.md", Some("b")),
             (".claude/harness.lock", Some("b")),
+            (".claude/cardinal.lock", Some("b")),
         ],
     );
     commit_at(

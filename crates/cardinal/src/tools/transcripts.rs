@@ -9,6 +9,8 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::{CONFIG, LOCK, OLD_CONFIG, OLD_LOCK};
+
 /// Branches that name no issue.
 pub const DEFAULT_BRANCHES: &[&str] = &["main", "master", "HEAD"];
 
@@ -290,42 +292,51 @@ pub fn default_branch(repo: &Path) -> Option<&'static str> {
     })
 }
 
-/// The last commit of the first-parent history of the default branch of `repo` touching `path` at or before `at`.
-fn last_commit(repo: &Path, at: &str, path: &str) -> Option<String> {
+/// The configuration of a project under its two names, the new one first (SYN-47 of `specs/sync.md`).
+pub const CONFIGS: [&str; 2] = [CONFIG, OLD_CONFIG];
+/// The lock under its two names, as `CONFIGS`.
+pub const LOCKS: [&str; 2] = [LOCK, OLD_LOCK];
+
+/// The last commit of the first-parent history of the default branch of `repo` touching one of `paths` at or before
+/// `at`.
+fn last_commit(repo: &Path, at: &str, paths: &[&str]) -> Option<String> {
     let branch = default_branch(repo)?;
-    git(
-        repo,
-        &[
-            "log",
-            "-1",
-            "--first-parent",
-            "--format=%H",
-            &format!("--before={at}"),
-            branch,
-            "--",
-            path,
-        ],
-    )
-    .filter(|c| !c.is_empty())
+    let before = format!("--before={at}");
+    let mut args = vec![
+        "log",
+        "-1",
+        "--first-parent",
+        "--format=%H",
+        &before,
+        branch,
+        "--",
+    ];
+    args.extend(paths);
+    git(repo, &args).filter(|c| !c.is_empty())
 }
 
-/// The text of `path` as committed on the default branch of `repo` at `at`; `None` when it cannot be read.
-pub fn committed_file(repo: &Path, at: &str, path: &str) -> Option<String> {
-    let commit = last_commit(repo, at, path)?;
-    git(repo, &["show", &format!("{commit}:{path}")])
+/// The text of the first of `paths` that `commit` of `repo` holds.
+pub fn shown(repo: &Path, commit: &str, paths: &[&str]) -> Option<String> {
+    paths
+        .iter()
+        .find_map(|path| git(repo, &["show", &format!("{commit}:{path}")]))
 }
 
-/// The `.claude/harness.toml` committed on the default branch of `repo` at `at`, parsed.
+/// The text of the first of `paths` as committed on the default branch of `repo` at `at`, in the last commit touching
+/// one of them (the new and the old name of a file); `None` when it cannot be read.
+pub fn committed_file(repo: &Path, at: &str, paths: &[&str]) -> Option<String> {
+    shown(repo, &last_commit(repo, at, paths)?, paths)
+}
+
+/// The configuration committed on the default branch of `repo` at `at`, parsed.
 pub fn committed_config(repo: &Path, at: &str) -> Option<toml::Table> {
-    committed_file(repo, at, ".claude/harness.toml")?
-        .parse()
-        .ok()
+    committed_file(repo, at, &CONFIGS)?.parse().ok()
 }
 
-/// The revision a parsed `.claude/harness.toml` pins (ADR 0002): its `rev`, `unpinned` with no `rev`; `None` for the
+/// The revision a parsed configuration pins (ADR 0002): its `rev`, `unpinned` with no `rev`; `None` for the
 /// harness repository itself (`source = "."`, no `rev`), whose revision is a commit of its `files/`.
 pub fn pinned_revision(config: &toml::Table) -> Option<String> {
-    let harness = config.get("harness");
+    let harness = config.get("cardinal").or_else(|| config.get("harness"));
     let field = |key: &str| {
         harness
             .and_then(|h| h.get(key))
@@ -338,7 +349,7 @@ pub fn pinned_revision(config: &toml::Table) -> Option<String> {
     }
 }
 
-/// The harness revision in force in `repo` at `start`: the `pinned_revision` of the `.claude/harness.toml` committed
+/// The harness revision in force in `repo` at `start`: the `pinned_revision` of the configuration committed
 /// on the default branch then; `self:<commit>` for the harness repository itself, the last commit touching `files/`;
 /// empty when it cannot be read.
 pub fn revision(repo: &Path, start: &str) -> String {
@@ -346,8 +357,67 @@ pub fn revision(repo: &Path, start: &str) -> String {
         return String::new();
     };
     pinned_revision(&config).unwrap_or_else(|| {
-        last_commit(repo, start, "files")
+        last_commit(repo, start, &["files"])
             .map(|c| format!("self:{c}"))
             .unwrap_or_default()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sh(repo: &Path, args: &[&str], date: &str) {
+        let out = std::process::Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+            .args(args)
+            .env("GIT_AUTHOR_DATE", date)
+            .env("GIT_COMMITTER_DATE", date)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {out:?}");
+    }
+
+    /// A repository whose old configuration and lock pin `old` at 10:00, moved to the new names pinning `new` at 12:00.
+    fn migrated() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        sh(repo, &["init", "-q", "-b", "main"], "2026-01-01T09:00:00Z");
+        std::fs::create_dir_all(repo.join(".claude")).unwrap();
+        let config = |table: &str, rev: &str| {
+            format!("[{table}]\nsource = \"x\"\nrev = \"{rev}\"\n[project]\ncommit_scopes = [\"{rev}\"]\n")
+        };
+        std::fs::write(repo.join(OLD_CONFIG), config("harness", "old")).unwrap();
+        std::fs::write(repo.join(OLD_LOCK), "h  old.txt\n").unwrap();
+        sh(repo, &["add", "-A"], "2026-01-01T10:00:00Z");
+        sh(repo, &["commit", "-qm", "old"], "2026-01-01T10:00:00Z");
+        std::fs::remove_file(repo.join(OLD_CONFIG)).unwrap();
+        std::fs::remove_file(repo.join(OLD_LOCK)).unwrap();
+        std::fs::write(repo.join(CONFIG), config("cardinal", "new")).unwrap();
+        std::fs::write(repo.join(LOCK), "h  new.txt\n").unwrap();
+        sh(repo, &["add", "-A"], "2026-01-01T12:00:00Z");
+        sh(repo, &["commit", "-qm", "new"], "2026-01-01T12:00:00Z");
+        dir
+    }
+
+    // every reader of the history goes through these helpers: a fixture per tool would repeat the same history
+    // spec: EVA-8, BRE-7, BRE-9, BRE-10, REP-2 (internal: the readers share these helpers)
+    #[test]
+    fn the_history_is_read_under_the_new_names_else_the_old_ones() {
+        let dir = migrated();
+        let repo = dir.path();
+        let rev = |at: &str| committed_config(repo, at).and_then(|c| pinned_revision(&c));
+        assert_eq!(rev("2026-01-01T11:00:00Z").as_deref(), Some("old"));
+        assert_eq!(rev("2026-01-01T13:00:00Z").as_deref(), Some("new"));
+        let lock = |at: &str| committed_file(repo, at, &LOCKS);
+        assert_eq!(lock("2026-01-01T11:00:00Z").as_deref(), Some("h  old.txt"));
+        assert_eq!(lock("2026-01-01T13:00:00Z").as_deref(), Some("h  new.txt"));
+        let head = git(repo, &["rev-parse", "HEAD"]).unwrap();
+        let first = git(repo, &["rev-parse", "HEAD~1"]).unwrap();
+        assert!(shown(repo, &head, &CONFIGS).unwrap().contains("[cardinal]"));
+        assert!(shown(repo, &first, &CONFIGS).unwrap().contains("[harness]"));
+    }
 }

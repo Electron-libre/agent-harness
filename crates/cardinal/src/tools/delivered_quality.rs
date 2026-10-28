@@ -24,7 +24,7 @@ const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_i
 
 /// The paths whose later fixes say nothing of the issue's work: the issue files, the docs and the lock of the sync.
 const UNRELATED_PREFIXES: &[&str] = &["issues/", "docs/"];
-const UNRELATED_FILES: &[&str] = &[".claude/harness.lock"];
+const UNRELATED_FILES: &[&str] = &[crate::LOCK, crate::OLD_LOCK];
 
 /// A non-merge commit of the default branch.
 struct Commit {

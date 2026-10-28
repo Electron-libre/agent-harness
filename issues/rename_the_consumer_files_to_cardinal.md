@@ -46,7 +46,7 @@ format-2 revision keeps the old names its tools read; readers without a source f
    `check`/`run`/tools/gate/`install_cardinal.sh` read either, `git mv` of `files/harness.just` and
    `seed/.claude/harness.toml`, the `import` lines, `just sync` migrating this repository (~800 lines); verified by
    `sync_cli`, `update_cli`, `run_cli`, `gate_cli` tests; makes true SYN-44, SYN-45, SYN-46, SYN-47, BIN-1, SYN-18.
-2. [ ] History readers read both names at each commit: `transcripts`, `rule_breaches`, `delivered_quality`,
+2. [x] History readers read both names at each commit: `transcripts`, `rule_breaches`, `delivered_quality`,
    `fixed_context` (~300 lines); verified by their CLI tests; makes true EVA-8, BRE-7, BRE-9, BRE-10, QUA-4, REP-2.
 3. [ ] Prose: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`), `seed/`, `docs/`, `README.md`,
    `CLAUDE.md`, then `just sync`; a follow-up issue to drop the old names with the format 2 (~300 lines); verified by
@@ -81,4 +81,23 @@ format-2 revision keeps the old names its tools read; readers without a source f
   - a migration interrupted after the move of the configuration left `.claude/harness.lock` for good: fixed, a sync
     writing the new lock drops the old one.
 - not verified: the migration of a consumer other than this repository; the CI run of `install_cardinal.sh`.
+- decisions needed: none
+
+## Deliverable 2
+
+- done: `transcripts` (`committed_file`, `shown`, `pinned_revision`) reads `.claude/cardinal.*` else
+  `.claude/harness.*` at each commit; `rule_breaches`, `fixed_context`, `delivered_quality` go through it.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | n/a: no doc describes these readers' file names besides the specs amended at step 1 |
+| code review | see below |
+
+- red: EVA-8, QUA-4, BRE-7, BRE-9, BRE-10, REP-2: `FAIL - the new configuration pins after the migration`,
+  `FAIL - a later fix of its files counts, docs, lock, side branch and window excluded`, the helpers missing
+- Code review: no findings
+- not verified: the readers on the history of a real consumer migrated later.
 - decisions needed: none
