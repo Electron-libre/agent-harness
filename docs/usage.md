@@ -46,7 +46,7 @@ session pays (`CLAUDE.md`, `.claude/CLAUDE.md`, the rules without `paths`, the f
 exceeds it, naming the largest part, and never fail because of it.
 
 The skill `evaluate-harness` runs the readers below and reports the trend per axis; each can also run alone. With no
-projects directory given, they read the `projects/` of the configuration directory and warn when it is missing.
+projects directory given, they read the `projects/` of the configuration directory and warn when it cannot be read.
 
 | Tool | Prints |
 |---|---|

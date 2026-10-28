@@ -35,6 +35,8 @@ Out of scope: a projects directory given explicitly (the user named it).
 ## Plan
 1. [x] Warn in `projects_root` for the default only; verified by a CLI test running the five tools with
    `CLAUDE_CONFIG_DIR` set to an empty temp dir (warning on stderr, exit 0); makes true EVA-15 (amended).
+2. [x] Fixes of the `high` review: warn when `read_dir` of the default fails (missing, file, unreadable) with the
+   reason; hermetic test (`HOME` a temp dir) checking stdout too; makes true EVA-15 (amended).
 
 ## Decisions
 - Mode: autonomous
@@ -47,3 +49,9 @@ Out of scope: a projects directory given explicitly (the user named it).
 - Code review: no findings
 - checks: `just check` ok (fmt, clippy, tests, specs); docs: `docs/usage.md`.
 - not verified: none. decisions needed: none.
+
+## Deliverable 2 (high review fixes)
+- done: the warning tests `read_dir` (same predicate as `read_sessions` of `delivered-quality`) and names the reason; the test covers a missing `projects/` and a `projects` file, isolates `HOME`, checks the header-only stdout.
+- red: EVA-15: `session-metrics: warning: the projects directory …/projects is missing: no transcript read` (wording and file case)
+- High review: 6 findings. Fixed: unreadable dir silent (1), wrong "missing" wording (2), stdout not checked (3), two predicates (5), `HOME` inherited (6). Not fixed: warn for an explicit directory (4), out of scope by answer 2 a.
+- Code review: no findings

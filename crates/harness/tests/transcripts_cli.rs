@@ -56,10 +56,22 @@ fn delivered_quality_runs_without_the_transcripts() {
     );
 }
 
+/// `harness tool <name> <args>` with `config` as the configuration directory and an empty home directory.
+fn configured(name: &str, args: &[&std::path::Path], config: &std::path::Path) -> Output {
+    let home = tempfile::tempdir().unwrap();
+    Command::new(env!("CARGO_BIN_EXE_harness"))
+        .arg("tool")
+        .arg(name)
+        .args(args)
+        .env("CLAUDE_CONFIG_DIR", config)
+        .env("HOME", home.path())
+        .output()
+        .unwrap()
+}
+
 // spec: EVA-15
 #[test]
-fn the_transcript_tools_warn_when_the_default_projects_directory_is_missing() {
-    let config = tempfile::tempdir().unwrap();
+fn the_transcript_tools_warn_when_the_default_projects_directory_cannot_be_read() {
     let repo = tempfile::tempdir().unwrap();
     assert!(Command::new("git")
         .arg("init")
@@ -68,29 +80,38 @@ fn the_transcript_tools_warn_when_the_default_projects_directory_is_missing() {
         .status()
         .unwrap()
         .success());
-    let missing = config.path().join("projects");
-    for (name, args) in [
-        ("session-metrics", vec![]),
-        ("rule-breaches", vec![]),
-        ("fixed-context", vec![]),
-        ("audit-sources", vec![]),
-        ("delivered-quality", vec![repo.path()]),
-    ] {
-        let out = Command::new(env!("CARGO_BIN_EXE_harness"))
-            .arg("tool")
-            .arg(name)
-            .args(args)
-            .env("CLAUDE_CONFIG_DIR", config.path())
-            .output()
-            .unwrap();
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(out.status.success(), "{name}: {stderr}");
-        assert!(
-            stderr.contains(&format!(
-                "the projects directory {} is missing",
-                missing.display()
-            )),
-            "{name}: {stderr}"
-        );
+    let absent = tempfile::tempdir().unwrap();
+    let file = tempfile::tempdir().unwrap();
+    std::fs::write(file.path().join("projects"), "").unwrap();
+    for config in [absent.path(), file.path()] {
+        let root = config.join("projects");
+        for (name, args) in [
+            ("session-metrics", vec![]),
+            ("rule-breaches", vec![]),
+            ("fixed-context", vec![]),
+            ("audit-sources", vec![]),
+            ("delivered-quality", vec![repo.path()]),
+        ] {
+            let out = configured(name, &args, config);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            assert!(out.status.success(), "{name}: {stderr}");
+            assert!(
+                stderr.contains(&format!(
+                    "the projects directory {} cannot be read (",
+                    root.display()
+                )),
+                "{name}: {stderr}"
+            );
+        }
     }
+}
+
+// spec: EVA-15
+#[test]
+fn session_metrics_prints_its_header_only_when_the_default_projects_directory_is_missing() {
+    let config = tempfile::tempdir().unwrap();
+    let out = configured("session-metrics", &[], config.path());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(stdout.lines().count(), 1, "{stdout}");
+    assert!(stdout.starts_with("session\tproject\t"), "{stdout}");
 }
