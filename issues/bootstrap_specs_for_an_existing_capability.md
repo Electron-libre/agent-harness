@@ -40,6 +40,9 @@ Out of scope: writing the specs of the uncovered capabilities themselves (each i
    what a test proves, cite the existing tests, untested behaviour becomes a follow-up issue via `skill:create-issue`,
    the user validates it like any spec, bugs included) and its pointer in `specs/README.md`; verified by a
    `REQUIRED_PASSAGES` entry of `crates/harness/tests/skills.rs` (~60 lines).
+3. [x] Fixes of the high review: test attributes such as `#[tokio::test]`, withdrawn requirements, a distinct
+   message when no test file is found, the git failure stated, the citation reader of `check-specs` reused; verified
+   by `crates/harness/tests/spec_coverage.rs`; makes true COV-1, COV-3, COV-7, COV-9, COV-10.
 
 ## Decisions
 - Mode: autonomous
@@ -67,5 +70,19 @@ Out of scope: writing the specs of the uncovered capabilities themselves (each i
 - checks: tests ok, lint ok, specs ok, docs updated, code review low ran.
 - red: none (no spec: the skill text is proven by two `REQUIRED_PASSAGES`, which failed as missing before the text).
 - not verified: how an agent follows the procedure on a real capability (a model's behaviour).
+- decisions needed: none.
+- Code review: no findings
+
+## Deliverable 3: fixes of the high review
+
+- done: COV-1, COV-3, COV-7 amended, COV-9 and COV-10 added; the report reuses `check_specs::citations` (now fed the
+  listed files) instead of its own scan.
+- checks: tests ok, lint ok, specs ok (COV back to `accepted`), docs updated (specs/README), code review low ran.
+- red: COV-1, COV-3, COV-9: `#[tokio::test]` file and withdrawn citation not listed, `no test file without an accepted
+  spec` printed for a root with no test (COV-10 passed before the code: the behaviour existed, now stated).
+- High review, 7 findings: 1, 2, 4, 5, 6 fixed (above); 3 (a consumer whose crate sits at its root is not read, a
+  limit shared with `check-specs`) filed as `issues/read_the_tests_of_any_project_layout.md`; 7 (spec problems
+  ignored) not fixed: `check-specs` reports them, the report does not validate (non-goal added).
+- not verified: none.
 - decisions needed: none.
 - Code review: no findings

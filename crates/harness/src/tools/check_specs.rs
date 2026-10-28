@@ -21,7 +21,7 @@ const SECTIONS: [&str; 4] = [
 pub(super) struct Requirement {
     pub(super) id: String,
     /// Needs no test: withdrawn, or of the former `quality` kind.
-    exempt: bool,
+    pub(super) exempt: bool,
 }
 
 pub(super) struct Spec {
@@ -369,23 +369,27 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
 }
 
 /// A file citing a requirement, and whether that citation gives the reason of an internal proof.
-struct Cite {
-    file: String,
+pub(super) struct Cite {
+    pub(super) file: String,
     reasoned: bool,
 }
 
-/// Ids cited by `// spec: A-1, B-2` comments, with the files that cite them and whether the citation gives a
+/// Ids cited by the `// spec: A-1, B-2` comments of `files`, with the files that cite them and whether the citation gives a
 /// reason. A citation sits right above a test: only attributes and other comments may come between it and the `fn`;
 /// any other place is a problem, and so is a reason that is blank, misplaced or unclosed (TRC-7).
-fn citations(root: &Path, out: &mut Vec<String>) -> BTreeMap<String, Vec<Cite>> {
+pub(super) fn citations(
+    root: &Path,
+    files: &[PathBuf],
+    out: &mut Vec<String>,
+) -> BTreeMap<String, Vec<Cite>> {
     let mut cited: BTreeMap<String, Vec<Cite>> = BTreeMap::new();
-    for file in test_files(root, out) {
-        let Ok(text) = std::fs::read_to_string(&file) else {
+    for file in files {
+        let Ok(text) = std::fs::read_to_string(file) else {
             continue;
         };
         let name = file
             .strip_prefix(root)
-            .unwrap_or(&file)
+            .unwrap_or(file)
             .display()
             .to_string();
         let lines: Vec<&str> = text.lines().collect();
@@ -463,7 +467,8 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
             ));
         }
     }
-    let cited = citations(root, &mut out);
+    let files = test_files(root, &mut out);
+    let cited = citations(root, &files, &mut out);
     let known: BTreeSet<&str> = specs
         .iter()
         .flat_map(|s| s.requirements.iter().map(|r| r.id.as_str()))

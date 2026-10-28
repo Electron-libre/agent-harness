@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::process::Command;
 
-const ACCEPTED: &str = "---\nid: RER\nstatus: accepted\nadrs: []\n---\n\n# Rerun\n\n## Intent\n\nReuse.\n\n## Requirements\n\n- **RER-1** (deterministic) A pass must reuse a saved result.\n\n## Scenarios\n\n## Non-goals\n";
+const ACCEPTED: &str = "---\nid: RER\nstatus: accepted\nadrs: []\n---\n\n# Rerun\n\n## Intent\n\nReuse.\n\n## Requirements\n\n- **RER-1** (deterministic) A pass must reuse a saved result.\n- **RER-2** (deterministic) withdrawn: no longer.\n\n## Scenarios\n\n## Non-goals\n";
 const DRAFT: &str = "---\nid: DRF\nstatus: draft\nadrs: []\n---\n\n# Draft\n\n## Intent\n\nLater.\n\n## Requirements\n\n- **DRF-1** (deterministic) A run must resume.\n\n## Scenarios\n\n## Non-goals\n";
 
 fn write(root: &Path, path: &str, body: &str) {
@@ -44,12 +44,13 @@ fn lists_each_test_file_with_its_line_count() {
         ("crates/a/tests/cli.rs", "#[test]\nfn t() {}\n"),
         (".claude/hooks/test_h.rs", "use x;\n\n#[test]\nfn t() {}\n"),
         ("crates/a/src/lib.rs", "fn helper() {}\n"),
+        ("crates/a/tests/run.rs", "#[tokio::test]\nasync fn t() {}\n"),
         ("docs/t.rs", "#[test]\nfn t() {}\n"),
     ]);
     let (_, stdout) = report(dir.path());
     assert_eq!(
         stdout,
-        "4\t.claude/hooks/test_h.rs\n2\tcrates/a/tests/cli.rs\n"
+        "4\t.claude/hooks/test_h.rs\n2\tcrates/a/tests/cli.rs\n2\tcrates/a/tests/run.rs\n"
     );
 }
 
@@ -72,6 +73,10 @@ fn a_citation_of_a_draft_or_unknown_id_is_no_citation() {
             "// spec: DRF-1\n#[test]\nfn t() {}\n",
         ),
         (
+            "crates/a/tests/withdrawn.rs",
+            "// spec: RER-2\n#[test]\nfn t() {}\n",
+        ),
+        (
             "crates/a/tests/unknown.rs",
             "// spec: RER-9 (internal: slow)\n#[test]\nfn t() {}\n",
         ),
@@ -79,6 +84,7 @@ fn a_citation_of_a_draft_or_unknown_id_is_no_citation() {
     let (_, stdout) = report(dir.path());
     assert!(stdout.contains("crates/a/tests/draft.rs"), "{stdout}");
     assert!(stdout.contains("crates/a/tests/unknown.rs"), "{stdout}");
+    assert!(stdout.contains("crates/a/tests/withdrawn.rs"), "{stdout}");
 }
 
 // spec: COV-5
@@ -95,26 +101,29 @@ fn orders_by_line_count_then_path() {
     );
 }
 
+/// Runs git in `dir`, offline and unsigned.
+fn git(dir: &Path, args: &[&str]) {
+    let ok = Command::new("git")
+        .args([
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .is_ok_and(|o| o.status.success());
+    assert!(ok, "git {args:?} failed");
+}
+
 // spec: COV-6
 #[test]
 fn reads_only_the_files_git_lists() {
     let dir = root(&[("crates/a/tests/cli.rs", "#[test]\nfn t() {}\n")]);
-    let git = |args: &[&str]| {
-        let ok = Command::new("git")
-            .args([
-                "-c",
-                "user.email=t@t",
-                "-c",
-                "user.name=t",
-                "-c",
-                "commit.gpgsign=false",
-            ])
-            .args(args)
-            .current_dir(dir.path())
-            .output()
-            .is_ok_and(|o| o.status.success());
-        assert!(ok, "git {args:?} failed");
-    };
+    let git = |args: &[&str]| git(dir.path(), args);
     git(&["init", "-q", "-b", "trunk", "."]);
     git(&["add", "-A"]);
     git(&["commit", "-qm", "init", "--no-verify"]);
@@ -157,4 +166,34 @@ fn says_so_when_every_test_file_is_covered() {
 fn exits_0_when_it_lists_files() {
     let dir = root(&[("crates/a/tests/cli.rs", "#[test]\nfn t() {}\n")]);
     assert_eq!(report(dir.path()).0, Some(0));
+}
+
+// spec: COV-9
+#[test]
+fn says_so_when_it_finds_no_test_file() {
+    let dir = root(&[("crates/a/src/lib.rs", "fn helper() {}\n")]);
+    assert_eq!(
+        report(dir.path()),
+        (
+            Some(0),
+            "no test file under crates/ or .claude/\n".to_string()
+        )
+    );
+}
+
+// spec: COV-10
+#[test]
+fn fails_when_git_cannot_list_the_files() {
+    let dir = root(&[("crates/a/tests/cli.rs", "#[test]\nfn t() {}\n")]);
+    git(dir.path(), &["init", "-q", "-b", "trunk", "."]);
+    git(dir.path(), &["add", "-A"]);
+    std::fs::write(dir.path().join(".git/index"), "corrupt").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_harness"))
+        .args(["tool", "spec-coverage"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("git ls-files"));
+    assert!(out.stdout.is_empty());
 }
