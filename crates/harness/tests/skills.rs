@@ -21,6 +21,36 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
         "the audit points to the skill that measures whether the rules paid off",
     ),
     (
+        "audit-instructions",
+        "always-on rule last",
+        "the forms are ordered by what they cost the context, always-on text last",
+    ),
+    (
+        "audit-instructions",
+        "names what it replaces or trims",
+        "an always-on rule pays for itself by cutting something else",
+    ),
+    (
+        "audit-instructions",
+        "a hint after a recurring error",
+        "a hook does more than block",
+    ),
+    (
+        "audit-instructions",
+        "Proposing nothing is a valid outcome",
+        "the audit does not grow the harness without evidence",
+    ),
+    (
+        "audit-instructions",
+        "seen in one session only is noise",
+        "a single occurrence is no evidence",
+    ),
+    (
+        "evaluate-harness",
+        "Proposing nothing is a valid outcome",
+        "the measure does not invent a change to make",
+    ),
+    (
         "evaluate-harness",
         "harness run harness-report",
         "the tables come from the report script, not from the agent's arithmetic",

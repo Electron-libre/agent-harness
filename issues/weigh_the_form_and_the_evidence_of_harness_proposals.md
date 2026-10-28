@@ -35,3 +35,46 @@ for it.
 # Hints
 * Edit `files/`, then `just sync`: the copies in `.claude/` are managed.
 * The skills are already long; the change should trim as much as it adds.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Make `audit-instructions` rank its proposals by context cost (skill, script or `harness` tool, hook, always-on rule
+last, which names what it replaces) with the hook shapes beyond blocking, and give it and `evaluate-harness` evidence
+rules (nothing is a valid outcome, one session is noise, counts in each row). Out of scope: new scripts or metrics.
+No spec: shared skill content, not a capability of the tool.
+
+## Plan
+1. [x] Form ladder and evidence rules: rewrite step 3 of `audit-instructions` (cost-ordered classes, hook shapes,
+   always-on rule names its trade), add the evidence rules to both skills and trim as much as is added (skill
+   descriptions untouched, so `harness run fixed-context` stays flat); verified by new `REQUIRED_PASSAGES` in
+   `crates/harness/tests/skills.rs` (red before the edit), `just check`, `just check-harness`; ~60 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: b4dd9e07cb7b5d40d593e0f1498becede562d65d
+- Fixed context: no skill description changed, so `harness run fixed-context` is unchanged; the bodies grew by
+  ~165 bytes (`audit-instructions`, step 1 rewritten shorter) and ~90 bytes (`evaluate-harness`), loaded on demand.
+
+## Deliverable 1
+done: cost-ordered forms (skill, script or `harness` tool, hook with its shapes, always-on rule last naming its
+trade) and the evidence rules in `audit-instructions`; "proposing nothing" and counts in `evaluate-harness`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass, none touched |
+| docs | skills are the docs; copies synced (`just check-harness`) |
+| code review | low, see below |
+
+red: none traced (no spec); `skills` test failed with `audit-instructions: missing 'always-on rule last'` and 5 more
+missing passages.
+
+Code review: no findings
+
+not verified: a real `audit-instructions` run with the new ladder (needs the user's transcripts).
+
+decisions needed: none

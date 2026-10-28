@@ -30,8 +30,9 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    - Before naming a trend, compare the `models`, `versions` and `projects` of the groups it spans: when they
      changed too, say the change may come from them, not from the harness.
    - A `too few` group supports no conclusion; say how many sessions it lacks.
-   - A skill in `unused` over the last groups is a candidate to drop or to describe better; a hook whose refusals
-     grow, or a rule whose `breached_share` stays high, is a question for `skill:audit-instructions`.
+   - A skill `unused` over the last groups is a candidate to drop or to describe better; a hook whose refusals
+     grow, or a rule whose `breached_share` stays high, goes to `skill:audit-instructions`, with its counts.
+   - Proposing nothing is a valid outcome: with no trend, say so and suggest no change.
 3. **Report**: one table per axis (efficiency, quality, rules, skills, fixed context), a row per metric that moved or
    matters, the columns `metric | <the last groups> | trend` (↑, ↓ or →) and a line `confounders` when the mix
    changed. Report the trend, never a pass or a fail, and set no target on agent behaviour: numbers become
