@@ -70,6 +70,9 @@ verdict. Out of scope: subagents for the tests or `update-docs`, a custom agent 
    conventions) to a read-only `Explore` subagent asking for the conclusion with the paths and lines behind it; a
    targeted read stays in the main thread; `just sync`; commit with `Expected-effect: main_context_peak down`;
    verified by `just check` and `just check-harness` (~20 lines).
+3. [x] Fixes of the `high` review: an inline sidechain turn is not a main turn (EVA-16); the upgrade finds the
+   column by name; REP-5 names the new column; the skill text keeps the reviews in `code-review` and reads back only
+   the lines a decision rests on.
 
 ## Decisions
 - Mode: autonomous
@@ -112,4 +115,35 @@ verdict. Out of scope: subagents for the tests or `update-docs`, a custom agent 
 - red: none (skill text, no test)
 - Code review: no findings
 - not verified: whether the agent delegates in practice; the verdict of `main_context_peak down` needs sessions.
+- decisions needed: none.
+
+## Deliverable 3: fixes of the high review
+
+`Code review` of `de1b647..HEAD` (high): 9 findings.
+
+| # | finding | done |
+|---|---|---|
+| 1 | inline sidechain turns counted in `main_context_peak` | fixed, EVA-16 states it |
+| 2 | median on fewer sessions than the group counts, verdict not marked | follow-up `issues/count_the_sessions_behind_a_partial_metric.md` |
+| 3 | `harness-report`/`harness-changes` refuse an old archive | not fixed: `evaluate-harness` runs `session-metrics --archive` first, which upgrades it |
+| 4 | `PEAK_INDEX` hard-coded | fixed: position read from `HEADER` |
+| 5 | short archived row padded silently | not fixed: the merge never checked row widths, out of this issue |
+| 6 | 0 for a session with no main turn | not fixed: EVA-16 says 0, as `turns` |
+| 7 | REP-5 and REP-9 disagree on the column order | fixed in REP-5 |
+| 8 | "reviews stay in the main thread" contradicts the forked `code-review` | fixed |
+| 9 | reading back every cited line undoes the delegation | fixed: only the lines a decision rests on |
+
+- done: the fixes above.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | n/a (the specs carry it) |
+| code review | low, see below |
+
+- red: EVA-16: `FAIL - a sub-agent turn written in the main transcript is not a main turn`
+- Code review: no findings
+- not verified: none.
 - decisions needed: none.

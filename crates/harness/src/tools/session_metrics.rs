@@ -18,9 +18,8 @@ use transcripts::{
 
 pub(super) const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
-/// The column added after `cache_creation_tokens` (EVA-16), and its place: an archive written before it is upgraded.
-const PEAK_COLUMN: &str = "\tmain_context_peak";
-const PEAK_INDEX: usize = 15;
+/// The column added after `cache_creation_tokens` (EVA-16): an archive written before it is upgraded.
+const PEAK_COLUMN: &str = "main_context_peak";
 
 /// The line types seen in the transcripts; any other is counted in `unknown_lines`, since the format moves.
 const KNOWN_TYPES: &[&str] = &[
@@ -121,7 +120,11 @@ impl Session {
         }
         push_distinct(&mut self.versions, line["version"].as_str());
         match kind {
-            "assistant" => self.assistant(&line["message"], main),
+            // a sub-agent written in the main transcript (older versions) is not the main context
+            "assistant" => self.assistant(
+                &line["message"],
+                main && line["isSidechain"].as_bool() != Some(true),
+            ),
             "user" => self.user(line, main),
             _ => {}
         }
@@ -247,8 +250,12 @@ fn keep_resolved(old: &str, new: &str) -> String {
 
 /// An archived row written before `main_context_peak`, given an empty one (EVA-17).
 fn with_empty_peak(row: &str) -> String {
+    let at = HEADER
+        .split('\t')
+        .position(|c| c == PEAK_COLUMN)
+        .unwrap_or(0);
     let mut cells: Vec<&str> = row.split('\t').collect();
-    cells.insert(PEAK_INDEX.min(cells.len()), "");
+    cells.insert(at.min(cells.len()), "");
     cells.join("\t")
 }
 
@@ -262,7 +269,7 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
         Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
     };
     let mut lines = existing.lines();
-    let before_peak = HEADER.replacen(PEAK_COLUMN, "", 1);
+    let before_peak = HEADER.replacen(&format!("\t{PEAK_COLUMN}"), "", 1);
     let upgrade = match lines.next() {
         Some(header) if header == before_peak => true,
         Some(header) if header != HEADER => {

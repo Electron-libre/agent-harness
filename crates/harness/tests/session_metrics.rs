@@ -253,6 +253,25 @@ fn fixture(tmp: &Path) -> (PathBuf, PathBuf) {
         ",\"gitBranch\":\"gone_nested\",\"message\":{\"role\":\"user\",\"content\":\"ok\"}",
     );
     std::fs::write(proj.join("s5.jsonl"), s5).unwrap();
+    let inline_subagent = line(
+        "assistant",
+        &repo,
+        "2026-10-26T09:00:01.000Z",
+        &format!(",\"isSidechain\":true,\"message\":{{\"id\":\"side\",\"model\":\"model-a\",\"content\":[]{}}}", usage(9000, 0, None, 0, 0)),
+    );
+    let s6 = [
+        assistant(
+            &repo,
+            "2026-10-26T09:00:00.000Z",
+            "own",
+            "model-a",
+            TEXT,
+            &usage(50, 0, None, 0, 0),
+        ),
+        inline_subagent,
+    ]
+    .concat();
+    std::fs::write(proj.join("s6.jsonl"), s6).unwrap();
     (projects, repo)
 }
 
@@ -271,17 +290,19 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let s3 = rows.get("s3").unwrap_or(&empty);
     let s4 = rows.get("s4").unwrap_or(&empty);
     let s5 = rows.get("s5").unwrap_or(&empty);
+    let s6 = rows.get("s6").unwrap_or(&empty);
     let col =
         |r: &HashMap<String, String>, c: &str| r.get(c).cloned().unwrap_or_else(|| "<none>".into());
     vec![
         ("the script succeeds", out.status.success()),
-        ("header names every column, one row per session, none for the sub-agent", rows.len() == 5),
+        ("header names every column, one row per session, none for the sub-agent", rows.len() == 6),
         ("a message repeated on 3 lines is one turn; the sub-agent adds one", col(s1, "turns") == "3"),
         ("tool calls count every tool_use block, sub-agent included", col(s1, "tool_calls") == "4"),
         ("tokens are added once per message, sub-agent included", col(s1, "input_tokens") == "1011" && col(s1, "output_tokens") == "22"),
         ("thinking tokens come from output_tokens_details", col(s1, "thinking_tokens") == "5"),
         ("cache tokens are added once per message", col(s1, "cache_read_tokens") == "103" && col(s1, "cache_creation_tokens") == "11"),
         ("the main context peak is the largest main turn, sub-agents excluded", col(s1, "main_context_peak") == "117"),
+        ("a sub-agent turn written in the main transcript is not a main turn", col(s6, "main_context_peak") == "50"),
         ("a session with no assistant message has a peak of 0", col(s2, "main_context_peak") == "0"),
         ("models in order of first appearance, sub-agent included", col(s1, "models") == "model-a,model-b,model-c"),
         ("versions in order of first appearance", col(s1, "versions") == "2.1.1,2.1.2"),
