@@ -64,7 +64,7 @@ configuration directory.
 
 ## Deliverable 2
 - done: fixes of the `high` review (9 findings, below); AUD-1 and AUD-2 reworded; follow-up issue
-  `issues/read_the_transcripts_from_the_configuration_directory.md`.
+  `issues/done/read_the_transcripts_from_the_configuration_directory.md`.
 
 | check | result |
 |---|---|

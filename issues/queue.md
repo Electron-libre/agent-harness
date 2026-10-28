@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [read_the_transcripts_from_the_configuration_directory](read_the_transcripts_from_the_configuration_directory.md) - after the audit gaps: aligns the transcripts with the configuration directory AUD-2 reads; small, before the evaluation issues
 - [warn_when_the_default_projects_directory_is_missing](warn_when_the_default_projects_directory_is_missing.md) - after the configuration directory change it follows from; small, before the evaluation issues whose numbers it protects
 - [record_a_verdict_for_each_harness_change](record_a_verdict_for_each_harness_change.md) - low priority, last: applies the evidence rules of the first and reads the metrics of the report
 - [measure_the_effect_of_the_language_hint](measure_the_effect_of_the_language_hint.md) - last: needs sessions run with the hook before it can measure anything

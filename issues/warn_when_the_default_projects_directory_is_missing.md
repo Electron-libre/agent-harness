@@ -7,7 +7,7 @@ With no projects directory given, the transcript tools read the `projects/` of t
 nothing says why. Tell the user the default directory is missing.
 
 # Findings
-* 2026-10-28, `high` review of `issues/read_the_transcripts_from_the_configuration_directory.md`: with
+* 2026-10-28, `high` review of `issues/done/read_the_transcripts_from_the_configuration_directory.md`: with
   `CLAUDE_CONFIG_DIR` set to a directory with no `projects/` while the transcripts stay under the home directory's
   `.claude/projects`, `session-metrics` prints its header only and exits 0.
 
