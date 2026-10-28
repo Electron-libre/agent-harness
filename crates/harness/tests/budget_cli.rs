@@ -115,14 +115,44 @@ fn the_largest_part_wins_its_ties_in_the_order_claude_agents_skills() {
 
 // spec: SYN-38
 #[test]
-fn a_symbolic_link_counts_as_the_file_it_points_to() {
+fn a_symbolic_link_counts_as_the_file_it_points_to_once() {
     let home = Home::new();
     let (_source, root) = measured(&home);
     set_budget(root.path(), "0");
-    std::fs::remove_file(root.path().join("AGENTS.md")).unwrap();
-    std::os::unix::fs::symlink("CLAUDE.md", root.path().join("AGENTS.md")).unwrap();
-    let run = home.ok(root.path(), &["check"]);
-    assert_eq!(budget(&run), [over(70, 0, "CLAUDE.md", 30).as_str()]);
+    let root = root.path();
+    std::fs::remove_file(root.join("AGENTS.md")).unwrap();
+    put(root, "docs/agents.md", &"a".repeat(25));
+    std::os::unix::fs::symlink("docs/agents.md", root.join("AGENTS.md")).unwrap();
+    // the same file as CLAUDE.md, loaded once
+    std::os::unix::fs::symlink("../CLAUDE.md", root.join(".claude/CLAUDE.md")).unwrap();
+    let run = home.ok(root, &["check"]);
+    assert_eq!(
+        budget(&run),
+        [over(65, 0, "CLAUDE.md", 30).as_str()],
+        "{run:?}"
+    );
+}
+
+// spec: SYN-38
+#[test]
+fn a_nested_fence_hides_its_imports_and_an_open_front_matter_scopes_nothing() {
+    let home = Home::new();
+    let (_source, root) = measured(&home);
+    set_budget(root.path(), "0");
+    let root = root.path();
+    let claude = "````markdown\n```\n@docs/big.md\n```\n````\n~~~\n@docs/big.md\n~~~~\n";
+    put(root, "CLAUDE.md", claude);
+    put(root, "docs/big.md", &"b".repeat(1000));
+    let rule = "---\nnot a front matter\n\npaths: see below\n";
+    put(root, ".claude/rules/open.md", rule);
+    // AGENTS.md is not imported; 10 of skill descriptions
+    let memory = (claude.len() + rule.len()) as u64;
+    let run = home.ok(root, &["check"]);
+    assert_eq!(
+        budget(&run),
+        [over(memory + 10, 0, "CLAUDE.md", memory).as_str()],
+        "{run:?}"
+    );
 }
 
 // spec: SYN-38

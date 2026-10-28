@@ -1,7 +1,7 @@
 //! The memory files a Claude Code session of a project loads at launch (`specs/harness-report.md`, REP-2), measured
 //! in one way for a commit (`fixed-context`) and for the work tree (the budget, SYN-38).
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
 use std::path::{Component, Path};
 
@@ -13,8 +13,8 @@ const HOPS: usize = 4;
 
 /// A tree the memory files are read from; paths are relative and `/`-separated.
 pub(crate) trait Tree {
-    /// The content of the file at `path`, a symbolic link read as the file it points to; `None` when absent.
-    fn read(&self, path: &str) -> Option<Vec<u8>>;
+    /// The path of the file `path` names, a symbolic link followed, and its content; `None` when absent.
+    fn read(&self, path: &str) -> Option<(String, Vec<u8>)>;
     /// The paths of the files under the directory `dir`, at any depth.
     fn files(&self, dir: &str) -> Vec<String>;
 }
@@ -23,8 +23,12 @@ pub(crate) trait Tree {
 pub(crate) struct WorkTree<'a>(pub &'a Path);
 
 impl Tree for WorkTree<'_> {
-    fn read(&self, path: &str) -> Option<Vec<u8>> {
-        fs::read(self.0.join(path)).ok()
+    fn read(&self, path: &str) -> Option<(String, Vec<u8>)> {
+        let file = fs::canonicalize(self.0.join(path)).ok()?;
+        let content = fs::read(&file).ok()?;
+        let root = fs::canonicalize(self.0).ok()?;
+        let file = file.strip_prefix(&root).unwrap_or(&file);
+        Some((file.to_string_lossy().into_owned(), content))
     }
 
     fn files(&self, dir: &str) -> Vec<String> {
@@ -56,12 +60,18 @@ pub(crate) struct Memory {
     pub agents: u64,
 }
 
-/// Measures the memory files of `tree` (REP-2): each counted once, the imports followed breadth first so that a file
-/// counts at its fewest hops.
+/// Measures the memory files of `tree` (REP-2): each file counted once, however many paths name it, the imports
+/// followed breadth first so that a file counts at its fewest hops.
 pub(crate) fn measure(tree: &impl Tree) -> Memory {
+    let mut read: HashMap<String, Option<(String, Vec<u8>)>> = HashMap::new();
+    let mut read = |path: &str| {
+        read.entry(path.to_string())
+            .or_insert_with(|| tree.read(path))
+            .clone()
+    };
     let mut roots: Vec<String> = ["CLAUDE.md", ".claude/CLAUDE.md"]
         .into_iter()
-        .filter(|p| tree.read(p).is_some())
+        .filter(|p| read(p).is_some())
         .map(String::from)
         .collect();
     if roots.is_empty() {
@@ -73,20 +83,21 @@ pub(crate) fn measure(tree: &impl Tree) -> Memory {
         .filter(|p| p.ends_with(".md"))
         .collect();
     rules.sort();
-    roots.extend(rules.into_iter().filter(|p| {
-        tree.read(p)
-            .is_some_and(|text| !scoped(&String::from_utf8_lossy(&text)))
-    }));
+    roots.extend(
+        rules
+            .into_iter()
+            .filter(|p| read(p).is_some_and(|(_, text)| !scoped(&String::from_utf8_lossy(&text)))),
+    );
     let mut memory = Memory::default();
     let mut seen = BTreeSet::new();
     let mut queue: VecDeque<(String, usize)> = roots.into_iter().map(|p| (p, 0)).collect();
     while let Some((path, hops)) = queue.pop_front() {
-        if !seen.insert(path.clone()) {
-            continue;
-        }
-        let Some(text) = tree.read(&path) else {
+        let Some((file, text)) = read(&path) else {
             continue;
         };
+        if !seen.insert(file) {
+            continue;
+        }
         let bytes = text.len() as u64;
         if AGENTS.contains(&path.as_str()) {
             memory.agents += bytes;
@@ -106,13 +117,21 @@ pub(crate) fn measure(tree: &impl Tree) -> Memory {
     memory
 }
 
-/// Whether a rule's front matter has a top-level `paths` key: the rule loads on demand only.
+/// Whether a rule's front matter, closed by its `---` line, has a top-level `paths` key: the rule loads on demand
+/// only.
 fn scoped(rule: &str) -> bool {
     let mut lines = rule.lines();
-    lines.next().map(str::trim) == Some("---")
-        && lines
-            .take_while(|l| l.trim() != "---")
-            .any(|l| l.split_once(':').is_some_and(|(key, _)| key == "paths"))
+    if lines.next().map(str::trim) != Some("---") {
+        return false;
+    }
+    let mut paths = false;
+    for line in lines {
+        if line.trim() == "---" {
+            return paths;
+        }
+        paths |= line.split_once(':').is_some_and(|(key, _)| key == "paths");
+    }
+    false
 }
 
 /// The `@<path>` imports of a memory file: at the start of a line or after a white space, outside a code span and a
@@ -120,18 +139,29 @@ fn scoped(rule: &str) -> bool {
 /// nothing.
 fn imports(text: &str) -> Vec<String> {
     let mut found = Vec::new();
-    let mut fence: Option<&str> = None;
+    // the character and length of the open fence
+    let mut fence: Option<(char, usize)> = None;
     for line in text.lines() {
         let trimmed = line.trim_start();
-        let marker = ["```", "~~~"]
-            .into_iter()
-            .find(|m| trimmed.starts_with(m) && line.len() - trimmed.len() < 4);
+        let marker = ['`', '~'].into_iter().find_map(|c| {
+            let run = trimmed.chars().take_while(|&t| t == c).count();
+            (run >= 3 && line.len() - trimmed.len() < 4).then_some((c, run))
+        });
         match (fence, marker) {
-            (None, Some(m)) => fence = Some(m),
-            (Some(f), Some(m)) if f == m => fence = None,
+            (None, Some(m)) => {
+                fence = Some(m);
+                continue;
+            }
+            // a closing fence is as long as the opening one at least and holds nothing else
+            (Some((c, n)), Some((m, run)))
+                if m == c && run >= n && trimmed[run..].trim().is_empty() =>
+            {
+                fence = None;
+                continue;
+            }
             _ => {}
         }
-        if fence.is_some() || marker.is_some() {
+        if fence.is_some() {
             continue;
         }
         let chars: Vec<char> = line.chars().collect();
@@ -170,9 +200,9 @@ fn imports(text: &str) -> Vec<String> {
     found
 }
 
-/// The path of an import relative to the root of the tree; `None` for an absolute path, a path from `~`, or one
-/// that leaves the tree.
-fn resolve(dir: &Path, import: &str) -> Option<String> {
+/// The path of an import (or of the target of a symbolic link) relative to the root of the tree; `None` for an
+/// absolute path, a path from `~`, or one that leaves the tree.
+pub(crate) fn resolve(dir: &Path, import: &str) -> Option<String> {
     if import.starts_with(['/', '~']) {
         return None;
     }

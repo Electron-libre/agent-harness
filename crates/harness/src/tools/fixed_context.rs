@@ -5,15 +5,14 @@
 //! Usage: `harness run fixed-context [projects_dir]` (default `~/.claude/projects`).
 
 use super::transcripts;
-use crate::memory::{measure, Tree};
+use crate::memory::{measure, resolve, Tree};
 
 use chrono::{DateTime, FixedOffset};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use transcripts::{
-    default_branch, for_each_line, git, pinned_revision, project_name, projects, projects_root,
-    repository, revision, sessions, subagents, Place,
+    default_branch, for_each_line, git, git_bytes, pinned_revision, project_name, projects,
+    projects_root, repository, revision, sessions, subagents, Place,
 };
 
 const HEADER: &str =
@@ -58,56 +57,60 @@ fn in_force_commit(pins: &[(String, Option<String>)], revision: &str) -> Option<
         .map(|(c, _)| c.clone())
 }
 
-/// The tree of a commit, a symbolic link read as the file it points to in the same tree.
+/// The links a chain of symbolic links may hold before it is read as a loop.
+const LINKS: usize = 8;
+
+/// The tree of a commit: its files, each marked when it is a symbolic link, listed once.
 struct CommitTree<'a> {
     repo: &'a Path,
     commit: &'a str,
+    links: BTreeMap<String, bool>,
 }
 
-impl CommitTree<'_> {
-    /// The content of the blob at `path`, as stored (the target of a symbolic link).
-    fn blob(&self, path: &str) -> Option<Vec<u8>> {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(self.repo)
-            .args(["cat-file", "blob", &format!("{}:{path}", self.commit)])
-            .output()
-            .ok()
-            .filter(|o| o.status.success())?;
-        Some(out.stdout)
+impl<'a> CommitTree<'a> {
+    fn new(repo: &'a Path, commit: &'a str) -> Self {
+        let listing =
+            git_bytes(repo, &["ls-tree", "-r", "-z", "--full-tree", commit]).unwrap_or_default();
+        let links = listing
+            .split(|&b| b == 0)
+            .filter_map(|entry| {
+                let (meta, path) = std::str::from_utf8(entry).ok()?.split_once('\t')?;
+                Some((path.to_string(), meta.starts_with("120000 ")))
+            })
+            .collect();
+        CommitTree {
+            repo,
+            commit,
+            links,
+        }
     }
 }
 
 impl Tree for CommitTree<'_> {
-    fn read(&self, path: &str) -> Option<Vec<u8>> {
-        let blob = self.blob(path)?;
-        let link = git(self.repo, &["ls-tree", self.commit, "--", path])
-            .is_some_and(|entry| entry.starts_with("120000 "));
-        if !link {
-            return Some(blob);
+    fn read(&self, path: &str) -> Option<(String, Vec<u8>)> {
+        let mut path = resolve(Path::new(""), path)?;
+        for _ in 0..LINKS {
+            let link = *self.links.get(&path)?;
+            let blob = git_bytes(
+                self.repo,
+                &["cat-file", "blob", &format!("{}:{path}", self.commit)],
+            )?;
+            if !link {
+                return Some((path, blob));
+            }
+            let dir = Path::new(&path).parent().unwrap_or(Path::new(""));
+            path = resolve(dir, &String::from_utf8_lossy(&blob))?;
         }
-        let target = Path::new(path).with_file_name(String::from_utf8_lossy(&blob).as_ref());
-        self.blob(&target.to_string_lossy())
+        None
     }
 
     fn files(&self, dir: &str) -> Vec<String> {
-        git(
-            self.repo,
-            &[
-                "-c",
-                "core.quotePath=false",
-                "ls-tree",
-                "-r",
-                "--name-only",
-                self.commit,
-                "--",
-                dir,
-            ],
-        )
-        .unwrap_or_default()
-        .lines()
-        .map(String::from)
-        .collect()
+        let prefix = format!("{dir}/");
+        self.links
+            .keys()
+            .filter(|p| p.starts_with(&prefix))
+            .cloned()
+            .collect()
     }
 }
 
@@ -205,10 +208,7 @@ fn context(repo: &Path, pins: &[(String, Option<String>)], revision: &str) -> Ve
         })
         .map(|t| description_bytes(&t))
         .sum();
-    let memory = measure(&CommitTree {
-        repo,
-        commit: &commit,
-    });
+    let memory = measure(&CommitTree::new(repo, &commit));
     vec![
         commit,
         memory.claude.to_string(),

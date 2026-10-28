@@ -49,6 +49,9 @@ Measured on 2026-10-28 (both local consumers): `CLAUDE.md` 2120 and 4891 bytes, 
    without `paths`, import, `AGENTS.md` not imported, fallback); makes true SYN-38 (~500 lines).
 2. [x] `fixed-context` on the shared measure: the git-tree reader (symbolic links as today); verified by
    `tests/fixed_context.rs`; makes true REP-2 (~300 lines).
+3. [x] Fixes of the `high` review: links read in a commit, a file counted once whatever path names it, nested
+   fences, an open front matter, one `ls-tree` per commit; verified by `tests/budget_cli.rs` and
+   `tests/fixed_context.rs`; makes true SYN-38, REP-2.
 
 ## Decisions
 - Mode: autonomous
@@ -73,6 +76,18 @@ Measured on 2026-10-28 (both local consumers): `CLAUDE.md` 2120 and 4891 bytes, 
   SYN-38 are one count; usage docs say what the columns hold.
 - red: REP-2: row `r1` read `10 4` instead of `44 4`, `r2` `0 10` instead of `5 10`, the harness row `2 2` instead of
   `2 0`: `.claude/CLAUDE.md`, rules and imports not counted, an `AGENTS.md` no session loads counted.
+- Code review: no findings
+- not verified: none.
+- decisions needed: none.
+
+## Deliverable 3 (fixes of the `high` review)
+
+- done: fixes 1, 3, 4, 6, 7, 8, 9 of the `high` review; not fixed: 2 (a linked rules directory points outside the
+  repository, a non-goal of REP-2), 5 (the Claude Code doc says four hops), 10 (an unreadable `CLAUDE.md` is absent
+  for Claude Code too; the commit case is fix 1), the code span over two lines of 6 (rare).
+- red: SYN-38, REP-2: `95 bytes ... CLAUDE.md (60 bytes)` instead of 65 and 30 (a linked `.claude/CLAUDE.md` counted
+  twice); `1071 bytes` instead of 112 (an import in a nested fence counted, an open front matter read as scoped); row
+  `r1` `44` instead of `51` (a rule linked with `..` read as 0 in the commit).
 - Code review: no findings
 - not verified: none.
 - decisions needed: none.

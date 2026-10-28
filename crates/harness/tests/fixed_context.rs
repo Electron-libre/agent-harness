@@ -97,6 +97,10 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     };
     let pinned = new_repo(&tmp.join("pinned"));
     commit_at(&pinned, "2025-12-01T00:00:00Z", &[("README.md", "x")]);
+    // a rule linked to a file of another directory, read in the commit
+    std::fs::create_dir_all(pinned.join(".claude/rules")).unwrap();
+    std::os::unix::fs::symlink("../../shared/rule.md", pinned.join(".claude/rules/link.md"))
+        .unwrap();
     let c1 = commit_at(
         &pinned,
         "2026-01-01T00:00:00Z",
@@ -106,6 +110,7 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             ("CLAUDE.md", "@AGENTS.md"),
             (".claude/CLAUDE.md", "@../docs/x.md `@AGENTS.md`"),
             ("docs/x.md", "xxx"),
+            ("shared/rule.md", "1234567"),
             (".claude/rules/r.md", "rrrrr"),
             (".claude/rules/s.md", "---\npaths: src\n---\nSECRET scoped"),
             (".claude/skills/one/SKILL.md", &skill("one", "d1d1")),
@@ -202,8 +207,8 @@ fn row_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             full(&own)
         ),
         // the memory files and their imports; AGENTS.md only when imported or in place of the CLAUDE.md files
-        format!("pinned\tr1\t{c1}\t44\t4\t7\tone"),
-        format!("pinned\tr2\t{c2}\t5\t10\t18\tone,three,two"),
+        format!("pinned\tr1\t{c1}\t51\t4\t7\tone"),
+        format!("pinned\tr2\t{c2}\t12\t10\t18\tone,three,two"),
     ];
     let lines: Vec<&str> = out.lines().collect();
     if lines != expected {

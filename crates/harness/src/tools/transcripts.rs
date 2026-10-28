@@ -210,6 +210,11 @@ impl Place {
 }
 
 pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
+    git_bytes(dir, args).map(|out| String::from_utf8_lossy(&out).trim().to_string())
+}
+
+/// The standard output of a successful git command in `dir`, as it is.
+pub fn git_bytes(dir: &Path, args: &[&str]) -> Option<Vec<u8>> {
     let out = Command::new("git")
         .arg("-C")
         .arg(dir)
@@ -217,7 +222,7 @@ pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
         .output()
         .ok()
         .filter(|o| o.status.success())?;
-    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    Some(out.stdout)
 }
 
 /// The main worktree of the repository holding `cwd`: a linked worktree counts with its main repository, a submodule
