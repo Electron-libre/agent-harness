@@ -8,7 +8,7 @@ reads the user-level instruction files from the configuration directory (`CLAUDE
 the projects directory to the `projects/` of the configuration directory.
 
 # Findings
-* 2026-10-28, `high` review of `issues/list_the_user_level_instruction_files_in_the_audit.md`: `projects_root`
+* 2026-10-28, `high` review of `issues/done/list_the_user_level_instruction_files_in_the_audit.md`: `projects_root`
   reads `HOME` only; `crate::config_dir()` now resolves the configuration directory for the retention warnings and
   AUD-2.
 

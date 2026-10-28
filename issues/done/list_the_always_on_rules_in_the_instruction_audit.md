@@ -92,4 +92,4 @@ High review: 9 findings
 8. long doc comment lines: fixed.
 9. code review twice in the summary: the format of issue-workflow asks for both.
 
-Follow-up: `issues/list_the_user_level_instruction_files_in_the_audit.md` (decision `1 a`).
+Follow-up: `issues/done/list_the_user_level_instruction_files_in_the_audit.md` (decision `1 a`).
