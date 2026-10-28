@@ -1,7 +1,8 @@
 //! List the sources of the instruction audit: per project of the transcripts directory, the sessions, the
-//! messages typed by the user, the memory files and the instruction files of each working directory (AUD-1: the
-//! memory files a session loads at launch, `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules). With `--messages`, print the typed messages as `project<TAB>session<TAB>text`
-//! (newlines escaped); subagent transcripts are skipped. Prints private content: never commit the output.
+//! messages typed by the user, the memory files and the instruction files of each working directory (AUD-1:
+//! the memory files a session loads at launch, `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules). With
+//! `--messages`, print the typed messages as `project<TAB>session<TAB>text` (newlines escaped); subagent
+//! transcripts are skipped. Prints private content: never commit the output.
 //! Usage: `harness run audit-sources [projects_dir] [--messages]` (default `~/.claude/projects`).
 
 use super::transcripts;

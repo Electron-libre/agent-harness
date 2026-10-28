@@ -13,9 +13,10 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 ## Procedure
 
 1. **Collect**: `harness run audit-sources` lists, per project of `~/.claude/projects`, the sessions, typed
-   messages, memory files and instruction files (the memory files a session loads at launch, `AGENTS.md` and the
-   scoped rules); read them project by project (`harness run audit-sources --messages` through
-   `grep -P '^<project>\t'`), keeping the private content in the conversation, never in the repository.
+   messages, memory files and instruction files (the memory files a session loads at launch, `AGENTS.md`,
+   `.claude/AGENTS.md` and the scoped rules); read them project by project (`harness run audit-sources
+   --messages` through `grep -P '^<project>\t'`), keeping the private content in the conversation, never in the
+   repository.
    `harness run rule-breaches --summary` gives, per rule and revision, the sessions where it applied, where the
    agent broke it and the refusals of a gate (no message text).
 2. **Detect** candidates:

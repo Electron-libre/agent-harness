@@ -129,6 +129,9 @@ fn audit_sources_lists_every_instruction_file_once() {
         "---\npaths: [\"src/**\"]\n---\nscoped\n",
     );
     write(".claude/rules/c.txt", "not a rule\n");
+    let shared = tmp.path().join("shared.md");
+    std::fs::write(&shared, "shared rule\n").unwrap();
+    std::os::unix::fs::symlink(&shared, repo.join(".claude/rules/linked.md")).unwrap();
     let cwd = repo.display().to_string();
     std::fs::write(
         proj.join("s1.jsonl"),
@@ -143,17 +146,21 @@ fn audit_sources_lists_every_instruction_file_once() {
     assert!(out.status.success());
     let listed: Vec<String> = String::from_utf8_lossy(&out.stdout)
         .lines()
-        .filter_map(|l| l.strip_prefix(&format!("  instructions: {cwd}/")))
-        .map(String::from)
+        .filter_map(|l| l.strip_prefix("  instructions: "))
+        .map(|l| l.strip_prefix(&format!("{cwd}/")).unwrap_or(l).to_string())
         .collect();
     assert_eq!(
         listed,
         [
-            ".claude/CLAUDE.md",
-            ".claude/rules/a.md",
-            ".claude/rules/sub/b.md",
-            "AGENTS.md",
-            "docs/x.md",
+            ".claude/CLAUDE.md".into(),
+            ".claude/rules/a.md".into(),
+            ".claude/rules/sub/b.md".into(),
+            std::fs::canonicalize(&shared)
+                .unwrap()
+                .display()
+                .to_string(),
+            "AGENTS.md".into(),
+            "docs/x.md".into(),
         ]
     );
 }

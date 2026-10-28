@@ -39,6 +39,7 @@ files (home directory) stay out of scope. Means: the issue's approach 1, with ap
 1. [x] List the instruction files: `memory.rs` returns the paths of the loaded files (`measure` sums them),
    `audit_sources.rs` prints them with the extra files, `audit-instructions` names them in "Collect"; verified by
    `tests/audit_sources.rs`; makes true AUD-1.
+2. [x] Fixes of the `high` review; verified by `tests/audit_sources.rs`; makes true AUD-1 (amended).
 
 ## Decisions
 - Mode: autonomous
@@ -55,10 +56,40 @@ done: `audit-sources` lists every instruction file of a working directory throug
 | lint | pass |
 | specs | AUD-1 traced, spec accepted |
 | docs | audit-instructions "Collect", architecture link |
-| code review | no findings |
+| code review | `low`: no findings |
 
 red: AUD-1: `left: ["CLAUDE.md", "AGENTS.md"]`, expected the five files of the scenario.
 
 Code review: no findings
 
 not verified: none. decisions needed: none.
+
+## Deliverable 2: fixes of the `high` review
+
+done: the `high` review of `54d6001..933fa06` (9 findings) settled; a rule linked outside the directory stays listed by
+its absolute path (AUD-1 amended), and the test checks every `instructions:` line.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | AUD-1 amended and traced |
+| docs | audit-instructions "Collect" names `.claude/AGENTS.md`; doc comments wrapped |
+| code review | `low`: no findings |
+
+red: none (the code already printed the absolute path; the test filtered it out).
+
+Code review: no findings
+
+High review: 9 findings
+1. absolute path of a file linked outside: kept, the user wrote it; AUD-1 states the form.
+2. test filtered the other lines: fixed.
+3. ancestors of the working directory: `issues/resolve_the_instruction_files_as_a_session_loads_them.md`.
+4. imports of a linked file: same issue (behaviour of REP-2 before this issue).
+5. rules read twice: not fixed, a few files per directory.
+6. `Loaded.agents` against `path`: documented on the fields.
+7. `.claude/AGENTS.md` missing from the skill: fixed.
+8. long doc comment lines: fixed.
+9. code review twice in the summary: the format of issue-workflow asks for both.
+
+Follow-up: `issues/list_the_user_level_instruction_files_in_the_audit.md` (decision `1 a`).

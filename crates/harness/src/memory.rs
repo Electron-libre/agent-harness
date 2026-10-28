@@ -73,9 +73,11 @@ pub(crate) fn measure(tree: &impl Tree) -> Memory {
     memory
 }
 
-/// A memory file loaded at launch: its path in the tree, a symbolic link followed.
+/// A memory file loaded at launch.
 struct Loaded {
+    /// Its path in the tree, a symbolic link followed (absolute when it points outside the tree).
     path: String,
+    /// Whether it was loaded through the name `AGENTS.md` or `.claude/AGENTS.md`, whatever file that name points to.
     agents: bool,
     bytes: u64,
 }
