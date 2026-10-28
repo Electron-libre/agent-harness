@@ -53,7 +53,7 @@ No `FORMAT` raise: no fragment key, lock line or source layout changes meaning; 
 2. [x] Tool names: `cardinal run cardinal-report` and `cardinal-changes` (registry, usage strings, skills, docs,
    CLAUDE.md `Expected-effect`); verified by the tools CLI test through the new names and `tests/skills.rs`;
    makes true REP-3, VRD-3, VRD-5, VRD-7, VRD-8 amended; ~150 lines.
-3. [ ] Commit scope `cardinal`: `commit-check` built-in scopes `docs` and `cardinal`; `rule-breaches` reads
+3. [x] Commit scope `cardinal`: `commit-check` built-in scopes `docs` and `cardinal`; `rule-breaches` reads
    `docs`, `cardinal` and `harness` (past commits); AGENTS.md, the `cardinal.toml` comments; verified by a
    commit-check test (`cardinal` accepted, `harness` refused) and a rule-breaches test (a past `harness` commit is no
    breach); makes true BRE-9 amended; ~80 lines.
@@ -105,6 +105,22 @@ Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names
 
 - red: REP-3, VRD-3, VRD-8: `cardinal: unknown tool \`cardinal-changes\``; `tests/skills.rs`: 2 failures (the skill
   named the old tools)
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3: commit scope
+- done: `commit-check` (and `check-commits`) accept `docs` and `cardinal`, refuse `harness`; `rule-breaches` reads
+  `docs`, `cardinal` and `harness` (BRE-9 amended); AGENTS.md (scope and example) and the `cardinal.toml` comments.
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| copies | `just sync` then `just check-harness` pass |
+| docs | AGENTS.md, seed and project `cardinal.toml` comments, BRE-9 |
+| code review | low, see below |
+
+- red: BRE-9: a `fix(cardinal): v` commit counted as a `commit-format` breach; commit-check: `unknown scope \`cardinal\``
 - Code review: no findings
 - not verified: none
 - decisions needed: none

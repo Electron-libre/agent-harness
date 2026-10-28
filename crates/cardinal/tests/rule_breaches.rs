@@ -540,6 +540,12 @@ fn commit_repo(tmp: &Path) -> (PathBuf, [String; 5]) {
         "2026-02-01T10:41:00Z",
         &["commit", "-q", "-m", "Mine, rebased."],
     );
+    commit_at(
+        &repo,
+        "2026-02-01T11:35:00Z",
+        "fix(cardinal): v",
+        &[("a", "7")],
+    );
     git_at(
         &repo,
         "2026-02-01T11:40:00Z",

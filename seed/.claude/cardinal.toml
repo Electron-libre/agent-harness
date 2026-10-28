@@ -2,7 +2,7 @@
 # rewrites it.
 
 [project]
-# Scopes allowed in commit messages besides `docs` and `harness` (crates, areas).
+# Scopes allowed in commit messages besides `docs` and `cardinal` (crates, areas).
 commit_scopes = []
 # Documents at the repository root that skills may cite besides AGENTS.md and CLAUDE.md.
 root_docs = ["README.md"]

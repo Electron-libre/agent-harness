@@ -93,8 +93,13 @@ fn commit_check_enforces_each_rule_of_agents_md() {
         ),
         (
             "built-in scope",
-            "docs(harness): describe the hooks\n".into(),
+            "docs(cardinal): describe the hooks\n".into(),
             "",
+        ),
+        (
+            "scope of before the rename",
+            "docs(harness): describe the hooks\n".into(),
+            "scope",
         ),
         (
             "body and footer",
