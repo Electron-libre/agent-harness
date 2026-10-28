@@ -51,7 +51,7 @@ thresholds, expectations outside the commit messages. Spec: `specs/harness-verdi
    temp git repository; makes true VRD-1, VRD-2, VRD-3, VRD-4, VRD-7, VRD-8; ~600 lines.
 2. [x] Verdict table: `harness-report --changes` prints `## Verdicts` (groups before and after, values, verdict);
    verified by tests through the binary on TSV fixtures; makes true VRD-5, VRD-6, REP-3 (amended); ~500 lines.
-3. [ ] Skill and docs: `evaluate-harness` collects `harness-changes`, passes `--changes` and reads the verdicts
+3. [x] Skill and docs: `evaluate-harness` collects `harness-changes`, passes `--changes` and reads the verdicts
    (`confounded` and `too few` are no conclusion); `AGENTS.md` names the footer line; verified by new
    `REQUIRED_PASSAGES` in `crates/harness/tests/skills.rs`, `just check-harness`; ~80 lines.
 
@@ -103,5 +103,27 @@ Code review: 1 finding, not fixed: the skills table is left out of the verdict l
 reads (`calls`, `hook_refusals`, `unused` are no metric).
 
 not verified: a report on real transcripts with a recorded change (none recorded yet).
+
+decisions needed: none
+
+## Deliverable 3
+done: `evaluate-harness` collects `harness-changes`, passes `--changes` and reads the verdicts (`confounded` and `no
+data` no conclusion, one pair of groups is not a trend); `AGENTS.md` names the `Expected-effect` footer line.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass, none touched |
+| docs | `docs/workflow.md`; copies synced (`just check-harness`) |
+| code review | low, see below |
+
+red: none traced (no spec); `skills` test failed with `evaluate-harness: missing 'harness run harness-changes'` and
+`missing '`no data` are no conclusion'`.
+
+Code review: no findings
+
+not verified: a real `evaluate-harness` run with a recorded change. Fixed context: unchanged (`AGENTS.md` is not
+loaded at launch here, no skill description changed).
 
 decisions needed: none

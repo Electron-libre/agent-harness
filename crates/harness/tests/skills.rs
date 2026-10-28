@@ -87,6 +87,16 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "evaluate-harness",
+        "harness run harness-changes",
+        "the recorded changes of the harness get a verdict",
+    ),
+    (
+        "evaluate-harness",
+        "`no data` are no conclusion",
+        "a verdict where something else changed too is not read as an effect",
+    ),
+    (
+        "evaluate-harness",
         "never a pass or a fail",
         "numbers become targets once shown: trends only",
     ),

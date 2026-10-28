@@ -95,6 +95,8 @@ sequenceDiagram
 
 `skill:evaluate-harness` reads the session transcripts and the git history and reports, per harness revision,
 whether the agent got more efficient, the delivered work better and the rules better followed
-([architecture](architecture.md#the-evaluation-from-the-transcripts)). `skill:audit-instructions` reads the
+([architecture](architecture.md#the-evaluation-from-the-transcripts)). A commit that changes `files/` names the
+effect it should have in an `Expected-effect: <metric> <up|down>` line (`AGENTS.md`); the report gives each one a
+verdict, `confounded` when something else changed too. `skill:audit-instructions` reads the
 instructions the user gave over time and proposes the skills, tools, hooks and rules worth adding; each validated proposal becomes
 an issue.
