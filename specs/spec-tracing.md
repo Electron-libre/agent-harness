@@ -58,3 +58,5 @@ stable, not required: an internal test is the proof when its citation gives the 
 - Failing the check on an internal-only proof: a boundary proof is an improvement, not a rule.
 - Judging whether a reason is good: the checker only requires one.
 - The other format and traceability checks of `check-specs`.
+- Telling the build output in another place than a `target` beside a `Cargo.toml` (a custom `target-dir`), or `.rs`
+  fixtures, from the tests: the `skipped_dirs` of `.claude/harness.toml` leave them out.

@@ -314,18 +314,19 @@ fn parse(
 }
 
 /// Every file under `dir` (outside a git repository, where no worktree can nest), but those of the directories
-/// `skipped` says to leave.
+/// `skipped` says to leave; a symbolic link is never followed, as in `repo_files` (ADR 0009).
 fn all_files(dir: &Path, skipped: &dyn Fn(&Path) -> bool, found: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
-            if !skipped(&path) {
-                all_files(&path, skipped, found);
-            }
-        } else {
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() && !skipped(&path) {
+            all_files(&path, skipped, found);
+        } else if kind.is_file() {
             found.push(path);
         }
     }
@@ -347,10 +348,16 @@ pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>)
 
 /// The `.rs` files of the root that may hold tests, whatever the layout of the project (TRC-9): all but those under
 /// `.git`, `node_modules`, a `target` beside a `Cargo.toml` (the build output) or a directory named like one of the
-/// `skipped_dirs` of `.claude/harness.toml` (TRC-10); a failure of git is a problem in `out`.
+/// `skipped_dirs` of `.claude/harness.toml` (TRC-10); a failure of git, or a `harness.toml` that does not parse, is a
+/// problem in `out`.
 pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     let mut names = vec![".git".to_string(), "node_modules".to_string()];
-    names.extend(super::config_list(root, "skipped_dirs").unwrap_or_default());
+    match super::config_list(root, "skipped_dirs") {
+        Ok(dirs) => names.extend(dirs),
+        // a project with no `harness.toml` skips nothing more
+        Err(e) if root.join(crate::CONFIG).exists() => out.push(e),
+        Err(_) => {}
+    }
     let skipped = |dir: &Path| {
         dir.file_name().is_some_and(|name| {
             names.iter().any(|n| name == n.as_str())
@@ -358,8 +365,17 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
         })
     };
     // in a git repository the files git lists, so never those of a nested worktree (ADR 0008) nor the ignored ones
-    let files: Vec<PathBuf> = match repo_files::repo_files(root, &[]) {
-        Ok(Some(files)) => files,
+    // git's `*` also matches `/`: the `.rs` files at any depth
+    let files: Vec<PathBuf> = match repo_files::repo_files(root, &["*.rs"]) {
+        Ok(Some(files)) => files
+            .into_iter()
+            .filter(|f| {
+                let dirs = f.strip_prefix(root).unwrap_or(f).ancestors().skip(1);
+                !dirs
+                    .filter(|dir| !dir.as_os_str().is_empty())
+                    .any(|dir| skipped(&root.join(dir)))
+            })
+            .collect(),
         Ok(None) => {
             let mut files = Vec::new();
             all_files(root, &skipped, &mut files);
@@ -373,15 +389,7 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     };
     files
         .into_iter()
-        .filter(|f| {
-            f.extension().is_some_and(|e| e == "rs")
-                && !f
-                    .strip_prefix(root)
-                    .unwrap_or(f)
-                    .ancestors()
-                    .skip(1)
-                    .any(|dir| !dir.as_os_str().is_empty() && skipped(&root.join(dir)))
-        })
+        .filter(|f| f.extension().is_some_and(|e| e == "rs"))
         .collect()
 }
 

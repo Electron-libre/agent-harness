@@ -330,7 +330,7 @@ fn check_specs() {
 type Case<'a> = dyn Fn(&str, &str, &str, &[(&str, &str)], Option<&str>) -> String + 'a;
 
 // spec: PAR-16
-/// The cases above run outside a git repository: every `.rs` file of `crates/` and `.claude/` is scanned there.
+/// The cases above run outside a git repository: every `.rs` file of the root is scanned there.
 fn outside_git(case: &Case) {
     case(
         "outside git, a test under .claude/worktrees is traced",
@@ -410,6 +410,38 @@ fn any_layout(case: &Case, report: &dyn Fn(&str, bool)) {
         ],
         None,
     );
+    case(
+        "a harness.toml that does not parse is a problem, not an empty skipped_dirs",
+        SPEC,
+        TESTS,
+        &[(".claude/harness.toml", "[project\n")],
+        Some(".claude/harness.toml"),
+    );
+}
+
+// spec: TRC-9
+/// Outside git, a symbolic link is not followed: neither a cycle nor a tree outside the root is read.
+#[cfg(unix)]
+#[test]
+fn outside_git_a_symbolic_link_is_not_followed() {
+    let dir = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let write = |root: &Path, path: &str, body: &str| {
+        std::fs::create_dir_all(root.join(path).parent().unwrap()).unwrap();
+        std::fs::write(root.join(path), body).unwrap();
+    };
+    write(dir.path(), "docs/adr/0005-incremental.md", "x");
+    write(dir.path(), "specs/rerun.md", SPEC);
+    write(dir.path(), "crates/a/src/t.rs", TESTS);
+    write(outside.path(), "x/bad.rs", "// spec: RER-9\nfn t() {}\n");
+    std::os::unix::fs::symlink("..", dir.path().join("crates/up")).unwrap();
+    std::os::unix::fs::symlink(outside.path(), dir.path().join("ext")).unwrap();
+    let out = tool_command("/tools/check_specs.rs")
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success() && stdout.is_empty(), "{stdout}");
 }
 
 // spec: PAR-14, TRC-10

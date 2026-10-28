@@ -8,7 +8,7 @@ source = "."
 commit_scopes = ["sync", "files"]
 # Documents at the repository root that skills may cite besides AGENTS.md and CLAUDE.md.
 root_docs = ["README.md"]
-# Directories that scripts do not scan besides .git, target and node_modules.
+# Directories that scripts do not scan besides .git, node_modules and the build output (target).
 skipped_dirs = []
 # Where the agent finds the context of the project (issue-workflow, create-issue, prioritize-issues).
 roadmap = ["issues/queue.md"]

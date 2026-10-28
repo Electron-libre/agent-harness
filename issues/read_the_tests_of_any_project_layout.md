@@ -38,7 +38,7 @@ Plan: validated
 
 ## Understanding
 `check-specs` and `spec-coverage` read every `.rs` file of the root (git's list, or the disk outside git), except
-under `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/harness.toml`, so a crate at the root is
+under `.git`, `node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` of `.claude/harness.toml`, so a crate at the root is
 traced and reported. Means: candidate 2.1 of the issue (no `test_dirs` key); `skipped_dirs` is the existing escape.
 
 ## Plan
@@ -46,6 +46,9 @@ traced and reported. Means: candidate 2.1 of the issue (no `test_dirs` key); `sk
    directories, `spec-coverage` prints `no test file found`; verified by binary tests on a root crate (`src/`,
    `tests/`, `build.rs`, `target/`, `vendor/` skipped) in `tests/check_specs.rs` and `tests/spec_coverage.rs`; makes
    true TRC-9, TRC-10, COV-1, COV-9, COV-11, PAR-16 (reworded).
+2. [x] Fixes of the `high` review: no symbolic link followed outside git, a `harness.toml` that does not parse is a
+   problem, git filters the `.rs` files, the seeded comment and a non-goal of TRC say which `target` is skipped;
+   verified by `tests/check_specs.rs`; makes true TRC-9, TRC-10.
 
 ## Decisions
 - Mode: autonomous
@@ -70,4 +73,25 @@ traced and reported. Means: candidate 2.1 of the issue (no `test_dirs` key); `sk
   must sit above a test fn`; spec-coverage printed `no test file under crates/ or .claude/` for a root crate.
 - Code review: no findings (low)
 - not verified: a real consumer with a root crate (only temp roots).
+- decisions needed: none.
+
+## Deliverable 2
+- done: fixes of the `high` review of `083f6e2..8d7766f`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | `seed/.claude/harness.toml` comment, TRC non-goal |
+| code review | low: no findings |
+
+- red: TRC-9, TRC-10: `crates/up/ext/x/bad.rs: cites RER-9, which no spec defines` (a link cycle followed outside git);
+  the unparsable `harness.toml` passed silently.
+- High review, 10 findings: fixed the link walk, the silent config error, the git pathspec, the seed comment, the
+  doubled skip, the stale test doc and the Understanding; not fixed: the `close-issue` skip rule differs on purpose
+  (a text rewrite, not a test scan); the module `crates/a/tests/target/` is already traced by the case `a test under
+  tests/target is traced`; a custom `target-dir` and fixtures became a non-goal of TRC (`skipped_dirs`).
+- Code review: no findings (low)
+- not verified: none.
 - decisions needed: none.
