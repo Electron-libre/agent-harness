@@ -1,6 +1,6 @@
 ---
 name: evaluate-harness
-description: Report whether the recent harness revisions made the agent more efficient, the delivered work better and the rules better followed, with the model, Claude Code version and project mix next to each number, plus the fixed context each revision costs and the skills nobody calls. Use when the user asks to evaluate or measure the harness, compare harness revisions, or see what a skill, hook or rule change brought.
+description: Report whether the recent Cardinal revisions made the agent more efficient, the delivered work better and the rules better followed, with the model, Claude Code version and project mix next to each number, plus the fixed context each revision costs and the skills nobody calls. Use when the user asks to evaluate or measure the harness (Cardinal), compare its revisions, or see what a skill, hook or rule change brought.
 ---
 
 # Evaluate the harness
@@ -24,14 +24,14 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
      the sessions name that has an `issues/done/` directory (the current one at least);
    - `harness run fixed-context > <dir>/context.tsv`;
    - `harness run harness-changes <source> --sessions <dir>/sessions.tsv > <dir>/changes.tsv`, `<source>` a local
-     checkout of the harness source (the `source` of `.claude/harness.toml` when it is a directory), for the
+     checkout of the Cardinal source (the `source` of `.claude/harness.toml` when it is a directory), for the
      `Expected-effect` lines of its commits; skip it, and `--changes`, when there is none;
    - `harness run harness-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv --changes <dir>/changes.tsv`,
      with `--min-sessions <n>` when the user asks for another sample size than 10.
 2. **Read** each table of the report, oldest group first: the tables are the numbers, never recompute them.
    - A trend is a change kept over two groups or more; one group out of line is noise.
    - Before naming a trend, compare the `models`, `versions` and `projects` of the groups it spans: when they
-     changed too, say the change may come from them, not from the harness.
+     changed too, say the change may come from them, not from Cardinal.
    - A `too few` group supports no conclusion; say how many sessions it lacks. The same holds for a
      `main_context_peak` whose `peak_sessions` is under the threshold.
    - A skill `unused` over the last groups may be dropped or described better; a hook whose refusals grow, or a

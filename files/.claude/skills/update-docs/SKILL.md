@@ -29,7 +29,7 @@ These rows hold for every project:
 | Behaviour of a capability that has a spec in `specs/` added, changed or dropped | `specs/<capability>.md` (requirement, scenario, status), the `// spec: ID` of the tests; `just check-specs` must pass |
 | Convention (lint, tests, harness) | `CLAUDE.md`, the page that describes the harness |
 | Commit scope added or removed (new crate or area) | `commit_scopes` in `.claude/harness.toml` |
-| A synced file (skill, script, `AGENTS.md`, `harness.just`, workflow) must change | not here: fix it in the central harness repository, then `harness sync` |
+| A synced file (skill, script, `AGENTS.md`, `harness.just`, workflow) must change | not here: fix it in the Cardinal repository, then `harness sync` |
 | Decision that a future reader would undo by accident | a new ADR in `docs/adr/` |
 
 ## 3. Detect stale statements

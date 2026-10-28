@@ -1,5 +1,5 @@
-# Recipes of the shared agent harness. Managed by `harness sync`: change them in the central repository. The tools they
-# run are those of `harness run`, the binary of the revision `.claude/harness.toml` pins.
+# Recipes of Cardinal, the shared agent harness. Managed by `harness sync`: change them in the Cardinal repository.
+# The tools they run are those of `harness run`, the binary of the revision `.claude/harness.toml` pins.
 
 # For the user only, never the agent: waive the code review of the next commit of this worktree (creates its waiver file and prints the path).
 waive-review:
@@ -45,6 +45,6 @@ check-specs *args:
 spec-coverage *args:
     @harness run spec-coverage {{args}}
 
-# Fail when a managed harness file was modified or deleted since the last `harness sync`.
+# Fail when a managed Cardinal file was modified or deleted since the last `harness sync`.
 check-harness:
     harness check

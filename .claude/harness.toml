@@ -1,7 +1,8 @@
 [harness]
 source = "."
 
-# Values of this project that the shared harness reads. Owned by the project: `harness sync` never rewrites it.
+# Values of this project that Cardinal, the shared agent harness, reads. Owned by the project: `harness sync` never
+# rewrites it.
 
 [project]
 # Scopes allowed in commit messages besides `docs` and `harness` (crates, areas).

@@ -38,7 +38,7 @@ stays for the concept and in every command, file, path, tool, skill or metric na
 ## Plan
 1. [x] Repository docs: ADR 0012 (the name and the series of renames), `README.md`, `CLAUDE.md`, `docs/`, the crate
    description; verified by `just check` and a reread of the remaining `harness` words; ~120 lines.
-2. [ ] Shared texts: the product mentions of `files/` and `seed/` (skills, `harness.just` comments, seeded
+2. [x] Shared texts: the product mentions of `files/` and `seed/` (skills, `harness.just` comments, seeded
    `harness.toml` comment), then `just sync`; verified by `just check` and `just check-harness`; ~60 lines.
 
 ## Decisions
@@ -64,3 +64,21 @@ stays for the concept and in every command, file, path, tool, skill or metric na
 - decisions needed: -
 - Note: `just check` first failed on `audit_sources`: a cached test binary still pointed at the old checkout path;
   touching the sources rebuilt it.
+
+## Deliverable 2
+- done: the product mentions of `files/` and `seed/` (`harness.just` header, `specs/README.md`, `update-docs`,
+  `evaluate-harness` and its description, the seeded `harness.toml` comment, also this repository's own) say
+  Cardinal; `just sync` updated the copies.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | `just check-harness` passes; the remaining `harness` words are commands, paths, tool names or the concept |
+| code review | low, see below |
+
+- red: none (docs only)
+- Code review: no findings
+- not verified: -
+- decisions needed: -
