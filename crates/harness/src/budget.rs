@@ -6,7 +6,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::tools::description_bytes;
-use crate::CONFIG;
+use crate::{read_config, CONFIG};
 
 /// The key of the `[project]` table that holds the budget, in bytes.
 const KEY: &str = "fixed_context_budget";
@@ -14,10 +14,7 @@ const KEY: &str = "fixed_context_budget";
 /// The warnings on the budget: none without the key, or when the configuration cannot be read (the command says so).
 #[must_use]
 pub fn warnings(root: &Path) -> Vec<String> {
-    let Some(config) = fs::read_to_string(root.join(CONFIG))
-        .ok()
-        .and_then(|text| text.parse::<toml::Table>().ok())
-    else {
+    let Ok(config) = read_config(root) else {
         return Vec::new();
     };
     let Some(value) = config.get("project").and_then(|p| p.get(KEY)) else {
