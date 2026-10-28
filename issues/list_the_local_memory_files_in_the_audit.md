@@ -6,7 +6,7 @@ git. `audit-sources` (AUD-1) therefore does not list the rules a user wrote ther
 again. The audit should list it in each directory it reads, as it lists `CLAUDE.md`.
 
 # Findings
-* 2026-10-28, `high` review of `issues/resolve_the_instruction_files_as_a_session_loads_them.md`: reported on
+* 2026-10-28, `high` review of `issues/done/resolve_the_instruction_files_as_a_session_loads_them.md`: reported on
   `loaded` in `memory.rs`.
 * `issues/done/count_every_always_loaded_memory_file.md` left `CLAUDE.local.md` out of REP-2 and SYN-38 on purpose:
   it is not in the git tree `fixed-context` reads, and the measured consumers had none.

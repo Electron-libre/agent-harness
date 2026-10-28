@@ -84,7 +84,7 @@ Code review: no findings
 High review: 9 findings
 1. absolute path of a file linked outside: kept, the user wrote it; AUD-1 states the form.
 2. test filtered the other lines: fixed.
-3. ancestors of the working directory: `issues/resolve_the_instruction_files_as_a_session_loads_them.md`.
+3. ancestors of the working directory: `issues/done/resolve_the_instruction_files_as_a_session_loads_them.md`.
 4. imports of a linked file: same issue (behaviour of REP-2 before this issue).
 5. rules read twice: not fixed, a few files per directory.
 6. `Loaded.agents` against `path`: documented on the fields.
