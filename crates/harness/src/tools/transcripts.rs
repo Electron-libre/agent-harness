@@ -28,7 +28,8 @@ pub fn projects_root(arg: Option<&String>) -> Result<PathBuf, String> {
         None => crate::config_dir()
             .map(|dir| dir.join("projects"))
             .ok_or_else(|| {
-                "neither CLAUDE_CONFIG_DIR nor HOME is set: pass the projects directory".to_string()
+                "the configuration directory cannot be located (set HOME or CLAUDE_CONFIG_DIR): pass the projects directory"
+                    .to_string()
             }),
     }
 }

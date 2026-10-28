@@ -37,6 +37,9 @@ it. Out of scope: `rule-breaches` and `audit-sources` specs, which name no defau
    names `CLAUDE_CONFIG_DIR` and `HOME`; doc comments, `docs/architecture.md` and the `audit-instructions` skill
    updated; verified by a `session-metrics` binary test with `CLAUDE_CONFIG_DIR` and `HOME` pointing at different
    transcripts, and one with neither set; makes true EVA-15 (~80 lines).
+2. [x] Fixes of the `high` review: the error worded as the retention warning (an empty variable is not "unset"),
+   the error path and the `delivered-quality` exception tested for each tool, the EVA-15 scenario in id order;
+   verified by `tests/transcripts_cli.rs`; makes true EVA-15.
 
 ## Decisions
 - Mode: autonomous
@@ -47,5 +50,18 @@ it. Out of scope: `rule-breaches` and `audit-sources` specs, which name no defau
   and `audit-instructions` updated.
 - red: EVA-15: `FAIL - the default projects directory is the one of CLAUDE_CONFIG_DIR`, `FAIL - with neither
   variable, the error names both`.
+- Code review: no findings.
+- not verified: none.
+
+## Deliverable 2
+- done: error `the configuration directory cannot be located (set HOME or CLAUDE_CONFIG_DIR)`; every transcript
+  tool tested without a configuration directory; scenario reordered.
+- red: EVA-15: `the_transcript_tools_fail_naming_both_variables` panicked, session-metrics printed `neither
+  CLAUDE_CONFIG_DIR nor HOME is set`.
+- `high` review, 6 findings: wording (2 findings) and test gap fixed here; scenario order fixed; a missing default
+  directory printing an empty result with no warning becomes
+  `issues/warn_when_the_default_projects_directory_is_missing.md`; the double `config_dir()` lookup of
+  `audit-sources` is kept: both read the same variables in one process, a `projects_dir` argument is meant to differ
+  from the configuration directory.
 - Code review: no findings.
 - not verified: none.

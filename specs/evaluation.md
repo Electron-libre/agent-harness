@@ -36,8 +36,8 @@ measures; it does not judge.
 - (EVA-2) Given an assistant message split over three lines with the same `message.id`, each carrying the same usage and one `tool_use`, when the row is printed, then `turns` is 1, the tokens are those of one usage and `tool_calls` is 3.
 - (EVA-8) Given a project whose `harness.toml` moved from `rev = "a"` to `rev = "b"` in a commit at 10:00, when a session starts at 09:00, then its revision is `a`; at 11:00, `b`.
 - (EVA-8) Given a session run in a linked worktree on a branch that changed the pin, when the revision is read, then it is the pin of the default branch, since the branch may be gone.
-- (EVA-15) Given `CLAUDE_CONFIG_DIR` naming a directory whose `projects/` holds a session and `HOME` one whose `.claude/projects/` holds another, when `session-metrics` runs with no argument, then it prints the session of `CLAUDE_CONFIG_DIR` only.
 - (EVA-11) Given an archive holding sessions A and B, when the transcripts hold only B (changed) and C, then the archive holds A, the new B and C.
+- (EVA-15) Given `CLAUDE_CONFIG_DIR` naming a directory whose `projects/` holds a session and `HOME` one whose `.claude/projects/` holds another, when `session-metrics` runs with no argument, then it prints the session of `CLAUDE_CONFIG_DIR` only.
 
 ## Non-goals
 
