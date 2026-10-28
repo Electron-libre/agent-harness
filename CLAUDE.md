@@ -30,7 +30,9 @@ fails when a copy drifted.
 Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability) before
 committing (it runs the tests of the tools and of the shared content too); no `Co-Authored-By` or AI attribution in commits;
 everything in English; the shared files hold nothing specific to one project (project values go through
-`.claude/harness.toml`).
+`.claude/harness.toml`). A commit that changes `files/` may add `Expected-effect: <metric> <up|down>` to its
+footer, one line per metric of `harness-report` it should move: a direction, never a target; `skill:evaluate-harness`
+gives it a verdict ([specs/harness-verdicts.md](specs/harness-verdicts.md)).
 
 ## Test conventions
 

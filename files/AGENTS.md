@@ -52,8 +52,6 @@ Use one of:
 
 - Separated from the body by a blank line.
 - Used for `BREAKING CHANGE: …` and issue references (`Refs: #123`).
-- In the harness source, a commit that changes the shared files may add `Expected-effect: <metric> <up|down>`, one
-  line per metric of `harness-report` it should move: a direction, never a target (`skill:evaluate-harness`).
 
 ### Language and style
 

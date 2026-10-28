@@ -10,8 +10,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::harness_changes::{HEADER as CHANGES, RULE_METRIC};
+use super::session_metrics::HEADER as SESSIONS;
 
-const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
 const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
@@ -126,6 +126,11 @@ fn median(mut values: Vec<u64>) -> u64 {
 
 /// `name=n` for each name of a comma-separated `column`, `n` the sessions that hold it, most frequent first.
 fn mix(sessions: &[&Row], column: &str) -> String {
+    sorted_pairs(name_counts(sessions, column))
+}
+
+/// The sessions that hold each name of a comma-separated `column`.
+fn name_counts<'a>(sessions: &[&'a Row], column: &str) -> BTreeMap<&'a str, u64> {
     let mut counts: BTreeMap<&str, u64> = BTreeMap::new();
     for row in sessions {
         let names: HashSet<&str> = value(row, column)
@@ -136,7 +141,7 @@ fn mix(sessions: &[&Row], column: &str) -> String {
             *counts.entry(name).or_default() += 1;
         }
     }
-    sorted_pairs(counts)
+    counts
 }
 
 /// `name=n, …`, most frequent first, then by name.
@@ -152,6 +157,7 @@ fn sorted_pairs(counts: BTreeMap<&str, u64>) -> String {
 
 /// The cells of a printed table: its columns, and per group its rows, computed for a `too few` group too.
 struct Table {
+    title: &'static str,
     columns: Vec<String>,
     rows: Vec<Vec<Vec<String>>>,
 }
@@ -177,7 +183,7 @@ impl Table {
 /// A markdown table under `## <title>`: `group`, `sessions`, then `columns`, one row or more per group; a group with
 /// too few sessions is one row showing only its size. Returns the cells, for the verdicts.
 fn table(
-    title: &str,
+    title: &'static str,
     columns: &[&str],
     groups: &[Group],
     cells: impl Fn(&Group) -> Vec<Vec<String>>,
@@ -186,12 +192,9 @@ fn table(
     println!("| group | sessions | {} |", columns.join(" | "));
     println!("|{}", "---|".repeat(columns.len() + 2));
     let computed: Vec<Vec<Vec<String>>> = groups.iter().map(&cells).collect();
+    let too_few = vec![vec![TOO_FEW.to_string(); columns.len()]];
     for (group, cells) in groups.iter().zip(&computed) {
-        let rows = if group.too_few {
-            vec![vec![TOO_FEW.to_string(); columns.len()]]
-        } else {
-            cells.clone()
-        };
+        let rows = if group.too_few { &too_few } else { cells };
         for row in rows {
             println!(
                 "| {} | {} | {} |",
@@ -203,6 +206,7 @@ fn table(
     }
     println!();
     Table {
+        title,
         columns: columns.iter().map(|c| (*c).to_string()).collect(),
         rows: computed,
     }
@@ -452,40 +456,49 @@ fn fixed_context(groups: &[Group], context: &[Row]) -> Table {
     })
 }
 
-/// The value of `metric` for group `g` in the tables, as a number (`breached_share` of the rule's row, its `%`
-/// dropped); `None` when it has no table, no cell or an empty one.
-fn metric_value(tables: &[&Table], g: usize, metric: &str) -> Option<String> {
-    let cell = match metric.strip_prefix(RULE_METRIC) {
-        Some(rule) => tables
-            .iter()
-            .find_map(|t| t.cell(g, "breached_share", Some(("rule", rule))))?,
-        None => tables.iter().find_map(|t| t.cell(g, metric, None))?,
+/// The value of `metric` for group `g` in the table VRD-1 takes it from, as a number (`breached_share` of the rule's
+/// row, its `%` dropped); `None` when that table is not printed or the cell is empty.
+fn metric_value(tables: &[Table], g: usize, metric: &str) -> Option<String> {
+    let (title, column, key) = match metric {
+        "fixes_after_per_issue" | "findings_per_review" => ("Quality", metric, None),
+        "total_bytes" => ("Fixed context", metric, None),
+        _ => match metric.strip_prefix(RULE_METRIC) {
+            Some(rule) => ("Rules", "breached_share", Some(("rule", rule))),
+            None => ("Efficiency", metric, None),
+        },
     };
-    let cell = cell.trim_end_matches('%');
+    let cell = tables
+        .iter()
+        .find(|t| t.title == title)?
+        .cell(g, column, key)?
+        .trim_end_matches('%');
     cell.parse::<f64>().is_ok().then(|| cell.to_string())
 }
 
-/// The most frequent name of `column` over the sessions of a group.
-fn dominant<'a>(group: &Group<'a>, column: &str) -> String {
-    let pairs = mix(&group.sessions, column);
-    pairs.split('=').next().unwrap_or_default().to_string()
+/// The most frequent name of `column` over the sessions of a group, the first by name among equals.
+fn dominant<'a>(group: &Group<'a>, column: &str) -> Option<&'a str> {
+    name_counts(&group.sessions, column)
+        .into_iter()
+        .max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(a.0)))
+        .map(|(name, _)| name)
 }
 
 /// The verdict of each expectation of `changes` (VRD-5, VRD-6), from the groups before and after its change.
-fn verdicts(groups: &[Group], tables: &[&Table], changes: &[Row]) {
-    let held = |row: &Row| -> HashSet<String> {
-        value(row, "revisions")
-            .split(',')
-            .filter(|r| !r.is_empty())
-            .map(str::to_string)
-            .collect()
-    };
-    let after_of = |row: &Row| {
-        let held = held(row);
-        groups
-            .iter()
-            .position(|g| g.revisions.iter().any(|r| held.contains(*r)))
-    };
+fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row]) {
+    // Per row: the revisions holding its change, and the index of its after group.
+    let placed: Vec<(HashSet<&str>, Option<usize>)> = changes
+        .iter()
+        .map(|row| {
+            let held: HashSet<&str> = value(row, "revisions")
+                .split(',')
+                .filter(|r| !r.is_empty())
+                .collect();
+            let after = groups
+                .iter()
+                .position(|g| g.revisions.iter().any(|r| held.contains(r)));
+            (held, after)
+        })
+        .collect();
     let columns = [
         "change",
         "metric",
@@ -499,27 +512,26 @@ fn verdicts(groups: &[Group], tables: &[&Table], changes: &[Row]) {
     println!("## Verdicts\n");
     println!("| {} |", columns.join(" | "));
     println!("|{}", "---|".repeat(columns.len()));
-    for row in changes {
+    for (row, (held, after_index)) in changes.iter().zip(&placed) {
         let change = value(row, "change");
         let (metric, direction) = (value(row, "metric"), value(row, "direction"));
-        let after_index = after_of(row);
         let before_index = after_index.and_then(|i| i.checked_sub(1));
         let name = |i: Option<usize>| i.map(|i| groups[i].name.clone()).unwrap_or_default();
         let at = |i: Option<usize>| i.and_then(|i| metric_value(tables, i, metric));
-        let (before_value, after_value) = (at(before_index), at(after_index));
+        let (before_value, after_value) = (at(before_index), at(*after_index));
         let verdict = match (before_index, after_index, &before_value, &after_value) {
             (Some(b), Some(a), Some(bv), Some(av)) => {
-                let (before, after) = (&groups[b], &groups[a]);
-                let held = held(row);
+                let (before, after) = (&groups[b], &groups[*a]);
                 let mix_changed = ["models", "versions", "project"]
                     .iter()
                     .any(|c| dominant(before, c) != dominant(after, c));
                 let other_change = changes
                     .iter()
-                    .any(|other| value(other, "change") != change && after_of(other) == Some(a));
-                if before.too_few
-                    || after.too_few
-                    || after.revisions.iter().any(|r| !held.contains(*r))
+                    .zip(&placed)
+                    .any(|(other, (_, i))| value(other, "change") != change && i == after_index);
+                // Only the last group can be too few, and the before group comes earlier.
+                if after.too_few
+                    || after.revisions.iter().any(|r| !held.contains(r))
                     || mix_changed
                     || other_change
                 {
@@ -527,10 +539,9 @@ fn verdicts(groups: &[Group], tables: &[&Table], changes: &[Row]) {
                 } else {
                     let (bv, av): (f64, f64) =
                         (bv.parse().unwrap_or(0.0), av.parse().unwrap_or(0.0));
-                    let up = direction == "up";
                     if av == bv {
                         "no observed effect"
-                    } else if (av > bv) == up {
+                    } else if (av > bv) == (direction == "up") {
                         "helped"
                     } else {
                         "hurt"
@@ -543,7 +554,7 @@ fn verdicts(groups: &[Group], tables: &[&Table], changes: &[Row]) {
         println!(
             "| {short_change} | {metric} | {direction} | {} | {} | {} | {} | {verdict} |",
             name(before_index),
-            name(after_index),
+            name(*after_index),
             before_value.unwrap_or_default(),
             after_value.unwrap_or_default(),
         );
@@ -644,7 +655,7 @@ pub(super) fn main(args: &[String]) -> u8 {
         tables.push(fixed_context(&groups, context));
     }
     if let Some(changes) = &changes {
-        verdicts(&groups, &tables.iter().collect::<Vec<_>>(), changes);
+        verdicts(&groups, &tables, changes);
     }
     0
 }

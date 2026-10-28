@@ -83,8 +83,8 @@ fn revisions(path: &str) -> Result<Vec<String>, String> {
     Ok(ordered.into_iter().map(|(rev, _)| rev).collect())
 }
 
-/// The expectations of the non-merge commits of the first-parent history of the default branch that change `files/`,
-/// sorted by commit date then by line: (change, metric, direction).
+/// The expectations of the non-merge commits of the default branch that change `files/`, a merged branch's included,
+/// oldest first as `git log --reverse` lists them, then by line: (change, metric, direction).
 fn expectations(repo: &Path) -> Vec<(String, String, String)> {
     let Some(branch) = default_branch(repo) else {
         return Vec::new();
@@ -93,32 +93,22 @@ fn expectations(repo: &Path) -> Vec<(String, String, String)> {
         repo,
         &[
             "log",
-            "--first-parent",
+            "--reverse",
             "--no-merges",
-            "--format=%H%x00%ct%x00%B%x1e",
+            "--format=%H%x00%B%x1e",
             branch,
             "--",
             "files",
         ],
     )
     .unwrap_or_default();
-    let mut commits: Vec<(i64, String, &str)> = log
-        .split('\x1e')
-        .filter_map(|entry| {
-            let mut parts = entry.trim_start_matches('\n').splitn(3, '\0');
-            let hash = parts.next()?.to_string();
-            let date = parts.next()?.parse().ok()?;
-            Some((date, hash, parts.next()?))
-        })
-        .collect();
-    commits.sort_by_key(|(date, ..)| *date);
-    commits
-        .into_iter()
-        .flat_map(|(_, hash, body)| {
+    log.split('\x1e')
+        .filter_map(|entry| entry.trim_start_matches('\n').split_once('\0'))
+        .flat_map(|(hash, body)| {
             body.lines()
                 .filter_map(|line| expectation(line)?.ok())
                 .map(|(metric, direction)| {
-                    (hash.clone(), metric.to_string(), direction.to_string())
+                    (hash.to_string(), metric.to_string(), direction.to_string())
                 })
                 .collect::<Vec<_>>()
         })
@@ -159,10 +149,17 @@ pub(super) fn main(args: &[String]) -> u8 {
         Ok(revisions) => revisions,
         Err(e) => return fail(e),
     };
+    // A pinned revision is a commit hash (ADR 0002): a branch or tag name would resolve to today's tip, not to the
+    // commit the sessions ran with, so it is never resolved.
     let commits: Vec<(&String, Option<String>)> = revisions
         .iter()
         .map(|rev| {
             let commit = rev.strip_prefix("self:").unwrap_or(rev);
+            let hash =
+                (7..=40).contains(&commit.len()) && commit.chars().all(|c| c.is_ascii_hexdigit());
+            if !hash {
+                return (rev, None);
+            }
             (
                 rev,
                 git(
@@ -185,13 +182,8 @@ pub(super) fn main(args: &[String]) -> u8 {
                 .iter()
                 .filter_map(|(rev, commit)| {
                     let commit = commit.as_deref()?;
-                    let ancestor = std::process::Command::new("git")
-                        .arg("-C")
-                        .arg(repo)
-                        .args(["merge-base", "--is-ancestor", &change, commit])
-                        .status()
-                        .is_ok_and(|s| s.success());
-                    ancestor.then_some(rev.as_str())
+                    git(repo, &["merge-base", "--is-ancestor", &change, commit])
+                        .map(|_| rev.as_str())
                 })
                 .collect::<Vec<_>>()
                 .join(",")

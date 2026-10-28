@@ -112,7 +112,7 @@ fn lists_the_expectations_of_the_changes_with_the_revisions_that_hold_them() {
         "fix(files): y\n\nExpected-effect: speed up\n",
     );
     git(&repo, &["checkout", "-q", "-b", "side"]);
-    commit(
+    let c4 = commit(
         &repo,
         4,
         "files/side.md",
@@ -136,6 +136,19 @@ fn lists_the_expectations_of_the_changes_with_the_revisions_that_hold_them() {
         "files/c.md",
         "feat(files): w\n\nExpected-effect: breached_share:commit-attribution down\n",
     );
+    // Two commits of the same second keep the order they were made in.
+    let c6 = commit(
+        &repo,
+        6,
+        "files/d.md",
+        "feat(files): v\n\nExpected-effect: turns up\n",
+    );
+    let c7 = commit(
+        &repo,
+        6,
+        "files/e.md",
+        "feat(files): u\n\nExpected-effect: turns down\n",
+    );
     let file = tmp.path().join("sessions.tsv");
     sessions(
         &file,
@@ -147,6 +160,7 @@ fn lists_the_expectations_of_the_changes_with_the_revisions_that_hold_them() {
             ("ffffffffffffffffffffffffffffffffffffffff", 5),
             (&c1, 6),
             (&c5, 7),
+            ("main", 8),
         ],
     );
     let (code, stdout, stderr) = run(&repo, &["--sessions", file.to_str().unwrap()]);
@@ -156,7 +170,10 @@ fn lists_the_expectations_of_the_changes_with_the_revisions_that_hold_them() {
         "change\tmetric\tdirection\trevisions".to_string(),
         format!("{c1}\tturns\tdown\t{held}"),
         format!("{c1}\ttotal_bytes\tup\t{held}"),
+        format!("{c4}\tvalidations\tup\t{c5}"),
         format!("{c5}\tbreached_share:commit-attribution\tdown\t{c5}"),
+        format!("{c6}\tturns\tup\t"),
+        format!("{c7}\tturns\tdown\t"),
     ];
     assert_eq!(stdout.lines().collect::<Vec<_>>(), expected);
     assert!(!stdout.contains("SECRET"));

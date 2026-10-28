@@ -54,6 +54,11 @@ thresholds, expectations outside the commit messages. Spec: `specs/harness-verdi
 3. [x] Skill and docs: `evaluate-harness` collects `harness-changes`, passes `--changes` and reads the verdicts
    (`confounded` and `too few` are no conclusion); `AGENTS.md` names the footer line; verified by new
    `REQUIRED_PASSAGES` in `crates/harness/tests/skills.rs`, `just check-harness`; ~80 lines.
+4. [x] Fixes of the `high` review: the expectations of a merged branch are listed (no `--first-parent`), in the
+   order of `git log --reverse`; a branch or tag name is never resolved as a revision; each metric reads the
+   table VRD-1 names; the after group of each row computed once; `dominant` reads the counts; the sessions
+   header shared; the `Expected-effect` line moved from the shared `AGENTS.md` to `CLAUDE.md`; verified by
+   the updated `harness_changes` test (red before the fix); makes true VRD-3, VRD-4, VRD-5.
 
 ## Decisions
 - Mode: autonomous
@@ -125,5 +130,29 @@ Code review: no findings
 
 not verified: a real `evaluate-harness` run with a recorded change. Fixed context: unchanged (`AGENTS.md` is not
 loaded at launch here, no skill description changed).
+
+decisions needed: none
+## Deliverable 4
+done: 8 of the 10 findings of the `high` review fixed (2 not fixed, see below); VRD-3, VRD-4, VRD-5 amended.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass; VRD-3 (merged branches, `git log --reverse` order), VRD-4 (hash revisions only), VRD-5 (table per metric) |
+| docs | `CLAUDE.md`, `docs/workflow.md`; `AGENTS.md` copies synced |
+| code review | low, see below |
+
+red: VRD-3, VRD-4: the side-branch expectation missing, `main` listed in `revisions`, two commits of the same
+second in reverse order.
+
+Code review: no findings
+
+Not fixed from the `high` review: one `git merge-base` process per change and revision (the changes are few; now
+through the `git` helper); `harness_changes` orders the revisions by first start as `groups()` does, in its own
+code (the two read different files). The cells of a `too few` group are still computed (VRD-5 needs them); only
+their copy was dropped.
+
+not verified: a real report with a recorded change.
 
 decisions needed: none
