@@ -176,8 +176,11 @@ struct Lock {
 
 /// The mark of a lock line that holds a managed entry of the settings instead of a file.
 const ENTRY: &str = "entry";
+/// The mark of the lock line that holds the format of the `cardinal` that wrote it, followed by one space: a
+/// `cardinal` older than SYN-41 skips a line with no two spaces.
+const FORMAT_LINE: &str = "format ";
 
-/// The lock of the project, `None` when it has none yet.
+/// The lock of the project, `None` when it has none yet; an error when a newer `cardinal` wrote it (SYN-42).
 fn read_lock(root: &Path) -> Result<Option<Lock>> {
     let path = root.join(LOCK);
     let text = match fs::read_to_string(&path) {
@@ -187,6 +190,19 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
     };
     let mut lock = Lock::default();
     for line in text.lines().filter(|l| !l.starts_with('#')) {
+        if let Some(format) = line.strip_prefix(FORMAT_LINE) {
+            let format: u32 = format
+                .parse()
+                .with_context(|| format!("{}: not a format: {line}", path.display()))?;
+            if format > FORMAT {
+                let install = match source_and_rev(root) {
+                    Ok((source, _)) => format!("`{}`", launcher::install(&source, None)),
+                    Err(_) => "the cardinal of the head of the source".to_string(),
+                };
+                bail!("{LOCK} was written by a cardinal that reads the format {format}, this one reads up to {FORMAT}: install a newer one with {install}");
+            }
+            continue;
+        }
         let Some((h, rel)) = line.split_once("  ") else {
             continue;
         };
@@ -208,6 +224,7 @@ fn write_lock(root: &Path, lock: &Lock) -> Result<()> {
     let mut text = String::from(
         "# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
     );
+    text.push_str(&format!("{FORMAT_LINE}{FORMAT}\n"));
     for (path, h) in &lock.files {
         text.push_str(&format!("{h}  {path}\n"));
     }

@@ -46,7 +46,7 @@ the issue, a format integer rather than the crate version, never raised). Out of
 1. [x] Source format: `cardinal-format` at the root (2), `FORMAT` in the binary kept equal by a test, `sync` and
    `update` refuse a higher one with the install command; verified by tests of `sync_from`, `update_in` and the
    format test; makes true SYN-40, SYN-43.
-2. [ ] Lock format: `write_lock` records `format <n>`, `read_lock` reads it, `check`, `sync` and `update` refuse a
+2. [x] Lock format: `write_lock` records `format <n>`, `read_lock` reads it, `check`, `sync` and `update` refuse a
    higher one with the install of the head of the source; ADR 0014 accepted, docs; verified by lock tests; makes
    true SYN-41, SYN-42.
 
@@ -73,6 +73,25 @@ the issue, a format integer rather than the crate version, never raised). Out of
 
 - red: SYN-40, SYN-43: `assertion left == right failed: left: Some(0) right: Some(3)` (sync accepted format 99);
   `cardinal-format` not found
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+
+- done: the lock records `format <n>`; `check`, `sync` and `update` refuse a lock of a newer format with the install
+  of the head of the source; ADR 0014 and `specs/sync.md` accepted; this repository's lock resynced.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | usage, architecture |
+| code review | low: no findings |
+
+- red: SYN-41, SYN-42: `assertion left == right failed` (no `format` line in the lock; `check` exited 0 on a newer
+  lock)
 - Code review: no findings
 - not verified: none
 - decisions needed: none

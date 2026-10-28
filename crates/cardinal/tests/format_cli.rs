@@ -114,3 +114,103 @@ fn update_refuses_a_revision_of_a_newer_format_and_keeps_the_project_as_it_was()
         assert_eq!(snapshot(root.path()), before);
     }
 }
+
+// spec: SYN-41
+#[test]
+fn the_lock_records_the_format_of_the_cardinal_that_wrote_it() {
+    let home = Home::new();
+    let (_source, root) = project(&home);
+    home.ok(root.path(), &["sync"]);
+    let lock = get(root.path(), LOCK).unwrap();
+    assert_eq!(
+        lock.lines()
+            .filter(|l| l.starts_with("format "))
+            .collect::<Vec<_>>(),
+        [format!("format {}", format())],
+        "{lock}"
+    );
+}
+
+// spec: SYN-41
+#[test]
+fn a_lock_without_a_format_is_read_and_rewritten_with_one() {
+    let home = Home::new();
+    let (_source, root) = project(&home);
+    home.ok(root.path(), &["sync"]);
+    let lock = get(root.path(), LOCK).unwrap();
+    let older: String = lock
+        .lines()
+        .filter(|l| !l.starts_with("format "))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    put(root.path(), LOCK, &older);
+    home.ok(root.path(), &["check"]);
+    let run = home.ok(root.path(), &["sync"]);
+    assert!(run.lines().is_empty(), "{run:?}");
+    assert_eq!(get(root.path(), LOCK), Some(lock));
+}
+
+// spec: SYN-42
+#[test]
+fn check_sync_and_update_refuse_a_lock_of_a_newer_format_and_write_nothing() {
+    let home = Home::new();
+    let (source, root) = project(&home);
+    home.ok(root.path(), &["sync"]);
+    let lock = get(root.path(), LOCK).unwrap();
+    put(
+        root.path(),
+        LOCK,
+        &lock.replace(&format!("format {}", format()), "format 99"),
+    );
+    put(source.path(), "files/a.txt", "a2");
+    let before = snapshot(root.path());
+    let install = format!(
+        "cargo install --force --path {}/crates/cardinal --locked",
+        source.path().display()
+    );
+    let refusal = format!(
+        "{LOCK} was written by a cardinal that reads the format 99, this one reads up to {}: install a newer one with `{install}`",
+        format()
+    );
+    for args in [&["check"][..], &["sync"], &["sync", "--dry-run"]] {
+        let run = home.harness(root.path(), args);
+        assert_eq!(run.code, Some(3), "{args:?} {run:?}");
+        assert!(run.stderr.contains(&refusal), "{args:?} {run:?}");
+        assert_eq!(snapshot(root.path()), before);
+    }
+}
+
+// spec: SYN-42
+#[test]
+fn update_refuses_a_lock_of_a_newer_format_naming_the_head_of_the_source() {
+    let home = Home::new();
+    let repo = tempdir().unwrap();
+    home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), "files/a.txt", "a1");
+    home.git(repo.path(), &["add", "."]);
+    home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
+    let root = tempdir().unwrap();
+    put(
+        root.path(),
+        CONFIG,
+        &format!("[harness]\nsource = \"{}\"\n", url(repo.path())),
+    );
+    home.ok(root.path(), &["update"]);
+    let lock = get(root.path(), LOCK).unwrap();
+    put(
+        root.path(),
+        LOCK,
+        &lock.replace(&format!("format {}", format()), "format 99"),
+    );
+    let before = snapshot(root.path());
+
+    let run = home.harness(root.path(), &["update"]);
+    assert_eq!(run.code, Some(3), "{run:?}");
+    let install = format!("cargo install --force --git {} --locked", url(repo.path()));
+    assert!(
+        run.stderr
+            .contains(&format!("install a newer one with `{install}`")),
+        "{run:?}"
+    );
+    assert_eq!(snapshot(root.path()), before);
+}

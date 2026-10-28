@@ -1,6 +1,6 @@
 # 0014. The source declares the format cardinal must read
 
-Status: Proposed
+Status: Accepted
 Date: 2026-10-28
 
 ## Context

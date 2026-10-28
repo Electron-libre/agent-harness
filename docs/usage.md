@@ -35,7 +35,8 @@ runs `cardinal`, else `harness`.
 
 A source also declares the format of its managed content in `cardinal-format`, a whole number (ADR 0014): `sync` and
 `update` refuse a source of a format the installed `cardinal` does not read, write nothing and print the install to
-run, instead of misreading it (SYN-40).
+run, instead of misreading it (SYN-40); `check`, `sync` and `update` refuse in the same way a lock written by a
+newer `cardinal` (SYN-42).
 
 ## Evaluating Cardinal
 

@@ -1,4 +1,5 @@
 # Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.
+format 2
 ae32a54ad3e59066328e1a2f7f5afff0ca4b13bf194272c376e23280e4a7ce4e  .claude/rules/reports-to-the-user.md
 4b9c74884d807a490d35e67018a5c981431fa3bf14da70b5c43143d64e8430d0  .claude/skills/audit-instructions/SKILL.md
 7a89df35224f9599902b1137d2906dfbc213c95c42f2593bd63f94cf36025f56  .claude/skills/commit-message/SKILL.md
