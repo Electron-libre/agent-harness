@@ -81,9 +81,20 @@ own issues).
    - Code review: no findings.
    - not verified: none.
    - decisions needed: none.
-4. [ ] Release and CI: `release.yml` publishes `cardinal-<commit>` and the legacy `harness-<commit>`,
+4. [x] Release and CI: `release.yml` publishes `cardinal-<commit>` and the legacy `harness-<commit>`,
    `install_cardinal.sh` fetches and caches `cardinal`; verified by `just check`, the shell syntax (`sh -n`) and the
    CI run after the push.
+   - done: `release.yml` builds `cardinal` and publishes it as `cardinal-<commit>` and `harness-<commit>`;
+     `install_cardinal.sh` fetches `cardinal-<commit>`, else `harness-<commit>`, into `<cache>/cardinal/bin`, links
+     `harness` to it, and builds naming no crate; `harness.yml` checks with `cardinal`; copies synced.
+   - check | result: tests, lint, specs pass (`just check`); `sh -n` passes; smoke run of the script with a fake
+     `curl` serving only the `harness` asset: installed `cardinal` and the `harness` link; docs: architecture.
+   - red: none (CI files, no test; the release workflow is a non-goal of BIN).
+   - Code review: 2 findings. Fixed: the build fallback moves `cardinal`, else `harness` (a pre-rename commit
+     with no release). Not fixed: `cargo install` naming no crate needs a single package with binaries, which this
+     workspace has and BIN-5 states.
+   - not verified: `release.yml` and `harness.yml` on GitHub (after the push).
+   - decisions needed: none.
 5. [ ] Switch the commands: the managed hooks, `files/harness.just`, the skills, `AGENTS.md`, the specs, the docs and
    the `justfile` call `cardinal`; `just install` then `just sync`; follow-up issue to drop the alias; verified by
    `just check`, `just check-harness`; makes true BIN-8; sets `tool-binaries` and `sync` `accepted`.

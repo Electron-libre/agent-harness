@@ -103,9 +103,11 @@ cannot run, nor a `cardinal` hook on a machine that has only the `harness` of be
 `crates/cardinal/src/launcher.rs`.
 
 This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): each push to the main
-branch builds `harness` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever the
-glibc) and `aarch64-apple-darwin`, and creates the release `harness-<commit>` with each binary and its `.sha256`. The CI
-of a consumer (`.github/install_cardinal.sh`) installs that asset, or builds it with `cargo` when there is none, so its
+branch builds `cardinal` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever
+the glibc) and `aarch64-apple-darwin`, and creates the release `cardinal-<commit>` with each binary and its `.sha256`,
+and the same binary as the release `harness-<commit>`, the name a launcher installed before the rename fetches. The CI
+of a consumer (`.github/install_cardinal.sh`) installs that asset with a `harness` link to it, or builds it with
+`cargo` when there is none, so its
 jobs need no Rust when the source publishes the commit.
 
 ## Hooks and their declaration
