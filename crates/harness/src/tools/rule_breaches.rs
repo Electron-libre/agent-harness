@@ -6,6 +6,7 @@
 //! message is printed.
 //! Usage: `harness run rule-breaches [projects_dir] [--summary]` (default `~/.claude/projects`).
 
+use super::language::Language;
 use super::transcripts;
 
 use chrono::{DateTime, FixedOffset};
@@ -218,50 +219,12 @@ struct Finding {
 }
 
 /// What a session is checked against: the work tree of each `cwd` of its calls, to make paths relative, the managed
-/// paths and the stop words of the conversation language then, with those of the other language.
+/// paths and the conversation language.
 struct Context {
     worktrees: HashMap<String, PathBuf>,
     managed: Option<HashSet<String>>,
-    language: Option<(&'static [&'static str], &'static [&'static str])>,
+    language: Option<Language>,
 }
-
-/// Frequent words of one language only (`a`, `on`, `or`, `plus` are both French and English).
-const FRENCH_WORDS: &[&str] = &[
-    "le", "la", "les", "un", "une", "des", "du", "de", "et", "est", "que", "qui", "dans", "pour",
-    "pas", "sur", "avec", "ce", "cette", "il", "elle", "je", "tu", "nous", "vous", "au", "aux",
-    "ou", "mais", "par", "sont", "fait", "sans", "comme", "se", "ne", "en", "donc", "puis",
-];
-const ENGLISH_WORDS: &[&str] = &[
-    "the", "an", "and", "is", "are", "that", "which", "in", "for", "not", "with", "this", "it",
-    "i", "you", "we", "of", "to", "be", "by", "was", "but", "as", "at", "from", "have", "has",
-    "so", "then", "will", "can",
-];
-
-/// The stop words of `user_language` then those of the other language; `None` for a language with no list.
-fn stop_words(language: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
-    match language {
-        "French" => Some((FRENCH_WORDS, ENGLISH_WORDS)),
-        "English" => Some((ENGLISH_WORDS, FRENCH_WORDS)),
-        _ => None,
-    }
-}
-
-/// The lower-cased words of a text once fenced code blocks (the fence rule of QUA-12) and inline code are removed.
-fn prose_words(text: &str) -> Vec<String> {
-    let mut prose = String::new();
-    for (line, _) in super::fenced(text.lines()).filter(|&(_, fenced)| !fenced) {
-        prose.extend(line.split('`').step_by(2).flat_map(|part| [part, " "]));
-        prose.push('\n');
-    }
-    prose
-        .split(|c: char| !c.is_alphabetic())
-        .filter(|w| !w.is_empty())
-        .map(str::to_lowercase)
-        .collect()
-}
-
-/// The fewest words a text block needs for its language to be judged.
-const MIN_WORDS: usize = 20;
 
 impl Context {
     /// `path` relative to the work tree of `cwd`; `None` outside it.
@@ -392,15 +355,11 @@ impl Verdict {
                     }
                 }
                 Event::Text { location, text } => {
-                    let words = prose_words(text);
-                    let Some((own, other)) = context.language.filter(|_| words.len() >= MIN_WORDS)
-                    else {
+                    let Some(breach) = context.language.and_then(|l| l.breached_by(text)) else {
                         continue;
                     };
                     self.applied.insert("user-language");
-                    let count =
-                        |list: &[&str]| words.iter().filter(|w| list.contains(&w.as_str())).count();
-                    if count(other) > count(own) {
+                    if breach {
                         self.add("user-language", false, location, String::new());
                     }
                 }
@@ -606,7 +565,7 @@ pub(super) fn main(args: &[String]) -> u8 {
                 .and_then(|c| c.get("project"))
                 .and_then(|p| p.get("user_language"))
                 .and_then(toml::Value::as_str)
-                .and_then(stop_words);
+                .and_then(Language::named);
             let context = Context {
                 worktrees,
                 managed: managed_paths(&repo, &start_text),

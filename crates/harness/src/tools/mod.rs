@@ -16,6 +16,7 @@ mod fixed_context;
 mod format_rust;
 mod harness_report;
 mod issue_worktree;
+mod language;
 mod next_issue;
 mod repo_files;
 mod review_gate;

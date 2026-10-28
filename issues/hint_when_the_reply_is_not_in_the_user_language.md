@@ -31,3 +31,41 @@ hint when the reply is in the other language.
 # Hints
 * After a `harness sync` that adds a hook, run `just check-harness` and the `cargo install` it prints.
 * A reply made mostly of code, paths or quoted output must not trigger the hint (the 20-word floor of BRE-10).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+A `Stop` hook `language-hint` judges the last reply with the BRE-10 test (moved to a module shared with
+`rule-breaches`) and exits 2 once with a one-line hint. It reads `last_assistant_message` of the `Stop` event (Claude
+Code 2.1.312 sends it), the transcript only as a fallback. The measure needs sessions run with the hook: a follow-up.
+
+## Plan
+1. [x] Shared language test: move `stop_words`, `prose_words` and the 20-word floor of `rule_breaches.rs` into
+   `tools/language.rs`, one function judging a text; verified by the `rule_breaches` tests unchanged (~120 lines).
+2. [ ] Hook `language-hint`: the tool, its declaration under `Stop` in `entries/.claude/settings.json`, `just sync`,
+   docs (architecture table); verified by `tests/language_hint.rs` through the binary; makes true LNG-1 to LNG-6,
+   spec `accepted` (~350 lines).
+3. [ ] Follow-up issue to measure `breached_share` of `user-language` with `skill:evaluate-harness` once sessions ran
+   with the hook (~40 lines, `issues/` only).
+
+## Decisions
+- Mode: autonomous
+- Base commit: fddf3f4e14becb841336fd2e6b0e11c4976e54a9
+- The measure of `breached_share` goes to a follow-up issue (deliverable 3): no session ran with the hook yet.
+
+## Deliverable 1
+- done: the stop words, the prose filter and the 20-word floor moved to `tools/language.rs` (`Language::named`,
+  `breached_by`); `rule-breaches` calls it.
+- | check | result |
+  |---|---|
+  | tests | `cargo test` green, BRE-10 test unchanged |
+  | lint | clippy -D warnings clean |
+  | specs | `just check-specs` ok |
+  | docs | no doc names the moved code (grep of `docs/`, `README.md`, `CLAUDE.md`) |
+  | code review | low, no findings |
+- red: none (pure refactor under the existing BRE-10 test)
+- Code review: no findings
+- not verified: none
+- decisions needed: none
