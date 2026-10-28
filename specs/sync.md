@@ -62,6 +62,7 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - **SYN-46** (deterministic) `init` must write the configuration under the name of the format of its source (SYN-44), with the defaults of the file of that name under the source's `seed/`, and must refuse when the project has either configuration.
 - **SYN-47** (deterministic) `check`, `run`, the tools and the native gate, which read no source, must read `.claude/cardinal.toml` and `.claude/cardinal.lock` when the file exists, else `.claude/harness.toml` and `.claude/harness.lock`.
 - **SYN-48** (deterministic) When the project has `.claude/cardinal.toml` and its source has a format below 3, `sync` and `update` must fail with the error `<config> needs a source of the format 3 or higher, <source> has the format <n>` (exit 3) and write nothing, `--dry-run` included: the tools of that source read only the old names.
+- **SYN-49** (deterministic) `sync`, `update`, `cardinal run` and the launcher must treat the source as a git repository to clone when it contains `://`, starts with `git@` or ends with `.git` (case sensitive, nothing after it), and as a local directory read in place otherwise.
 
 ## Scenarios
 
@@ -96,6 +97,7 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - (SYN-45) Given a `justfile` that imports `harness.just` and a source that manages `cardinal.just` instead, when `sync` migrates the project, then `harness.just` is removed (unchanged since the lock, SYN-5), `cardinal.just` is added and the import names it.
 - (SYN-45) Given a source that seeds `.claude/cardinal.toml`, when `sync --dry-run` would migrate the project, then it does not report that file as seeded.
 - (SYN-45) Given a migrated project, when `sync` runs again, then it renames nothing.
+- (SYN-49) Given the source `/x/.git`, then it is cloned; given `../x.git/` (trailing slash) or `/x/X.GIT`, then it is read as a local directory.
 
 ## Non-goals
 

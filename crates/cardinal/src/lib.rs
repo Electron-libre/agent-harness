@@ -355,12 +355,11 @@ fn read_config(root: &Path) -> Result<toml::Table> {
         .with_context(|| format!("parsing {}", path.display()))
 }
 
+// A plain suffix test, not `Path::extension`: `/x/.git` is a repository and `X.GIT` or `x.git/` a
+// directory (SYN-49).
+#[allow(clippy::case_sensitive_file_extension_comparisons)]
 fn is_git_url(source: &str) -> bool {
-    source.contains("://")
-        || source.starts_with("git@")
-        || Path::new(source)
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("git"))
+    source.contains("://") || source.starts_with("git@") || source.ends_with(".git")
 }
 
 fn git(dir: Option<&Path>, args: &[&str]) -> Result<()> {

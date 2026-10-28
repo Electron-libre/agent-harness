@@ -231,6 +231,39 @@ fn update_refuses_a_local_directory_source_and_changes_nothing() {
     assert!(get(root.path(), LOCK).is_none());
 }
 
+// spec: SYN-49
+#[test]
+fn a_source_ending_in_dot_git_is_cloned_and_any_other_ending_is_a_local_directory() {
+    let home = Home::new();
+    let (repo, _first, second) = git_source(&home);
+    let source_at = |source: &str| {
+        let root = tempdir().unwrap();
+        put(
+            root.path(),
+            CONFIG,
+            &format!("[harness]\nsource = \"{source}\"\n"),
+        );
+        root
+    };
+
+    let cloned = source_at(&format!("{}/.git", repo.path().display()));
+    let run = home.ok(cloned.path(), &["update"]);
+    assert_eq!(
+        run.lines()[0],
+        format!("rev: (none) -> {second}"),
+        "{run:?}"
+    );
+
+    let dirs = tempdir().unwrap();
+    for local in ["x.git/", "X.GIT"] {
+        put(&dirs.path().join(local), "files/a.txt", "a1");
+        let root = source_at(&format!("{}/{local}", dirs.path().display()));
+        let run = home.harness(root.path(), &["update"]);
+        assert_eq!(run.code, Some(3), "{local}: {run:?}");
+        assert!(run.stderr.contains("local directory"), "{local}: {run:?}");
+    }
+}
+
 // spec: SYN-15
 #[test]
 fn update_dry_run_reports_the_target_and_writes_nothing() {

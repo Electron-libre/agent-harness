@@ -33,3 +33,20 @@ fn the_binary_reads_the_format_of_its_own_revision() {
             .unwrap();
     assert_eq!(declared.trim().parse::<u32>().unwrap(), FORMAT);
 }
+
+// spec: SYN-49 (internal: the forms of `git@` and `https://` need a remote the binary tests cannot reach)
+#[test]
+fn a_git_source_is_a_url_or_ends_with_dot_git() {
+    for git in [
+        "https://host/x",
+        "file:///x",
+        "git@host:x",
+        "/x/.git",
+        "../x.git",
+    ] {
+        assert!(is_git_url(git), "{git}");
+    }
+    for local in ["../x.git/", "/x/X.GIT", "/x", "x.gitx"] {
+        assert!(!is_git_url(local), "{local}");
+    }
+}

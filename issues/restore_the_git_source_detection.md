@@ -26,3 +26,25 @@ specify a new one, and test it.
 # Resources
 * `crates/cardinal/src/lib.rs` (`is_git_url`), `run.rs`, `launcher.rs`
 * `git show e5352ff -- crates/cardinal/src/lib.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Bring back the pre-`e5352ff` rule (`ends_with(".git")`, case sensitive) with an `#[allow]` stating why, and specify it as SYN-49.
+Out of scope: any new source form (e.g. `file://` already counts as git through `://`).
+
+## Plan
+1. [x] Restore and specify the git source rule: `is_git_url` back to `ends_with(".git")` under `#[allow(clippy::case_sensitive_file_extension_comparisons)]`; verified by a binary test of `update` (a source `<repo>/.git` is cloned, `<dir>/x.git/` and `<dir>/X.GIT` are refused as local directories) plus a unit test of the five forms; makes true SYN-49. ~60 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 88a0f3ac215b6f3dd2d131675654afbcf9e9950c
+
+## Deliverable 1
+- done: `is_git_url` back to `ends_with(".git")` under an `#[allow]` with its reason; SYN-49 specified and traced.
+- red: SYN-49: `update` on `<repo>/.git` failed with "`source` is a local directory, which has no revision to update".
+- Code review: no findings
+- not verified: the `git@` and `https://` forms through the binary (unit test only).
+- decisions needed: none
