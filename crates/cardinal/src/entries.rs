@@ -1,5 +1,5 @@
 //! The entries of the project's `.claude/settings.json` that the source manages (`specs/sync.md`, SYN-29 to SYN-36,
-//! ADR 0007): the deny rules and hook objects of `entries/.claude/settings.json`, added to the settings by `sync` and
+//! ADR 0007, ADR 0013): the allow and deny rules and hook objects of `entries/.claude/settings.json`, added to the settings by `sync` and
 //! recorded in the lock, every other key left as the project wrote it.
 
 use std::fmt;
@@ -17,9 +17,14 @@ pub const SETTINGS: &str = ".claude/settings.json";
 /// The managed entries, relative to the source.
 pub const FRAGMENT: &str = "entries/.claude/settings.json";
 
-/// One managed entry: a rule of `permissions.deny`, or a hook object of an event and matcher of `hooks`.
+/// The lists of `permissions` whose rules are managed entries.
+const PERMISSIONS: [&str; 2] = ["allow", "deny"];
+
+/// One managed entry: a rule of `permissions.allow` or `permissions.deny`, or a hook object of an event and matcher of
+/// `hooks`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Entry {
+    Allow(String),
     Deny(String),
     Hook {
         event: String,
@@ -31,7 +36,7 @@ pub enum Entry {
 impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Entry::Deny(rule) => write!(f, "deny {rule}"),
+            Entry::Allow(rule) | Entry::Deny(rule) => write!(f, "{} {rule}", self.list()),
             Entry::Hook {
                 event,
                 matcher,
@@ -51,10 +56,27 @@ impl fmt::Display for Entry {
 }
 
 impl Entry {
+    /// The rule `rule` of the list `list` of `permissions`.
+    fn rule(list: &str, rule: &str) -> Entry {
+        match list {
+            "allow" => Entry::Allow(rule.to_string()),
+            _ => Entry::Deny(rule.to_string()),
+        }
+    }
+
+    /// The list of `permissions` that holds the entry, `hooks` for a hook.
+    fn list(&self) -> &'static str {
+        match self {
+            Entry::Allow(_) => "allow",
+            Entry::Deny(_) => "deny",
+            Entry::Hook { .. } => "hooks",
+        }
+    }
+
     /// The entry as one line of JSON, for the lock.
     pub fn to_lock(&self) -> String {
         match self {
-            Entry::Deny(rule) => json!({ "deny": rule }),
+            Entry::Allow(rule) | Entry::Deny(rule) => json!({ self.list(): rule }),
             Entry::Hook {
                 event,
                 matcher,
@@ -67,8 +89,10 @@ impl Entry {
     /// The entry of a line written by `to_lock`.
     pub fn from_lock(line: &str) -> Result<Entry> {
         let value: Value = serde_json::from_str(line)?;
-        if let Some(rule) = value["deny"].as_str() {
-            return Ok(Entry::Deny(rule.to_string()));
+        for list in PERMISSIONS {
+            if let Some(rule) = value[list].as_str() {
+                return Ok(Entry::rule(list, rule));
+            }
         }
         match (&value["event"], &value["matcher"], &value["hook"]) {
             (Value::String(event), Value::String(_) | Value::Null, hook @ Value::Object(_)) => {
@@ -102,7 +126,7 @@ pub fn of_source(source: &Path) -> Result<Vec<Entry>> {
         .with_context(|| format!("{}: not in the shape of the settings", path.display()))
 }
 
-/// Every deny rule and hook of `settings`, or why its shape is not the one of SYN-29.
+/// Every allow and deny rule and hook of `settings`, or why its shape is not the one of SYN-29.
 fn entries(settings: &Value) -> Result<Vec<Entry>> {
     let Some(settings) = settings.as_object() else {
         bail!("not an object");
@@ -112,13 +136,18 @@ fn entries(settings: &Value) -> Result<Vec<Entry>> {
         let Some(permissions) = permissions.as_object() else {
             bail!("`permissions` is not an object");
         };
-        if let Some(deny) = permissions.get("deny") {
-            for rule in deny
+        for list in PERMISSIONS {
+            let Some(rules) = permissions.get(list) else {
+                continue;
+            };
+            for rule in rules
                 .as_array()
-                .context("`permissions.deny` is not an array")?
+                .with_context(|| format!("`permissions.{list}` is not an array"))?
             {
-                let rule = rule.as_str().context("a deny rule is not a string")?;
-                entries.push(Entry::Deny(rule.to_string()));
+                let rule = rule
+                    .as_str()
+                    .with_context(|| format!("a rule of `permissions.{list}` is not a string"))?;
+                entries.push(Entry::rule(list, rule));
             }
         }
     }
@@ -280,9 +309,9 @@ fn locate(
 /// Whether `settings` hold `entry` (JSON equality, key order ignored).
 fn holds(settings: &Value, entry: &Entry) -> bool {
     match entry {
-        Entry::Deny(rule) => settings["permissions"]["deny"]
+        Entry::Allow(rule) | Entry::Deny(rule) => settings["permissions"][entry.list()]
             .as_array()
-            .is_some_and(|deny| deny.iter().any(|r| r.as_str() == Some(rule))),
+            .is_some_and(|rules| rules.iter().any(|r| r.as_str() == Some(rule))),
         Entry::Hook {
             event,
             matcher,
@@ -295,9 +324,9 @@ fn holds(settings: &Value, entry: &Entry) -> bool {
 fn add(settings: &mut Value, entry: &Entry) {
     let settings = settings.as_object_mut().expect("checked by `entries`");
     match entry {
-        Entry::Deny(rule) => {
+        Entry::Allow(rule) | Entry::Deny(rule) => {
             let permissions = object(settings, "permissions");
-            array(permissions, "deny").push(Value::String(rule.clone()));
+            array(permissions, entry.list()).push(Value::String(rule.clone()));
         }
         Entry::Hook {
             event,
@@ -331,14 +360,14 @@ fn add(settings: &mut Value, entry: &Entry) {
 /// event and matcher, and `settings` are in the shape of SYN-29.
 fn replace(settings: &mut Value, entry: &Entry, by: Option<&Entry>) -> bool {
     match entry {
-        Entry::Deny(rule) => {
-            let Some(deny) = settings["permissions"]["deny"].as_array_mut() else {
+        Entry::Allow(rule) | Entry::Deny(rule) => {
+            let Some(rules) = settings["permissions"][entry.list()].as_array_mut() else {
                 return false;
             };
-            let Some(at) = deny.iter().position(|r| r.as_str() == Some(rule)) else {
+            let Some(at) = rules.iter().position(|r| r.as_str() == Some(rule)) else {
                 return false;
             };
-            deny.remove(at);
+            rules.remove(at);
             true
         }
         Entry::Hook {

@@ -386,7 +386,8 @@ fn every_tool_the_shared_harness_runs_exists() {
             let rest = &text[at + "cardinal run ".len()..];
             let name = rest.split_whitespace().next().unwrap_or("");
             let name = name.trim_end_matches(['"', '`', ')', ',', ';']);
-            if name.is_empty() || name.starts_with('<') {
+            // a placeholder, or the wildcard of an allow rule
+            if name.is_empty() || name.starts_with('<') || name == "*" {
                 continue;
             }
             runs += 1;

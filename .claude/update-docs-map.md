@@ -10,5 +10,5 @@ Read by `skill:update-docs`.
 | Step, stop or recipe of the issue process (`issue-workflow`, `create-issue`, `harness.just`) | `docs/workflow.md` |
 | New key read from `.claude/harness.toml` | `seed/.claude/harness.toml` (with its comment), `docs/architecture.md` |
 | Project-owned file added under `seed/` | `docs/architecture.md` |
-| Hook added, renamed or dropped (a `cardinal run` tool or a script under `files/.claude/hooks/`), or a deny rule of the harness | `entries/.claude/settings.json`, `docs/architecture.md` (Hooks and their declaration), `README.md` (What a project gets, Gates), then `just sync` |
+| Hook added, renamed or dropped (a `cardinal run` tool or a script under `files/.claude/hooks/`), or an allow or deny rule of the harness | `entries/.claude/settings.json`, `docs/architecture.md` (Hooks and their declaration), `README.md` (What a project gets, Gates), then `just sync` |
 | Column or metric of a transcript reader (`session-metrics`, `harness-report`, `Expected-effect:` metrics) | its spec (`specs/evaluation.md`, `harness-report.md`, `harness-verdicts.md`), `docs/architecture.md` (the readers table) |

@@ -459,3 +459,66 @@ fn check_reports_nothing_of_settings_it_cannot_judge() {
         assert_eq!(home.ok(root.path(), &["check"]).stdout, "", "{text:?}");
     }
 }
+
+const ALLOW: &str = "Bash(cardinal run *)";
+
+/// The `with_fragment` project whose source allows `ALLOW`, synced once from settings that allow
+/// `Bash(harness run *)` only, as a project seeded before the rename; the outcome of `ALLOW` in that sync.
+fn allowing(home: &Home) -> (TempDir, TempDir, Option<String>) {
+    let (source, root) = with_fragment(home, &json!({"permissions": {"allow": [ALLOW]}}));
+    put(
+        root.path(),
+        SETTINGS,
+        &json!({"permissions": {"allow": ["Bash(harness run *)"]}}).to_string(),
+    );
+    let run = home.ok(root.path(), &["sync"]);
+    let outcome = run.outcome(&allow(ALLOW)).map(String::from);
+    (source, root, outcome)
+}
+
+/// `<entry>` of SYN-34 for an allow rule.
+fn allow(rule: &str) -> String {
+    format!("{SETTINGS} allow {rule}")
+}
+
+// spec: SYN-29
+// spec: SYN-34
+#[test]
+fn sync_appends_a_managed_allow_rule_and_keeps_those_of_the_project() {
+    let home = Home::new();
+    let (_source, root, outcome) = allowing(&home);
+    assert_eq!(
+        settings(&root)["permissions"]["allow"],
+        json!(["Bash(harness run *)", ALLOW])
+    );
+    assert_eq!(outcome.as_deref(), Some("added"));
+}
+
+// spec: SYN-31
+#[test]
+fn sync_removes_an_allow_rule_the_source_dropped() {
+    let home = Home::new();
+    let (source, root, _) = allowing(&home);
+    put(source.path(), FRAGMENT, "{}");
+    let run = home.ok(root.path(), &["sync"]);
+    assert_eq!(
+        settings(&root)["permissions"]["allow"],
+        json!(["Bash(harness run *)"])
+    );
+    assert_eq!(run.outcome(&allow(ALLOW)), Some("removed"));
+}
+
+// spec: SYN-36
+#[test]
+fn check_reports_a_recorded_allow_rule_the_settings_no_longer_hold() {
+    let home = Home::new();
+    let (_source, root, _) = allowing(&home);
+    put(
+        root.path(),
+        SETTINGS,
+        &json!({"permissions": {"allow": []}}).to_string(),
+    );
+    let run = home.harness(root.path(), &["check"]);
+    assert_eq!(run.code, Some(1), "{run:?}");
+    assert_eq!(run.lines(), [format!("missing: {}", allow(ALLOW))]);
+}

@@ -13,7 +13,6 @@
       "Bash(cargo check *)",
       "Bash(just)",
       "Bash(just *)",
-      "Bash(cardinal run *)",
       "Bash(git status)",
       "Bash(git status *)",
       "Bash(git diff)",

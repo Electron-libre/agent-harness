@@ -15,6 +15,7 @@ b62476023e1d6aea7b55d3d30ac81cd750d60d3e263a8e4b0784a5335664fb5f  .github/workfl
 bb5364191f1020fc237c1c516c6030d553aa80cc1fe7da9e0fa2fdf73ffac1ac  harness.just
 6fcb30f4bc1309ae99269fde9cacb6bf9256cdc9cfe03d4950eeca1bb26aba22  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
+entry  {"allow":"Bash(cardinal run *)"}
 entry  {"deny":"Bash(just waive-review)"}
 entry  {"deny":"Bash(just waive-review *)"}
 entry  {"deny":"Edit(//**/claude-review-waived)"}
