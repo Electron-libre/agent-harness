@@ -29,3 +29,40 @@ under-counted and its budget never warns. Make the shared measure count what a s
 
 # Hints
 * Keep the two measures one: the budget is only useful if it agrees with what `evaluate-harness` reports.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Measure the memory files a session loads at launch (`CLAUDE.md`, `.claude/CLAUDE.md`, `.claude/rules/` without
+`paths`, their `@` imports; `AGENTS.md` only when imported or when no `CLAUDE.md` exists) with one function shared by
+REP-2 (git tree) and SYN-38 (work tree). Out of scope: memory outside the repository, `CLAUDE.local.md`.
+
+Measured on 2026-10-28 (both local consumers): `CLAUDE.md` 2120 and 4891 bytes, `AGENTS.md` 2545 in each, no
+`.claude/CLAUDE.md`, `CLAUDE.local.md`, `.claude/rules/` nor `@` import. Claude Code (2.1.312, default setting) reads
+`AGENTS.md` only when no `CLAUDE.md` exists or one imports it: the current measure counts 2545 bytes no session loads.
+
+## Plan
+1. [x] Shared memory measure + budget: a module reading the memory files through a reader (work tree or git tree),
+   following imports; `budget.rs` uses it; verified by `tests/budget_cli.rs` (`.claude/CLAUDE.md`, rules with and
+   without `paths`, import, `AGENTS.md` not imported, fallback); makes true SYN-38 (~500 lines).
+2. [ ] `fixed-context` on the shared measure: the git-tree reader (symbolic links as today); verified by
+   `tests/fixed_context.rs`; makes true REP-2 (~300 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 360b947
+- Columns and budget parts kept (`claude_md_bytes`, `agents_md_bytes`; `CLAUDE.md`, `AGENTS.md`), their meaning widened.
+- `CLAUDE.local.md` never counted: one measure for the budget and `evaluate-harness`.
+- The shared `AGENTS.md` no session loads goes to a separate issue.
+
+## Deliverable 1
+
+- done: `memory.rs` measures the memory files loaded at launch (work tree reader, `Tree` trait for the commit reader of
+  deliverable 2); the budget counts through it; docs and the `harness.toml` comments say what is counted.
+- red: SYN-38: `the fixed context is 1110 bytes ... the largest part is AGENTS.md (1000 bytes)` instead of 193 and
+  `CLAUDE.md` (183): `.claude/CLAUDE.md`, rules and imports not counted, an `AGENTS.md` no session loads counted.
+- Code review: no findings
+- not verified: the measure against `/context` of a real session (the doc of Claude Code is the reference).
+- decisions needed: none.

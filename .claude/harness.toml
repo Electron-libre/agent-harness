@@ -19,5 +19,5 @@ test_conventions = "CLAUDE.md"
 confidential = "name no private project of the user in a shared file or an issue; the shared harness must hold nothing specific to one project"
 # Language of the conversation with the user (skills, code, docs and issues stay in English).
 user_language = "French"
-# Bytes of CLAUDE.md, AGENTS.md and skill descriptions every session loads; `check`, `sync` and `update` warn above it.
+# Bytes of the memory files and skill descriptions every session loads; `check`, `sync` and `update` warn above it.
 fixed_context_budget = 10000

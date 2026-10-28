@@ -30,6 +30,7 @@ pub use budget::warnings as budget_warnings;
 mod entries;
 mod gate;
 mod launcher;
+mod memory;
 pub mod run;
 mod settings;
 pub mod tools;

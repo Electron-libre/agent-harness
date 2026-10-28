@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::memory::{measure, WorkTree};
 use crate::tools::description_bytes;
 use crate::{read_config, CONFIG};
 
@@ -41,10 +42,10 @@ pub fn warnings(root: &Path) -> Vec<String> {
     )]
 }
 
-/// The parts of the fixed context of the work tree at `root`, with their bytes.
+/// The parts of the fixed context of the work tree at `root`, with their bytes: the memory files as REP-2 counts
+/// them (`CLAUDE.md` for all but the `AGENTS.md` files), then the skill descriptions.
 fn parts(root: &Path) -> [(&'static str, u64); 3] {
-    // `metadata` follows a symbolic link; a missing file counts 0
-    let size = |name: &str| fs::metadata(root.join(name)).map_or(0, |m| m.len());
+    let memory = measure(&WorkTree(root));
     let descriptions = fs::read_dir(root.join(".claude/skills"))
         .into_iter()
         .flatten()
@@ -52,8 +53,8 @@ fn parts(root: &Path) -> [(&'static str, u64); 3] {
         .map(|skill| description_bytes(&skill))
         .sum();
     [
-        ("CLAUDE.md", size("CLAUDE.md")),
-        ("AGENTS.md", size("AGENTS.md")),
+        ("CLAUDE.md", memory.claude),
+        ("AGENTS.md", memory.agents),
         ("skill descriptions", descriptions),
     ]
 }

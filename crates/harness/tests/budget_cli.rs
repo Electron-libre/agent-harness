@@ -46,11 +46,16 @@ fn set_budget(root: &Path, value: &str) {
     put(root, CONFIG, &config);
 }
 
-/// A synced project of 30 bytes of `CLAUDE.md`, 20 of `AGENTS.md` and 10 of skill descriptions.
+/// A `CLAUDE.md` of `bytes` bytes that imports `AGENTS.md`.
+fn importing(bytes: usize) -> String {
+    format!("@AGENTS.md\n{}", "c".repeat(bytes - 11))
+}
+
+/// A synced project of 30 bytes of `CLAUDE.md`, 20 of the `AGENTS.md` it imports and 10 of skill descriptions.
 fn measured(home: &Home) -> (tempfile::TempDir, tempfile::TempDir) {
     let (source, root) = project(home);
     home.ok(root.path(), &["sync"]);
-    put(root.path(), "CLAUDE.md", &"c".repeat(30));
+    put(root.path(), "CLAUDE.md", &importing(30));
     put(root.path(), "AGENTS.md", &"a".repeat(20));
     put(root.path(), ".claude/skills/a/SKILL.md", SKILL);
     (source, root)
@@ -138,7 +143,7 @@ fn update_warns_once_judging_the_work_tree_it_leaves() {
             repo.path().display()
         ),
     );
-    put(root.path(), "CLAUDE.md", &"c".repeat(10));
+    put(root.path(), "CLAUDE.md", "@AGENTS.md");
     let run = home.ok(root.path(), &["update", "--dry-run"]);
     assert!(
         budget(&run).is_empty(),
@@ -146,6 +151,74 @@ fn update_warns_once_judging_the_work_tree_it_leaves() {
     );
     let run = home.ok(root.path(), &["update"]);
     assert_eq!(budget(&run), [over(30, 25, "AGENTS.md", 20).as_str()]);
+}
+
+// spec: SYN-38
+#[test]
+fn every_memory_file_a_session_loads_at_launch_counts_and_nothing_else() {
+    let home = Home::new();
+    let (_source, root) = measured(&home);
+    set_budget(root.path(), "0");
+    let root = root.path();
+    // 100 bytes: two imports, one in a code span and one in a fenced block that import nothing, an e-mail address
+    let claude = "@docs/a.md see `@docs/b.md` x@docs/b.md\n```\n@docs/b.md\n```\n";
+    put(
+        root,
+        "CLAUDE.md",
+        &format!("{claude}{}", "c".repeat(100 - claude.len())),
+    );
+    put(root, "AGENTS.md", &"a".repeat(1000));
+    put(root, "CLAUDE.local.md", &"l".repeat(1000));
+    put(root, "docs/b.md", &"b".repeat(1000));
+    // imported twice, counted once; its relative import resolves against its own directory
+    put(root, "docs/a.md", "@c.md @c.md\n");
+    put(root, "docs/c.md", &"c".repeat(8));
+    put(root, ".claude/CLAUDE.md", &"d".repeat(40));
+    put(
+        root,
+        ".claude/rules/x/always.md",
+        "---\ndescription: x\n---\n",
+    );
+    put(
+        root,
+        ".claude/rules/scoped.md",
+        &format!("---\npaths:\n  - \"src/**\"\n---\n{}", "s".repeat(1000)),
+    );
+    put(root, ".claude/rules/notes.txt", &"t".repeat(1000));
+    // 100 + 12 + 8 + 40 + 23, and 10 of skill descriptions
+    let run = home.ok(root, &["check"]);
+    assert_eq!(
+        budget(&run),
+        [over(193, 0, "CLAUDE.md", 183).as_str()],
+        "{run:?}"
+    );
+}
+
+// spec: SYN-38
+#[test]
+fn agents_md_counts_in_place_of_a_missing_claude_md_and_imports_stop_at_four_hops() {
+    let home = Home::new();
+    let (_source, root) = measured(&home);
+    set_budget(root.path(), "0");
+    let root = root.path();
+    std::fs::remove_file(root.join("CLAUDE.md")).unwrap();
+    put(
+        root,
+        "AGENTS.md",
+        "@1.md @/etc/hostname @~/x.md @../outside.md\n",
+    );
+    put(root, ".claude/AGENTS.md", &"a".repeat(6));
+    for hop in 1..=4 {
+        put(root, &format!("{hop}.md"), &format!("@{}.md\n", hop + 1));
+    }
+    put(root, "5.md", &"f".repeat(1000));
+    // AGENTS.md 44 + 6, four hops of 6 bytes, 10 of skill descriptions
+    let run = home.ok(root, &["check"]);
+    assert_eq!(
+        budget(&run),
+        [over(84, 0, "AGENTS.md", 50).as_str()],
+        "{run:?}"
+    );
 }
 
 // spec: SYN-39
