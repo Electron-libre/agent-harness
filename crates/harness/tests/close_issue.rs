@@ -211,6 +211,80 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
+// spec: CLS-2, CLS-3, CLS-4, CLS-5
+/// The Markdown links to a closed issue are resolved against the directory of their file, so the relative ones
+/// (`../issues/foo.md` from `docs/`) follow it to `issues/done/`, and those of the moved issue still resolve.
+fn relinks_the_markdown_links(script: &Path) -> Vec<(&'static str, bool)> {
+    let root = std::fs::canonicalize(tempfile::tempdir().unwrap().keep()).unwrap();
+    for dir in ["issues/done", "docs/adr"] {
+        std::fs::create_dir_all(root.join(dir)).unwrap();
+    }
+    let write = |p: &str, text: &str| std::fs::write(root.join(p), text).unwrap();
+    let read = |p: &str| std::fs::read_to_string(root.join(p)).unwrap();
+    write(
+        "issues/foo.md",
+        "[bar](bar.md) [q](queue.md#top) [old](done/old.md) [d](../docs/a.md) [u](https://x.org/a.md) [o](../../out.md)\n",
+    );
+    write("issues/bar.md", "[foo](foo.md)\n[f]: ./foo.md#goal\n");
+    write("issues/old.md", "x");
+    write(
+        "docs/a.md",
+        "[a](../issues/foo.md) [g](../issues/foo.md#goal) [s](issues/sibling.md)\n",
+    );
+    write("docs/adr/b.md", "[b](../../issues/foo.md)\n");
+    write(
+        "README.md",
+        "[x](../issues/foo.md) [y](docs/issues/foo.md)\n",
+    );
+    write("notes.txt", "(../issues/foo.md)\n");
+    assert!(Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&root)
+        .status()
+        .unwrap()
+        .success());
+    let (closed, _) = run(script, &root, "issues/foo.md");
+    let docs = read("docs/a.md");
+    let adr = read("docs/adr/b.md");
+    let bar = read("issues/bar.md");
+    let moved = read("issues/done/foo.md");
+    let readme = read("README.md");
+    let notes = read("notes.txt");
+    // a link to an issue closed with an older tool, before relative links were followed
+    std::fs::rename(root.join("issues/old.md"), root.join("issues/done/old.md")).unwrap();
+    write("docs/c.md", "[o](../issues/old.md)\n");
+    let (relinked, _) = run(script, &root, "--relink");
+    let out = vec![
+        ("closing an issue with Markdown links succeeds", closed),
+        (
+            "a relative link from docs/ and docs/adr/ follows the issue, anchor kept",
+            docs == "[a](../issues/done/foo.md) [g](../issues/done/foo.md#goal) [s](issues/sibling.md)\n"
+                && adr == "[b](../../issues/done/foo.md)\n",
+        ),
+        (
+            "a link between issues follows the issue, inline and reference",
+            bar == "[foo](done/foo.md)\n[f]: done/foo.md#goal\n",
+        ),
+        (
+            "a link that does not resolve to the issue is untouched",
+            readme == "[x](../issues/foo.md) [y](docs/issues/foo.md)\n"
+                && notes == "(../issues/foo.md)\n",
+        ),
+        (
+            "the links of the moved issue still resolve from done/",
+            moved
+                == "[bar](../bar.md) [q](../queue.md#top) [old](old.md) [d](../../docs/a.md) [u](https://x.org/a.md) [o](../../out.md)\n",
+        ),
+        (
+            "--relink repairs a relative link to an issue already in done/",
+            relinked && read("docs/c.md") == "[o](../issues/done/old.md)\n",
+        ),
+    ];
+    let _ = std::fs::remove_dir_all(&root);
+    out
+}
+
+// spec: CLS-1
 #[test]
 fn close_issue() {
     let script = std::path::PathBuf::from("/tools/close_issue.rs");
@@ -346,6 +420,7 @@ fn close_issue() {
     for (name, ok) in refuses_a_linked_worktree(&script)
         .into_iter()
         .chain(skips_the_nested_worktrees(&script))
+        .chain(relinks_the_markdown_links(&script))
     {
         check(name, ok);
     }

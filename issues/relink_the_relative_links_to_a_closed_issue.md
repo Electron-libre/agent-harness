@@ -27,7 +27,7 @@ pointing at the old path. After a close, every link to the issue, relative or no
    `specs/close-issue.md`), with a test per form: root path, `../`, `../../`, and `docs/issues/foo.md` left alone.
 
 # Specs
-* The relinking of `close-issue` (root paths and relative links): no spec yet, to write at `issue-workflow` step 1.
+* `specs/close-issue.md` (new): CLS-1 to CLS-5.
 
 # Resources
 * `crates/harness/src/tools/close_issue.rs` (`relink_text`, `relink`, `--relink`)
@@ -38,3 +38,34 @@ pointing at the old path. After a close, every link to the issue, relative or no
   scope or not is a decision of step 1.
 * Run `--relink` on this repository once fixed, to repair the relative links already dangling (none found in
   `docs/` on 2026-10-28).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+After a close, every link to the issue resolves to `issues/done/<stem>.md`: root paths as today, plus the Markdown
+link targets resolved against the directory of their file. HTML links, URLs and bare file names are out of scope.
+
+## Plan
+1. [x] Relink the relative Markdown links: resolve each link target of a `.md` file against its directory in
+   `relink_text`, for `close-issue` and `--relink`; verified by new checks in `crates/harness/tests/close_issue.rs`
+   (`../`, `../../`, `foo.md` from `issues/`, `#anchor`, targets left alone), then `--relink` on this repository;
+   makes true CLS-1 to CLS-5. About 200 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 19c72ea
+- Relative links of the moved issue itself are rewritten (CLS-4).
+
+## Deliverable 1
+- done: `close-issue` and `--relink` rewrite the Markdown link targets that resolve to a closed issue, and rebase
+  the relative links of the moved issue; new spec `specs/close-issue.md` (accepted).
+- red: CLS-2, CLS-3, CLS-4, CLS-5: `FAIL - a relative link from docs/ and docs/adr/ follows the issue, anchor kept`
+  (and the inter-issue, moved-issue and `--relink` checks).
+- `--relink` on this repository: no relative link to repair; it only rewrote a quoted command in
+  `issues/done/move_tracked_issues_with_git_mv.md` by CLS-1 (pre-existing behaviour), reverted.
+- checks: `just check` ok (167 tests, clippy, fmt, specs `--strict`); docs: `issue-workflow` rule on `close-issue`
+  (`files/` and its synced copy).
+- Code review: no findings
+- not verified: none. decisions needed: none.

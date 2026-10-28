@@ -161,7 +161,7 @@ the commands left to the user).
 - When the issue is fully done, mark it in the issue and say what, if anything, remains. Then **ask the
   user whether to close it** (in a linked worktree, see "Merge back"); on their agreement run `just close-issue issues/<name>.md` (moves it to
   `issues/done/`, drops the issue from `issues/queue.md` and rewrites `issues/<name>.md` to
-  `issues/done/<name>.md` in every other document that cites it) and include the
+  `issues/done/<name>.md` in every other document that cites it, relative Markdown links included) and include the
   move and those edits in the final commit. Never move it unasked.
 - To know which issue comes next, run `just next-issue` (first entry of `issues/queue.md` that no branch or
   worktree has taken) instead of reading the issue files. An issue is taken when a branch named after its stem

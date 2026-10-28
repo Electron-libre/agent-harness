@@ -1,7 +1,9 @@
 //! Move a finished issue file into `issues/done/` (only run after the user agreed).
 //! Uses `git mv` when the file is tracked, a plain rename otherwise. Refuses to overwrite.
 //! Then rewrites every `issues/foo.md` mentioned in the other text files of the repo to
-//! `issues/done/foo.md`, so no document keeps pointing at the old path. The files are those git lists (tracked and
+//! `issues/done/foo.md`, and every Markdown link that resolves to the issue from the directory of its file
+//! (`../issues/foo.md` from `docs/`), so no document keeps pointing at the old path; the relative links of the moved
+//! issue are rebased so they still resolve from `issues/done/`. The files are those git lists (tracked and
 //! untracked, not ignored), so the issue worktrees nested under `.claude/worktrees/` keep their own files.
 //! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: the
 //! queue is edited at merge time, on the main worktree.
@@ -10,7 +12,7 @@
 
 use super::repo_files;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
@@ -95,15 +97,154 @@ fn relink_text(text: &str, stems: &HashSet<String>) -> String {
     out
 }
 
-/// Rewrite the references to the given closed issues in every text file under `root`.
-fn relink(root: &Path, stems: &HashSet<String>) {
+/// A path relative to the repository root, as its components.
+type RepoPath = Vec<String>;
+
+fn components(path: &Path) -> RepoPath {
+    path.components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect()
+}
+
+/// `target` (a `/`-separated relative path) resolved against the directory `dir`; `None` when it climbs above the root.
+fn resolve(dir: &[String], target: &str) -> Option<RepoPath> {
+    let mut parts = dir.to_vec();
+    for part in target.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            part => parts.push(part.to_string()),
+        }
+    }
+    Some(parts)
+}
+
+/// The relative path from the directory `from` to the file `to`.
+fn relative(from: &[String], to: &[String]) -> String {
+    let common = from.iter().zip(to).take_while(|(a, b)| a == b).count();
+    let mut parts = vec![".."; from.len() - common];
+    parts.extend(to[common..].iter().map(String::as_str));
+    parts.join("/")
+}
+
+/// The new target of a link written from `old_dir` and read from `new_dir`, when the file it designates moved
+/// (`moves`) or the file holding the link did; `None` when it stays as written (URLs, absolute paths and anchors
+/// alone included).
+fn relink_target(
+    target: &str,
+    old_dir: &[String],
+    new_dir: &[String],
+    moves: &HashMap<RepoPath, RepoPath>,
+) -> Option<String> {
+    if target.starts_with(['/', '#']) || target.contains(':') {
+        return None;
+    }
+    let (path, anchor) = target.split_at(target.find(['#', '?']).unwrap_or(target.len()));
+    if path.is_empty() {
+        return None;
+    }
+    let resolved = resolve(old_dir, path)?;
+    let dest = moves.get(&resolved).unwrap_or(&resolved);
+    (dest != &resolved || old_dir != new_dir).then(|| relative(new_dir, dest) + anchor)
+}
+
+/// Byte ranges of the link targets of a Markdown text: inline `[text](target)` and reference `[label]: target`.
+fn link_targets(text: &str) -> Vec<std::ops::Range<usize>> {
+    let target_end = |line: &str, start: usize| {
+        start
+            + line[start..]
+                .find(|c: char| c.is_whitespace() || c == ')')
+                .unwrap_or(line.len() - start)
+    };
+    let mut spans = vec![];
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        let indent = line.len() - line.trim_start_matches(' ').len();
+        let label = line[indent..]
+            .strip_prefix('[')
+            .and_then(|rest| rest.split_once("]:"));
+        if let Some((label, after)) = label.filter(|(label, _)| indent <= 3 && !label.contains(']'))
+        {
+            let start = indent + 1 + label.len() + 2 + (after.len() - after.trim_start().len());
+            spans.push(offset + start..offset + target_end(line, start));
+        }
+        let mut from = 0;
+        while let Some(i) = line[from..].find("](") {
+            let start = from + i + 2;
+            let span = match line[start..].strip_prefix('<') {
+                Some(rest) => start + 1..start + 1 + rest.find('>').unwrap_or(0),
+                None => start..target_end(line, start),
+            };
+            spans.push(offset + span.start..offset + span.end);
+            from = start;
+        }
+        offset += line.len();
+    }
+    spans.retain(|s| !s.is_empty());
+    spans.sort_by_key(|s| s.start);
+    spans
+}
+
+/// Rewrite the Markdown link targets of `text`, written from `old_dir` and read from `new_dir` (CLS-2, CLS-4).
+fn relink_links(
+    text: &str,
+    old_dir: &[String],
+    new_dir: &[String],
+    moves: &HashMap<RepoPath, RepoPath>,
+) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for span in link_targets(text) {
+        if span.start < last {
+            continue;
+        }
+        if let Some(target) = relink_target(&text[span.clone()], old_dir, new_dir, moves) {
+            out.push_str(&text[last..span.start]);
+            out.push_str(&target);
+            last = span.end;
+        }
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// Rewrite the references to the given closed issues of the `issues/` directory `issues` (relative to `root`) in
+/// every text file under `root`; `moved` is the stem of the issue just moved, whose own links are rebased.
+fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option<&str>) {
     let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
     skipped.extend(config_list(root, "skipped_dirs"));
+    let in_issues = |parts: &[&str]| -> RepoPath {
+        let mut path = issues.to_vec();
+        path.extend(parts.iter().map(|p| (*p).to_string()));
+        path
+    };
+    let moves: HashMap<RepoPath, RepoPath> = stems
+        .iter()
+        .map(|stem| {
+            let name = format!("{stem}.md");
+            (in_issues(&[&name]), in_issues(&["done", &name]))
+        })
+        .collect();
+    let moved = moved.map(|stem| in_issues(&["done", &format!("{stem}.md")]));
     for file in text_files(root, &skipped) {
         let Ok(text) = std::fs::read_to_string(&file) else {
             continue;
         };
-        let updated = relink_text(&text, stems);
+        let path = components(file.strip_prefix(root).unwrap_or(&file));
+        let dir = &path[..path.len().saturating_sub(1)];
+        let linked = if file.extension().is_some_and(|e| e == "md") {
+            let old_dir = if moved.as_ref() == Some(&path) {
+                issues
+            } else {
+                dir
+            };
+            relink_links(&text, old_dir, dir, &moves)
+        } else {
+            text.clone()
+        };
+        let updated = relink_text(&linked, stems);
         if updated == text {
             continue;
         }
@@ -112,6 +253,13 @@ fn relink(root: &Path, stems: &HashSet<String>) {
             Err(e) => eprintln!("could not update {}: {e}", file.display()),
         }
     }
+}
+
+/// The directory `dir` relative to `root`, as components; `None` when it is not under `root`.
+fn under(root: &Path, dir: &Path) -> Option<RepoPath> {
+    let root = std::fs::canonicalize(root).ok()?;
+    let dir = std::fs::canonicalize(dir).ok()?;
+    Some(components(dir.strip_prefix(root).ok()?))
 }
 
 /// Root of the git repository containing `dir`; the references are only rewritten inside it.
@@ -171,7 +319,10 @@ pub(super) fn main(args: &[String]) -> u8 {
             })
             .collect();
         match repo_root(Path::new(".")) {
-            Some(root) => relink(&root, &stems),
+            Some(root) => {
+                let issues = under(&root, Path::new("issues")).unwrap_or_default();
+                relink(&root, &issues, &stems, None);
+            }
             None => {
                 eprintln!("not inside a git repository");
                 std::process::exit(1);
@@ -252,7 +403,15 @@ pub(super) fn main(args: &[String]) -> u8 {
     }
     // Last, so that a failure here never leaves the queue offering a closed issue.
     match repo_root(dir) {
-        Some(root) => relink(&root, &HashSet::from([stem.to_string()])),
+        Some(root) => {
+            let issues = under(&root, dir).unwrap_or_default();
+            relink(
+                &root,
+                &issues,
+                &HashSet::from([stem.to_string()]),
+                Some(stem),
+            );
+        }
         None => eprintln!("not inside a git repository: references to {stem} were not updated"),
     }
     0
