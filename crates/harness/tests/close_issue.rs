@@ -211,7 +211,7 @@ fn skips_the_nested_worktrees(script: &Path) -> Vec<(&'static str, bool)> {
     out
 }
 
-// spec: CLS-2, CLS-3, CLS-4, CLS-5
+// spec: CLS-2, CLS-3, CLS-4, CLS-5, CLS-6
 /// The Markdown links to a closed issue are resolved against the directory of their file, so the relative ones
 /// (`../issues/foo.md` from `docs/`) follow it to `issues/done/`, and those of the moved issue still resolve.
 fn relinks_the_markdown_links(script: &Path) -> Vec<(&'static str, bool)> {
@@ -223,13 +223,13 @@ fn relinks_the_markdown_links(script: &Path) -> Vec<(&'static str, bool)> {
     let read = |p: &str| std::fs::read_to_string(root.join(p)).unwrap();
     write(
         "issues/foo.md",
-        "[bar](bar.md) [q](queue.md#top) [old](done/old.md) [d](../docs/a.md) [u](https://x.org/a.md) [o](../../out.md)\n",
+        "[bar](bar.md) [q](queue.md#top) [old](done/old.md) [d](../docs/a.md) [u](https://x.org/a.md) [o](../../out.md)\n[c](done/) [docs](../docs/) `[e](bar.md)`\n[^1]: Some text\n[y]: <bar.md>\n```text\n[f](bar.md)\n```\n",
     );
     write("issues/bar.md", "[foo](foo.md)\n[f]: ./foo.md#goal\n");
     write("issues/old.md", "x");
     write(
         "docs/a.md",
-        "[a](../issues/foo.md) [g](../issues/foo.md#goal) [s](issues/sibling.md)\n",
+        "[a](../issues/foo.md) [g](../issues/foo.md#goal) [s](issues/sibling.md)\n[z]: <../issues/foo.md>\n`[k](../issues/foo.md)`\n",
     );
     write("docs/adr/b.md", "[b](../../issues/foo.md)\n");
     write(
@@ -258,7 +258,7 @@ fn relinks_the_markdown_links(script: &Path) -> Vec<(&'static str, bool)> {
         ("closing an issue with Markdown links succeeds", closed),
         (
             "a relative link from docs/ and docs/adr/ follows the issue, anchor kept",
-            docs == "[a](../issues/done/foo.md) [g](../issues/done/foo.md#goal) [s](issues/sibling.md)\n"
+            docs == "[a](../issues/done/foo.md) [g](../issues/done/foo.md#goal) [s](issues/sibling.md)\n[z]: <../issues/done/foo.md>\n`[k](../issues/foo.md)`\n"
                 && adr == "[b](../../issues/done/foo.md)\n",
         ),
         (
@@ -273,7 +273,7 @@ fn relinks_the_markdown_links(script: &Path) -> Vec<(&'static str, bool)> {
         (
             "the links of the moved issue still resolve from done/",
             moved
-                == "[bar](../bar.md) [q](../queue.md#top) [old](old.md) [d](../../docs/a.md) [u](https://x.org/a.md) [o](../../out.md)\n",
+                == "[bar](../bar.md) [q](../queue.md#top) [old](old.md) [d](../../docs/a.md) [u](https://x.org/a.md) [o](../../../out.md)\n[c](./) [docs](../../docs/) `[e](bar.md)`\n[^1]: Some text\n[y]: <../bar.md>\n```text\n[f](bar.md)\n```\n",
         ),
         (
             "--relink repairs a relative link to an issue already in done/",

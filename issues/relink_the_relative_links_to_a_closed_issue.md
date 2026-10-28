@@ -52,6 +52,10 @@ link targets resolved against the directory of their file. HTML links, URLs and 
    `relink_text`, for `close-issue` and `--relink`; verified by new checks in `crates/harness/tests/close_issue.rs`
    (`../`, `../../`, `foo.md` from `issues/`, `#anchor`, targets left alone), then `--relink` on this repository;
    makes true CLS-1 to CLS-5. About 200 lines.
+2. [x] Fixes of the `high` review: links in code spans, fenced blocks and footnotes left alone (CLS-6), `<...>`
+   reference targets, `done/` and trailing `/` kept, links above the root rebased (CLS-4 amended), no silent
+   fallback when the issues directory is not under the root, files that cite no closed issue skipped; verified by
+   new checks in `crates/harness/tests/close_issue.rs`; makes true CLS-4, CLS-6.
 
 ## Decisions
 - Mode: autonomous
@@ -67,5 +71,16 @@ link targets resolved against the directory of their file. HTML links, URLs and 
   `issues/done/move_tracked_issues_with_git_mv.md` by CLS-1 (pre-existing behaviour), reverted.
 - checks: `just check` ok (167 tests, clippy, fmt, specs `--strict`); docs: `issue-workflow` rule on `close-issue`
   (`files/` and its synced copy).
+- Code review: no findings
+- not verified: none. decisions needed: none.
+
+## Deliverable 2
+- `high` review of `19c72ea..519d75f`: 9 findings. Fixed: empty target for `done/`, footnotes, links above the
+  root, code spans and fences, `<...>` reference targets, silent fallback of the issues directory, trailing `/`,
+  files that cite no closed issue parsed for nothing. Not fixed: a root path `issues/<stem>.md` written in a
+  Markdown link of a subdirectory is still rewritten by CLS-1 (pre-existing behaviour, which CLS-3 leaves open).
+- red: CLS-4, CLS-6: `FAIL - the links of the moved issue still resolve from done/` and `FAIL - a relative link
+  from docs/ and docs/adr/ follows the issue, anchor kept` (code span and `<...>` reference).
+- checks: `just check` ok; docs: `specs/close-issue.md` (CLS-4 amended, CLS-6 added, accepted).
 - Code review: no findings
 - not verified: none. decisions needed: none.

@@ -121,12 +121,16 @@ fn resolve(dir: &[String], target: &str) -> Option<RepoPath> {
     Some(parts)
 }
 
-/// The relative path from the directory `from` to the file `to`.
+/// The relative path from the directory `from` to `to`; `.` when they are the same.
 fn relative(from: &[String], to: &[String]) -> String {
     let common = from.iter().zip(to).take_while(|(a, b)| a == b).count();
     let mut parts = vec![".."; from.len() - common];
     parts.extend(to[common..].iter().map(String::as_str));
-    parts.join("/")
+    if parts.is_empty() {
+        ".".to_string()
+    } else {
+        parts.join("/")
+    }
 }
 
 /// The new target of a link written from `old_dir` and read from `new_dir`, when the file it designates moved
@@ -145,44 +149,108 @@ fn relink_target(
     if path.is_empty() {
         return None;
     }
-    let resolved = resolve(old_dir, path)?;
+    let Some(resolved) = resolve(old_dir, path) else {
+        // above the root: only the move of the file holding the link changes it, one `../` per level gone down
+        let deeper = new_dir.strip_prefix(old_dir).filter(|d| !d.is_empty())?;
+        return Some("../".repeat(deeper.len()) + target);
+    };
     let dest = moves.get(&resolved).unwrap_or(&resolved);
-    (dest != &resolved || old_dir != new_dir).then(|| relative(new_dir, dest) + anchor)
+    let slash = if path.ends_with('/') { "/" } else { "" };
+    (dest != &resolved || old_dir != new_dir).then(|| relative(new_dir, dest) + slash + anchor)
 }
 
-/// Byte ranges of the link targets of a Markdown text: inline `[text](target)` and reference `[label]: target`.
-fn link_targets(text: &str) -> Vec<std::ops::Range<usize>> {
-    let target_end = |line: &str, start: usize| {
-        start
-            + line[start..]
+/// The range of the link target starting at `start` of `line`, inside its `<...>` when it has them.
+fn target_span(line: &str, start: usize) -> std::ops::Range<usize> {
+    match line[start..].strip_prefix('<') {
+        Some(rest) => start + 1..start + 1 + rest.find('>').unwrap_or(0),
+        None => {
+            let len = line[start..]
                 .find(|c: char| c.is_whitespace() || c == ')')
-                .unwrap_or(line.len() - start)
-    };
+                .unwrap_or(line.len() - start);
+            start..start + len
+        }
+    }
+}
+
+/// Byte ranges of `line` inside inline code spans (a run of backticks up to the next run of the same length).
+fn code_spans(line: &str) -> Vec<std::ops::Range<usize>> {
+    let mut spans = vec![];
+    let mut from = 0;
+    while let Some(i) = line[from..].find('`') {
+        let open = from + i;
+        let ticks = line[open..].len() - line[open..].trim_start_matches('`').len();
+        let fence = &line[open..open + ticks];
+        let mut search = open + ticks;
+        let close = loop {
+            match line[search..].find(fence) {
+                Some(j) => {
+                    let at = search + j;
+                    let run = line[at..].len() - line[at..].trim_start_matches('`').len();
+                    if run == ticks {
+                        break Some(at);
+                    }
+                    search = at + run;
+                }
+                None => break None,
+            }
+        };
+        match close {
+            Some(close) => {
+                spans.push(open..close + ticks);
+                from = close + ticks;
+            }
+            None => from = open + ticks,
+        }
+    }
+    spans
+}
+
+/// Byte ranges of the link targets of a Markdown text: inline `[text](target)` and reference `[label]: target`,
+/// outside code spans, fenced code blocks and footnotes (CLS-6).
+fn link_targets(text: &str) -> Vec<std::ops::Range<usize>> {
     let mut spans = vec![];
     let mut offset = 0;
+    let mut fence: Option<&str> = None;
     for line in text.split_inclusive('\n') {
         let indent = line.len() - line.trim_start_matches(' ').len();
-        let label = line[indent..]
+        let body = &line[indent..];
+        let marker = ["```", "~~~"]
+            .into_iter()
+            .find(|m| indent <= 3 && body.starts_with(m));
+        match (fence, marker) {
+            (None, Some(m)) => fence = Some(m),
+            (Some(f), Some(m)) if f == m => fence = None,
+            _ => {}
+        }
+        if fence.is_some() || marker.is_some() {
+            offset += line.len();
+            continue;
+        }
+        let code = code_spans(line);
+        let mut found = vec![];
+        let label = body
             .strip_prefix('[')
             .and_then(|rest| rest.split_once("]:"));
-        if let Some((label, after)) = label.filter(|(label, _)| indent <= 3 && !label.contains(']'))
+        if let Some((label, after)) = label
+            .filter(|(label, _)| indent <= 3 && !label.contains(']') && !label.starts_with('^'))
         {
             let start = indent + 1 + label.len() + 2 + (after.len() - after.trim_start().len());
-            spans.push(offset + start..offset + target_end(line, start));
+            found.push(target_span(line, start));
         }
         let mut from = 0;
         while let Some(i) = line[from..].find("](") {
             let start = from + i + 2;
-            let span = match line[start..].strip_prefix('<') {
-                Some(rest) => start + 1..start + 1 + rest.find('>').unwrap_or(0),
-                None => start..target_end(line, start),
-            };
-            spans.push(offset + span.start..offset + span.end);
+            found.push(target_span(line, start));
             from = start;
         }
+        spans.extend(
+            found
+                .into_iter()
+                .filter(|s| !s.is_empty() && !code.iter().any(|c| c.contains(&s.start)))
+                .map(|s| offset + s.start..offset + s.end),
+        );
         offset += line.len();
     }
-    spans.retain(|s| !s.is_empty());
     spans.sort_by_key(|s| s.start);
     spans
 }
@@ -234,17 +302,17 @@ fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option
         };
         let path = components(file.strip_prefix(root).unwrap_or(&file));
         let dir = &path[..path.len().saturating_sub(1)];
-        let linked = if file.extension().is_some_and(|e| e == "md") {
-            let old_dir = if moved.as_ref() == Some(&path) {
-                issues
-            } else {
-                dir
-            };
-            relink_links(&text, old_dir, dir, &moves)
+        let is_moved = moved.as_ref() == Some(&path);
+        let cites = is_moved || stems.iter().any(|stem| text.contains(stem.as_str()));
+        if !cites {
+            continue;
+        }
+        let updated = if file.extension().is_some_and(|e| e == "md") {
+            let old_dir = if is_moved { issues } else { dir };
+            relink_text(&relink_links(&text, old_dir, dir, &moves), stems)
         } else {
-            text.clone()
+            relink_text(&text, stems)
         };
-        let updated = relink_text(&linked, stems);
         if updated == text {
             continue;
         }
@@ -255,11 +323,21 @@ fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option
     }
 }
 
-/// The directory `dir` relative to `root`, as components; `None` when it is not under `root`.
-fn under(root: &Path, dir: &Path) -> Option<RepoPath> {
-    let root = std::fs::canonicalize(root).ok()?;
-    let dir = std::fs::canonicalize(dir).ok()?;
-    Some(components(dir.strip_prefix(root).ok()?))
+/// The directory `dir` relative to `root`, as components. Exits with an error when it is not under `root`, since
+/// the links could not be resolved.
+fn under(root: &Path, dir: &Path) -> RepoPath {
+    let relative = std::fs::canonicalize(root).ok().and_then(|root| {
+        let dir = std::fs::canonicalize(dir).ok()?;
+        Some(components(dir.strip_prefix(root).ok()?))
+    });
+    relative.unwrap_or_else(|| {
+        eprintln!(
+            "{} is not under {}: references were not updated, run `just close-issue --relink` once fixed",
+            dir.display(),
+            root.display()
+        );
+        std::process::exit(1);
+    })
 }
 
 /// Root of the git repository containing `dir`; the references are only rewritten inside it.
@@ -318,9 +396,12 @@ pub(super) fn main(args: &[String]) -> u8 {
                     .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
             })
             .collect();
+        if stems.is_empty() {
+            return 0;
+        }
         match repo_root(Path::new(".")) {
             Some(root) => {
-                let issues = under(&root, Path::new("issues")).unwrap_or_default();
+                let issues = under(&root, Path::new("issues"));
                 relink(&root, &issues, &stems, None);
             }
             None => {
@@ -404,7 +485,7 @@ pub(super) fn main(args: &[String]) -> u8 {
     // Last, so that a failure here never leaves the queue offering a closed issue.
     match repo_root(dir) {
         Some(root) => {
-            let issues = under(&root, dir).unwrap_or_default();
+            let issues = under(&root, dir);
             relink(
                 &root,
                 &issues,
