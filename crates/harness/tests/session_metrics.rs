@@ -603,6 +603,59 @@ fn archive_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+// spec: EVA-15
+fn default_root_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let config = tmp.join("default-root/config");
+    let home = tmp.join("default-root/home");
+    let session = |root: &Path, name: &str| {
+        let proj = root.join("projects/-tmp-p");
+        std::fs::create_dir_all(&proj).unwrap();
+        let text = typed(tmp, "2026-10-26T09:00:00.000Z", "hi");
+        std::fs::write(proj.join(format!("{name}.jsonl")), text).unwrap();
+    };
+    session(&config, "from_config");
+    session(&home.join(".claude"), "from_home");
+    let sessions = |cmd: &mut std::process::Command| {
+        let out = cmd.output().unwrap();
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let mut names: Vec<String> = rows(&stdout).unwrap_or_default().into_keys().collect();
+        names.sort();
+        (out.status.success(), names)
+    };
+    let set = sessions(
+        tool_command(dir.join("session_metrics.rs"))
+            .env("CLAUDE_CONFIG_DIR", &config)
+            .env("HOME", &home),
+    );
+    let unset = sessions(
+        tool_command(dir.join("session_metrics.rs"))
+            .env("CLAUDE_CONFIG_DIR", "")
+            .env("HOME", &home),
+    );
+    let neither = tool_command(dir.join("session_metrics.rs"))
+        .env_remove("CLAUDE_CONFIG_DIR")
+        .env_remove("HOME")
+        .output()
+        .unwrap();
+    let error = String::from_utf8_lossy(&neither.stderr).into_owned();
+    vec![
+        (
+            "the default projects directory is the one of CLAUDE_CONFIG_DIR",
+            set == (true, vec!["from_config".to_string()]),
+        ),
+        (
+            "an empty CLAUDE_CONFIG_DIR falls back to the home directory",
+            unset == (true, vec!["from_home".to_string()]),
+        ),
+        (
+            "with neither variable, the error names both",
+            !neither.status.success()
+                && error.contains("CLAUDE_CONFIG_DIR")
+                && error.contains("HOME"),
+        ),
+    ]
+}
+
 #[test]
 fn session_metrics() {
     let dir = std::path::PathBuf::from("/tools");
@@ -613,6 +666,7 @@ fn session_metrics() {
         .chain(revision_checks(&dir, &tmp))
         .chain(archive_checks(&dir, &tmp))
         .chain(shared_reader_checks(&dir))
+        .chain(default_root_checks(&dir, &tmp))
         .collect();
     let mut failed = false;
     for (name, ok) in checks {

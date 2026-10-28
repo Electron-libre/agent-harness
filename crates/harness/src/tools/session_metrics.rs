@@ -3,7 +3,8 @@
 //! sub-agent transcripts count with their session; the harness revision comes from the git history of the
 //! project's `.claude/harness.toml`. No text of a message is printed, so the rows can be archived.
 //! With `--archive <file>`, also merge the rows into that file, so the history outlives the transcripts.
-//! Usage: `harness run session-metrics [projects_dir] [--archive <file>]` (default `~/.claude/projects`).
+//! Usage: `harness run session-metrics [projects_dir] [--archive <file>]`
+//! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::transcripts;
 

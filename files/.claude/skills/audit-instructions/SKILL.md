@@ -12,7 +12,7 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 ## Procedure
 
-1. **Collect**: `harness run audit-sources` lists, per project of `~/.claude/projects`, the sessions, typed
+1. **Collect**: `harness run audit-sources` lists, per project of the `projects/` of the configuration directory, the sessions, typed
    messages, memory files and instruction files (the memory files a session loads at launch, `CLAUDE.local.md`
    and its imports included, `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules, of each working directory and
    its ancestors up to the repository root), after the user-level instruction files (`CLAUDE.md`, `rules/` and their imports in the configuration

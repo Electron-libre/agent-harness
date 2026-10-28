@@ -5,7 +5,8 @@
 //! configuration directory (AUD-2). With
 //! `--messages`, print the typed messages as `project<TAB>session<TAB>text` (newlines escaped); subagent
 //! transcripts are skipped. Prints private content: never commit the output.
-//! Usage: `harness run audit-sources [projects_dir] [--messages]` (default `~/.claude/projects`).
+//! Usage: `harness run audit-sources [projects_dir] [--messages]`
+//! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::transcripts;
 use crate::memory::{instruction_files, WorkTree, PROJECT, USER};

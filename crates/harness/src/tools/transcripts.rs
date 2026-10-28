@@ -21,13 +21,15 @@ pub fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
     paths
 }
 
-/// The projects directory: `arg` when given, else `~/.claude/projects`.
+/// The projects directory: `arg` when given, else the `projects/` of the configuration directory (EVA-15).
 pub fn projects_root(arg: Option<&String>) -> Result<PathBuf, String> {
     match arg {
         Some(dir) => Ok(PathBuf::from(dir)),
-        None => std::env::var("HOME")
-            .map(|home| PathBuf::from(home).join(".claude/projects"))
-            .map_err(|_| "HOME is not set: pass the projects directory".to_string()),
+        None => crate::config_dir()
+            .map(|dir| dir.join("projects"))
+            .ok_or_else(|| {
+                "neither CLAUDE_CONFIG_DIR nor HOME is set: pass the projects directory".to_string()
+            }),
     }
 }
 

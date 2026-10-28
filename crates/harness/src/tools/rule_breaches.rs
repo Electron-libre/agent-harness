@@ -4,7 +4,8 @@
 //! so a rule broken often (a hook candidate) stands out from one that rarely applies. The commit messages are read
 //! from the git history of each project, a commit counting with the session whose span holds its date. No text of a
 //! message is printed.
-//! Usage: `harness run rule-breaches [projects_dir] [--summary]` (default `~/.claude/projects`).
+//! Usage: `harness run rule-breaches [projects_dir] [--summary]`
+//! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::language::Language;
 use super::transcripts;

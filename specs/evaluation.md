@@ -15,7 +15,7 @@ measures; it does not judge.
 
 ## Requirements
 
-- **EVA-1** (deterministic) `session-metrics [projects_dir]` must print a header line then one tab-separated row per session (one `<session>.jsonl` of a project directory, default `~/.claude/projects`), with the columns `session`, `project`, `issues`, `revision`, `models`, `versions`, `start`, `duration_s`, `turns`, `tool_calls`, `input_tokens`, `output_tokens`, `thinking_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `hook_refusals`, `skills`, `validations`, `other_messages`, `unreadable_lines`, `unknown_lines`, `missing_fields`.
+- **EVA-1** (deterministic) `session-metrics [projects_dir]` must print a header line then one tab-separated row per session (one `<session>.jsonl` of a project directory, default EVA-15), with the columns `session`, `project`, `issues`, `revision`, `models`, `versions`, `start`, `duration_s`, `turns`, `tool_calls`, `input_tokens`, `output_tokens`, `thinking_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `hook_refusals`, `skills`, `validations`, `other_messages`, `unreadable_lines`, `unknown_lines`, `missing_fields`.
 - **EVA-2** (deterministic) An assistant message must be counted once per `message.id`, whatever the number of lines that repeat it: one turn, its `message.usage` tokens added once (`thinking_tokens` from `output_tokens_details.thinking_tokens`, 0 when absent), its model counted once; `tool_calls` counts the `tool_use` blocks of all its lines.
 - **EVA-3** (deterministic) The transcripts of a session's sub-agents (`<session>/subagents/*.jsonl`) must be added to that session's row (turns, tool calls, tokens, hook refusals, skills, skipped lines), and must not produce a row of their own nor add typed messages.
 - **EVA-4** (deterministic) A typed message (the same filter as `audit-sources`: a `user` line, not meta, not sidechain, not a tool result nor injected text) must count in `validations` when, trimmed, lower-cased and stripped of trailing `.` and `!`, it is one of `ok`, `okay`, `yes`, `y`, `oui`, `go`, `continue`, `lgtm`, `vas-y` or `c'est bon`, or answers the questions of a stop (only comma-separated items of a number then one letter from `a` to `h`, such as `1 a, 2 c`: two items at least, or one with a space, so `4k` is not one); any other typed message counts in `other_messages`.
@@ -29,12 +29,14 @@ measures; it does not judge.
 - **EVA-12** (deterministic) `audit-sources` and `session-metrics` must read the transcripts through the same module (`transcripts.rs` of the tools of the `harness` crate): the typed-message filter and the listing of projects and sessions are written once.
 - **EVA-13** (deterministic) withdrawn: the readers are modules of `harness` (ADR 0010), built with the module they use, so no hash line ties them to it.
 - **EVA-14** (deterministic) When `--archive` replaces a row whose `revision` was not empty with a new row whose `revision` is empty (the repository is gone or unreadable), the merged row must keep the archived `project` and `revision`.
+- **EVA-15** (deterministic) Without a projects directory given, `session-metrics`, `rule-breaches`, `audit-sources`, `fixed-context` and `delivered-quality` must read the `projects/` directory of the configuration directory (`CLAUDE_CONFIG_DIR` when set and not empty, else the `.claude/` directory of the home directory, as AUD-2); when neither `CLAUDE_CONFIG_DIR` nor `HOME` is set and not empty, each must fail with a message naming both variables, except `delivered-quality`, whose transcript columns are then empty (QUA-7).
 
 ## Scenarios
 
 - (EVA-2) Given an assistant message split over three lines with the same `message.id`, each carrying the same usage and one `tool_use`, when the row is printed, then `turns` is 1, the tokens are those of one usage and `tool_calls` is 3.
 - (EVA-8) Given a project whose `harness.toml` moved from `rev = "a"` to `rev = "b"` in a commit at 10:00, when a session starts at 09:00, then its revision is `a`; at 11:00, `b`.
 - (EVA-8) Given a session run in a linked worktree on a branch that changed the pin, when the revision is read, then it is the pin of the default branch, since the branch may be gone.
+- (EVA-15) Given `CLAUDE_CONFIG_DIR` naming a directory whose `projects/` holds a session and `HOME` one whose `.claude/projects/` holds another, when `session-metrics` runs with no argument, then it prints the session of `CLAUDE_CONFIG_DIR` only.
 - (EVA-11) Given an archive holding sessions A and B, when the transcripts hold only B (changed) and C, then the archive holds A, the new B and C.
 
 ## Non-goals
