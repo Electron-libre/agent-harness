@@ -1,4 +1,4 @@
-# agent-harness
+# cardinal
 
 One agent harness for many projects. This repository holds the Claude Code skills, hooks, checks, `just` recipes and CI
 that a project needs to have an agent work its issues safely, plus `harness`, the tool that copies them into each
@@ -17,7 +17,7 @@ project and tells when a copy drifted.
 
 ```mermaid
 flowchart LR
-  subgraph source["agent-harness (source)"]
+  subgraph source["cardinal (source)"]
     files["files/<br/>managed"]
     seed["seed/<br/>project-owned"]
     entries["entries/<br/>hooks and deny rules"]
