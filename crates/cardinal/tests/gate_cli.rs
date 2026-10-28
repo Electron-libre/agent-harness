@@ -40,10 +40,12 @@ fn fake(program: &str, body: &str) -> TempDir {
 
 /// A `harness` that knows `run` and whose `run` exits with `code`.
 fn fake_harness(code: i32) -> TempDir {
-    fake(
-        "harness",
-        &format!("[ \"$1\" = help ] && exit 0\nexit {code}\n"),
-    )
+    fake_launcher("harness", code)
+}
+
+/// A launcher `name` that knows `run` and whose `run` exits with `code`.
+fn fake_launcher(name: &str, code: i32) -> TempDir {
+    fake(name, &format!("[ \"$1\" = help ] && exit 0\nexit {code}\n"))
 }
 
 /// What the fake of `bin` was called with, one line per call; empty when it never ran.
@@ -83,7 +85,7 @@ fn sync_installs_an_executable_hook_that_runs_the_review_in_native_mode() {
         text.starts_with("#!/bin/sh\n# harness: native review gate"),
         "{text}"
     );
-    assert!(text.contains("harness run review-gate native"), "{text}");
+    assert!(text.contains("run review-gate native"), "{text}");
     assert!(executable(&pre_commit(&root)));
 }
 
@@ -160,6 +162,26 @@ fn the_hook_warns_and_lets_the_commit_through_without_the_harness() {
     assert_eq!(hook.code, Some(0), "{hook:?}");
     assert!(hook.stderr.contains(SKIPPED), "{hook:?}");
     assert_eq!(calls(&old), "help run\n");
+}
+
+// spec: BIN-9
+#[test]
+fn the_hook_runs_the_gate_through_cardinal_else_through_harness() {
+    let home = Home::new();
+    let (_source, root) = synced(&home);
+    let cardinal = fake_launcher("cardinal", 2);
+    let harness = fake_harness(0);
+    let both = std::env::join_paths([cardinal.path(), harness.path()]).unwrap();
+
+    let hook = run_hook(&home, &root, Path::new(&both), &[]);
+
+    assert_eq!(hook.code, Some(2), "the refusal of cardinal: {hook:?}");
+    assert_eq!(calls(&cardinal), "help run\nrun review-gate native\n");
+    assert_eq!(calls(&harness), "");
+    // only the `harness` of before the rename
+    let hook = run_hook(&home, &root, harness.path(), &[]);
+    assert_eq!(hook.code, Some(0), "{hook:?}");
+    assert_eq!(calls(&harness), "help run\nrun review-gate native\n");
 }
 
 // spec: SYN-19
@@ -429,6 +451,25 @@ fn check_reports_a_missing_or_modified_gate() {
 
     // a hook of the user without ours is a missing gate too
     user_hook(&root, 0);
+    assert_problems(&check(&home, &root, false), &[MISSING]);
+}
+
+// spec: SYN-23
+#[test]
+fn check_expects_the_gate_of_a_review_hook_named_before_the_rename() {
+    let home = Home::new();
+    let (source, root) = gated(&home);
+    let old = RECORD.replacen("cardinal", "harness", 1);
+    let fragment = serde_json::json!({"hooks": {"PostToolUse": [{"matcher": "Skill", "hooks": [
+        {"type": "command", "command": old}]}]}});
+    put(
+        source.path(),
+        "entries/.claude/settings.json",
+        &fragment.to_string(),
+    );
+    let sync = home.ok(root.path(), &["sync"]);
+    assert_eq!(sync.outcome(GATE), Some("added"), "{sync:?}");
+    fs::remove_file(pre_commit(&root)).unwrap();
     assert_problems(&check(&home, &root, false), &[MISSING]);
 }
 

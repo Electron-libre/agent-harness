@@ -1,7 +1,7 @@
 //! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-23).
 //!
-//! The hook is a small `sh` script that starts `harness run review-gate native` (the tool of the revision the project
-//! pins, `specs/tool-binaries.md`), then the `pre-commit` the user already had (moved to `pre-commit.user`, never
+//! The hook is a small `sh` script that starts `cardinal run review-gate native` (the tool of the revision the project
+//! pins, `specs/tool-binaries.md`; through `harness`, its name before the rename, when only that is installed), then the `pre-commit` the user already had (moved to `pre-commit.user`, never
 //! overwritten).
 
 use std::fs;
@@ -16,14 +16,15 @@ use crate::{is_executable, set_executable, write, Outcome};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 
-/// The command of the hooks that run the review gate: the gate exists only where the harness manages such a hook, or
-/// the review hook script of an older revision (`LEGACY_HOOK`).
-pub const REVIEW_TOOL: &str = "harness run review-gate";
+/// The commands of the hooks that run the review gate, and their name before the rename: the gate exists only where the
+/// harness manages such a hook, or the review hook script of an older revision (`LEGACY_HOOK`).
+pub const REVIEW_TOOLS: [&str; 2] = ["cardinal run review-gate", "harness run review-gate"];
 /// The review hook of the revisions before the tools moved into `harness`, among their managed files.
 pub const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
-/// The line that tells the installed hook from one of the user.
+/// The line that tells the installed hook from one of the user; kept as the revisions before the rename wrote it, so
+/// their gate is still ours.
 const MARK: &str = "# harness: native review gate";
 /// Where a `pre-commit` of the user goes, and is run from.
 const CHAINED: &str = "pre-commit.user";
@@ -33,20 +34,21 @@ const CHAINED: &str = "pre-commit.user";
 /// that cannot run the tool (exit 3, BIN-14) is a warning, not a refusal, so a branch or a machine without the harness
 /// can still commit (BIN-9).
 const SCRIPT: &str = r#"#!/bin/sh
-# harness: native review gate (installed by `harness sync`, do not edit)
+# harness: native review gate (installed by `cardinal sync`, do not edit)
 legacy=.claude/hooks/require_code_review.rs
+if command -v cardinal >/dev/null 2>&1; then launcher=cardinal; else launcher=harness; fi
 if [ -f "$legacy" ] && command -v rust-script >/dev/null 2>&1; then
     rust-script "$legacy" native || exit $?
-elif [ ! -f "$legacy" ] && [ -f .claude/harness.toml ] && harness help run >/dev/null 2>&1; then
-    harness run review-gate native
+elif [ ! -f "$legacy" ] && [ -f .claude/harness.toml ] && "$launcher" help run >/dev/null 2>&1; then
+    "$launcher" run review-gate native
     code=$?
     if [ "$code" -eq 3 ]; then
-        echo "harness: review gate skipped, harness could not run it" >&2
+        echo "cardinal: review gate skipped, $launcher could not run it" >&2
     elif [ "$code" -ne 0 ]; then
         exit "$code"
     fi
 else
-    echo "harness: review gate skipped, its hook or the program to run it (rust-script, or a harness with \`run\`) is missing" >&2
+    echo "cardinal: review gate skipped, its hook or the program to run it (rust-script, or cardinal) is missing" >&2
 fi
 case "$0" in */*) dir="${0%/*}" ;; *) dir=. ;; esac
 user="$dir/pre-commit.user"
@@ -136,7 +138,10 @@ pub fn state(hooks: &Path) -> State {
 /// review hook of an older revision.
 #[must_use]
 pub fn manages<'a>(entries: &[Entry], mut files: impl Iterator<Item = &'a String>) -> bool {
-    entries.iter().any(|e| e.label().contains(REVIEW_TOOL)) || files.any(|f| f == LEGACY_HOOK)
+    entries
+        .iter()
+        .any(|e| REVIEW_TOOLS.iter().any(|tool| e.label().contains(tool)))
+        || files.any(|f| f == LEGACY_HOOK)
 }
 
 /// The hooks directory of the project and what its `pre-commit` is, `None` when the project is not expected to have the
@@ -177,7 +182,7 @@ pub fn plan(root: &Path, has_review_hook: bool) -> Result<Option<Plan>> {
     };
     if state == State::Foreign && hooks.join(CHAINED).exists() {
         bail!(
-            "{} and {} both exist: merge them by hand, `harness sync` never overwrites a hook of yours",
+            "{} and {} both exist: merge them by hand, `cardinal sync` never overwrites a hook of yours",
             hooks.join("pre-commit").display(),
             hooks.join(CHAINED).display()
         );
@@ -191,7 +196,7 @@ impl Plan {
     pub fn outcomes(&self) -> Vec<(String, Outcome)> {
         let mut out = Vec::new();
         if self.state == State::Redirected {
-            let why = "not installed: core.hooksPath is set, so git reads its hooks elsewhere; add `harness run review-gate native` to your own pre-commit, run from the top of the work tree";
+            let why = "not installed: core.hooksPath is set, so git reads its hooks elsewhere; add `cardinal run review-gate native` to your own pre-commit, run from the top of the work tree";
             return vec![(GATE.to_string(), Outcome::Skipped(why))];
         }
         if self.state == State::Foreign {

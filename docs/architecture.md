@@ -97,8 +97,9 @@ A commit from before the rename is fetched from its `harness-<commit>` release, 
 names no crate, which builds the single package of the commit whatever its name. `sync` and `update` fetch the binary
 ahead.
 
-The launcher itself is not of the pinned revision: a hook running a subcommand the installed `harness` does not know
-cannot run. `check` names the `cargo install` to run (BIN-15) and `update` refuses such a revision (BIN-16);
+The launcher itself is not of the pinned revision: a hook running a subcommand the installed `cardinal` does not know
+cannot run, nor a `cardinal` hook on a machine that has only the `harness` of before the rename. `check` names the
+`cargo install --force` to run (BIN-15) and `update` refuses such a revision (BIN-16);
 `crates/cardinal/src/launcher.rs`.
 
 This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): each push to the main

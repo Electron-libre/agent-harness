@@ -1,5 +1,5 @@
-//! The hook commands the installed `harness` must accept (BIN-15, BIN-16), run as the binary with a fake installed
-//! `harness` first on the path.
+//! The hook commands the installed `cardinal` (or `harness`, its name before the rename) must accept (BIN-15, BIN-16),
+//! run as the binary with fake installed launchers first on the path.
 #![cfg(unix)]
 
 mod common;
@@ -54,7 +54,7 @@ fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refus
     assert!(problems[1].contains("`harness newcmd again`"), "{run:?}");
     // the install of the project's source, run from its root
     let install = format!(
-        "cargo install --path {}/crates/cardinal --locked",
+        "cargo install --force --path {}/crates/cardinal --locked",
         source.path().display()
     );
     assert!(problems.iter().all(|p| p.contains(&install)), "{run:?}");
@@ -64,15 +64,66 @@ fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refus
 
 // spec: BIN-15
 #[test]
-fn check_looks_at_nothing_without_a_harness_on_the_path() {
+fn check_looks_at_nothing_without_a_launcher_on_the_path() {
     let home = Home::new();
     let (_source, root) = project_with_hooks(&home);
+    put(
+        root.path(),
+        SETTINGS,
+        &HOOKS.replace("harness newcmd again", "cardinal newcmd"),
+    );
     fs::remove_file(home.path().join("bin/harness")).unwrap();
+    fs::remove_file(home.path().join("bin/cardinal")).unwrap();
 
     let run = home.harness(root.path(), &["check"]);
 
     assert_eq!(run.code, Some(0), "{run:?}");
     assert_eq!(run.stdout, "");
+}
+
+const CARDINAL_HOOKS: &str = r#"{"hooks": {"Stop": [{"hooks": [
+    {"type": "command", "command": "cardinal run review-gate check"},
+    {"type": "command", "command": "cardinal newcmd"},
+    {"type": "command", "command": "harness run language-hint"}
+]}]}}"#;
+
+// spec: BIN-15
+#[test]
+fn check_refuses_the_cardinal_hooks_when_only_the_harness_of_before_is_installed() {
+    let home = Home::new();
+    let (source, root) = project_with_hooks(&home);
+    put(root.path(), SETTINGS, CARDINAL_HOOKS);
+    fs::remove_file(home.path().join("bin/cardinal")).unwrap();
+
+    let run = home.harness(root.path(), &["check"]);
+
+    assert_eq!(run.code, Some(1), "{run:?}");
+    let problems = run.lines();
+    assert_eq!(problems.len(), 2, "{run:?}");
+    assert!(
+        problems[0].contains("`cardinal run review-gate check`"),
+        "{run:?}"
+    );
+    assert!(problems[1].contains("`cardinal newcmd`"), "{run:?}");
+    let install = format!(
+        "cargo install --force --path {}/crates/cardinal --locked",
+        source.path().display()
+    );
+    assert!(problems.iter().all(|p| p.contains(&install)), "{run:?}");
+
+    // a `cardinal` that knows `run` only: its unknown subcommand is refused, by it
+    home.program(
+        "cardinal",
+        &format!(
+            "echo \"$*\" >> '{}/log'\n[ \"$1\" = help ] && [ \"$2\" = run ]\n",
+            home.path().display()
+        ),
+    );
+    let run = home.harness(root.path(), &["check"]);
+    assert_eq!(run.code, Some(1), "{run:?}");
+    assert_eq!(run.lines().len(), 1, "{run:?}");
+    assert!(run.lines()[0].contains("`cardinal newcmd`"), "{run:?}");
+    assert_eq!(get(home.path(), "log").unwrap(), "help run\nhelp newcmd\n");
 }
 
 /// A git source whose head adds the hooks `harness newcmd` and `harness newcmd other`, a project moved to its tag
@@ -122,7 +173,7 @@ fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuse
     assert!(run.stderr.contains("`harness newcmd`"), "{run:?}");
     assert!(run.stderr.contains("`harness newcmd other`"), "{run:?}");
     let install = format!(
-        "cargo install --git {} --rev {head} --locked",
+        "cargo install --force --git {} --rev {head} --locked",
         url(repo.path())
     );
     // one install for all the hooks
@@ -138,6 +189,40 @@ fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuse
     assert!(run.stdout.starts_with("rev: "), "{run:?}");
     assert!(get(root.path(), CONFIG).unwrap().contains(&head), "{run:?}");
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a2"));
+}
+
+// spec: BIN-16
+#[test]
+fn update_refuses_cardinal_hooks_until_cardinal_is_installed() {
+    let home = Home::new();
+    let (repo, root, _) = source_with_a_new_hook_command(&home);
+    put(
+        repo.path(),
+        &format!("entries/{SETTINGS}"),
+        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "cardinal run language-hint"}]}]}}"#,
+    );
+    home.git(repo.path(), &["commit", "--quiet", "-am", "cardinal hook"]);
+    let head = home.git(repo.path(), &["rev-parse", "HEAD"]);
+    fs::remove_file(home.path().join("bin/cardinal")).unwrap();
+    let config = get(root.path(), CONFIG);
+
+    let run = home.harness(root.path(), &["update"]);
+
+    assert_eq!(run.code, Some(3), "{run:?}");
+    assert!(
+        run.stderr.contains("`cardinal run language-hint`"),
+        "{run:?}"
+    );
+    let install = format!(
+        "cargo install --force --git {} --rev {head} --locked",
+        url(repo.path())
+    );
+    assert!(run.stderr.contains(&install), "{run:?}");
+    assert_eq!(get(root.path(), CONFIG), config);
+
+    home.program("cardinal", "exit 0\n");
+    let run = home.ok(root.path(), &["update"]);
+    assert!(get(root.path(), CONFIG).unwrap().contains(&head), "{run:?}");
 }
 
 // spec: BIN-16

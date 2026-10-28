@@ -68,9 +68,19 @@ own issues).
    - Code review: no findings.
    - not verified: a real `cargo install --git` of a pre-rename commit naming no crate (faked in the tests).
    - decisions needed: none. The lock header still says `harness sync` (consumer files issue).
-3. [ ] Hook transition: the git gate runs `cardinal`, else `harness`; the review gate is found under both commands;
+3. [x] Hook transition: the git gate runs `cardinal`, else `harness`; the review gate is found under both commands;
    `check` and `update` judge the `cardinal` hooks and print the install with `--force`; verified by `gate_cli.rs`,
    `launcher_cli.rs`, `update_cli.rs`; makes true BIN-9, BIN-15, BIN-16, SYN-23.
+   - done: the gate script runs `cardinal`, else `harness` (its mark line kept, so the gates of before stay ours);
+     the gate is managed under both review commands; `check` and `update` judge the `cardinal` and `harness` hooks, a
+     missing `cardinal` refusing when `harness` is there; install lines take `--force`; the gate of this repository
+     reinstalled by `just sync`.
+   - check | result: tests, lint, specs pass (`just check`); `just check-harness` passes; docs: architecture, usage.
+   - red: BIN-9, BIN-15, BIN-16, SYN-23: `gate_cli` 18 failed, the gate not installed for a `cardinal run
+     review-gate` hook (`sync_installs_an_executable_hook...` panicked at `gate_cli.rs:82`).
+   - Code review: no findings.
+   - not verified: none.
+   - decisions needed: none.
 4. [ ] Release and CI: `release.yml` publishes `cardinal-<commit>` and the legacy `harness-<commit>`,
    `install_cardinal.sh` fetches and caches `cardinal`; verified by `just check`, the shell syntax (`sh -n`) and the
    CI run after the push.

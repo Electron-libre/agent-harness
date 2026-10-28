@@ -1,5 +1,6 @@
 //! Helpers of the tests that run the `harness` binary on temp dirs, offline. The cache, the user settings, the `PATH`
-//! (a failing `curl` and `cargo`, a `harness` that knows every subcommand, and a few programs of the system) live in a
+//! (a failing `curl` and `cargo`, a `cardinal` and a `harness` that know every subcommand, and a few programs of the
+//! system) live in a
 //! temp home: the prefetch of the tools binary (BIN-13), the retention warning (SYN-28), the hooks `check` judges
 //! (BIN-15) and git never reach outside it. The fakes are
 //! shell scripts: these tests run on Unix.
@@ -81,10 +82,11 @@ impl Home {
         }
         let home = Self { dir };
         // no network: `curl` fails as on a missing asset, and the prefetch of a git source would build the tools
-        // binary with `cargo install`: it fails at once here; the `harness` on the path knows every subcommand, so
-        // `check` refuses no hook whatever is installed (BIN-15)
+        // binary with `cargo install`: it fails at once here; the `cardinal` and `harness` on the path know every
+        // subcommand, so `check` refuses no hook whatever is installed (BIN-15)
         home.program("curl", "exit 22\n");
         home.program("cargo", "exit 1\n");
+        home.program("cardinal", "exit 0\n");
         home.program("harness", "exit 0\n");
         home
     }
@@ -270,7 +272,7 @@ pub fn project(home: &Home) -> (TempDir, TempDir) {
 }
 
 /// The managed hook of the review gate.
-pub const RECORD: &str = "harness run review-gate record";
+pub const RECORD: &str = "cardinal run review-gate record";
 
 /// The `hooks` table running `RECORD` after `Skill`.
 pub fn record_hook() -> serde_json::Value {

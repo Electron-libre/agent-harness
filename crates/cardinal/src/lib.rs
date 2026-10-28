@@ -6,7 +6,7 @@
 //! written and the managed entries, so a later sync tells a local edit from a source change.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
@@ -661,7 +661,7 @@ pub struct UpdateReport {
 /// # Errors
 /// When the source is a local directory, the revision is unknown, or the configuration or sync fails.
 pub fn update(root: &Path, rev: Option<&str>, options: &SyncOptions) -> Result<UpdateReport> {
-    let mut done = update_in(None, root, rev, options, OsStr::new("harness"))?;
+    let mut done = update_in(None, root, rev, options)?;
     if done.applied {
         let (source, _) = source_and_rev(root)?;
         done.sync.warnings.extend(prefetch(
@@ -679,7 +679,6 @@ fn update_in(
     root: &Path,
     rev: Option<&str>,
     options: &SyncOptions,
-    harness: &OsStr,
 ) -> Result<UpdateReport> {
     let (source, previous) = source_and_rev(root)?;
     if !is_git_url(&source) {
@@ -693,14 +692,16 @@ fn update_in(
     let mut refused: Vec<String> = fs::read_to_string(dir.join(entries::FRAGMENT))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
-        .map(|fragment| launcher::refused(&fragment, harness))
+        .map(|fragment| launcher::refused(&fragment))
         .unwrap_or_default()
         .iter()
-        .map(|command| format!("the installed harness cannot run the hook `{command}` of {commit}"))
+        .map(|command| {
+            format!("the installed cardinal cannot run the hook `{command}` of {commit}")
+        })
         .collect();
     if !refused.is_empty() {
         refused.push(format!(
-            "install the harness of {commit} first, `{}`, then run `harness update` again",
+            "install the cardinal of {commit} first, `{}`, then run `cardinal update` again",
             launcher::install(&source, Some(&commit))
         ));
     }
@@ -760,7 +761,7 @@ pub struct Checked {
 /// # Errors
 /// When the project was never synced (no lock file) or the lock cannot be read.
 pub fn check(root: &Path) -> Result<Checked> {
-    check_with(root, in_ci(), OsStr::new("harness"))
+    check_with(root, in_ci())
 }
 
 /// Whether `CI` says so: set, and not empty, `0` or `false`.
@@ -797,7 +798,7 @@ fn config_dir_of(config_dir: Option<OsString>, home: Option<OsString>) -> Option
     set(config_dir).or_else(|| set(home).map(|h| h.join(".claude")))
 }
 
-fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
+fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
         bail!("no {LOCK}: run `cardinal sync` first");
     };
@@ -806,11 +807,11 @@ fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
     let hooks = text
         .as_deref()
         .and_then(|text| serde_json::from_str(text).ok())
-        .map(|settings| launcher::refused(&settings, harness))
+        .map(|settings| launcher::refused(&settings))
         .unwrap_or_default();
     let install = match source_and_rev(root) {
         Ok((source, rev)) => format!("`{}`", launcher::install(&source, rev.as_deref())),
-        Err(_) => "the harness of this revision".to_string(),
+        Err(_) => "the cardinal of this revision".to_string(),
     };
     let problems = lock
         .files
@@ -824,7 +825,7 @@ fn check_with(root: &Path, ci: bool, harness: &OsStr) -> Result<Checked> {
         .chain(gate::problem(root, !ci && gated))
         .chain(hooks.iter().map(|command| {
             format!(
-                "refused: the installed harness cannot run the hook `{command}` of {}: install {install} first",
+                "refused: the installed cardinal cannot run the hook `{command}` of {}: install {install} first",
                 entries::SETTINGS
             )
         }))
