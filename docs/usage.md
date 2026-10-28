@@ -33,6 +33,10 @@ A machine that has only the `harness` of before the rename refuses every `cardin
 (`cargo install --force ...`) puts `cardinal` and its `harness` alias in place of the old binary. The git review gate
 runs `cardinal`, else `harness`.
 
+A source also declares the format of its managed content in `cardinal-format`, a whole number (ADR 0014): `sync` and
+`update` refuse a source of a format the installed `cardinal` does not read, write nothing and print the install to
+run, instead of misreading it (SYN-40).
+
 ## Evaluating Cardinal
 
 Cardinal is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes

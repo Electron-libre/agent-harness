@@ -33,7 +33,9 @@ committing (it runs the tests of the tools and of the shared content too); no `C
 everything in English; the shared files hold nothing specific to one project (project values go through
 `.claude/harness.toml`). A commit that changes `files/` may add `Expected-effect: <metric> <up|down>` to its
 footer, one line per metric of `harness-report` it should move: a direction, never a target; `skill:evaluate-harness`
-gives it a verdict ([specs/harness-verdicts.md](specs/harness-verdicts.md)).
+gives it a verdict ([specs/harness-verdicts.md](specs/harness-verdicts.md)). A change of the meaning of
+the managed content (fragment keys, lock lines, source layout) that an older `cardinal` would misread raises
+`cardinal-format` and `FORMAT` together (ADR 0014).
 
 ## Test conventions
 

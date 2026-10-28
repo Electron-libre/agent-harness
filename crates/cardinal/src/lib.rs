@@ -24,6 +24,11 @@ pub const LOCK: &str = ".claude/harness.lock";
 /// the launcher that cannot parse its arguments, an error of the other subcommands. Not 2, which Claude Code reads as
 /// the refusal of a hook (BIN-7, BIN-14, BIN-17, SYN-37).
 pub const NOT_A_REFUSAL: u8 = 3;
+/// The format of the managed content this `cardinal` reads, and every lower one (SYN-40, ADR 0014): equal to the
+/// `cardinal-format` of its revision (SYN-43).
+pub const FORMAT: u32 = 2;
+/// The file of the source that declares the format its content needs, relative to the source.
+const SOURCE_FORMAT: &str = "cardinal-format";
 
 mod budget;
 pub use budget::warnings as budget_warnings;
@@ -454,6 +459,28 @@ fn source_and_rev(root: &Path) -> Result<(String, Option<String>)> {
     Ok((source, text("rev")))
 }
 
+/// The format the source in `dir` declares, 1 when it declares none.
+fn format_of(dir: &Path) -> Result<u32> {
+    let path = dir.join(SOURCE_FORMAT);
+    match fs::read_to_string(&path) {
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(1),
+        Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
+        Ok(text) => text
+            .trim()
+            .parse()
+            .with_context(|| format!("{}: not a whole number", path.display())),
+    }
+}
+
+/// An error when the source `name` in `dir` needs a newer `cardinal`, which `install` installs (SYN-40).
+fn readable(dir: &Path, name: &str, install: &str) -> Result<()> {
+    let format = format_of(dir)?;
+    if format > FORMAT {
+        bail!("{name} needs a cardinal that reads the format {format}, this one reads up to {FORMAT}: install it with `{install}`");
+    }
+    Ok(())
+}
+
 fn source_dir(cache: Option<&Path>, root: &Path, rev_override: Option<&str>) -> Result<PathBuf> {
     let (source, rev) = source_and_rev(root)?;
     if is_git_url(&source) {
@@ -498,8 +525,9 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
 /// When the configuration or the source cannot be read, or a file cannot be written.
 pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
     let dir = source_dir(None, root, None)?;
+    let (source, rev) = source_and_rev(root)?;
+    readable(&dir, &source, &launcher::install(&source, rev.as_deref()))?;
     let mut report = sync_from(root, &dir, options)?;
-    let (source, _) = source_and_rev(root)?;
     if is_git_url(&source) && !options.dry_run {
         let commit = git_output(&dir, &["rev-parse", "HEAD"])?;
         report.warnings.extend(prefetch(
@@ -687,6 +715,11 @@ fn update_in(
     let dir = fetch(&cache_or_default(cache)?, &source)?;
     let commit = resolve_in(&dir, &source, rev)?;
     git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
+    readable(
+        &dir,
+        &format!("{source} at {commit}"),
+        &launcher::install(&source, Some(&commit)),
+    )?;
     // The hooks of the target must not lock the agent out: the installed launcher has to know their subcommands. A
     // fragment that cannot be read fails the sync below, before anything is written.
     let mut refused: Vec<String> = fs::read_to_string(dir.join(entries::FRAGMENT))

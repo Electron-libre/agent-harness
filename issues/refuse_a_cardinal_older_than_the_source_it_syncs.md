@@ -32,3 +32,47 @@ syncing wrongly or failing with an obscure error.
 
 # Hints
 * A binary already released cannot be changed: only the binaries from this issue on can refuse a newer source.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+`sync`/`update` refuse a source whose declared format (`cardinal-format`, a whole number) exceeds the one compiled in
+the binary, and `sync`/`update`/`check` a lock that records a higher one, naming the install command (approach 1 of
+the issue, a format integer rather than the crate version, never raised). Out of scope: the binaries already released.
+
+## Plan
+1. [x] Source format: `cardinal-format` at the root (2), `FORMAT` in the binary kept equal by a test, `sync` and
+   `update` refuse a higher one with the install command; verified by tests of `sync_from`, `update_in` and the
+   format test; makes true SYN-40, SYN-43.
+2. [ ] Lock format: `write_lock` records `format <n>`, `read_lock` reads it, `check`, `sync` and `update` refuse a
+   higher one with the install of the head of the source; ADR 0014 accepted, docs; verified by lock tests; makes
+   true SYN-41, SYN-42.
+
+## Decisions
+- Mode: autonomous
+- Base commit: `896f6210b22ceb668c24dd7fbfb9255afc00130b`
+- The format is declared in `cardinal-format` at the root of the source.
+- The lock records the format of the binary that wrote it; its refusal installs the head of the source.
+- Format 2 is the one of ADR 0013; no declaration means 1.
+- `--dry-run` refuses too.
+
+## Deliverable 1
+
+- done: `cardinal-format` (2) at the root, `FORMAT` in the binary, `sync` and `update` refuse a newer source with
+  the install command, `--dry-run` included.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | usage, architecture, CLAUDE.md, docs map |
+| code review | low: no findings |
+
+- red: SYN-40, SYN-43: `assertion left == right failed: left: Some(0) right: Some(3)` (sync accepted format 99);
+  `cardinal-format` not found
+- Code review: no findings
+- not verified: none
+- decisions needed: none

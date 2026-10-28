@@ -23,3 +23,12 @@ fn only_a_full_hexadecimal_hash_is_fetched_by_hash() {
     assert!(!is_full_hash(&"g".repeat(40)));
     assert!(!is_full_hash("main"));
 }
+
+// spec: SYN-43 (internal: the format compiled in the binary is not printed)
+#[test]
+fn the_binary_reads_the_format_of_its_own_revision() {
+    let declared =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../cardinal-format"))
+            .unwrap();
+    assert_eq!(declared.trim().parse::<u32>().unwrap(), FORMAT);
+}
