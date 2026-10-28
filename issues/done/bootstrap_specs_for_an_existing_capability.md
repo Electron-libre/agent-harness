@@ -81,7 +81,7 @@ Out of scope: writing the specs of the uncovered capabilities themselves (each i
 - red: COV-1, COV-3, COV-9: `#[tokio::test]` file and withdrawn citation not listed, `no test file without an accepted
   spec` printed for a root with no test (COV-10 passed before the code: the behaviour existed, now stated).
 - High review, 7 findings: 1, 2, 4, 5, 6 fixed (above); 3 (a consumer whose crate sits at its root is not read, a
-  limit shared with `check-specs`) filed as `issues/read_the_tests_of_any_project_layout.md`; 7 (spec problems
+  limit shared with `check-specs`) filed as `issues/done/read_the_tests_of_any_project_layout.md`; 7 (spec problems
   ignored) not fixed: `check-specs` reports them, the report does not validate (non-goal added).
 - not verified: none.
 - decisions needed: none.
