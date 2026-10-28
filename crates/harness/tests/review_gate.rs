@@ -430,6 +430,20 @@ fn native_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
     let reviewed = commit(&["commit", "-qam", "x"]) && commits() == before + 1;
     fs::write(current.join("a.txt"), "three\n").unwrap();
     let refused = !commit(&["commit", "-qam", "y"]);
+    // the commit records the issues only: the unreviewed change of `a.txt` stays out of it
+    fs::create_dir_all(current.join("issues")).unwrap();
+    fs::write(current.join("issues/i.md"), "one\n").unwrap();
+    fs::write(current.join("issues/j.md"), "one\n").unwrap();
+    let staged_issue = commit(&["add", "issues/i.md"])
+        && commit(&["commit", "-qm", "issue"])
+        && commits() == before + 2;
+    let only_issue = commit(&["add", "-N", "issues/j.md"])
+        && commit(&["commit", "-qm", "issue", "--", "issues/j.md"])
+        && commits() == before + 3;
+    let issue_with_code = commit(&["add", "issues/i.md", "a.txt"]) && {
+        fs::write(current.join("issues/i.md"), "two\n").unwrap();
+        commit(&["add", "issues/i.md"]) && !commit(&["commit", "-qm", "both"])
+    };
     let out = vec![
         (
             "git runs the native hook and a reviewed commit -a passes",
@@ -440,8 +454,20 @@ fn native_hook_checks(hook: &Path) -> Vec<(&'static str, bool)> {
             refused,
         ),
         (
-            "the refused commit left the history alone",
-            commits() == before + 1,
+            "git lets through a commit of a staged issue file while an unreviewed file stays modified",
+            staged_issue,
+        ),
+        (
+            "git lets through `commit -- issues/<file>` while an unreviewed file stays modified",
+            only_issue,
+        ),
+        (
+            "git refuses a commit whose index holds an unreviewed file next to the issue",
+            issue_with_code,
+        ),
+        (
+            "the refused commits left the history alone",
+            commits() == before + 3,
         ),
     ];
     let _ = fs::remove_dir_all(current.parent().unwrap());

@@ -9,7 +9,7 @@
 //! A commit moves `HEAD`, which retires the marker. `code-review` runs forked, so its `PostToolUse` fires when
 //! the review is over, not when the skill loads. Changes made afterwards (the fixes of the review) pass as long
 //! as they stay in files the review saw. A commit with nothing to commit, an amend of a clean tree
-//! included, one that only touches `issues/`, and a machine without `git` are not gated. The user waives the
+//! included, one that only touches `issues/` (the work tree, or the index it records), and a machine without `git` are not gated. The user waives the
 //! review of the next commit by creating `claude-review-waived` in the git directory (`just waive-review`); the hook
 //! stamps it with `HEAD` when it lets a commit through and removes it, without using it, at the first check after
 //! `HEAD` moved (a command that does not commit, such as `--dry-run`, leaves it usable; after a commit the user
@@ -391,6 +391,30 @@ enum Waiver {
     Text(PathBuf, String),
 }
 
+/// Whether the index git commits (the temporary one of `commit -a` or `commit -- <paths>` when git handed one)
+/// differs from `HEAD` under `issues/` only: the other changes of the work tree stay out of the commit.
+fn records_issues_only(cwd: &Path, head: &str, index: Option<&Path>) -> bool {
+    if head.is_empty() {
+        return false;
+    }
+    let mut diff = Command::new("git");
+    diff.args([
+        "diff",
+        "--cached",
+        "HEAD",
+        "--name-only",
+        "--no-renames",
+        "-z",
+    ])
+    .current_dir(cwd)
+    .stderr(Stdio::null());
+    if let Some(index) = index {
+        diff.env("GIT_INDEX_FILE", index);
+    }
+    let staged = names(&diff.output().map(|o| o.stdout).unwrap_or_default());
+    !staged.is_empty() && staged.iter().all(|f| f.starts_with(ISSUES_DIR))
+}
+
 /// The waiver of `cwd`; one gone before the read is absent, content that is not UTF-8 is content, not a read failure.
 fn waiver(cwd: &Path) -> Waiver {
     let Some(path) = git_file(cwd, WAIVER) else {
@@ -403,8 +427,9 @@ fn waiver(cwd: &Path) -> Waiver {
     }
 }
 
-/// Why the commit must wait for a review, or `None` when the review covers it.
-fn refusal(cwd: &Path) -> Option<Refusal> {
+/// Why the commit must wait for a review, or `None` when the review covers it; `index` is the one git commits, when it
+/// is not the index of the repository.
+fn refusal(cwd: &Path, index: Option<&Path>) -> Option<Refusal> {
     let snap = snapshot(cwd);
     let path = marker_path(cwd)?;
     // the waiver is spent by a commit, not by a command that may not commit (`--dry-run`, a refusal of another hook
@@ -421,7 +446,10 @@ fn refusal(cwd: &Path) -> Option<Refusal> {
             waiver = Waiver::Absent;
         }
     }
-    if snap.files.is_empty() || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR)) {
+    if snap.files.is_empty()
+        || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR))
+        || records_issues_only(cwd, &snap.head, index)
+    {
         return None;
     }
     // fail closed: a waiver that cannot be read or stamped could never be spent, so the review alone judges the commit
@@ -495,13 +523,14 @@ pub(super) fn main(args: &[String]) -> u8 {
         let here = std::env::current_dir().unwrap_or_else(|_| ".".into());
         // `git commit -a` hands its hook a temporary index: the review judges the real one, as `check` does; a relative
         // `GIT_DIR` or `GIT_WORK_TREE` is only valid from this directory, the commands below run from the top of the tree
+        let index = std::env::var_os("GIT_INDEX_FILE").map(|i| here.join(i));
         std::env::remove_var("GIT_INDEX_FILE");
         for name in ["GIT_DIR", "GIT_WORK_TREE"] {
             if let Some(value) = std::env::var_os(name).filter(|v| Path::new(v).is_relative()) {
                 std::env::set_var(name, here.join(value));
             }
         }
-        if let Some(refusal) = refusal(&toplevel(&here)) {
+        if let Some(refusal) = refusal(&toplevel(&here), index.as_deref()) {
             refuse(refusal);
         }
         return 0;

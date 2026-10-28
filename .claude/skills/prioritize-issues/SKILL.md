@@ -30,5 +30,6 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
 6. **Apply** on their agreement: split the issues as validated (`skill:issue-workflow` `details.md`, "Split an
    issue"), rewrite the entries of `issues/queue.md` in the validated order (format
    `- [<stem>](<stem>.md) - <why here>`, keep the header text), run `just next-issue` and check it reports
-   no drift. Then commit `issues/queue.md` alone, with the issue files the split wrote, staged by path (never
-   `git add -A`), with `skill:commit-message`; ask first when the queue held changes that are not this skill's.
+   no drift. When the queue changed, commit `issues/queue.md` alone, with the issue files the split wrote or
+   narrowed, added then named on the commit line (`git add <files>`, then
+   `git commit -m <msg> -- <files>`; never `git add -A`), with `skill:commit-message`; ask first when the queue held changes that are not this skill's.

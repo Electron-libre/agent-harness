@@ -279,7 +279,7 @@ fn skills() {
             }
         }
         for (skill, passage, why) in REQUIRED_PASSAGES.iter().filter(|(s, _, _)| *s == name) {
-            if !text.contains(passage) {
+            if !flat.contains(passage) {
                 failures.push(format!("{skill}: missing '{passage}' ({why})"));
             }
         }

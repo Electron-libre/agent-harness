@@ -23,7 +23,7 @@ mistakes of a cooperative agent, not deliberate bypasses (ADR 0005).
 - **REV-6** (deterministic) withdrawn: see REV-1.
 - **REV-7** (deterministic) withdrawn: see REV-1.
 - **REV-8** (deterministic) withdrawn: see REV-1.
-- **REV-9** (deterministic) `harness run review-gate native` (run by the native `pre-commit` hook) must judge the repository git resolved for the commit (the `GIT_DIR` and work tree git passes, or the current directory when it passes none), never the text of a command, and must refuse a commit while the diff holds a file the last recorded review never saw, except when there is nothing to commit, when the diff is under `issues/` only, or when the waiver of the repository lets it through.
+- **REV-9** (deterministic) `harness run review-gate native` (run by the native `pre-commit` hook) must judge the repository git resolved for the commit (the `GIT_DIR` and work tree git passes, or the current directory when it passes none), never the text of a command, and must refuse a commit while the diff holds a file the last recorded review never saw, except when there is nothing to commit, when the diff is under `issues/` only, when what the commit records (the index git commits, against `HEAD`) is not empty and lies under `issues/` only, whatever else the work tree holds, or when the waiver of the repository lets it through.
 - **REV-10** (deterministic) `native` must exit non-zero when it refuses and zero otherwise, and its refusal must tell the agent to run `/code-review low` on the diff. A waiver it cannot read or cannot stamp must let nothing through: `native` must judge the commit as if there were no waiver, and a refusal must then also tell the agent to ask the user to fix that waiver, naming its path.
 - **REV-11** (deterministic) `native` must judge a linked worktree by its own marker and waiver (the git directory of that worktree), and a repository reached through `--git-dir` by that git directory.
 - **REV-12** (deterministic) `check` must refuse a `git commit` line carrying `--no-verify` or `-n` (also in a bundle of short options such as `-nm`; `-am` and a `-n` inside a quoted message are not one), and a line that sets `core.hooksPath` (`-c core.hooksPath=…`, `--config-env=core.hooksPath=…`, `git config core.hooksPath …`), since they skip the native hook; the message must say why.
@@ -38,6 +38,7 @@ mistakes of a cooperative agent, not deliberate bypasses (ADR 0005).
 ## Scenarios
 
 - (REV-9) Given a commit whose repository the command text does not name readably, when that repository holds an unreviewed change, then the native hook refuses it, since git resolved the repository.
+- (REV-9) Given a modified file nobody reviewed, when only an issue file is staged and committed (`git add issues/x.md` then `git commit`, or `git commit -- issues/x.md`), then the native hook lets it through; `git commit -a` is still refused.
 - (REV-11) Given a linked worktree reviewed and the main worktree not, then a commit in the linked worktree passes.
 - (REV-12) Given `git commit -m "fix -n"` or `git commit -am x`, then neither counts as `-n`: the Claude hook lets it through.
 

@@ -38,18 +38,24 @@ Plan: validated
 ## Understanding
 `create-issue` step 6 commits the new issue file and its queue line through `skill:commit-message`, unless the issue
 belongs to another deliverable (review finding) or `issues/queue.md` holds changes that are not the skill's: then it
-asks. Out of scope: the review gate (already lets an `issues/`-only diff through).
+asks. The review gate lets that commit through when the index it records lies under `issues/` only (REV-9),
+whatever else the work tree holds.
 
 ## Plan
 1. [x] Commit rule: `create-issue` step 6 (and `prioritize-issues` step 6, after the validated order) commits only its
    own issue files, staged by path, through `skill:commit-message`; skipped inside another deliverable; verified by
    `REQUIRED_PASSAGES` in `crates/harness/tests/skills.rs` + `just check`.
+2. [x] Fixes of the `high` review: REV-9 exempts a commit whose index lies under `issues/` only (the hook keeps
+   the index git hands it); the skills commit with `git commit -- <files>`; verified by `native_hook_checks`.
 
 ## Decisions
 - Mode: autonomous
 - Base commit: ef136bac59c0c73b0c684b0c60667f0dfd91d63a
 - `prioritize-issues` gets the same rule, after the order is validated (answer 1 a).
 - Other files modified outside `issues/`: commit only the issue files, staged by path (answer 2 a).
+- `high` review finding 1: amend REV-9 so the gate judges the index the commit records for the `issues/`
+  exemption (answer 1 a). Findings 5 (a rank correction makes a second commit) and 8 (an issue created in a linked
+  worktree is committed on its branch, as it was already written there) are not fixed.
 
 ## Deliverable 1
 - done: `create-issue` gets a commit step (6) that commits the issue files alone, except inside another deliverable
@@ -59,4 +65,14 @@ asks. Out of scope: the review gate (already lets an `issues/`-only diff through
 - red: none (passages of `REQUIRED_PASSAGES` failed as missing before the skill text).
 - Code review: no findings
 - not verified: the agent's actual behaviour in a live session.
+- decisions needed: none
+
+## Deliverable 2
+- done: REV-9 amended; `native` keeps the index git hands it and lets through a commit whose index lies under
+  `issues/` only; `create-issue` and `prioritize-issues` commit with `git add` then `git commit -- <files>`;
+  `commit-message` allows the commit step of such a skill; the passages are matched on the reflowed text.
+- check | result: `just check` ok; docs: module doc of `review_gate.rs`, spec scenario.
+- red: REV-9: "FAIL - git lets through a commit of a staged issue file while an unreviewed file stays modified"
+- Code review: no findings
+- not verified: none
 - decisions needed: none
