@@ -32,7 +32,7 @@ Essentials: `just check` (fmt + clippy -D warnings + tests + spec traceability) 
 committing (it runs the tests of the tools and of the shared content too); no `Co-Authored-By` or AI attribution in commits;
 everything in English; the shared files hold nothing specific to one project (project values go through
 `.claude/cardinal.toml`). A commit that changes `files/` may add `Expected-effect: <metric> <up|down>` to its
-footer, one line per metric of `harness-report` it should move: a direction, never a target; `skill:evaluate-harness`
+footer, one line per metric of `cardinal-report` it should move: a direction, never a target; `skill:evaluate-harness`
 gives it a verdict ([specs/cardinal-verdicts.md](specs/cardinal-verdicts.md)). A change of the meaning of
 the managed content (fragment keys, lock lines, source layout) that an older `cardinal` would misread raises
 `cardinal-format` and `FORMAT` together (ADR 0014).

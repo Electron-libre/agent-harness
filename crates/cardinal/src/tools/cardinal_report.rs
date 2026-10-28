@@ -2,8 +2,8 @@
 //! per group of consecutive revisions holding at least `--min-sessions` sessions, with the model, version and project
 //! mix and the sample size next to the numbers. Reads the outputs of the other transcript readers, never the
 //! transcripts; it reports trends, never a pass or a fail.
-//! Usage: `cardinal run harness-report --sessions <session-metrics rows> [--breaches <rule-breaches --summary>]
-//! [--quality <delivered-quality --summary>]... [--context <fixed-context rows>] [--changes <harness-changes rows>]
+//! Usage: `cardinal run cardinal-report --sessions <session-metrics rows> [--breaches <rule-breaches --summary>]
+//! [--quality <delivered-quality --summary>]... [--context <fixed-context rows>] [--changes <cardinal-changes rows>]
 //! [--min-sessions <n>] [--anonymous]`. With `--changes`, a last table gives each recorded change of the harness a
 //! verdict from the groups before and after it (`specs/cardinal-verdicts.md`).
 
@@ -16,7 +16,7 @@ const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
 const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
-const USAGE: &str = "usage: cardinal run harness-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--changes <file>] [--min-sessions <n>] [--anonymous]";
+const USAGE: &str = "usage: cardinal run cardinal-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--changes <file>] [--min-sessions <n>] [--anonymous]";
 const TOO_FEW: &str = "too few";
 
 type Row = HashMap<String, String>;

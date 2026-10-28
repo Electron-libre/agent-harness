@@ -44,6 +44,16 @@ pub const TOOLS: &[Tool] = &[
         main: audit_sources::main,
     },
     Tool {
+        name: "cardinal-changes",
+        about: "[repo] --sessions <file>: the expected effects of the harness changes, with the revisions holding each",
+        main: cardinal_changes::main,
+    },
+    Tool {
+        name: "cardinal-report",
+        about: "--sessions <file> [...]: the markdown report of the readers, by group of revisions",
+        main: cardinal_report::main,
+    },
+    Tool {
         name: "check-commits",
         about: "validate the message of every non-merge commit of <base>..<head>",
         main: check_commits::main,
@@ -87,16 +97,6 @@ pub const TOOLS: &[Tool] = &[
         name: "format-rust",
         about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
         main: format_rust::main,
-    },
-    Tool {
-        name: "harness-changes",
-        about: "[repo] --sessions <file>: the expected effects of the harness changes, with the revisions holding each",
-        main: cardinal_changes::main,
-    },
-    Tool {
-        name: "harness-report",
-        about: "--sessions <file> [...]: the markdown report of the readers, by group of revisions",
-        main: cardinal_report::main,
     },
     Tool {
         name: "issue-worktree",

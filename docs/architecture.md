@@ -221,11 +221,11 @@ flowchart LR
   git -->|revision in force| metrics
   git --> breaches
   git --> context
-  metrics -->|TSV| report["harness-report"]
+  metrics -->|TSV| report["cardinal-report"]
   breaches -->|TSV| report
   quality -->|TSV| report
   context -->|TSV| report
-  git -->|"Expected-effect lines"| changes["harness-changes"]
+  git -->|"Expected-effect lines"| changes["cardinal-changes"]
   metrics -->|TSV| changes
   changes -->|TSV| report
   metrics -.->|"--archive"| archive[("archive file,<br/>outside the repos")]
@@ -238,8 +238,8 @@ flowchart LR
 | `rule-breaches` | finding (`--summary`: rule and revision) | the rules a program can check, `breach` or `blocked` | [`rule-breaches.md`](../specs/rule-breaches.md) |
 | `delivered-quality` | done issue (`--summary`: revision) | deliverables, fixes inside and after, review findings, failed checks, traced ids | [`delivered-quality.md`](../specs/delivered-quality.md) |
 | `fixed-context` | project and revision | the bytes every session pays before any work, the skills shipped | [`cardinal-report.md`](../specs/cardinal-report.md) |
-| `harness-changes` | expected effect of a change | the `Expected-effect` lines of the commits of `files/`, the revisions in use that hold each | [`cardinal-verdicts.md`](../specs/cardinal-verdicts.md) |
-| `harness-report` | group of revisions | the tables of the readers above, never the transcripts; a verdict per expected effect | [`cardinal-report.md`](../specs/cardinal-report.md) |
+| `cardinal-changes` | expected effect of a change | the `Expected-effect` lines of the commits of `files/`, the revisions in use that hold each | [`cardinal-verdicts.md`](../specs/cardinal-verdicts.md) |
+| `cardinal-report` | group of revisions | the tables of the readers above, never the transcripts; a verdict per expected effect | [`cardinal-report.md`](../specs/cardinal-report.md) |
 
 The choices behind them:
 

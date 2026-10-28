@@ -50,7 +50,7 @@ No `FORMAT` raise: no fragment key, lock line or source layout changes meaning; 
    `tools/harness_{report,changes}.rs` and `tests/harness_{report,changes}.rs` to `cardinal_*`,
    `files/.github/workflows/harness.yml` to `cardinal.yml`, with only the `mod`/`use` lines and links that keep
    `just check` green, then `just sync`; verified by `just check`, `just check-harness`; ~60 lines + renames.
-2. [ ] Tool names: `cardinal run cardinal-report` and `cardinal-changes` (registry, usage strings, skills, docs,
+2. [x] Tool names: `cardinal run cardinal-report` and `cardinal-changes` (registry, usage strings, skills, docs,
    CLAUDE.md `Expected-effect`); verified by the tools CLI test through the new names and `tests/skills.rs`;
    makes true REP-3, VRD-3, VRD-5, VRD-7, VRD-8 amended; ~150 lines.
 3. [ ] Commit scope `cardinal`: `commit-check` built-in scopes `docs` and `cardinal`; `rule-breaches` reads
@@ -90,4 +90,21 @@ Specs amended in place (ids kept): REP-3, VRD-3, VRD-5, VRD-7, VRD-8 (tool names
 - red: none (moves only, no behaviour)
 - Code review: no findings
 - not verified: the GitHub run of the renamed workflow (runs on push)
+- decisions needed: none
+
+## Deliverable 2: tool names
+- done: the tools answer to `cardinal-report` and `cardinal-changes` (registry kept in alphabetical order, usage
+  strings, `evaluate-harness`, specs REP-3 and VRD-3/5/7/8, CLAUDE.md, docs).
+
+| check | result |
+|---|---|
+| tests, lint, specs | `just check` passes |
+| copies | `just sync` then `just check-harness` pass |
+| docs | usage, workflow, architecture, update-docs map, CLAUDE.md |
+| code review | low, see below |
+
+- red: REP-3, VRD-3, VRD-8: `cardinal: unknown tool \`cardinal-changes\``; `tests/skills.rs`: 2 failures (the skill
+  named the old tools)
+- Code review: no findings
+- not verified: none
 - decisions needed: none

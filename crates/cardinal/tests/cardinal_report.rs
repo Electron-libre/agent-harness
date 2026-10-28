@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool harness-report` on fixture TSV files: the groups of revisions, the tables per axis, the
+//! Behavior test for `cardinal tool cardinal-report` on fixture TSV files: the groups of revisions, the tables per axis, the
 //! confounders next to the numbers, the refusal of what it cannot read.
 
 use std::collections::HashMap;
@@ -118,7 +118,7 @@ fn write(path: &Path, header: &str, rows: &[String]) -> PathBuf {
 }
 
 fn run(dir: &Path, args: &[&std::ffi::OsStr]) -> (bool, String, String) {
-    let out = tool_command(dir.join("harness_report.rs"))
+    let out = tool_command(dir.join("cardinal_report.rs"))
         .args(args)
         .output()
         .unwrap();
@@ -770,7 +770,7 @@ fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
 }
 
 #[test]
-fn harness_report() {
+fn cardinal_report() {
     let dir = std::path::PathBuf::from("/tools");
     let temp = tempfile::tempdir().unwrap();
     let checks: Vec<_> = efficiency_checks(&dir, temp.path())

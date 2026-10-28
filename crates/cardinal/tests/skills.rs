@@ -67,7 +67,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "evaluate-harness",
-        "cardinal run harness-report",
+        "cardinal run cardinal-report",
         "the tables come from the report script, not from the agent's arithmetic",
     ),
     (
@@ -87,7 +87,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "evaluate-harness",
-        "cardinal run harness-changes",
+        "cardinal run cardinal-changes",
         "the recorded changes of the harness get a verdict",
     ),
     (

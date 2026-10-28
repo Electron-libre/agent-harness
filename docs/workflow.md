@@ -54,7 +54,7 @@ flowchart TD
 - **Size limit**: an issue too large for one session is split at step 2 (the limits are in step 1 of the skill).
 - **Delegated exploration**: a broad search (many files, the history, the conventions) at step 1 or 3.1 goes to a
   read-only `Explore` subagent, which returns its conclusion with the paths and lines behind it, so the main context
-  grows more slowly; `main_context_peak` in `harness-report` measures the effect.
+  grows more slowly; `main_context_peak` in `cardinal-report` measures the effect.
 - **Specs**: when the issue changes what a capability does, `skill:write-spec` writes its requirements at step 1
   and the tests of step 3.2 carry their `// spec: ID` ([specs/README.md](../specs/README.md)). A capability older than its spec gets one
   read back from its code and tests (`skill:write-spec`, "Bootstrap the spec of an existing capability"), picked from

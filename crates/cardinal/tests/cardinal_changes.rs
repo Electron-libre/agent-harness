@@ -1,4 +1,4 @@
-//! Behavior test for `harness tool harness-changes` on a fixture repository: the expectations of the commits that
+//! Behavior test for `cardinal tool cardinal-changes` on a fixture repository: the expectations of the commits that
 //! change `files/`, the revisions in use that hold each change, the refusal of what it cannot read.
 
 use std::path::Path;
@@ -72,7 +72,7 @@ fn sessions(path: &Path, rows: &[(&str, u32)]) {
 
 fn run(cwd: &Path, args: &[&str]) -> (i32, String, String) {
     let out = Command::new(env!("CARGO_BIN_EXE_cardinal"))
-        .args(["tool", "harness-changes"])
+        .args(["tool", "cardinal-changes"])
         .args(args)
         .current_dir(cwd)
         .env_remove("GIT_DIR")

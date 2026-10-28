@@ -23,10 +23,10 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    - `cardinal run delivered-quality <repo> --summary > <dir>/quality-<n>.tsv` for each repository
      the sessions name that has an `issues/done/` directory (the current one at least);
    - `cardinal run fixed-context > <dir>/context.tsv`;
-   - `cardinal run harness-changes <source> --sessions <dir>/sessions.tsv > <dir>/changes.tsv`, `<source>` a local
+   - `cardinal run cardinal-changes <source> --sessions <dir>/sessions.tsv > <dir>/changes.tsv`, `<source>` a local
      checkout of the Cardinal source (the `source` of `.claude/cardinal.toml` when it is a directory), for the
      `Expected-effect` lines of its commits; skip it, and `--changes`, when there is none;
-   - `cardinal run harness-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv --changes <dir>/changes.tsv`,
+   - `cardinal run cardinal-report --sessions <dir>/sessions.tsv --breaches <dir>/breaches.tsv --quality <dir>/quality-1.tsv … --context <dir>/context.tsv --changes <dir>/changes.tsv`,
      with `--min-sessions <n>` when the user asks for another sample size than 10.
 2. **Read** each table of the report, oldest group first: the tables are the numbers, never recompute them.
    - A trend is a change kept over two groups or more; one group out of line is noise.
