@@ -108,6 +108,56 @@ fn audit_sources() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
+// spec: AUD-1
+#[test]
+fn audit_sources_lists_every_instruction_file_once() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo = tmp.path().join("repo");
+    let proj = tmp.path().join("projects/-tmp-repo");
+    std::fs::create_dir_all(&proj).unwrap();
+    std::fs::create_dir_all(repo.join(".claude/rules/sub")).unwrap();
+    std::fs::create_dir_all(repo.join("docs")).unwrap();
+    let write = |path: &str, text: &str| std::fs::write(repo.join(path), text).unwrap();
+    write("AGENTS.md", "# agents\n");
+    std::os::unix::fs::symlink("AGENTS.md", repo.join("CLAUDE.md")).unwrap();
+    write(".claude/CLAUDE.md", "see @../docs/x.md and @~/notes.md\n");
+    write("docs/x.md", "imported\n");
+    write("docs/y.md", "not imported\n");
+    write(".claude/rules/a.md", "always\n");
+    write(
+        ".claude/rules/sub/b.md",
+        "---\npaths: [\"src/**\"]\n---\nscoped\n",
+    );
+    write(".claude/rules/c.txt", "not a rule\n");
+    let cwd = repo.display().to_string();
+    std::fs::write(
+        proj.join("s1.jsonl"),
+        format!("{{\"type\":\"user\",\"cwd\":{cwd:?},\"message\":{{\"content\":\"hi\"}}}}\n"),
+    )
+    .unwrap();
+
+    let out = tool_command("audit_sources.rs")
+        .arg(tmp.path().join("projects"))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let listed: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.strip_prefix(&format!("  instructions: {cwd}/")))
+        .map(String::from)
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            ".claude/CLAUDE.md",
+            ".claude/rules/a.md",
+            ".claude/rules/sub/b.md",
+            "AGENTS.md",
+            "docs/x.md",
+        ]
+    );
+}
+
 /// `harness tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script

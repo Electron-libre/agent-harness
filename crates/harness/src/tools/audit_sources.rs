@@ -1,10 +1,11 @@
 //! List the sources of the instruction audit: per project of the transcripts directory, the sessions, the
-//! messages typed by the user, the memory files and the instruction files (`CLAUDE.md`, `AGENTS.md`) of its
-//! working directory. With `--messages`, print the typed messages as `project<TAB>session<TAB>text`
+//! messages typed by the user, the memory files and the instruction files of each working directory (AUD-1: the
+//! memory files a session loads at launch, `AGENTS.md`, `.claude/AGENTS.md` and the scoped rules). With `--messages`, print the typed messages as `project<TAB>session<TAB>text`
 //! (newlines escaped); subagent transcripts are skipped. Prints private content: never commit the output.
 //! Usage: `harness run audit-sources [projects_dir] [--messages]` (default `~/.claude/projects`).
 
 use super::transcripts;
+use crate::memory::{instruction_files, WorkTree};
 
 use std::path::{Path, PathBuf};
 use transcripts::{for_each_line, projects, projects_root, sessions, sorted_entries, typed_text};
@@ -16,8 +17,6 @@ fn escape(text: &str) -> String {
         .replace('\r', "\\r")
         .replace('\t', "\\t")
 }
-
-const INSTRUCTION_FILES: [&str; 2] = ["CLAUDE.md", "AGENTS.md"];
 
 pub(super) fn main(args: &[String]) -> u8 {
     let args: Vec<String> = args.to_vec();
@@ -85,11 +84,8 @@ pub(super) fn main(args: &[String]) -> u8 {
             println!("  memory: {memory} files");
         }
         for cwd in &cwds {
-            for f in INSTRUCTION_FILES
-                .iter()
-                .filter(|f| Path::new(cwd).join(f).is_file())
-            {
-                println!("  instructions: {cwd}/{f}");
+            for f in instruction_files(&WorkTree(Path::new(cwd))) {
+                println!("  instructions: {}", Path::new(cwd).join(f).display());
             }
         }
     }

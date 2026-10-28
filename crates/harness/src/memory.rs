@@ -60,9 +60,29 @@ pub(crate) struct Memory {
     pub agents: u64,
 }
 
-/// Measures the memory files of `tree` (REP-2): each file counted once, however many paths name it, the imports
-/// followed breadth first so that a file counts at its fewest hops.
+/// Measures the memory files of `tree` (REP-2).
 pub(crate) fn measure(tree: &impl Tree) -> Memory {
+    let mut memory = Memory::default();
+    for file in loaded(tree) {
+        if file.agents {
+            memory.agents += file.bytes;
+        } else {
+            memory.claude += file.bytes;
+        }
+    }
+    memory
+}
+
+/// A memory file loaded at launch: its path in the tree, a symbolic link followed.
+struct Loaded {
+    path: String,
+    agents: bool,
+    bytes: u64,
+}
+
+/// The memory files of `tree` loaded at launch (REP-2): each file once, however many paths name it, the imports
+/// followed breadth first so that a file counts at its fewest hops.
+fn loaded(tree: &impl Tree) -> Vec<Loaded> {
     let mut read: HashMap<String, Option<(String, Vec<u8>)>> = HashMap::new();
     let mut read = |path: &str| {
         read.entry(path.to_string())
@@ -77,33 +97,26 @@ pub(crate) fn measure(tree: &impl Tree) -> Memory {
     if roots.is_empty() {
         roots.extend(AGENTS.map(String::from));
     }
-    let mut rules: Vec<String> = tree
-        .files(".claude/rules")
-        .into_iter()
-        .filter(|p| p.ends_with(".md"))
-        .collect();
-    rules.sort();
     roots.extend(
-        rules
+        rules(tree)
             .into_iter()
             .filter(|p| read(p).is_some_and(|(_, text)| !scoped(&String::from_utf8_lossy(&text)))),
     );
-    let mut memory = Memory::default();
+    let mut loaded = Vec::new();
     let mut seen = BTreeSet::new();
     let mut queue: VecDeque<(String, usize)> = roots.into_iter().map(|p| (p, 0)).collect();
     while let Some((path, hops)) = queue.pop_front() {
         let Some((file, text)) = read(&path) else {
             continue;
         };
-        if !seen.insert(file) {
+        if !seen.insert(file.clone()) {
             continue;
         }
-        let bytes = text.len() as u64;
-        if AGENTS.contains(&path.as_str()) {
-            memory.agents += bytes;
-        } else {
-            memory.claude += bytes;
-        }
+        loaded.push(Loaded {
+            path: file,
+            agents: AGENTS.contains(&path.as_str()),
+            bytes: text.len() as u64,
+        });
         if hops < HOPS {
             let dir = Path::new(&path).parent().unwrap_or(Path::new(""));
             queue.extend(
@@ -114,7 +127,27 @@ pub(crate) fn measure(tree: &impl Tree) -> Memory {
             );
         }
     }
-    memory
+    loaded
+}
+
+/// The instruction files of `tree` the user wrote (AUD-1): the memory files loaded at launch, plus `AGENTS.md`,
+/// `.claude/AGENTS.md` and the scoped rules, each once, sorted by path.
+pub(crate) fn instruction_files(tree: &impl Tree) -> BTreeSet<String> {
+    let mut files: BTreeSet<String> = loaded(tree).into_iter().map(|f| f.path).collect();
+    let extra = AGENTS.into_iter().map(String::from).chain(rules(tree));
+    files.extend(extra.filter_map(|p| tree.read(&p)).map(|(file, _)| file));
+    files
+}
+
+/// The `.claude/rules/**/*.md` files of `tree`, sorted.
+fn rules(tree: &impl Tree) -> Vec<String> {
+    let mut rules: Vec<String> = tree
+        .files(".claude/rules")
+        .into_iter()
+        .filter(|p| p.ends_with(".md"))
+        .collect();
+    rules.sort();
+    rules
 }
 
 /// Whether a rule's front matter, closed by its `---` line, has a top-level `paths` key: the rule loads on demand
