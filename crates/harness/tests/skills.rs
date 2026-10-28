@@ -11,6 +11,21 @@ const BUILT_IN_ROOT_DOCS: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 /// Passages a skill must keep, as (skill, passage, why).
 const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     (
+        "create-issue",
+        "commit the issue files alone",
+        "the user no longer types \"commit\" after each new issue",
+    ),
+    (
+        "create-issue",
+        "committed with that deliverable",
+        "an issue found inside another deliverable is not committed on its own",
+    ),
+    (
+        "prioritize-issues",
+        "commit `issues/queue.md` alone",
+        "the validated order is committed without a further ask",
+    ),
+    (
         "audit-instructions",
         "rule-breaches --summary",
         "the rules broken often feed the audit as hook candidates",

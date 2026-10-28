@@ -45,7 +45,7 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    - No `# Tracking` section: the plan is written there by `issue-workflow`.
    - Size: estimate the changed lines and deliverables the Approach implies. Over the size limit of
      `skill:issue-workflow` step 1, propose the cuts to the user and, on their agreement, write one issue per cut
-     instead (its `details.md`, "Split an issue"); steps 5 and 6 then cover all of them.
+     instead (its `details.md`, "Split an issue"); steps 5 to 7 then cover all of them.
    - Confidentiality: follow the `confidential` note of `.claude/harness.toml` (what must not be named in an
      issue; describe it generically). No absolute or home paths.
 4. **Validate**, and fix the file until it prints nothing:
@@ -60,5 +60,9 @@ Show the user your results as `AGENTS.md` section "Reports to the user" says.
    reason to the user, who can move it. If the new issue changes the case for others, say so and suggest
    `skill:prioritize-issues` rather than silently reshuffling. Run `just next-issue` and check it reports
    no drift.
-6. **Deliver**: give the path, rank and one line (no other recap). Don't commit unless asked (then
-   `skill:commit-message`), and offer to start `skill:issue-workflow` on it.
+6. **Commit**: commit the issue files alone, staged by path (the new issue files and `issues/queue.md`, never
+   `git add -A`), with `skill:commit-message`; other modified files stay out of the commit. Two exceptions:
+   an issue written inside another deliverable (a review finding) is committed with that deliverable, not on
+   its own; when `issues/queue.md` already held changes that are not this skill's, ask before committing.
+7. **Deliver**: give the path, rank, commit hash and one line (no other recap), and offer to start
+   `skill:issue-workflow` on it.
