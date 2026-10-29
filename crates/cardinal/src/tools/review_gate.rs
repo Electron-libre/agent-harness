@@ -87,7 +87,11 @@ fn untracked_hashes(cwd: &Path, names: &[String]) -> Vec<String> {
     if batch.is_empty() {
         return names.iter().map(|_| "-".to_string()).collect();
     }
-    let listing = batch.iter().map(|n| [n, "\n"].concat()).collect::<String>();
+    let mut listing = String::new();
+    for name in &batch {
+        listing.push_str(name);
+        listing.push('\n');
+    }
     let out = git(
         cwd,
         &["hash-object", "--no-filters", "--stdin-paths"],

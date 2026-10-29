@@ -33,9 +33,11 @@ pub fn warnings(root: &Path) -> Vec<String> {
         return Vec::new();
     }
     // the first of the largest parts, in the order of `parts`
-    let Some((part, bytes)) = parts.iter().rev().max_by_key(|(_, bytes)| bytes) else {
-        return Vec::new();
-    };
+    let [first, rest @ ..] = &parts;
+    let (part, bytes) = rest.iter().fold(
+        first,
+        |largest, part| if part.1 > largest.1 { part } else { largest },
+    );
     vec![format!(
         "warning: the fixed context is {total} bytes, over the budget of {budget} ({KEY} in {}); the largest part is {part} ({bytes} bytes)",
         Names::read(root).config

@@ -39,7 +39,7 @@ no `Option` and no invariant to break, instead of restoring a panic.
 1. [x] Verdict equality: extract the verdict of two values into a function comparing with `==` under
    `#[allow(clippy::float_cmp)]` and its reason; verified by a unit test (`-0.0` after `0.0` is `no observed effect`);
    makes true VRD-6 at the edge (~30 lines).
-2. [ ] Pedantic cleanups: one `problem` helper shared by `parse` and `parse_requirements`; one buffer in
+2. [x] Pedantic cleanups: one `problem` helper shared by `parse` and `parse_requirements`; one buffer in
    `untracked_hashes`; the largest part of `budget` taken without an `Option`; verified by `just check` (existing
    tests of check-specs, review-gate, SYN-38) (~50 lines).
 
@@ -56,6 +56,19 @@ no `Option` and no invariant to break, instead of restoring a panic.
   | docs | none changed: VRD-6 already says equal |
   | code review | low, see below |
 - red: VRD-6: `assertion left == right failed, left: "hurt", right: "no observed effect"`
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: one `problem` function in `check_specs`; one buffer for the listing of `review_gate`; the largest part of
+  `budget` folded over the three parts, no `Option` left.
+- | check | result |
+  |---|---|
+  | tests, lint, specs | `just check` green |
+  | docs | none changed: no behaviour change |
+  | code review | low, see below |
+- red: none
 - Code review: no findings
 - not verified: none
 - decisions needed: none

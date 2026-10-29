@@ -173,6 +173,11 @@ fn check_wording(file: &str, id: &str, statement: &str, warn: &mut Vec<String>) 
     }
 }
 
+/// Record the problem `m` of the spec `file` in `out`.
+fn problem(out: &mut Vec<String>, file: &str, m: &str) {
+    out.push(format!("{file}: {m}"));
+}
+
 fn parse(
     root: &Path,
     file: &str,
@@ -180,7 +185,6 @@ fn parse(
     out: &mut Vec<String>,
     warn: &mut Vec<String>,
 ) -> Spec {
-    let mut problem = |m: String| out.push(format!("{file}: {m}"));
     let mut spec = Spec {
         file: file.to_string(),
         id: String::new(),
@@ -194,7 +198,7 @@ fn parse(
         .position(|l| l.trim() == "---")
         .map(|p| p + 1);
     if lines.first().map(|l| l.trim()) != Some("---") || close.is_none() {
-        problem("no front matter (`---` ... `---`)".to_string());
+        problem(out, file, "no front matter (`---` ... `---`)");
         return spec;
     }
     let close = close.unwrap_or(0);
@@ -223,7 +227,7 @@ fn parse(
                                 .starts_with(&format!("{n}-"))
                         });
                     if !found {
-                        problem(format!("adr {n} not found in docs/adr"));
+                        problem(out, file, &format!("adr {n} not found in docs/adr"));
                     }
                 }
             }
@@ -231,10 +235,14 @@ fn parse(
         }
     }
     if !is_id_prefix(&spec.id) {
-        problem(format!(
-            "front matter `id` must be three capital letters, got `{}`",
-            spec.id
-        ));
+        problem(
+            out,
+            file,
+            &format!(
+                "front matter `id` must be three capital letters, got `{}`",
+                spec.id
+            ),
+        );
     }
     // `implemented` was a status of its own, enforced like `accepted`: still read as such so older specs keep passing
     if spec.status == "implemented" {
@@ -244,14 +252,18 @@ fn parse(
         spec.status = "accepted".to_string();
     }
     if !["draft", "accepted"].contains(&spec.status.as_str()) {
-        problem(format!(
-            "front matter `status` must be draft or accepted, got `{}`",
-            spec.status
-        ));
+        problem(
+            out,
+            file,
+            &format!(
+                "front matter `status` must be draft or accepted, got `{}`",
+                spec.status
+            ),
+        );
     }
     for section in SECTIONS {
         if !lines.iter().any(|l| l.trim() == section) {
-            problem(format!("missing section `{section}`"));
+            problem(out, file, &format!("missing section `{section}`"));
         }
     }
     parse_requirements(file, &lines, &mut spec, out, warn);
@@ -267,7 +279,6 @@ fn parse_requirements(
     out: &mut Vec<String>,
     warn: &mut Vec<String>,
 ) {
-    let mut problem = |m: String| out.push(format!("{file}: {m}"));
     let mut seen = BTreeSet::new();
     let mut in_requirements = false;
     for line in lines {
@@ -282,20 +293,28 @@ fn parse_requirements(
             .and_then(|r| r.split_once("**"))
             .filter(|(id, _)| is_req_id(id));
         let Some((id, after)) = parsed else {
-            problem(format!(
-                "requirement line must start with `- **{}-<n>**`: `{line}`",
-                spec.id
-            ));
+            problem(
+                out,
+                file,
+                &format!(
+                    "requirement line must start with `- **{}-<n>**`: `{line}`",
+                    spec.id
+                ),
+            );
             continue;
         };
         if !id.starts_with(&format!("{}-", spec.id)) {
-            problem(format!(
-                "requirement {id} does not start with the spec id `{}`",
-                spec.id
-            ));
+            problem(
+                out,
+                file,
+                &format!(
+                    "requirement {id} does not start with the spec id `{}`",
+                    spec.id
+                ),
+            );
         }
         if !seen.insert(id.to_string()) {
-            problem(format!("duplicate requirement {id}"));
+            problem(out, file, &format!("duplicate requirement {id}"));
         }
         let kind = after
             .trim()
@@ -309,9 +328,11 @@ fn parse_requirements(
         if kind == "quality" && !withdrawn {
             warn.push(format!("warning: {file}: requirement {id}: kind `quality` is deprecated, reword it for a test or withdraw it"));
         } else if kind != "deterministic" && kind != "quality" {
-            problem(format!(
-                "requirement {id}: kind must be `(deterministic)`, got `({kind})`"
-            ));
+            problem(
+                out,
+                file,
+                &format!("requirement {id}: kind must be `(deterministic)`, got `({kind})`"),
+            );
         }
         // with no `(kind)`, the statement was not found: the format problem is enough
         if spec.status == "draft" && !withdrawn && !kind.is_empty() {
