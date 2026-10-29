@@ -23,11 +23,12 @@ const REVIEW_TOOL: &str = "cardinal run review-gate";
 pub const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
-/// The lines that tell the installed hook from one of the user: the mark, then the one the revisions before the rename
-/// wrote, so their gate is still ours.
+/// The line that tells the installed hook from one of the user, written by every revision; it keeps the old name
+/// because an older `cardinal` that took the gate for the user's would move it to `pre-commit.user`, which would then
+/// run itself in a loop. The second is read too: two revisions wrote it.
 const MARKS: [&str; 2] = [
-    "# cardinal: native review gate",
     "# harness: native review gate",
+    "# cardinal: native review gate",
 ];
 /// Where a `pre-commit` of the user goes, and is run from.
 const CHAINED: &str = "pre-commit.user";
@@ -37,7 +38,7 @@ const CHAINED: &str = "pre-commit.user";
 /// that cannot run the tool (exit 3, BIN-14) is a warning, not a refusal, so a branch or a machine without Cardinal
 /// can still commit (BIN-9).
 const SCRIPT: &str = r#"#!/bin/sh
-# cardinal: native review gate (installed by `cardinal sync`, do not edit)
+# harness: native review gate (installed by `cardinal sync`, do not edit)
 legacy=.claude/hooks/require_code_review.rs
 if [ -f "$legacy" ] && command -v rust-script >/dev/null 2>&1; then
     rust-script "$legacy" native || exit $?

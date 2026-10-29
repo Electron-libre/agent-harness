@@ -82,7 +82,8 @@ fn sync_installs_an_executable_hook_that_runs_the_review_in_native_mode() {
     assert_eq!(sync.outcome(GATE), Some("added"), "{sync:?}");
     let text = get(root.path(), ".git/hooks/pre-commit").unwrap();
     assert!(
-        text.starts_with("#!/bin/sh\n# cardinal: native review gate"),
+        // the mark every revision reads as its own gate, the ones before the rename included
+        text.starts_with("#!/bin/sh\n# harness: native review gate"),
         "{text}"
     );
     assert!(text.contains("run review-gate native"), "{text}");
@@ -270,16 +271,17 @@ fn sync_never_replaces_a_chained_hook_and_fails_changing_nothing() {
 fn a_gate_installed_before_the_rename_is_ours_and_replaced() {
     let home = Home::new();
     let (_source, root) = gated(&home);
-    script(
-        &pre_commit(&root),
-        "# harness: native review gate (installed by `harness sync`, do not edit)\nexit 0\n",
-    );
-    let sync = home.ok(root.path(), &["sync"]);
-    assert_eq!(sync.outcome(GATE), Some("updated"), "{sync:?}");
-    assert_eq!(sync.outcome(MOVED), None, "{sync:?}");
-    assert!(get(root.path(), ".git/hooks/pre-commit")
-        .unwrap()
-        .starts_with("#!/bin/sh\n# cardinal: native review gate"));
+    // the mark of the revisions before the rename, and the one two revisions after it wrote
+    for mark in [
+        "# harness: native review gate (installed by `harness sync`, do not edit)",
+        "# cardinal: native review gate (installed by `cardinal sync`, do not edit)",
+    ] {
+        script(&pre_commit(&root), &format!("{mark}\nexit 0\n"));
+        let sync = home.ok(root.path(), &["sync"]);
+        assert_eq!(sync.outcome(GATE), Some("updated"), "{mark}: {sync:?}");
+        assert_eq!(sync.outcome(MOVED), None, "{mark}: {sync:?}");
+    }
+    assert!(!root.path().join(".git/hooks/pre-commit.user").exists());
 }
 
 // spec: SYN-19

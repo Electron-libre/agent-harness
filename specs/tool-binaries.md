@@ -32,7 +32,7 @@ from before the rename keep that name (BIN-3, BIN-5).
 - **BIN-15** (deterministic) `check` must fail with one line per hook command of the project's `.claude/settings.json` whose first word is `cardinal` and whose second word is a subcommand the `cardinal` on the path refuses (`cardinal help <subcommand>` exits non-zero), the line naming the command and the install of the project's `cardinal` (`cargo install --force --git <source> --rev <rev> --locked`, or `--force --path <source>/crates/cardinal` for a local source: `--force` reinstalls the same version), and look at nothing when no `cardinal` is on the path, as BIN-9.
 - **BIN-16** (deterministic) `update` must write nothing and fail when a hook command of the managed entries of the target revision names a subcommand the `cardinal` on the path refuses (as BIN-15 judges it), naming each command and, once, the install of the target, `cargo install --force --git <source> --rev <commit> --locked`, except under `--dry-run`, which prints the same lines as warnings without failing.
 - **BIN-17** (deterministic) When the `cardinal` launcher cannot parse its arguments (an unknown subcommand, an unknown flag, a missing argument), it must print the parser's message on stderr and exit 3, as BIN-14, so that a hook command the installed launcher cannot parse never blocks the agent, whatever path brought it to the project; `--help` and `--version` keep exit 0. A tool the pinned binary does not know is BIN-7's.
-- **BIN-18** (deterministic) withdrawn: the install of the source no longer puts a `harness` alias next to `cardinal`; every consumer runs `cardinal`, and a project whose hooks still call `harness` moves them with one `sync`.
+- **BIN-18** (deterministic) withdrawn: the install of the source no longer puts a `harness` alias next to `cardinal`; every consumer runs `cardinal`, and a project whose hooks still call `harness` moves them with one `update`.
 
 ## Scenarios
 
@@ -69,5 +69,5 @@ from before the rename keep that name (BIN-3, BIN-5).
 - Checking the words after the subcommand (the tool of `cardinal run`): the pinned binary runs them (BIN-1), not the
   installed one.
 - Hook commands that do not start with `cardinal`, such as the `harness` hooks of a project synced before the rename
-  (they fail as a missing command, which never blocks the agent, until `sync` moves them to `cardinal`), and an
+  (they fail as a missing command, which never blocks the agent, until `update` moves them to `cardinal`), and an
   installed `cardinal` older than BIN-15 and BIN-16: it cannot refuse what it does not check.

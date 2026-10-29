@@ -22,7 +22,7 @@ test:
     #!/usr/bin/env sh
     out=$(cargo test -q --workspace 2>&1) || { printf '%s\n' "$out"; exit 1; }
 
-# Install the `cardinal` binary and its `harness` alias to ~/.cargo/bin (`--force`: over a `harness` of before).
+# Install the `cardinal` binary to ~/.cargo/bin (`--force`: over the installed one, even of the same version).
 install:
     cargo install --force --path crates/cardinal --locked
 

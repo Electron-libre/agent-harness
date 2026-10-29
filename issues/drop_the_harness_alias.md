@@ -59,11 +59,19 @@ commits (BIN-3, BIN-5), the old transcripts and commits (EVA-5, BRE-9), the old 
    recipe `check-harness` leaves `files/cardinal.just`; tests amended, docs (`docs/usage.md`, `docs/architecture.md`,
    README, CLAUDE.md) updated; verified by the gate, launcher and sync CLI tests; makes true BIN-9, BIN-15, BIN-16,
    BIN-17, SYN-18, SYN-22, SYN-23. ~250 lines.
+3. [x] Fixes of the `high` review: the gate keeps writing its mark `# harness: native review gate` and also reads
+   `# cardinal: native review gate`, the docs say `update` (not
+   `sync`) moves the `harness` hooks, the `install` recipe no longer names the alias; verified by the gate CLI tests;
+   makes true SYN-18, SYN-19. ~35 lines.
 
 ## Decisions
 - Mode: autonomous
 - Base commit: 300d92b57383b6a51237a38d947c9b0116e09ab9
 - No new ADR: the drop is the end of step 2 of ADR 0012.
+- The gate mark stays `# harness: native review gate` (point 7 of the findings reverted): an older `cardinal` reads
+  only that mark, would take a `# cardinal:` gate for the user's, move it to `pre-commit.user`, and that copy would
+  exec itself in a loop. The `# cardinal:` mark that `fd59f8b` and `9db214f` wrote is read too: the `sync` of this
+  repository had already moved such a gate to `pre-commit.user` (removed by hand, identical to the gate of `9db214f`).
 - Machine cleanup (old cache, old binary): the commands are given to the user at the end, not run (answer 1 a).
 
 ## Deliverable 1
@@ -99,5 +107,28 @@ commits (BIN-3, BIN-5), the old transcripts and commits (EVA-5, BRE-9), the old 
   instead of 0), `check` refused 3 hooks with only `harness` installed instead of none, the gate was written with the
   `# harness:` mark, a `harness run review-gate` hook got a gate (`added: native review gate`).
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3
+- done: the `high` review of `300d92b..9db214f` (9 findings) settled.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | updated (usage, BIN-18, the `install` recipe) |
+| code review | `low`: 1 finding, fixed |
+
+- red: SYN-18, SYN-19: the gate was written with the mark `# cardinal: native review gate`, which an older `cardinal` takes
+  for the user's hook; then a gate of that mark was moved to `pre-commit.user` (`added`, expected `updated`).
+- Fixed, `high` findings: the gate mark (1), `sync` instead of `update` in the docs (5), the `install` recipe comment (7).
+- Not fixed, `high` findings: the `harness` hooks unjudged (2) and a `harness run review-gate` hook given no gate (3), by
+  design (BIN-15, SYN-22, no consumer left on them); `check-harness` removal (4), no consumer justfile depends on it
+  (checked); the old-commit fallbacks of `install_cardinal.sh` (6), reachable for a pin between `e82841f` and `afe9e0f`,
+  kept as Approach 3 says; a stale `pre-commit.harness-new` (8), only left by an interrupted older write, harmless;
+  `modified: native review gate` before the next `sync` (9), what any change of the gate script does already.
+- Code review: 1 findings: a gate of the `# cardinal:` mark taken for the user's (fixed: both marks read).
 - not verified: none
 - decisions needed: none
