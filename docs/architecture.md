@@ -101,7 +101,7 @@ names no crate, which builds the single package of the commit whatever its name.
 ahead.
 
 The launcher itself is not of the pinned revision: a hook running a subcommand the installed `cardinal` does not know
-cannot run, nor a `cardinal` hook on a machine that has only the `harness` of before the rename. `check` names the
+cannot run. `check` names the
 `cargo install --force` to run (BIN-15) and `update` refuses such a revision (BIN-16);
 `crates/cardinal/src/launcher.rs`. Nor does a launcher read a managed content newer than itself: the source declares
 its format in `cardinal-format`, `cardinal` reads up to the `FORMAT` compiled in it, and `sync` and `update` refuse a
@@ -191,7 +191,7 @@ sequenceDiagram
   directory of the common git directory, keeps a user's own hook as `pre-commit.user` run after it, and skips a
   `core.hooksPath` set elsewhere (SYN-18 to SYN-23); a project nested in another repository, or outside any, gets
   no gate and no error. `.git/hooks` is not cloned, so each clone needs its own `sync`. A
-  missing `cardinal` (and `harness`), or a launcher that cannot run the tool (exit 3), is a warning, not a refusal.
+  missing `cardinal`, or a launcher that cannot run the tool (exit 3), is a warning, not a refusal.
 
 ### The Rust hooks
 

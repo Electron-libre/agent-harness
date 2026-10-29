@@ -104,12 +104,11 @@ impl Home {
         }
         let home = Self { dir };
         // no network: `curl` fails as on a missing asset, and the prefetch of a git source would build the tools
-        // binary with `cargo install`: it fails at once here; the `cardinal` and `harness` on the path know every
-        // subcommand, so `check` refuses no hook whatever is installed (BIN-15)
+        // binary with `cargo install`: it fails at once here; the `cardinal` on the path knows every subcommand, so
+        // `check` refuses no hook whatever is installed (BIN-15)
         home.program("curl", "exit 22\n");
         home.program("cargo", "exit 1\n");
         home.program("cardinal", "exit 0\n");
-        home.program("harness", "exit 0\n");
         home
     }
 

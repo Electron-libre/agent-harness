@@ -1,7 +1,7 @@
 //! The native git `pre-commit` hook that runs the review gate of the project (`specs/sync.md`, SYN-18 to SYN-23).
 //!
 //! The hook is a small `sh` script that starts `cardinal run review-gate native` (the tool of the revision the project
-//! pins, `specs/tool-binaries.md`; through `harness`, its name before the rename, when only that is installed), then the `pre-commit` the user already had (moved to `pre-commit.user`, never
+//! pins, `specs/tool-binaries.md`), then the `pre-commit` the user already had (moved to `pre-commit.user`, never
 //! overwritten).
 
 use std::fs;
@@ -16,16 +16,19 @@ use crate::{is_executable, set_executable, write, Outcome};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 
-/// The commands of the hooks that run the review gate, and their name before the rename: the gate exists only where the
-/// Cardinal manages such a hook, or the review hook script of an older revision (`LEGACY_HOOK`).
-pub const REVIEW_TOOLS: [&str; 2] = ["cardinal run review-gate", "harness run review-gate"];
+/// The command of the hooks that run the review gate: the gate exists only where Cardinal manages such a hook, or the
+/// review hook script of an older revision (`LEGACY_HOOK`).
+const REVIEW_TOOL: &str = "cardinal run review-gate";
 /// The review hook of the revisions before the tools moved into `harness`, among their managed files.
 pub const LEGACY_HOOK: &str = ".claude/hooks/require_code_review.rs";
 /// Name of the gate in a report.
 pub const GATE: &str = "native review gate";
-/// The line that tells the installed hook from one of the user; kept as the revisions before the rename wrote it, so
-/// their gate is still ours.
-const MARK: &str = "# harness: native review gate";
+/// The lines that tell the installed hook from one of the user: the mark, then the one the revisions before the rename
+/// wrote, so their gate is still ours.
+const MARKS: [&str; 2] = [
+    "# cardinal: native review gate",
+    "# harness: native review gate",
+];
 /// Where a `pre-commit` of the user goes, and is run from.
 const CHAINED: &str = "pre-commit.user";
 
@@ -34,16 +37,15 @@ const CHAINED: &str = "pre-commit.user";
 /// that cannot run the tool (exit 3, BIN-14) is a warning, not a refusal, so a branch or a machine without Cardinal
 /// can still commit (BIN-9).
 const SCRIPT: &str = r#"#!/bin/sh
-# harness: native review gate (installed by `cardinal sync`, do not edit)
+# cardinal: native review gate (installed by `cardinal sync`, do not edit)
 legacy=.claude/hooks/require_code_review.rs
-if command -v cardinal >/dev/null 2>&1; then launcher=cardinal; else launcher=harness; fi
 if [ -f "$legacy" ] && command -v rust-script >/dev/null 2>&1; then
     rust-script "$legacy" native || exit $?
-elif [ ! -f "$legacy" ] && { [ -f .claude/cardinal.toml ] || [ -f .claude/harness.toml ]; } && "$launcher" help run >/dev/null 2>&1; then
-    "$launcher" run review-gate native
+elif [ ! -f "$legacy" ] && { [ -f .claude/cardinal.toml ] || [ -f .claude/harness.toml ]; } && cardinal help run >/dev/null 2>&1; then
+    cardinal run review-gate native
     code=$?
     if [ "$code" -eq 3 ]; then
-        echo "cardinal: review gate skipped, $launcher could not run it" >&2
+        echo "cardinal: review gate skipped, cardinal could not run it" >&2
     elif [ "$code" -ne 0 ]; then
         exit "$code"
     fi
@@ -123,7 +125,12 @@ pub fn state(hooks: &Path) -> State {
     match fs::read_to_string(&path) {
         Err(_) if fs::symlink_metadata(&path).is_err() => State::Missing,
         // the mark is the second line, so a hook of the user that only quotes it is not taken for ours
-        Ok(text) if text.lines().nth(1).is_some_and(|l| l.starts_with(MARK)) => {
+        Ok(text)
+            if text
+                .lines()
+                .nth(1)
+                .is_some_and(|l| MARKS.iter().any(|mark| l.starts_with(mark))) =>
+        {
             if text == SCRIPT && is_executable(&path) {
                 State::UpToDate
             } else {
@@ -138,10 +145,7 @@ pub fn state(hooks: &Path) -> State {
 /// review hook of an older revision.
 #[must_use]
 pub fn manages<'a>(entries: &[Entry], mut files: impl Iterator<Item = &'a String>) -> bool {
-    entries
-        .iter()
-        .any(|e| REVIEW_TOOLS.iter().any(|tool| e.label().contains(tool)))
-        || files.any(|f| f == LEGACY_HOOK)
+    entries.iter().any(|e| e.label().contains(REVIEW_TOOL)) || files.any(|f| f == LEGACY_HOOK)
 }
 
 /// The hooks directory of the project and what its `pre-commit` is, `None` when the project is not expected to have the
@@ -222,7 +226,7 @@ impl Plan {
         let hook = self.hooks.join("pre-commit");
         // the new hook is complete before the hook of the user moves, so a failure never leaves the repository
         // with no hook at all
-        let staged = self.hooks.join("pre-commit.harness-new");
+        let staged = self.hooks.join("pre-commit.cardinal-new");
         write(&staged, SCRIPT.as_bytes())?;
         set_executable(&staged, true)?;
         if self.state == State::Foreign {

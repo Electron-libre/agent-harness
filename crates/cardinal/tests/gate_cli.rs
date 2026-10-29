@@ -38,9 +38,9 @@ fn fake(program: &str, body: &str) -> TempDir {
     bin
 }
 
-/// A `harness` that knows `run` and whose `run` exits with `code`.
-fn fake_harness(code: i32) -> TempDir {
-    fake_launcher("harness", code)
+/// A `cardinal` that knows `run` and whose `run` exits with `code`.
+fn fake_cardinal(code: i32) -> TempDir {
+    fake_launcher("cardinal", code)
 }
 
 /// A launcher `name` that knows `run` and whose `run` exits with `code`.
@@ -82,7 +82,7 @@ fn sync_installs_an_executable_hook_that_runs_the_review_in_native_mode() {
     assert_eq!(sync.outcome(GATE), Some("added"), "{sync:?}");
     let text = get(root.path(), ".git/hooks/pre-commit").unwrap();
     assert!(
-        text.starts_with("#!/bin/sh\n# harness: native review gate"),
+        text.starts_with("#!/bin/sh\n# cardinal: native review gate"),
         "{text}"
     );
     assert!(text.contains("run review-gate native"), "{text}");
@@ -95,7 +95,7 @@ fn the_hook_runs_the_review_and_fails_the_commit_with_its_exit_code() {
     let home = Home::new();
     let (_source, root) = synced(&home);
     for code in [0, 1, 2] {
-        let bin = fake_harness(code);
+        let bin = fake_cardinal(code);
         let hook = run_hook(&home, &root, bin.path(), &[]);
         assert_eq!(hook.code, Some(code), "{hook:?}");
         assert_eq!(calls(&bin), "help run\nrun review-gate native\n");
@@ -107,7 +107,7 @@ fn the_hook_runs_the_review_and_fails_the_commit_with_its_exit_code() {
 fn the_hook_lets_the_commit_through_when_the_launcher_cannot_run_the_review() {
     let home = Home::new();
     let (_source, root) = synced(&home);
-    let bin = fake_harness(3);
+    let bin = fake_cardinal(3);
     let hook = run_hook(&home, &root, bin.path(), &[]);
     assert_eq!(hook.code, Some(0), "{hook:?}");
     assert!(hook.stderr.contains(SKIPPED), "{hook:?}");
@@ -139,25 +139,25 @@ fn the_hook_runs_the_review_script_of_an_older_revision_with_rust_script() {
 
 // spec: SYN-18, BIN-9
 #[test]
-fn the_hook_warns_and_lets_the_commit_through_without_the_harness() {
+fn the_hook_warns_and_lets_the_commit_through_without_cardinal() {
     let home = Home::new();
     let (_source, root) = synced(&home);
-    // no harness.toml in the work tree (a branch that predates the harness)
+    // no configuration in the work tree (a branch that predates Cardinal)
     let config = get(root.path(), CONFIG).unwrap();
     fs::remove_file(root.path().join(CONFIG)).unwrap();
-    let bin = fake_harness(2);
+    let bin = fake_cardinal(2);
     let hook = run_hook(&home, &root, bin.path(), &[]);
     assert_eq!(hook.code, Some(0), "{hook:?}");
     assert!(hook.stderr.contains(SKIPPED), "{hook:?}");
     assert_eq!(calls(&bin), "");
-    // harness.toml present, no harness on the PATH
+    // the configuration present, no cardinal on the PATH
     put(root.path(), CONFIG, &config);
     let empty = tempdir().unwrap();
     let hook = run_hook(&home, &root, empty.path(), &[]);
     assert_eq!(hook.code, Some(0), "{hook:?}");
     assert!(hook.stderr.contains(SKIPPED), "{hook:?}");
-    // a harness that predates `run`: its `help run` fails, as any unknown subcommand
-    let old = fake("harness", "exit 2\n");
+    // a launcher that predates `run`: its `help run` fails, as any unknown subcommand
+    let old = fake("cardinal", "exit 2\n");
     let hook = run_hook(&home, &root, old.path(), &[]);
     assert_eq!(hook.code, Some(0), "{hook:?}");
     assert!(hook.stderr.contains(SKIPPED), "{hook:?}");
@@ -184,11 +184,11 @@ fn the_hook_runs_the_review_in_a_work_tree_of_the_new_configuration() {
 
 // spec: BIN-9
 #[test]
-fn the_hook_runs_the_gate_through_cardinal_else_through_harness() {
+fn the_hook_runs_the_gate_through_cardinal_never_through_harness() {
     let home = Home::new();
     let (_source, root) = synced(&home);
-    let cardinal = fake_launcher("cardinal", 2);
-    let harness = fake_harness(0);
+    let cardinal = fake_cardinal(2);
+    let harness = fake_launcher("harness", 2);
     let both = std::env::join_paths([cardinal.path(), harness.path()]).unwrap();
 
     let hook = run_hook(&home, &root, Path::new(&both), &[]);
@@ -196,10 +196,11 @@ fn the_hook_runs_the_gate_through_cardinal_else_through_harness() {
     assert_eq!(hook.code, Some(2), "the refusal of cardinal: {hook:?}");
     assert_eq!(calls(&cardinal), "help run\nrun review-gate native\n");
     assert_eq!(calls(&harness), "");
-    // only the `harness` of before the rename
+    // only the `harness` of before the rename: skipped, as without a launcher
     let hook = run_hook(&home, &root, harness.path(), &[]);
     assert_eq!(hook.code, Some(0), "{hook:?}");
-    assert_eq!(calls(&harness), "help run\nrun review-gate native\n");
+    assert!(hook.stderr.contains(SKIPPED), "{hook:?}");
+    assert_eq!(calls(&harness), "");
 }
 
 // spec: SYN-19
@@ -216,7 +217,7 @@ fn sync_moves_a_hook_of_the_user_aside_and_the_gate_runs_it_after_the_review() {
     assert_eq!(fs::read_to_string(&chained).unwrap(), original);
     assert!(executable(&chained));
 
-    let bin = fake_harness(0);
+    let bin = fake_cardinal(0);
     let hook = run_hook(&home, &root, bin.path(), &["msg-file", "message"]);
     assert_eq!(hook.code, Some(0), "{hook:?}");
     assert_eq!(calls(&bin), "help run\nrun review-gate native\n");
@@ -233,7 +234,7 @@ fn a_refusal_of_the_gate_stops_the_commit_before_the_hook_of_the_user() {
     let (_source, root) = gated(&home);
     user_hook(&root, 0);
     home.ok(root.path(), &["sync"]);
-    let bin = fake_harness(2);
+    let bin = fake_cardinal(2);
     assert_eq!(run_hook(&home, &root, bin.path(), &[]).code, Some(2));
     assert!(get(root.path(), "ran").is_none());
 }
@@ -245,7 +246,7 @@ fn a_failure_of_the_hook_of_the_user_fails_the_commit() {
     let (_source, root) = gated(&home);
     user_hook(&root, 7);
     home.ok(root.path(), &["sync"]);
-    let bin = fake_harness(0);
+    let bin = fake_cardinal(0);
     assert_eq!(run_hook(&home, &root, bin.path(), &[]).code, Some(7));
     assert_eq!(get(root.path(), "ran").as_deref(), Some("user \n"));
 }
@@ -262,6 +263,23 @@ fn sync_never_replaces_a_chained_hook_and_fails_changing_nothing() {
     assert_ne!(sync.code, Some(0), "{sync:?}");
     assert!(sync.stderr.contains("pre-commit.user"), "{sync:?}");
     assert_eq!(snapshot(root.path()), before);
+}
+
+// spec: SYN-19, SYN-20
+#[test]
+fn a_gate_installed_before_the_rename_is_ours_and_replaced() {
+    let home = Home::new();
+    let (_source, root) = gated(&home);
+    script(
+        &pre_commit(&root),
+        "# harness: native review gate (installed by `harness sync`, do not edit)\nexit 0\n",
+    );
+    let sync = home.ok(root.path(), &["sync"]);
+    assert_eq!(sync.outcome(GATE), Some("updated"), "{sync:?}");
+    assert_eq!(sync.outcome(MOVED), None, "{sync:?}");
+    assert!(get(root.path(), ".git/hooks/pre-commit")
+        .unwrap()
+        .starts_with("#!/bin/sh\n# cardinal: native review gate"));
 }
 
 // spec: SYN-19
@@ -290,7 +308,7 @@ fn a_symlinked_hook_of_the_user_still_reaches_its_target_once_moved() {
     std::os::unix::fs::symlink("../../scripts/hook", pre_commit(&root)).unwrap();
     home.ok(root.path(), &["sync"]);
     assert!(fs::symlink_metadata(pre_commit(&root)).unwrap().is_file());
-    let bin = fake_harness(0);
+    let bin = fake_cardinal(0);
     assert_eq!(run_hook(&home, &root, bin.path(), &[]).code, Some(0));
     assert_eq!(get(root.path(), "ran").as_deref(), Some("linked\n"));
 }
@@ -472,9 +490,9 @@ fn check_reports_a_missing_or_modified_gate() {
     assert_problems(&check(&home, &root, false), &[MISSING]);
 }
 
-// spec: SYN-23
+// spec: SYN-22, SYN-23
 #[test]
-fn check_expects_the_gate_of_a_review_hook_named_before_the_rename() {
+fn a_review_hook_named_before_the_rename_gets_no_gate() {
     let home = Home::new();
     let (source, root) = gated(&home);
     let old = RECORD.replacen("cardinal", "harness", 1);
@@ -486,9 +504,9 @@ fn check_expects_the_gate_of_a_review_hook_named_before_the_rename() {
         &fragment.to_string(),
     );
     let sync = home.ok(root.path(), &["sync"]);
-    assert_eq!(sync.outcome(GATE), Some("added"), "{sync:?}");
-    fs::remove_file(pre_commit(&root)).unwrap();
-    assert_problems(&check(&home, &root, false), &[MISSING]);
+    assert_eq!(sync.outcome(GATE), None, "{sync:?}");
+    assert!(!pre_commit(&root).exists());
+    assert_problems(&check(&home, &root, false), &[]);
 }
 
 // spec: SYN-23

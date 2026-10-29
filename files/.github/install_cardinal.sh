@@ -100,6 +100,6 @@ elif [ -n "$full" ]; then
   rm -rf "$dir/.root"
   echo "$dir" >> "$GITHUB_PATH"
 else
-  # --force: over a `harness` package installed before the rename
+  # --force: over the installed `cardinal`, even of the same version
   cargo install --quiet --force --git "$cargo_url" ${rev:+--rev "$rev"} --locked
 fi

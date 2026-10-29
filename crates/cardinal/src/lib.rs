@@ -1006,7 +1006,7 @@ pub struct UpdateReport {
 }
 
 /// Move the project to `rev` of its git source (default: the head of the default branch): sync to it, then write
-/// the resolved commit to `rev` in the configuration. A conflict, an unknown revision, an unreadable source or a hook the launcher on the path refuses (`cardinal`, else `harness`, BIN-16) leave the project as it was;
+/// the resolved commit to `rev` in the configuration. A conflict, an unknown revision, an unreadable source or a hook the `cardinal` on the path refuses (BIN-16) leave the project as it was;
 /// an I/O error during the write itself is not rolled back, as for `sync`.
 ///
 /// # Errors
@@ -1118,7 +1118,7 @@ pub struct Checked {
 /// should have it and does not. Under CI (the `CI` environment variable is set) the gate is not looked at: a fresh
 /// clone has no git hooks, and nobody commits there. It also warns of what the project's settings lack: the deny rules of
 /// the review waiver (when the review hook is among the managed files), the hooks they run, the attribution turned off.
-/// A hook command whose subcommand the launcher on the path refuses (`cardinal`, else `harness`) is a problem too
+/// A hook command whose subcommand the `cardinal` on the path refuses is a problem too
 /// (BIN-15).
 ///
 /// # Errors

@@ -53,7 +53,7 @@ commits (BIN-3, BIN-5), the old transcripts and commits (EVA-5, BRE-9), the old 
    of `release.yml`, the `harness` links of `install_cardinal.sh` (keeping its fallback to the `harness` release and
    build of an old commit), the BIN-18 test; verified by `just check` and the install script tests; makes true BIN-18
    (withdrawn). ~80 lines.
-2. [ ] Drop the `harness` fallbacks: the gate script runs `cardinal` only and writes the mark
+2. [x] Drop the `harness` fallbacks: the gate script runs `cardinal` only and writes the mark
    `# cardinal: native review gate` (the old mark still recognised), `launcher::LAUNCHERS` and the "missing
    `cardinal` but `harness` there" refusal go, `gate::REVIEW_TOOLS` keeps `cardinal run review-gate` only, the
    recipe `check-harness` leaves `files/cardinal.just`; tests amended, docs (`docs/usage.md`, `docs/architecture.md`,
@@ -80,4 +80,24 @@ commits (BIN-3, BIN-5), the old transcripts and commits (EVA-5, BRE-9), the old 
 - red: none (a removal: the BIN-18 half of the BIN-17 test is dropped, no new test)
 - Code review: no findings
 - not verified: `release.yml` runs on the push to the main branch only.
+- decisions needed: none
+
+## Deliverable 2
+- done: the gate runs `cardinal` only and writes the mark `# cardinal: native review gate` (the old one still ours),
+  `check` and `update` judge the `cardinal` hooks only, the review hook is `cardinal run review-gate` only, no
+  `check-harness` recipe; both specs `accepted`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass (both `accepted`) |
+| docs | updated (usage, architecture) |
+| code review | `low`: no findings |
+
+- red: BIN-9, BIN-15, SYN-18, SYN-19, SYN-20, SYN-22, SYN-23: the gate ran `harness` when only it was installed (exit 2
+  instead of 0), `check` refused 3 hooks with only `harness` installed instead of none, the gate was written with the
+  `# harness:` mark, a `harness run review-gate` hook got a gate (`added: native review gate`).
+- Code review: no findings
+- not verified: none
 - decisions needed: none

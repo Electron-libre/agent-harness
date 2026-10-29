@@ -1,5 +1,5 @@
-//! The hook commands the installed `cardinal` (or `harness`, its name before the rename) must accept (BIN-15, BIN-16),
-//! run as the binary with fake installed launchers first on the path.
+//! The hook commands the installed `cardinal` must accept (BIN-15, BIN-16), run as the binary with a fake installed
+//! launcher first on the path.
 #![cfg(unix)]
 
 mod common;
@@ -12,10 +12,10 @@ use tempfile::{tempdir, TempDir};
 
 const SETTINGS: &str = ".claude/settings.json";
 
-/// Make the installed `harness` of `home` one that knows only the subcommand `run`, logging each call to `<home>/log`.
-fn install_harness_with_run(home: &Home) {
+/// Make the installed `cardinal` of `home` one that knows only the subcommand `run`, logging each call to `<home>/log`.
+fn install_cardinal_with_run(home: &Home) {
     home.program(
-        "harness",
+        "cardinal",
         &format!(
             "echo \"$*\" >> '{}/log'\n[ \"$1\" = help ] && [ \"$2\" = run ]\n",
             home.path().display()
@@ -24,11 +24,11 @@ fn install_harness_with_run(home: &Home) {
 }
 
 const HOOKS: &str = r#"{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
-    {"type": "command", "command": "harness run review-gate check"},
-    {"type": "command", "command": "harness 'run' quoted"},
-    {"type": "command", "command": "harness newcmd --flag"},
-    {"type": "command", "command": "sh -c 'harness newcmd'"}
-]}], "Stop": [{"hooks": [{"type": "command", "command": "harness newcmd again"}]}]}}"#;
+    {"type": "command", "command": "cardinal run review-gate check"},
+    {"type": "command", "command": "cardinal 'run' quoted"},
+    {"type": "command", "command": "cardinal newcmd --flag"},
+    {"type": "command", "command": "sh -c 'cardinal newcmd'"}
+]}], "Stop": [{"hooks": [{"type": "command", "command": "cardinal newcmd again"}]}]}}"#;
 
 /// A synced project whose settings hold `HOOKS`.
 fn project_with_hooks(home: &Home) -> (TempDir, TempDir) {
@@ -40,18 +40,18 @@ fn project_with_hooks(home: &Home) -> (TempDir, TempDir) {
 
 // spec: BIN-15
 #[test]
-fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refuses() {
+fn check_fails_on_each_hook_command_whose_subcommand_the_installed_cardinal_refuses() {
     let home = Home::new();
     let (source, root) = project_with_hooks(&home);
-    install_harness_with_run(&home);
+    install_cardinal_with_run(&home);
 
     let run = home.harness(root.path(), &["check"]);
 
     assert_eq!(run.code, Some(1), "{run:?}");
     let problems = run.lines();
     assert_eq!(problems.len(), 2, "{run:?}");
-    assert!(problems[0].contains("`harness newcmd --flag`"), "{run:?}");
-    assert!(problems[1].contains("`harness newcmd again`"), "{run:?}");
+    assert!(problems[0].contains("`cardinal newcmd --flag`"), "{run:?}");
+    assert!(problems[1].contains("`cardinal newcmd again`"), "{run:?}");
     // the install of the project's source, run from its root
     let install = format!(
         "cargo install --force --path {}/crates/cardinal --locked",
@@ -67,12 +67,6 @@ fn check_fails_on_each_hook_command_whose_subcommand_the_installed_harness_refus
 fn check_looks_at_nothing_without_a_launcher_on_the_path() {
     let home = Home::new();
     let (_source, root) = project_with_hooks(&home);
-    put(
-        root.path(),
-        SETTINGS,
-        &HOOKS.replace("harness newcmd again", "cardinal newcmd"),
-    );
-    fs::remove_file(home.path().join("bin/harness")).unwrap();
     fs::remove_file(home.path().join("bin/cardinal")).unwrap();
 
     let run = home.harness(root.path(), &["check"]);
@@ -89,36 +83,23 @@ const CARDINAL_HOOKS: &str = r#"{"hooks": {"Stop": [{"hooks": [
 
 // spec: BIN-15
 #[test]
-fn check_refuses_the_cardinal_hooks_when_only_the_harness_of_before_is_installed() {
+fn check_judges_no_harness_hook_and_no_cardinal_hook_through_the_harness_of_before() {
     let home = Home::new();
-    let (source, root) = project_with_hooks(&home);
+    let (_source, root) = project_with_hooks(&home);
     put(root.path(), SETTINGS, CARDINAL_HOOKS);
+    home.program(
+        "harness",
+        &format!("echo \"$*\" >> '{}/log'\nexit 1\n", home.path().display()),
+    );
     fs::remove_file(home.path().join("bin/cardinal")).unwrap();
 
     let run = home.harness(root.path(), &["check"]);
 
-    assert_eq!(run.code, Some(1), "{run:?}");
-    let problems = run.lines();
-    assert_eq!(problems.len(), 2, "{run:?}");
-    assert!(
-        problems[0].contains("`cardinal run review-gate check`"),
-        "{run:?}"
-    );
-    assert!(problems[1].contains("`cardinal newcmd`"), "{run:?}");
-    let install = format!(
-        "cargo install --force --path {}/crates/cardinal --locked",
-        source.path().display()
-    );
-    assert!(problems.iter().all(|p| p.contains(&install)), "{run:?}");
+    assert_eq!(run.code, Some(0), "{run:?}");
+    assert_eq!(run.stdout, "");
 
-    // a `cardinal` that knows `run` only: its unknown subcommand is refused, by it
-    home.program(
-        "cardinal",
-        &format!(
-            "echo \"$*\" >> '{}/log'\n[ \"$1\" = help ] && [ \"$2\" = run ]\n",
-            home.path().display()
-        ),
-    );
+    // a `cardinal` that knows `run` only refuses its unknown subcommand, and the `harness` hook stays unjudged
+    install_cardinal_with_run(&home);
     let run = home.harness(root.path(), &["check"]);
     assert_eq!(run.code, Some(1), "{run:?}");
     assert_eq!(run.lines().len(), 1, "{run:?}");
@@ -126,7 +107,7 @@ fn check_refuses_the_cardinal_hooks_when_only_the_harness_of_before_is_installed
     assert_eq!(get(home.path(), "log").unwrap(), "help run\nhelp newcmd\n");
 }
 
-/// A git source whose head adds the hooks `harness newcmd` and `harness newcmd other`, a project moved to its tag
+/// A git source whose head adds the hooks `cardinal newcmd` and `cardinal newcmd other`, a project moved to its tag
 /// `v1`, and the head.
 fn source_with_a_new_hook_command(home: &Home) -> (TempDir, TempDir, String) {
     let repo = tempdir().unwrap();
@@ -145,8 +126,8 @@ fn source_with_a_new_hook_command(home: &Home) -> (TempDir, TempDir, String) {
     put(
         repo.path(),
         &format!("entries/{SETTINGS}"),
-        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "harness newcmd"},
-            {"type": "command", "command": "harness newcmd other"}]}]}}"#,
+        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "cardinal newcmd"},
+            {"type": "command", "command": "cardinal newcmd other"}]}]}}"#,
     );
     put(repo.path(), "files/a.txt", "a2");
     home.git(repo.path(), &["add", "."]);
@@ -161,17 +142,17 @@ fn url(repo: &Path) -> String {
 
 // spec: BIN-16
 #[test]
-fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuses_a_hook() {
+fn update_writes_nothing_and_names_the_install_when_the_installed_cardinal_refuses_a_hook() {
     let home = Home::new();
     let (repo, root, head) = source_with_a_new_hook_command(&home);
-    install_harness_with_run(&home);
+    install_cardinal_with_run(&home);
     let (config, lock) = (get(root.path(), CONFIG), get(root.path(), LOCK));
 
     let run = home.harness(root.path(), &["update"]);
 
     assert_eq!(run.code, Some(3), "{run:?}");
-    assert!(run.stderr.contains("`harness newcmd`"), "{run:?}");
-    assert!(run.stderr.contains("`harness newcmd other`"), "{run:?}");
+    assert!(run.stderr.contains("`cardinal newcmd`"), "{run:?}");
+    assert!(run.stderr.contains("`cardinal newcmd other`"), "{run:?}");
     let install = format!(
         "cargo install --force --git {} --rev {head} --locked",
         url(repo.path())
@@ -183,8 +164,8 @@ fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuse
     assert_eq!(get(root.path(), "a.txt").as_deref(), Some("a1"));
     assert!(get(root.path(), SETTINGS).is_none());
 
-    // once the harness of the target is installed, the same update goes through
-    home.program("harness", "exit 0\n");
+    // once the cardinal of the target is installed, the same update goes through
+    home.program("cardinal", "exit 0\n");
     let run = home.ok(root.path(), &["update"]);
     assert!(run.stdout.starts_with("rev: "), "{run:?}");
     assert!(get(root.path(), CONFIG).unwrap().contains(&head), "{run:?}");
@@ -193,44 +174,10 @@ fn update_writes_nothing_and_names_the_install_when_the_installed_harness_refuse
 
 // spec: BIN-16
 #[test]
-fn update_refuses_cardinal_hooks_until_cardinal_is_installed() {
-    let home = Home::new();
-    let (repo, root, _) = source_with_a_new_hook_command(&home);
-    put(
-        repo.path(),
-        &format!("entries/{SETTINGS}"),
-        r#"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "cardinal run language-hint"}]}]}}"#,
-    );
-    home.git(repo.path(), &["commit", "--quiet", "-am", "cardinal hook"]);
-    let head = home.git(repo.path(), &["rev-parse", "HEAD"]);
-    fs::remove_file(home.path().join("bin/cardinal")).unwrap();
-    let config = get(root.path(), CONFIG);
-
-    let run = home.harness(root.path(), &["update"]);
-
-    assert_eq!(run.code, Some(3), "{run:?}");
-    assert!(
-        run.stderr.contains("`cardinal run language-hint`"),
-        "{run:?}"
-    );
-    let install = format!(
-        "cargo install --force --git {} --rev {head} --locked",
-        url(repo.path())
-    );
-    assert!(run.stderr.contains(&install), "{run:?}");
-    assert_eq!(get(root.path(), CONFIG), config);
-
-    home.program("cardinal", "exit 0\n");
-    let run = home.ok(root.path(), &["update"]);
-    assert!(get(root.path(), CONFIG).unwrap().contains(&head), "{run:?}");
-}
-
-// spec: BIN-16
-#[test]
-fn update_dry_run_warns_of_a_hook_the_installed_harness_refuses() {
+fn update_dry_run_warns_of_a_hook_the_installed_cardinal_refuses() {
     let home = Home::new();
     let (_repo, root, _head) = source_with_a_new_hook_command(&home);
-    install_harness_with_run(&home);
+    install_cardinal_with_run(&home);
     let config = get(root.path(), CONFIG);
 
     let run = home.ok(root.path(), &["update", "--dry-run"]);
@@ -241,7 +188,7 @@ fn update_dry_run_warns_of_a_hook_the_installed_harness_refuses() {
             .any(|w| w.starts_with("warning:") && w.contains(text))
     };
     assert!(
-        warned("`harness newcmd`") && warned("cargo install"),
+        warned("`cardinal newcmd`") && warned("cargo install"),
         "{run:?}"
     );
     assert_eq!(get(root.path(), CONFIG), config);
