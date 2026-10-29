@@ -40,6 +40,10 @@ settings of existing projects (owned), which the docs tell what to remove by han
    `Bash` allow rule of the seed is a `just` or `git` one; `docs/usage.md` says a project of another stack may drop
    the `cargo` rules it was seeded with and add its own (this repository keeps its own); verified by the hygiene
    test (red with the current seed); ~40 lines.
+2. [x] Fixes of the `high` review of the issue: the seed check reports an invalid seed, runs the dangerous and
+   machine path checks, and accepts only `Bash(just)`, `Bash(just …)` and the read-only `git` subcommands (any
+   tool kind); the docs paragraph names the rules `sync` adds and sits after the command table; verified by the
+   hygiene test.
 
 ## Decisions
 - Mode: autonomous
@@ -61,5 +65,24 @@ project seeded before removes by hand; `.claude/update-docs-map.md` gains the ro
 red: none traced (no spec): `FAIL - seeded allowlist has a rule of one stack (only `just` and `git`): Bash(cargo build *)` and the four other `cargo` rules
 
 Code review: no findings (low; the test change was out of its scope).
+
+not verified: none. decisions needed: none.
+
+## Summary of deliverable 2
+done: the six findings of the `high` review fixed (one shared rule check for the shared and the seeded
+allowlists, strict stack-neutral match, invalid seed reported; docs paragraph corrected and moved).
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass, no spec touched |
+| docs | `docs/usage.md` |
+| code review | low, see below |
+
+red: none traced (no spec): with `Bash(justify *)`, `Bash(git push *)`, `Bash(git reset *)` and `Read(./target/**)`
+added to the seed, the test failed on each; with an invalid seed, `FAIL - seed/.claude/settings.json is not valid JSON`
+
+Code review: no findings (low).
 
 not verified: none. decisions needed: none.

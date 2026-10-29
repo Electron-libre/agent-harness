@@ -21,6 +21,17 @@ const DANGEROUS: [&str; 10] = [
     "git add",
     "git commit",
 ];
+/// The read-only git subcommands the seeded allowlist may hold.
+const READ_ONLY_GIT: [&str; 8] = [
+    "status",
+    "diff",
+    "log",
+    "show",
+    "branch",
+    "check-ignore",
+    "grep",
+    "ls-files",
+];
 /// Interpreters, matched with their version suffix (`python3`).
 const INTERPRETERS: [&str; 4] = ["python", "node", "perl", "ruby"];
 /// Dev commands the shared allowlist must cover so the agent doesn't stop to ask.
@@ -45,6 +56,38 @@ fn allow(settings: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn read_settings(path: &Path, label: &str, failures: &mut Vec<String>) -> Value {
+    serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap_or_else(|e| {
+        failures.push(format!("{label} is not valid JSON: {e}"));
+        Value::Null
+    })
+}
+
+/// Pushes a failure for each dangerous or machine specific rule of an allowlist.
+fn check_rules(label: &str, rules: &[String], failures: &mut Vec<String>) {
+    for rule in rules {
+        if dangerous(rule) {
+            failures.push(format!("{label} has a dangerous rule: {rule}"));
+        }
+        if rule.contains("/home/") || rule.contains("~/") {
+            failures.push(format!("{label} has a machine specific path: {rule}"));
+        }
+    }
+}
+
+/// A rule of no stack: `just`, or a read-only git subcommand.
+fn stack_neutral(rule: &str) -> bool {
+    let Some(body) = rule.strip_prefix("Bash(").and_then(|b| b.strip_suffix(')')) else {
+        return false;
+    };
+    body == "just"
+        || body.starts_with("just ")
+        || body.strip_prefix("git ").is_some_and(|git| {
+            let sub = git.split_whitespace().next().unwrap_or("");
+            READ_ONLY_GIT.contains(&sub)
+        })
+}
+
 fn dangerous(rule: &str) -> bool {
     let body = rule.strip_prefix("Bash(").unwrap_or(rule);
     let words = body.split(|c: char| c.is_whitespace() || c == ')');
@@ -65,12 +108,11 @@ fn settings_hygiene() {
     let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
     let mut failures: Vec<String> = Vec::new();
 
-    let shared: Value =
-        serde_json::from_str(&fs::read_to_string(root.join(".claude/settings.json")).unwrap())
-            .unwrap_or_else(|e| {
-                failures.push(format!("settings.json is not valid JSON: {e}"));
-                Value::Null
-            });
+    let shared = read_settings(
+        &root.join(".claude/settings.json"),
+        "settings.json",
+        &mut failures,
+    );
 
     // hooks reference scripts that exist; a tool of `cardinal run` is checked by the tests of the harness source
     for event in shared["hooks"].as_object().into_iter().flatten() {
@@ -110,27 +152,20 @@ fn settings_hygiene() {
             failures.push(format!("shared allowlist does not cover `{needed}`"));
         }
     }
-    for rule in &rules {
-        if dangerous(rule) {
-            failures.push(format!("shared allowlist has a dangerous rule: {rule}"));
-        }
-        if rule.contains("/home/") || rule.contains("~/") {
-            failures.push(format!(
-                "shared allowlist has a machine specific path: {rule}"
-            ));
-        }
-    }
+    check_rules("shared allowlist", &rules, &mut failures);
 
-    // seeded allowlist: stack-neutral, the stack rules come from the project
-    let seed: Value =
-        serde_json::from_str(&fs::read_to_string(root.join("seed/.claude/settings.json")).unwrap())
-            .unwrap_or(Value::Null);
-    for rule in allow(&seed).iter().filter(|r| r.starts_with("Bash(")) {
-        if !(rule.starts_with("Bash(just") || rule.starts_with("Bash(git ")) {
-            failures.push(format!(
-                "seeded allowlist has a rule of one stack (only `just` and `git`): {rule}"
-            ));
-        }
+    // seeded allowlist: stack-neutral (`just`, read-only `git`), the stack rules come from the project
+    let seed = read_settings(
+        &root.join("seed/.claude/settings.json"),
+        "seed/.claude/settings.json",
+        &mut failures,
+    );
+    let seeded = allow(&seed);
+    check_rules("seeded allowlist", &seeded, &mut failures);
+    for rule in seeded.iter().filter(|r| !stack_neutral(r)) {
+        failures.push(format!(
+            "seeded allowlist has a rule that is not `just` or read-only `git`: {rule}"
+        ));
     }
 
     // personal file: git-ignored, no dangerous rule left behind

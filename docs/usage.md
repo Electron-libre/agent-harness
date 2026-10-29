@@ -20,13 +20,14 @@ cardinal run <tool> [args]
 | `check` | fails when a managed file was modified or deleted, the git review gate is missing, or a hook runs a `cardinal` subcommand the installed one refuses. It warns when `.claude/settings.json` lacks a deny rule of the review waiver, runs a missing hook or leaves the attribution on, and when Claude Code keeps the transcripts less than a year (`sync` and `update` warn too). |
 | `run` | runs a tool of Cardinal with the binary of the pinned revision, fetched (release asset) or built once into the cache; `cardinal run` alone lists the tools. |
 
+The seeded `.claude/settings.json` allows no command of a stack: `just` and the read-only `git` commands, next to
+the rules `sync` manages (`cardinal run`, the deny rules of the review waiver). The project adds the rules of its own
+stack (`cargo test`, `npm test`…), or runs them through `just`. A project seeded before allows `cargo build`, `cargo
+test`, `cargo clippy`, `cargo fmt` and `cargo check`: it owns the file, so a project of another stack removes them by
+hand.
+
 With a local directory source (this repository), `cardinal run` builds the source's crate with `cargo`, so a hook runs
 the tools of the working tree, or of the last build that compiled.
-
-The seeded `.claude/settings.json` allows `just` and the read-only `git` commands only: the project adds the rules
-of its own stack (`cargo test`, `npm test`…), or runs them through `just`. A project seeded before allows `cargo
-build`, `cargo test`, `cargo clippy`, `cargo fmt` and `cargo check`: it owns the file, so a project of another stack
-removes them by hand.
 
 ### The installed launcher
 
