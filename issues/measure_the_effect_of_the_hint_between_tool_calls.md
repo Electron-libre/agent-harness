@@ -7,7 +7,7 @@ before a tool call is not in the `user_language`. Measure whether the share of s
 it.
 
 # Findings
-* Baseline of 2026-10-29 (`issues/judge_the_text_blocks_between_tool_calls.md`, `### Baseline`): before the Stop hook,
+* Baseline of 2026-10-29 (`issues/done/judge_the_text_blocks_between_tool_calls.md`, `### Baseline`): before the Stop hook,
   9 of 89 sessions breached (21 breaches: 2 final, 19 intermediate); with the Stop hook, 4 of 29 (4 intermediate),
   revisions split by `git merge-base --is-ancestor ad56d2a <revision>`.
 * `rule-breaches` marks each `user-language` breach `hinted`, `final` or `intermediate` (BRE-13). The hint shows in a
@@ -27,7 +27,7 @@ it.
    when a change is needed.
 
 # Resources
-* `issues/judge_the_text_blocks_between_tool_calls.md` (the baseline and the decisions)
+* `issues/done/judge_the_text_blocks_between_tool_calls.md` (the baseline and the decisions)
 * `issues/done/measure_the_effect_of_the_language_hint.md` (the method of the previous measure)
 * `specs/language-hint.md`, `specs/rule-breaches.md` (BRE-10, BRE-13), `skill:evaluate-harness`
 

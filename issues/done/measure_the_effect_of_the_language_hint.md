@@ -63,7 +63,7 @@ change in this issue: the outcome is the decision and, when the hook stays, the 
 2. [x] Fix the findings of the `high` review of the issue; verified by `just check-issue` and `just next-issue`.
 
 ## Deliverable 1
-- done: decision recorded (keep the hook); follow-up `issues/judge_the_text_blocks_between_tool_calls.md`, ranked 2nd.
+- done: decision recorded (keep the hook); follow-up `issues/done/judge_the_text_blocks_between_tool_calls.md`, ranked 2nd.
 
 | check | result |
 |---|---|

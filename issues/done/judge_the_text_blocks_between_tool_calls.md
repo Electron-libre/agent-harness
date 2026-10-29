@@ -189,3 +189,4 @@ Revisions split by `git merge-base --is-ancestor ad56d2a <revision>`, on the tra
 - Tools (3 a): every tool, no matcher.
 - Cost (asked at validation): no token while the language is kept, one line of ~40 tokens per turn at most; ~40 ms
   per tool call measured on a 14 MB transcript with the Stop mode, accepted.
+- Closed: 2026-10-29, every deliverable done; the measure after the change is `issues/measure_the_effect_of_the_hint_between_tool_calls.md`.
