@@ -1,7 +1,9 @@
-//! `lint-gate`, the Stop hook: if Rust files changed, clippy must be warning-free before the agent can finish.
-//! Exit 2 sends clippy's diagnostics back to the agent so it fixes the code: one line each (file, line, column,
-//! message), at most `MAX_DIAGNOSTICS`, since every line is billed to the agent. A passing run stamps the Rust state
-//! in the git directory, and clippy does not run again until that state changes. When the agent already retried once
+//! `lint-gate`, the Stop hook: if the code changed, the project's lint must pass before the agent can finish. The lint
+//! is the `lint_command` of `.claude/cardinal.toml` over the files named like its `lint_files`, else clippy over the
+//! `.rs` files. Exit 2 sends the problems back to the agent so it fixes the code: clippy's diagnostics one line each
+//! (file, line, column, message), any other lint's first lines, at most `MAX_DIAGNOSTICS`, since every line is billed
+//! to the agent. A passing run stamps the lint state in the git directory, and the lint does not run again until that
+//! state changes. When the agent already retried once
 //! (`stop_hook_active`), let go to avoid an endless loop. It checks the work tree of the event's `cwd` (an agent that
 //! entered an issue worktree is checked there), at the place `CLAUDE_PROJECT_DIR` has in its own. Spec:
 //! `specs/lint-gate.md`.
@@ -59,8 +61,63 @@ fn work_tree(event: &serde_json::Value) -> String {
         .into_owned()
 }
 
-/// The changed and untracked `.rs` files, outside the `.claude` directories whose scripts are not crate code.
-fn changed_rust_files(dir: &str) -> Vec<String> {
+/// The lint of a project: the command it declares, run by `sh -c`, or clippy (`None`), and the file-name patterns of
+/// the files it checks, every file when empty (CLG-7).
+struct Lint {
+    command: Option<String>,
+    patterns: Vec<String>,
+}
+
+/// The lint declared in the `.claude/cardinal.toml` of the work tree of `dir`; clippy over `*.rs` when it declares no
+/// `lint_command`, or when the file is missing, does not parse or gives a key of another type.
+fn lint_of(dir: &str) -> Lint {
+    let clippy = Lint {
+        command: None,
+        patterns: vec!["*.rs".into()],
+    };
+    let root = git(dir, &["rev-parse", "--show-toplevel"]);
+    let Ok(table) = std::fs::read_to_string(crate::config_of(Path::new(root.trim())))
+        .unwrap_or_default()
+        .parse::<toml::Table>()
+    else {
+        return clippy;
+    };
+    let project = table.get("project");
+    let Some(command) = project
+        .and_then(|p| p.get("lint_command"))
+        .and_then(toml::Value::as_str)
+    else {
+        return clippy;
+    };
+    let patterns = match project.and_then(|p| p.get("lint_files")) {
+        None => Vec::new(),
+        Some(files) => match files.as_array().and_then(|a| {
+            a.iter()
+                .map(|v| v.as_str().map(String::from))
+                .collect::<Option<Vec<_>>>()
+        }) {
+            Some(patterns) => patterns,
+            None => return clippy,
+        },
+    };
+    Lint {
+        command: Some(command.into()),
+        patterns,
+    }
+}
+
+/// Whether the lint checks the file `path`: its name matches one of the patterns, or there are none.
+fn checks(patterns: &[String], path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    patterns.is_empty()
+        || patterns
+            .iter()
+            .any(|p| super::check_specs::name_matches(p, name))
+}
+
+/// The changed and untracked files the lint checks, outside the `.claude` directories whose scripts are not project
+/// code.
+fn changed_files(dir: &str, patterns: &[String]) -> Vec<String> {
     let status = git(
         dir,
         &["status", "--porcelain", "-z", "--untracked-files=all"],
@@ -77,19 +134,17 @@ fn changed_rust_files(dir: &str) -> Vec<String> {
         files.extend(
             paths
                 .into_iter()
-                .filter(|p| {
-                    Path::new(p).extension().is_some_and(|e| e == "rs")
-                        && !p.split('/').any(|c| c == ".claude")
-                })
+                .filter(|p| checks(patterns, p) && !p.split('/').any(|c| c == ".claude"))
                 .map(String::from),
         );
     }
     files
 }
 
-/// A hash of what clippy sees of the Rust code: the commit, and the path and content of each changed `.rs` file.
-fn rust_state(dir: &str, files: &[String]) -> String {
+/// A hash of what the lint sees: its command, the commit, and the path and content of each changed file it checks.
+fn lint_state(dir: &str, command: Option<&str>, files: &[String]) -> String {
     let mut hasher = DefaultHasher::new();
+    command.hash(&mut hasher);
     git(dir, &["rev-parse", "HEAD"]).hash(&mut hasher);
     for file in files {
         file.hash(&mut hasher);
@@ -125,11 +180,13 @@ pub(super) fn main(_args: &[String]) -> u8 {
         return 0;
     }
     let dir = work_tree(&event);
-
-    if !Path::new(&dir).join("Cargo.toml").exists() {
-        return 0;
+    let lint = lint_of(&dir);
+    match lint.command.as_deref() {
+        Some("") => return 0,
+        None if !Path::new(&dir).join("Cargo.toml").exists() => return 0,
+        _ => {}
     }
-    let files = changed_rust_files(&dir);
+    let files = changed_files(&dir, &lint.patterns);
     if files.is_empty() {
         return 0;
     }
@@ -139,15 +196,64 @@ pub(super) fn main(_args: &[String]) -> u8 {
             "rev-parse",
             "--path-format=absolute",
             "--git-path",
-            "claude-clippy-pass",
+            "claude-lint-pass",
         ],
     );
     let stamp = stamp.trim();
-    let state = rust_state(&dir, &files);
+    let state = lint_state(&dir, lint.command.as_deref(), &files);
     if !stamp.is_empty() && std::fs::read_to_string(stamp).is_ok_and(|s| s == state) {
         return 0;
     }
+    let passed = match &lint.command {
+        Some(command) => run_declared(&dir, command),
+        None => run_clippy(&dir),
+    };
+    if !passed {
+        return 2;
+    }
+    if !stamp.is_empty() {
+        let _ = std::fs::write(stamp, state);
+    }
+    0
+}
 
+/// Run the declared lint `command`; when it fails, report its first non-blank lines, standard output first (CLG-8).
+fn run_declared(dir: &str, command: &str) -> bool {
+    let Ok(out) = Command::new("sh")
+        .args(["-c", command])
+        .current_dir(dir)
+        .output()
+    else {
+        eprintln!("cannot run `sh -c {command}`");
+        return false;
+    };
+    if out.status.success() {
+        return true;
+    }
+    let (stdout, stderr) = (
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    let lines: Vec<&str> = stdout
+        .lines()
+        .chain(stderr.lines())
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+    eprintln!("`{command}` reports problems; fix them (the project must stay warning-free):");
+    for line in lines.iter().take(MAX_DIAGNOSTICS) {
+        eprintln!("{line}");
+    }
+    if lines.len() > MAX_DIAGNOSTICS {
+        eprintln!(
+            "... {} more lines (run `{command}` for the rest)",
+            lines.len() - MAX_DIAGNOSTICS
+        );
+    }
+    false
+}
+
+/// Run clippy; when it fails, report its diagnostics one line each (CLG-2, CLG-3).
+fn run_clippy(dir: &str) -> bool {
     let clippy = Command::new("cargo")
         .args([
             "clippy",
@@ -158,14 +264,11 @@ pub(super) fn main(_args: &[String]) -> u8 {
             "-D",
             "warnings",
         ])
-        .current_dir(&dir)
+        .current_dir(dir)
         .output()
         .expect("cargo must be installed");
     if clippy.status.success() {
-        if !stamp.is_empty() {
-            let _ = std::fs::write(stamp, state);
-        }
-        return 0;
+        return true;
     }
 
     let stderr = String::from_utf8_lossy(&clippy.stderr);
@@ -202,5 +305,5 @@ pub(super) fn main(_args: &[String]) -> u8 {
             );
         }
     }
-    2
+    false
 }

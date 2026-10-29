@@ -39,7 +39,8 @@ hash differs from the lock was edited locally: `sync` reports a conflict instead
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/cardinal.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`, `internal_dirs`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
+(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`, `internal_dirs`), the hooks the project's commands
+(`lint_command`, `lint_files`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
@@ -125,7 +126,7 @@ jobs need no Rust when the source publishes the commit.
 | `PostToolUse` | `Skill` | `review-gate record` | records what the code review saw | [`review-gate.md`](../specs/review-gate.md) |
 | `PostToolUse` | `Edit\|Write` | `format-code` | `cargo fmt` the project of an edited `.rs` file | |
 | `PostToolUse` | | `language-hint` | adds a context, once per turn, when the text written before the call is not in the `user_language` | [`language-hint.md`](../specs/language-hint.md) |
-| `Stop` | | `lint-gate` | blocks the end of a turn while clippy reports a problem | [`lint-gate.md`](../specs/lint-gate.md) |
+| `Stop` | | `lint-gate` | blocks the end of a turn while the project's lint (else clippy) reports a problem | [`lint-gate.md`](../specs/lint-gate.md) |
 | `Stop` | | `language-hint` | sends the agent back once when its last reply is not in the `user_language`, judged as rule `user-language` of `rule-breaches` (`tools/language.rs`) | [`language-hint.md`](../specs/language-hint.md) |
 | git `pre-commit` | | `review-gate native` | refuses a commit whose diff the review never saw | [`review-gate.md`](../specs/review-gate.md) REV-9 |
 
@@ -197,11 +198,14 @@ sequenceDiagram
   no gate and no error. `.git/hooks` is not cloned, so each clone needs its own `sync`. A
   missing `cardinal`, or a launcher that cannot run the tool (exit 3), is a warning, not a refusal.
 
-### The Rust hooks
+### The code hooks
 
-`lint-gate` runs `cargo clippy` at the end of a turn only in a project with a `Cargo.toml` and a changed `.rs` file
-outside the `.claude` directories, and only when the Rust state changed since the last passing run (CLG-1, CLG-4). What
-it prints is billed to the agent at each turn, so it sends one short line per diagnostic, at most 40 (CLG-2, CLG-3).
+`lint-gate` runs at the end of a turn the `lint_command` of `.claude/cardinal.toml` (by `sh -c`, from the project
+directory) when a file named like one of its `lint_files` changed outside the `.claude` directories, else `cargo clippy`
+in a project with a `Cargo.toml` and a changed `.rs` file; in both cases only when the lint state (command, commit,
+changed files) changed since the last passing run (CLG-1, CLG-4, CLG-7). What it prints is billed to the agent at each
+turn: one short line per clippy diagnostic, at most 40 (CLG-2, CLG-3), the first 40 non-blank lines of another lint
+(CLG-8). An empty `lint_command` turns the gate off.
 
 The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session that entered another worktree keeps it on the
 main one, where another agent may work. `lint-gate` checks the work tree of the event's `cwd` (CLG-6) and

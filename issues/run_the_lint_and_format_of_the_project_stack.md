@@ -50,7 +50,7 @@ per project (one command, the project chains them), parsing a non-clippy output 
    format 4 with `migrations/4.toml` naming the old names, ADR 0014/0017; `specs/clippy-gate.md` → `specs/lint-gate.md`,
    ids kept; PAR-12, docs), no behaviour change; verified by `rust_hooks` and the migration/format tests; makes true none
    (rename). ~350 lines.
-2. [ ] Generic lint gate: `lint_command`, `lint_files`, the stamp over the declared patterns and the command, output cut
+2. [x] Generic lint gate: `lint_command`, `lint_files`, the stamp over the declared patterns and the command, output cut
    to 40 lines, clippy kept as default; verified by tests with a fake linter; makes true CLG-1, CLG-4, CLG-5, CLG-7,
    CLG-8. ~400 lines.
 3. [ ] Generic format hook: `format_command`, `format_files`, file appended, run from the work tree root, silent;
@@ -72,4 +72,14 @@ per project (one command, the project chains them), parsing a non-clippy output 
 - red: none (rename, no new behaviour; `rust_hooks` and `migration_cli` adapted).
 - Code review: no findings
 - not verified: a consumer on the format 3 updated to this revision (the migration warnings were seen here only).
+- decisions needed: none.
+
+## Deliverable 2
+- done: `lint-gate` runs the `lint_command` over the `lint_files` of `.claude/cardinal.toml`, clippy staying the
+  default; the stamp hashes the command too (`claude-lint-pass`); seed, README and architecture document the keys.
+- check | result: tests ok, lint ok, specs ok (`lint-gate.md` accepted), docs ok, code review: see below.
+- red: CLG-1, CLG-4, CLG-5, CLG-7, CLG-8: `assertion left == right failed: left (0, 0) right (0, 1)`, the declared
+  lint never ran.
+- Code review: no findings
+- not verified: a real linter (eslint, ruff) in a consumer.
 - decisions needed: none.

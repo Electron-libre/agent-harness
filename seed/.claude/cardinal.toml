@@ -13,6 +13,10 @@ skipped_dirs = []
 # spec_files = ["*.rs"]
 # Directories whose tests call the code from inside, for the boundary warning of `check-specs` (default ["src"]).
 # internal_dirs = ["src"]
+# The lint the Stop hook `lint-gate` runs (`sh -c`, from the project directory) while a file named like one of
+# `lint_files` changed (every file when absent); without it, `cargo clippy` over the `.rs` files; "" turns it off.
+# lint_command = "npx eslint ."
+# lint_files = ["*.ts", "*.tsx"]
 # Where the agent finds the context of the project (issue-workflow, create-issue, prioritize-issues).
 roadmap = ["docs/TODO.md"]
 architecture = "docs/architecture.md"

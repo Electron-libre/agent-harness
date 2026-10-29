@@ -1,6 +1,6 @@
 ---
 id: CLG
-status: draft
+status: accepted
 adrs: [0005]
 ---
 
