@@ -72,7 +72,7 @@ breaches apart. Out of scope: the measure after the change, which needs sessions
    lists on the transcripts kept, recorded here; verified by a `rule-breaches` test; makes true BRE-13.
 3. [x] `PostToolUse` mode of `language-hint`, declared for every tool in `entries/.claude/settings.json`, synced and
    installed; verified by `language-hint` tests through the binary; makes true LNG-1, LNG-2, LNG-5, LNG-7 to LNG-10.
-4. [ ] Follow-up issue to measure the change once sessions ran with it (`skill:create-issue`); verified by its checker.
+4. [x] Follow-up issue to measure the change once sessions ran with it (`skill:create-issue`); verified by its checker.
 
 ## Deliverable 1
 - done: `an` and `as` left the English list; `user_language` read without case (`french` works).
@@ -136,6 +136,20 @@ Revisions split by `git merge-base --is-ancestor ad56d2a <revision>`, on the tra
 - Code review: no findings (`low`)
 - not verified: that Claude Code shows the added context to the model in a real session (the formatter's context
   shows as `hook_additional_context`, the same channel); the follow-up measure checks it in the transcripts
+- decisions needed: none
+
+## Deliverable 4
+- done: `issues/measure_the_effect_of_the_hint_between_tool_calls.md`, ranked 6th (after the other stacks, so
+  sessions have run with the hint).
+
+| check | result |
+|---|---|
+| `just check-issue` | pass |
+| `just next-issue` | no drift |
+
+- red: none (issue files only)
+- Code review: no findings (`low`; issue files only)
+- not verified: none
 - decisions needed: none
 
 ## Decisions
