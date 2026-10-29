@@ -51,3 +51,11 @@ reaching the local-path branch and exiting 0. Out of scope: any other check of t
 - Code review: no findings
 - not verified: a real GitHub Actions run
 - decisions needed: none
+
+## High review of the issue
+- Code review: 6 findings
+  - 1-4 (empty `source` past the guard: no key, single-quoted literal, unreadable file; no test of it): outside this
+    issue's requirement, filed as `issues/fail_the_ci_installer_when_the_source_is_empty.md`.
+  - 5 (the `*)` branch still exits 0 on stdout): not fixed, intended for a real local path outside the repository.
+  - 6 (no fix hint in the message): not fixed, the message names the project-owned file to restore.
+- Done: no code change left.
