@@ -70,7 +70,7 @@ breaches apart. Out of scope: the measure after the change, which needs sessions
    verified by tests through the binaries of `rule-breaches` and `language-hint`; makes true BRE-10.
 2. [x] Kinds of language breach: `detail` `hinted`, `final` or `intermediate`, then the baseline re-run with the new
    lists on the transcripts kept, recorded here; verified by a `rule-breaches` test; makes true BRE-13.
-3. [ ] `PostToolUse` mode of `language-hint`, declared for every tool in `entries/.claude/settings.json`, synced and
+3. [x] `PostToolUse` mode of `language-hint`, declared for every tool in `entries/.claude/settings.json`, synced and
    installed; verified by `language-hint` tests through the binary; makes true LNG-1, LNG-2, LNG-5, LNG-7 to LNG-10.
 4. [ ] Follow-up issue to measure the change once sessions ran with it (`skill:create-issue`); verified by its checker.
 
@@ -116,6 +116,27 @@ Revisions split by `git merge-base --is-ancestor ad56d2a <revision>`, on the tra
   changes no count here.
 * The counts differ from the table of 2026-10-29 (72 and 32 sessions applied) by the grouping above and the sessions
   run since; the comparison of the follow-up measure starts from this table.
+
+## Deliverable 3
+- done: `language-hint` judges the text before a tool call on `PostToolUse` (every tool) and adds one context per
+  turn; it reads only the lines of the turn, without parsing tool results or other attachments; declared in
+  `entries/.claude/settings.json`, synced; both specs `accepted`.
+
+| check | result |
+|---|---|
+| `just check` | pass |
+| `just check-cardinal` | pass, no install asked |
+| live run (`cardinal run language-hint`, crafted transcript) | added context printed, exit 0 |
+| time per call, 14 MB transcript | ~25 ms with a release binary (consumers); ~150 ms through `cardinal run` here (debug build of the local source) |
+| docs | `docs/architecture.md` (hooks table, readers table for BRE-13), `README.md` (Gates) |
+| code review | `low`, see below |
+
+- red: LNG-7, LNG-8, LNG-9: the tests got `code: Some(2)` and the Stop hint on stderr instead of an added context
+  (the event was judged as a Stop).
+- Code review: no findings (`low`)
+- not verified: that Claude Code shows the added context to the model in a real session (the formatter's context
+  shows as `hook_additional_context`, the same channel); the follow-up measure checks it in the transcripts
+- decisions needed: none
 
 ## Decisions
 - Mode: autonomous

@@ -1,6 +1,6 @@
 ---
 id: LNG
-status: draft
+status: accepted
 adrs: [0005]
 ---
 

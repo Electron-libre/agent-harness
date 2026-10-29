@@ -1,7 +1,9 @@
-//! `language-hint`, a Stop hook: when the last reply of the agent is not in the `user_language` of
-//! `.claude/cardinal.toml`, as the test of rule `user-language` judges it (`language.rs`), exit 2 with a one-line hint
-//! so the agent gives it again in that language. It lets go when the agent already retried (`stop_hook_active`) and
-//! whenever the reply cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
+//! `language-hint`, a Stop and `PostToolUse` hook: when the text of the agent is not in the `user_language` of
+//! `.claude/cardinal.toml`, as the test of rule `user-language` judges it (`language.rs`), it hints at that language.
+//! At Stop it judges the last reply and exits 2 with a one-line hint so the agent gives it again, letting go once the
+//! agent retried (`stop_hook_active`). After a tool call it judges the text written before the call and adds a
+//! one-line context, once per turn, so the next texts are in that language; the call never fails. It lets go whenever
+//! the text cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
 use super::language::{Language, HINT_MARK};
 use super::transcripts::{git, typed_text};
@@ -60,12 +62,118 @@ fn reply(event: &Value) -> Option<String> {
     last_text(&std::fs::read_to_string(event["transcript_path"].as_str()?).ok()?)
 }
 
+/// The text blocks written before the `tool_use` block `id`, back to the previous tool result or typed message,
+/// joined by a blank line; `None` when the call is not in the transcript or another call of the same message comes
+/// between those texts and it (LNG-7).
+fn text_before_call(lines: &[Value], id: &str) -> Option<String> {
+    let mut texts = Vec::new();
+    let mut found = false;
+    for line in lines.iter().rev() {
+        if line["type"] == "user" {
+            if !found {
+                continue;
+            }
+            let content = line["message"]["content"].as_array();
+            let result = content
+                .into_iter()
+                .flatten()
+                .any(|b| b["type"] == "tool_result");
+            if result || typed_text(line).is_some() {
+                break;
+            }
+            continue;
+        }
+        if line["type"] != "assistant" {
+            continue;
+        }
+        let blocks = line["message"]["content"].as_array();
+        for block in blocks.into_iter().flatten().rev() {
+            match block["type"].as_str() {
+                Some("tool_use") if !found => found = block["id"] == id,
+                Some("tool_use") => return None,
+                Some("text") if found => texts.extend(block["text"].as_str()),
+                _ => {}
+            }
+        }
+    }
+    texts.reverse();
+    (found && !texts.is_empty()).then(|| texts.join("\n\n"))
+}
+
+/// Whether a hint of this hook was added since the last message the user typed (LNG-8).
+fn hinted_this_turn(lines: &[Value]) -> bool {
+    for line in lines.iter().rev() {
+        if typed_text(line).is_some() {
+            return false;
+        }
+        let attachment = &line["attachment"];
+        if line["type"] == "attachment"
+            && attachment["type"] == "hook_additional_context"
+            && attachment["content"].to_string().contains(HINT_MARK)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// The `PostToolUse` mode: the text before the call, judged once per turn, gets an added context (LNG-7 to LNG-10).
+fn after_call(event: &Value, language: Language) -> u8 {
+    let (Some(path), Some(id)) = (
+        event["transcript_path"].as_str(),
+        event["tool_use_id"].as_str(),
+    ) else {
+        return 0;
+    };
+    let Ok(transcript) = std::fs::read_to_string(path) else {
+        return 0;
+    };
+    // the lines of the turn only, read back from the end: a long session holds megabytes of earlier turns, and a
+    // long turn megabytes of tool results, which only mark where the text before a call starts
+    let mut lines: Vec<Value> = Vec::new();
+    for line in transcript.lines().rev() {
+        if line.contains(r#""type":"tool_result""#) {
+            lines.push(serde_json::json!({"type": "user", "message": {"content": [{"type": "tool_result"}]}}));
+            continue;
+        }
+        if line.contains(r#""type":"attachment""#) && !line.contains(HINT_MARK) {
+            continue;
+        }
+        let Ok(line) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let typed = typed_text(&line).is_some();
+        lines.push(line);
+        if typed {
+            break;
+        }
+    }
+    lines.reverse();
+    if hinted_this_turn(&lines)
+        || text_before_call(&lines, id).and_then(|text| language.breached_by(&text)) != Some(true)
+    {
+        return 0;
+    }
+    let name = language.name;
+    let hint = format!(
+        "Your text before this tool call is not in {name}, {HINT_MARK}: write your next texts to the user in {name}."
+    );
+    let output = serde_json::json!({
+        "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": hint}
+    });
+    println!("{output}");
+    0
+}
+
 pub(super) fn main(_args: &[String]) -> u8 {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).ok();
     let Ok(event) = serde_json::from_str::<Value>(&input) else {
         return 0;
     };
+    if event["hook_event_name"] == "PostToolUse" {
+        return user_language(&event).map_or(0, |language| after_call(&event, language));
+    }
     if event["stop_hook_active"].as_bool().unwrap_or(false) {
         return 0;
     }

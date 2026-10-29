@@ -124,6 +124,7 @@ jobs need no Rust when the source publishes the commit.
 | `PreToolUse` | `Bash` | `review-gate check` | refuses a command that would skip the git hook | [`review-gate.md`](../specs/review-gate.md) REV-12 |
 | `PostToolUse` | `Skill` | `review-gate record` | records what the code review saw | [`review-gate.md`](../specs/review-gate.md) |
 | `PostToolUse` | `Edit\|Write` | `format-rust` | `cargo fmt` the project of an edited `.rs` file | |
+| `PostToolUse` | | `language-hint` | adds a context, once per turn, when the text written before the call is not in the `user_language` | [`language-hint.md`](../specs/language-hint.md) |
 | `Stop` | | `clippy-gate` | blocks the end of a turn while clippy reports a problem | [`clippy-gate.md`](../specs/clippy-gate.md) |
 | `Stop` | | `language-hint` | sends the agent back once when its last reply is not in the `user_language`, judged as rule `user-language` of `rule-breaches` (`tools/language.rs`) | [`language-hint.md`](../specs/language-hint.md) |
 | git `pre-commit` | | `review-gate native` | refuses a commit whose diff the review never saw | [`review-gate.md`](../specs/review-gate.md) REV-9 |
@@ -237,7 +238,7 @@ flowchart LR
 | Reader | One row per | Measures | Spec |
 |---|---|---|---|
 | `session-metrics` | session | tokens, the peak of the main context (sub-agents apart), turns, tool calls, hook refusals, skill calls, typed messages | [`evaluation.md`](../specs/evaluation.md) |
-| `rule-breaches` | finding (`--summary`: rule and revision) | the rules a program can check, `breach` or `blocked` | [`rule-breaches.md`](../specs/rule-breaches.md) |
+| `rule-breaches` | finding (`--summary`: rule and revision) | the rules a program can check, `breach` or `blocked`; a language breach is `hinted`, `final` or `intermediate` | [`rule-breaches.md`](../specs/rule-breaches.md) |
 | `delivered-quality` | done issue (`--summary`: revision) | deliverables, fixes inside and after, review findings, failed checks, traced ids | [`delivered-quality.md`](../specs/delivered-quality.md) |
 | `fixed-context` | project and revision | the bytes every session pays before any work, the skills shipped | [`cardinal-report.md`](../specs/cardinal-report.md) |
 | `cardinal-changes` | expected effect of a change | the `Expected-effect` lines of the commits of `files/`, the revisions in use that hold each | [`cardinal-verdicts.md`](../specs/cardinal-verdicts.md) |

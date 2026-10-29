@@ -67,6 +67,14 @@
             "command": "cardinal run format-rust"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cardinal run language-hint"
+          }
+        ]
       }
     ],
     "Stop": [
