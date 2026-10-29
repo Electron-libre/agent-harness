@@ -39,7 +39,7 @@ hash differs from the lock was edited locally: `sync` reports a conflict instead
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/cardinal.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
+(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`, `internal_dirs`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.

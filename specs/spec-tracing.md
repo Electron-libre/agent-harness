@@ -1,6 +1,6 @@
 ---
 id: TRC
-status: draft
+status: accepted
 adrs: []
 ---
 
@@ -31,7 +31,7 @@ stable, not required: an internal test is the proof when its citation gives the 
 - **TRC-12** (deterministic) The checker must read as a citation a line whose trimmed text starts with the line-comment marker of its file's extension followed by ` spec:`: `//` for `rs`, `ts`, `tsx`, `js`, `jsx`, `mjs`, `cjs`, `go`, `java`, `kt`, `kts`, `scala`, `swift`, `c`, `cc`, `cpp`, `h`, `hpp`, `cs`, `dart` and `php`; `#` for `py`, `sh`, `bash`, `zsh`, `bats`, `rb`, `pl`, `r` (either case), `ex`, `exs` and `nix`; `--` for `lua`, `sql`, `hs` and `elm`; `;` for `clj`, `cljs`, `lisp`, `el`, `scm` and `rkt`; any of the four for another extension.
 - **TRC-13** (deterministic) The checker must report as a problem, naming its file and line, a citation of a file other than a `.rs` one whose next line, past the comment lines (any marker of TRC-12) and the decorator lines (trimmed text starting with `@`), is blank or missing; a citation of a `.rs` file keeps the rule of `specs/README.md`, a `fn` past the attributes and comments.
 - **TRC-14** (deterministic) When `.claude/cardinal.toml` sets `internal_dirs`, the checker must count as calling the code from inside (TRC-1 to TRC-6) the tests under a directory named like one of its entries, instead of those under a `src` directory.
-- **TRC-15** (deterministic) The checker must report as a problem a pattern of `spec_files` that holds a `/` or a `\`, naming the pattern.
+- **TRC-15** (deterministic) The checker must report as a problem a pattern of `spec_files` or an entry of `internal_dirs` that holds a `/` or a `\`, naming it.
 
 ## Scenarios
 
@@ -71,7 +71,8 @@ stable, not required: an internal test is the proof when its citation gives the 
   fails naming the file and line.
 - (TRC-14) Given `internal_dirs = ["lib"]`, `SYN-1` cited only in `lib/a_test.py` and `SYN-2` only in `src/b_test.py`,
   when the checker runs, then the boundary warning names `SYN-1` alone.
-- (TRC-15) Given `spec_files = ["tests/*.py"]`, when the checker runs, then it fails naming `tests/*.py`.
+- (TRC-15) Given `spec_files = ["tests/*.py"]`, when the checker runs, then it fails naming `tests/*.py`; given
+  `internal_dirs = ["tests/unit"]`, it fails naming `tests/unit`.
 
 ## Non-goals
 

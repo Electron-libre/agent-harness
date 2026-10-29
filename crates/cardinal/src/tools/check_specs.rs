@@ -636,7 +636,18 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
             }
         }
     }
-    boundary_warnings(&specs, &cited);
+    // `internal_dirs` replaces `src` when set (TRC-14); a `cardinal.toml` that does not parse is already a problem
+    let mut internal = super::config_list(root, "internal_dirs").unwrap_or_default();
+    for d in internal.iter().filter(|d| d.contains(['/', '\\'])) {
+        out.push(format!(
+            "{}: `internal_dirs` entry `{d}` must be a directory name, not a path",
+            crate::config_of(root).display()
+        ));
+    }
+    if internal.is_empty() {
+        internal.push("src".to_string());
+    }
+    boundary_warnings(&specs, &cited, &internal);
     out
 }
 
@@ -645,15 +656,27 @@ fn is_managed(file: &str) -> bool {
     file.replace('\\', "/").starts_with(".claude/")
 }
 
-/// Whether a test file calls the code from inside: it sits under a `src` directory, outside the managed tests
-/// (TRC-1, TRC-5).
-fn is_internal(file: &str) -> bool {
-    !is_managed(file) && Path::new(file).components().any(|c| c.as_os_str() == "src")
+/// Whether a test file calls the code from inside: it sits under a directory named like one of `internal`, outside
+/// the managed tests (TRC-1, TRC-5, TRC-14).
+fn is_internal(file: &str, internal: &[String]) -> bool {
+    !is_managed(file)
+        && Path::new(file)
+            .components()
+            .any(|c| internal.iter().any(|d| c.as_os_str() == d.as_str()))
 }
 
 /// Warn, per spec, of the cited requirements whose every citation is internal, one at least giving no reason
-/// (TRC-1 to TRC-4, TRC-6).
-fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<Cite>>) {
+/// (TRC-1 to TRC-4, TRC-6), the internal ones being under a directory named like one of `internal_dirs`.
+fn boundary_warnings(
+    specs: &[Spec],
+    cited: &BTreeMap<String, Vec<Cite>>,
+    internal_dirs: &[String],
+) {
+    let dirs = internal_dirs
+        .iter()
+        .map(|d| format!("`{d}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
     for spec in specs {
         let internal: Vec<&str> = spec
             .requirements
@@ -661,7 +684,8 @@ fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<Cite>>) {
             .filter(|r| !r.exempt)
             .filter(|r| {
                 cited.get(&r.id).is_some_and(|cites| {
-                    cites.iter().all(|c| is_internal(&c.file)) && cites.iter().any(|c| !c.reasoned)
+                    cites.iter().all(|c| is_internal(&c.file, internal_dirs))
+                        && cites.iter().any(|c| !c.reasoned)
                 })
             })
             .map(|r| r.id.as_str())
@@ -669,7 +693,7 @@ fn boundary_warnings(specs: &[Spec], cited: &BTreeMap<String, Vec<Cite>>) {
         if !internal.is_empty() {
             let plural = if internal.len() == 1 { "" } else { "s" };
             eprintln!(
-                "warning: {}: {} requirement{plural} proven only by tests under `src` with no reason: {} \
+                "warning: {}: {} requirement{plural} proven only by tests under {dirs} with no reason: {} \
                  (give it as `// spec: ID (internal: <reason>)`)",
                 spec.file,
                 internal.len(),

@@ -1,6 +1,6 @@
 ---
 id: COV
-status: draft
+status: accepted
 adrs: [0009]
 ---
 

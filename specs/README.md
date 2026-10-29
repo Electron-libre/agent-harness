@@ -49,7 +49,8 @@ through the binary would be impossible, slow or fragile, a test under `src` (one
 ideally at the public boundary of a module) is the proof, and its citation gives the reason:
 `// spec: RER-1 (internal: <reason>)`, the reason covering every id of the line. `check-specs` warns, per spec, of the
 requirements only tests under `src` cite as long as one of those citations at least gives no reason, and fails on a
-blank reason.
+blank reason. A stack that keeps its internal tests elsewhere names those directories in `internal_dirs` of
+`.claude/cardinal.toml` (`["src"]` when absent), which then replace `src`.
 
 ### Open questions
 

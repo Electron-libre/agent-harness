@@ -54,7 +54,7 @@ boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comm
    TRC-13, TRC-15, COV-12.
 2. [x] `traced` of `delivered-quality` reads the citations with the marker of each file's extension; verified by a
    test on a fixture repository; makes true QUA-13.
-3. [ ] `internal_dirs` replaces `src` in the boundary rule when set; documented in the README and the seed; verified
+3. [x] `internal_dirs` replaces `src` in the boundary rule when set; documented in the README and the seed; verified
    by a test through the binary; makes true TRC-14, and sets TRC, COV and QUA back to `accepted`.
 
 ## Decisions
@@ -81,4 +81,13 @@ boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comm
 - red: QUA-13: `FAIL - a citation is read with the marker of its file's extension`.
 - Code review: no findings
 - not verified: none.
+- decisions needed: none.
+
+## Deliverable 3
+- done: `internal_dirs` replaces `src` in the boundary rule and its warning names them; README, seed and
+  architecture document the key; TRC, COV and QUA are `accepted` again.
+- red: TRC-14: `FAIL - a test under an internal_dirs entry is internal, one under src is not`.
+- Code review: 1 finding: an `internal_dirs` entry holding a `/` never matched; fixed, reported as a problem
+  (TRC-15 extended).
+- not verified: the red run of the TRC-15 case added by the fix.
 - decisions needed: none.

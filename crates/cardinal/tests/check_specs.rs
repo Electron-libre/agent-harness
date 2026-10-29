@@ -71,6 +71,7 @@ fn check_specs() {
     marker_checks(&case, &report);
     wording_checks(&case, &report);
     boundary_checks(&case, &report);
+    internal_dirs_checks(&case, &report);
 
     strict.set(true);
     case(
@@ -900,6 +901,42 @@ fn reason_checks(case: &Case, report: &dyn Fn(&str, bool)) {
             Some("`(internal: <reason>)` must follow the ids and end the line"),
         );
     }
+}
+
+// spec: TRC-14, TRC-15
+/// The `internal_dirs` of `cardinal.toml` replace `src` as the directories of the internal tests.
+fn internal_dirs_checks(case: &Case, report: &dyn Fn(&str, bool)) {
+    let stderr = case(
+        "internal_dirs replace src",
+        SPEC,
+        "// spec: RER-2\n#[test]\nfn t() {}\n",
+        &[
+            (
+                ".claude/cardinal.toml",
+                "[project]\ninternal_dirs = [\"lib\"]\n",
+            ),
+            ("lib/a.rs", "// spec: RER-1\n#[test]\nfn t() {}\n"),
+        ],
+        None,
+    );
+    case(
+        "an internal_dirs entry holding a / is a problem",
+        SPEC,
+        TESTS,
+        &[(
+            ".claude/cardinal.toml",
+            "[project]\ninternal_dirs = [\"tests/unit\"]\n",
+        )],
+        Some("`tests/unit`"),
+    );
+    let lines: Vec<&str> = stderr
+        .lines()
+        .filter(|l| l.contains("proven only by tests under"))
+        .collect();
+    report(
+        "a test under an internal_dirs entry is internal, one under src is not",
+        lines == [warning("1 requirement", "RER-1").replace("under `src`", "under `lib`")],
+    );
 }
 
 /// The boundary warning of `specs/rerun.md` for `count` requirements, `ids`.
