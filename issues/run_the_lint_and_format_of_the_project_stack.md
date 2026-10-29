@@ -55,7 +55,7 @@ per project (one command, the project chains them), parsing a non-clippy output 
    CLG-8. ~400 lines.
 3. [x] Generic format hook: `format_command`, `format_files`, file appended, run from the work tree root, silent;
    verified by tests with a fake formatter; makes true FMT-1 to FMT-4. ~250 lines.
-4. [ ] Reword `issue-workflow` (step 3.3, 3.5) and its `details.md` around "the lint gate" and `just check`; document
+4. [x] Reword `issue-workflow` (step 3.3, 3.5) and its `details.md` around "the lint gate" and `just check`; document
    the keys in `seed/.claude/cardinal.toml` and `docs/architecture.md`; verified by `just check` (skills tests);
    makes true none (docs). ~60 lines.
 
@@ -92,4 +92,13 @@ per project (one command, the project chains them), parsing a non-clippy output 
 - red: FMT-1, FMT-3: `assertion left == right failed`, `fmt.log` empty, the declared format never ran.
 - Code review: no findings
 - not verified: a real formatter (prettier, ruff) in a consumer.
+- decisions needed: none.
+
+## Deliverable 4
+- done: `issue-workflow` names "the lint gate hook" and `just check` as the project's format, lint and tests, and the
+  specs; `details.md` already neutral since deliverable 1; the keys were documented by deliverables 2 and 3.
+- check | result: tests ok, lint ok, specs ok, docs ok, code review: see below.
+- red: none (wording of a skill, no test).
+- Code review: no findings
+- not verified: nothing.
 - decisions needed: none.
