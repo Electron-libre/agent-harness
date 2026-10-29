@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [trace_the_specs_in_the_tests_of_any_language](trace_the_specs_in_the_tests_of_any_language.md) - first of the other stacks, which no consumer has yet: without it the spec workflow and the quality measures fail outside Rust; before the team issues, which are comfort
 - [run_the_lint_and_format_of_the_project_stack](run_the_lint_and_format_of_the_project_stack.md) - after the tracing: a missing lint gate leaves a project working, a missing tracing does not
 - [seed_no_cargo_permissions_in_a_project_of_another_stack](seed_no_cargo_permissions_in_a_project_of_another_stack.md) - last of the other stacks: the cost is only permission prompts
 - [read_the_ci_installer_configuration_with_a_toml_parser](read_the_ci_installer_configuration_with_a_toml_parser.md) - after the other stacks: only a hand-edited configuration hits it, since `init` and `update` write the canonical form; before the hint measure, which only waits for sessions
