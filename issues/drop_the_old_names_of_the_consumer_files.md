@@ -50,6 +50,10 @@ build of an old commit (`install_cardinal.sh`), the gate mark `# harness: native
    `names_cli.rs` gives way to the SYN-51 tests; ADR 0016 accepted, ADR 0014 and 0015 marked partly superseded;
    `docs/usage.md` and `docs/architecture.md` updated; verified by the SYN-51 tests and `just check`; makes true
    SYN-51 (SYN-44 to SYN-48 withdrawn, SYN-9, SYN-11, SYN-18, SYN-42, BIN-1, LNG-3, TRC-10 amended). ~700 lines.
+3. [x] Fixes of the `high` review: a source path that holds no `files/` is reported by SYN-10, not as the format 1;
+   `init` names the resolved URL and the commit in its install hint; `readable` returns nothing; ADR 0016 says a
+   project of the old names is not detected; the next issue no longer relies on SYN-45; verified by the SYN-10 test of
+   `format_cli.rs`; makes true SYN-10, SYN-51. ~80 lines.
 
 ## Decisions
 - Mode: autonomous
@@ -92,4 +96,25 @@ build of an old commit (`install_cardinal.sh`), the gate mark `# harness: native
   instead of `<source> has the format 2, this cardinal syncs the format 3 and higher`
 - Code review: no findings (its two open points hold: `sync` and `update` call `readable` before `sync_from`, `transcripts::LOCKS` compiles)
 - not verified: the CI run of `install_cardinal.sh` (a push only)
+- decisions needed: none
+
+## Deliverable 3
+- done: fixes of the `high` review (9 findings).
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | ADR 0016, `issues/report_what_a_format_migration_leaves_to_the_project.md` |
+| code review | `high`: 9 findings; `low` on the fixes: no findings |
+
+- red: SYN-10: `error: <source>/gone has the format 1, this cardinal syncs the format 3 and higher` instead of `has no files/ directory`
+- Code review: no findings (`low` on the fixes)
+- `high` findings: 1 (old-name project not refused) ADR 0016 corrected, no code: detecting it would keep the old
+  names; 2 (missing source read as format 1) fixed; 3 (`init` install hint) fixed; 4 (next issue cites SYN-45)
+  fixed; 5 (CI installer exits 0 without a configuration) pre-existing, issue
+  `fail_the_ci_installer_when_the_configuration_is_missing`; 6 (`readable` result unused) fixed; 7 (`config_of`
+  twice) fixed; 8 (`write_lock` doc) fixed; 9 (test name claims an older format) renamed.
+- not verified: the install hint of `init` for a git source of a too new format (no test, as for SYN-40 of `init`)
 - decisions needed: none

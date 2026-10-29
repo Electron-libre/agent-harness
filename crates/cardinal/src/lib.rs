@@ -236,7 +236,7 @@ fn install_hint(root: &Path) -> String {
     }
 }
 
-/// Write the lock of a sync from a source of the format `format`, under the name `name`.
+/// Write the lock of a sync from a source of the format `format`.
 fn write_lock(root: &Path, lock: &Lock, format: u32) -> Result<()> {
     let mut text = String::from(
         "# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
@@ -564,9 +564,12 @@ fn format_of(dir: &Path) -> Result<u32> {
     }
 }
 
-/// The format of the source `name` in `dir`; an error when it needs a newer `cardinal`, which `install` installs
-/// (SYN-40), or an older one (SYN-51).
-fn readable(dir: &Path, name: &str, install: &str) -> Result<u32> {
+/// An error when the source `name` in `dir` needs a newer `cardinal`, which `install` installs (SYN-40), or an older
+/// one (SYN-51); a directory without `files/` is no source, which the sync reports (SYN-10).
+fn readable(dir: &Path, name: &str, install: &str) -> Result<()> {
+    if !dir.join("files").is_dir() {
+        return Ok(());
+    }
     let format = format_of(dir)?;
     if format > FORMAT {
         bail!("{name} needs a cardinal that reads the format {format}, this one reads up to {FORMAT}: install it with `{install}`");
@@ -574,7 +577,7 @@ fn readable(dir: &Path, name: &str, install: &str) -> Result<u32> {
     if format < MIN_FORMAT {
         bail!("{name} has the format {format}, this cardinal syncs the format {MIN_FORMAT} and higher");
     }
-    Ok(format)
+    Ok(())
 }
 
 /// Create the configuration from the source and the project-owned defaults of the source (SYN-9).
@@ -586,12 +589,16 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
     if path.exists() {
         bail!("{} already exists", path.display());
     }
-    let dir = if is_git_url(source) {
-        checkout(None, &resolved(root, source), rev)?
+    let (dir, install) = if is_git_url(source) {
+        let url = resolved(root, source);
+        let dir = checkout(None, &url, rev)?;
+        let commit = git_output(&dir, &["rev-parse", "HEAD"])?;
+        let install = launcher::install(&url, Some(&commit));
+        (dir, install)
     } else {
-        root.join(source)
+        (root.join(source), launcher::install(source, None))
     };
-    readable(&dir, source, &launcher::install(source, rev))?;
+    readable(&dir, source, &install)?;
     let mut table = toml::Table::new();
     table.insert("source".into(), source.into());
     if let Some(rev) = rev {
@@ -877,8 +884,8 @@ fn update_in(
     if !refused.is_empty() && !options.dry_run {
         bail!("{}", refused.join("\n"));
     }
-    let current = fs::read_to_string(config_of(root))?;
-    let path = root.join(CONFIG);
+    let path = config_of(root);
+    let current = fs::read_to_string(&path)?;
     let text = set_rev(&current, &commit, rev.unwrap_or("default branch"))?;
     // Nothing is written before the dry run shows a clean sync.
     let mut preview = sync_from(

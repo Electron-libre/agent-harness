@@ -1,7 +1,7 @@
 # Report what a format migration leaves to the project
 
 # Goal
-When `update` migrates a project to a new format (SYN-45), it renames the managed names, but the project-owned files
+When `update` migrates a project to a new format (as SYN-45 did, withdrawn by ADR 0016), it renames the managed names, but the project-owned files
 still cite the old ones, and nothing tells the agent the migration exists before it runs `update`. In the two
 migrations to `cardinal`, the agent of each consumer spent its session finding and fixing those leftovers by hand.
 Make the next format migration discoverable and make `update` say, or fix, what it leaves behind.
@@ -31,15 +31,15 @@ Make the next format migration discoverable and make `update` say, or fix, what 
 4. Optionally, `update` rewrites a `source` URL the forge redirects (a renamed repository), or only reports it.
 
 # Specs
-* `specs/sync.md`: SYN-45 amended, new requirements for the leftover report and the migration hint.
+* `specs/sync.md`: new requirements for the migration, the leftover report and the migration hint.
 
 # Resources
-* ADR 0014, ADR 0015, `docs/usage.md` (the migration paragraph)
-* `crates/cardinal/src/lib.rs` (`Migration`, `imports_renamed`)
+* ADR 0014, ADR 0015, ADR 0016
+* `crates/cardinal/src/lib.rs` before `faea050` (`Migration`, `imports_renamed`), the migration it dropped
 * `issues/done/rename_the_consumer_files_to_cardinal.md`
 
 # Hints
 * No consumer is left to migrate to `cardinal`: the value is for the next change of `FORMAT`, so the old names to
   look for come from the format change, not hard-coded `harness` strings.
-* `drop_the_old_names_of_the_consumer_files` removes the format 2 migration code: write this one so it does not
-  depend on that code staying.
+* The format 2 migration code is gone (`drop_the_old_names_of_the_consumer_files`): the next migration brings its
+  own, and this issue builds on it.

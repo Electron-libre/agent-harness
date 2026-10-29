@@ -50,7 +50,7 @@ fn sync_refuses_a_source_of_a_newer_format_and_writes_nothing() {
 
 // spec: SYN-40
 #[test]
-fn sync_reads_a_source_of_the_same_or_an_older_format() {
+fn sync_reads_a_source_of_a_format_it_reads() {
     let home = Home::new();
     let (source, root) = project(&home);
     for declared in [FORMAT.trim().to_string(), format()] {
@@ -309,4 +309,20 @@ fn update_to_a_revision_below_the_format_3_keeps_the_project_as_it_was() {
         assert!(run.stderr.contains(&too_old(&source, 2)), "{run:?}");
         assert_eq!(snapshot(root.path()), before);
     }
+}
+
+// spec: SYN-10
+#[test]
+fn a_source_path_that_holds_nothing_is_reported_as_such_not_as_an_old_format() {
+    let home = Home::new();
+    let (source, root) = project(&home);
+    let gone = source.path().join("gone");
+    put(
+        root.path(),
+        CONFIG,
+        &format!("[cardinal]\nsource = \"{}\"\n", gone.display()),
+    );
+    let run = home.harness(root.path(), &["sync"]);
+    assert_eq!(run.code, Some(3), "{run:?}");
+    assert!(run.stderr.contains("has no files/ directory"), "{run:?}");
 }

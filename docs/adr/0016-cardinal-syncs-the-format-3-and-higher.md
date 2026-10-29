@@ -20,6 +20,7 @@ This supersedes the part of ADR 0014 that has a `cardinal` read every lower form
 migration of ADR 0015.
 
 ## Consequences
-A project still on the old names, or a source below the format 3, needs the `cardinal` of its own revision; this one
-refuses it instead of misreading it. The next format that drops what an older one needs does the same: a minimum
+A source below the format 3 needs the `cardinal` of its own revision: this one refuses it instead of misreading it. A
+project still on the old names is not detected: this one finds no configuration in it (`check`, `sync` and `update`
+fail naming `.claude/cardinal.toml`), and the `cardinal` of its revision reads it. The next format that drops what an older one needs does the same: a minimum
 format, raised by an ADR once no consumer needs the lower ones.
