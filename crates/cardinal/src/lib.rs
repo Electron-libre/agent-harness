@@ -40,6 +40,7 @@ mod entries;
 mod gate;
 mod launcher;
 mod memory;
+mod migration;
 pub mod run;
 mod settings;
 pub mod tools;
@@ -69,6 +70,8 @@ pub enum Outcome {
     Kept,
     /// A hook of the project's own moved aside so that the managed one can chain it.
     Moved,
+    /// A project file whose seeded text a migration rewrote (SYN-53).
+    Rewritten,
     /// Not done, for the reason given.
     Skipped(&'static str),
 }
@@ -84,6 +87,7 @@ impl fmt::Display for Outcome {
             Outcome::Conflict => "conflict (modified locally, fix it in the source or use --force)",
             Outcome::Kept => "kept (dropped from the source but modified locally)",
             Outcome::Moved => "moved (your hook now runs after the review gate)",
+            Outcome::Rewritten => "rewritten",
             Outcome::Skipped(why) => return write!(f, "skipped ({why})"),
         })
     }
@@ -177,11 +181,13 @@ fn is_inside(rel: &str) -> bool {
         .all(|c| matches!(c, Component::Normal(_)))
 }
 
-/// What the lock records: the fingerprint of each managed file, and the managed entries of the settings.
+/// What the lock records: the fingerprint of each managed file, the managed entries of the settings, and the format of
+/// the source it was synced from (1 when it records none, SYN-41).
 #[derive(Debug, Default)]
 struct Lock {
     files: BTreeMap<String, String>,
     entries: Vec<entries::Entry>,
+    format: u32,
 }
 
 /// The mark of a lock line that holds a managed entry of the settings instead of a file.
@@ -200,6 +206,10 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
         Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
     };
     let lines = || text.lines().filter(|l| !l.starts_with('#'));
+    let mut lock = Lock {
+        format: 1,
+        ..Lock::default()
+    };
     for format in lines().filter_map(|line| line.strip_prefix(FORMAT_LINE)) {
         let format: u32 = format
             .parse()
@@ -207,8 +217,8 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
         if format > FORMAT {
             bail!("{LOCK} was synced from a source of the format {format}, this one reads up to {FORMAT}: install it with {}", install_hint(root));
         }
+        lock.format = format;
     }
-    let mut lock = Lock::default();
     for line in lines().filter(|l| !l.starts_with(FORMAT_LINE)) {
         let Some((h, rel)) = line.split_once("  ") else {
             continue;
@@ -661,11 +671,18 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
             CONFIG
         );
     }
+    let previous = read_lock(root)?;
+    let format = format_of(source)?;
+    // read before anything is written: a migration that cannot be read stops the sync (SYN-52)
+    let migrations = match &previous {
+        Some(lock) => migration::applying(source, lock.format, format)?,
+        None => Vec::new(),
+    };
     let Lock {
         files: lock,
         entries: recorded,
-    } = read_lock(root)?.unwrap_or_default();
-    let format = format_of(source)?;
+        ..
+    } = previous.unwrap_or_default();
     let wanted = entries::of_source(source)?;
     // decided first: a hook of the user that cannot be chained stops the sync before it writes anything
     let files = list(&managed)?;
@@ -700,7 +717,9 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
     let new_lock = Lock {
         files: new_lock,
         entries: merge.lock,
+        format,
     };
+    rewrite_seeded(root, &migrations, &file_set, options, &mut report)?;
     if !options.dry_run {
         write_lock(root, &new_lock, format)?;
     }
@@ -782,6 +801,44 @@ fn remove_dropped(
             }
             Some(_) => report.entries.push((rel.clone(), Outcome::Kept)),
         }
+    }
+    Ok(())
+}
+
+/// Rewrite the seeded texts of `migrations` in the project files, the managed ones and the lock excepted (SYN-53).
+fn rewrite_seeded(
+    root: &Path,
+    migrations: &[migration::Migration],
+    file_set: &BTreeSet<&String>,
+    options: SyncOptions,
+    report: &mut Report,
+) -> Result<()> {
+    let mut texts: BTreeMap<&str, String> = BTreeMap::new();
+    let mut changed = Vec::new();
+    for rewrite in migrations.iter().flat_map(|m| &m.rewrites) {
+        let rel = rewrite.path.as_str();
+        if !is_inside(rel) || rel == LOCK || file_set.contains(&rewrite.path) {
+            continue;
+        }
+        if !texts.contains_key(rel) {
+            let Ok(text) = fs::read_to_string(root.join(rel)) else {
+                continue;
+            };
+            texts.insert(rel, text);
+        }
+        let text = texts.get_mut(rel).expect("read above");
+        if let Some(new) = migration::rewritten(text, &rewrite.old, &rewrite.new) {
+            *text = new;
+            if !changed.contains(&rel) {
+                changed.push(rel);
+            }
+        }
+    }
+    for rel in changed {
+        if !options.dry_run {
+            write(&root.join(rel), texts[rel].as_bytes())?;
+        }
+        report.entries.push((rel.to_string(), Outcome::Rewritten));
     }
     Ok(())
 }
@@ -902,6 +959,15 @@ fn update_in(
     let applied = !options.dry_run && preview.conflicts() == 0;
     let sync = if applied {
         let sync = sync_from(root, &dir, options)?;
+        // the configuration as the sync left it: a migration may have rewritten it (SYN-53)
+        let text = match sync.outcome(CONFIG) {
+            Some(Outcome::Rewritten) => set_rev(
+                &fs::read_to_string(&path)?,
+                &commit,
+                rev.unwrap_or("default branch"),
+            )?,
+            _ => text,
+        };
         write(&path, text.as_bytes())?;
         sync
     } else {

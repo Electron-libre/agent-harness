@@ -42,6 +42,23 @@ The files of a project are `.claude/cardinal.toml` (table `[cardinal]`), `.claud
 (`.claude/harness.toml`, `.claude/harness.lock`, `harness.just`), and write nothing (SYN-51, ADR 0016): a project of
 those names is read and migrated by the `cardinal` of its own revision only.
 
+A source that raises its format declares what changed in `migrations/<n>.toml`, `<n>` the new format (ADR 0017):
+
+```toml
+[[names]]            # a managed name the format replaced
+old = "check-old"
+new = "check-new"
+
+[[rewrite]]          # a seeded text of a project file, matched as whole lines
+path = "justfile"
+old = "check: check-old"
+new = "check: check-new"
+```
+
+`sync` and `update` apply the migrations above the format of the lock, up to the one of the source, in increasing
+format (SYN-52): each `rewrite` replaces its text where the project left it as seeded, printed `rewritten: <path>`,
+and leaves a line the project changed as it is (SYN-53). A migration that cannot be read fails them, writing nothing.
+
 ## Evaluating Cardinal
 
 Cardinal is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes

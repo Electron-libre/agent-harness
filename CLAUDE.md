@@ -34,7 +34,8 @@ everything in English; the shared files hold nothing specific to one project (pr
 footer, one line per metric of `cardinal-report` it should move: a direction, never a target; `skill:evaluate-harness`
 gives it a verdict ([specs/cardinal-verdicts.md](specs/cardinal-verdicts.md)). A change of the meaning of
 the managed content (fragment keys, lock lines, source layout) that an older `cardinal` would misread raises
-`cardinal-format` and `FORMAT` together (ADR 0014).
+`cardinal-format` and `FORMAT` together (ADR 0014), and declares the names and seeded texts it replaces in
+`migrations/<n>.toml` (ADR 0017).
 
 ## Test conventions
 

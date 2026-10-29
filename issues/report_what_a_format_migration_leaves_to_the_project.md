@@ -43,3 +43,40 @@ Make the next format migration discoverable and make `update` say, or fix, what 
   look for come from the format change, not hard-coded `harness` strings.
 * The format 2 migration code is gone (`drop_the_old_names_of_the_consumer_files`): the next migration brings its
   own, and this issue builds on it.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Make the next format change discoverable and self-reporting: the source declares its migration as data
+(`migrations/<n>.toml`: old/new names, exact seeded texts), `sync`/`update` rewrite those texts and warn `path:line`
+of each leftover citation; `check`/`sync` hint at `update` below the binary's format. Out of scope: the `source` URL
+of a renamed repository (forge redirect), a migration that renames the configuration or the lock (its own code).
+
+## Plan
+1. [x] Migration declarations and seeded rewrites: read `migrations/<n>.toml` of the applying formats, rewrite the
+   whole-line texts, `rewritten:` lines, ADR 0017; verified by binary tests (lock of format 1 or 2, source 3);
+   makes true SYN-52, SYN-53. ~400 lines.
+2. [ ] Leftover report: scan the git-tracked project-owned files for the old names after the rewrites, warn
+   `path:line`; verified by binary tests; makes true SYN-54. ~300 lines.
+3. [ ] Format hint in `check` and `sync`; verified by binary tests (lock `format 2`); makes true SYN-55, spec
+   `accepted`. ~150 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 62fdd8ddc14eb39638abf0baf46f9ba420ee229f
+- Migration declared as data in the source, `migrations/<n>.toml` (1 a).
+- Hint in `check` and `sync` (2 a).
+- Leftovers reported once, by the run that applies the migration (3 a).
+- The `source` URL of a renamed repository is out of scope (4 a).
+
+## Deliverable 1
+
+- done: `migrations/<n>.toml` read above the format of the lock (`migration.rs`), whole-line seeded rewrites with
+  `rewritten:` lines, `update` keeps a rewritten configuration under its new `rev`; ADR 0017, usage, architecture.
+- red: SYN-52, SYN-53: `assertion left == right failed: left: None, right: Some("rewritten")` (no outcome for the
+  justfile).
+- Code review: no findings
+- not verified: none
+- decisions needed: none
