@@ -101,27 +101,31 @@ fn a_configuration_without_a_source_fails_naming_the_key_and_the_file() {
     let run = install(root.path(), bin.path());
 
     assert_eq!(run.code, Some(1), "{run:?}");
-    assert!(run.stderr.contains("source"), "{run:?}");
-    assert!(run.stderr.contains(CONFIG), "{run:?}");
+    assert!(
+        run.stderr
+            .contains(&format!("no source read from {CONFIG}")),
+        "{run:?}"
+    );
     assert!(!bin.path().join("log").exists(), "{run:?}");
 }
 
 #[test]
-fn a_literal_string_source_is_installed() {
-    let root = tempdir().unwrap();
-    let bin = tempdir().unwrap();
-    put(
-        root.path(),
-        CONFIG,
+fn a_literal_or_indented_source_is_installed() {
+    for config in [
         "[cardinal]\nsource = 'host:x.git'\nrev = 'main'\n",
-    );
+        "[cardinal]\n  source\t= \"host:x.git\"\n\trev = \"main\"\n",
+    ] {
+        let root = tempdir().unwrap();
+        let bin = tempdir().unwrap();
+        put(root.path(), CONFIG, config);
 
-    let run = install(root.path(), bin.path());
+        let run = install(root.path(), bin.path());
 
-    assert_eq!(run.code, Some(0), "{run:?}");
-    let log = fs::read_to_string(bin.path().join("log")).unwrap_or_default();
-    assert_eq!(
-        log, "install --quiet --force --git ssh://host/x.git --rev main --locked\n",
-        "{run:?}"
-    );
+        assert_eq!(run.code, Some(0), "{config}: {run:?}");
+        let log = fs::read_to_string(bin.path().join("log")).unwrap_or_default();
+        assert_eq!(
+            log, "install --quiet --force --git ssh://host/x.git --rev main --locked\n",
+            "{config}: {run:?}"
+        );
+    }
 }

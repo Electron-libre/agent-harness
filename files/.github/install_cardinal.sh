@@ -8,13 +8,14 @@ set -eu
 
 config=.claude/cardinal.toml
 [ -f "$config" ] || { echo "no $config: cardinal not installed" >&2; exit 1; }
-# a basic or a literal TOML string
+# a basic or a literal TOML string, the key indented or not
 value() {
-  sed -n -e "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" -e "s/^$1 *= *'\([^']*\)'.*/\1/p" "$config" | head -n 1
+  key="^[[:space:]]*$1[[:space:]]*=[[:space:]]*"
+  sed -n -e "s/$key\"\([^\"]*\)\".*/\1/p" -e "s/$key'\([^']*\)'.*/\1/p" "$config" | head -n 1
 }
 source=$(value source)
 # no key, another form of string or an unreadable file: the local-path branch below would take '' for a path
-[ -n "$source" ] || { echo "no source in $config: cardinal not installed" >&2; exit 1; }
+[ -n "$source" ] || { echo "no source read from $config: cardinal not installed" >&2; exit 1; }
 rev=$(value rev)
 
 # A path git source as the absolute `file://` URL of that path from the top of the work tree, its symlinks resolved, as
