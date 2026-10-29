@@ -6,7 +6,7 @@ Rule `user-language` is mostly breached in the text blocks the agent writes betw
 falls, and remove the two skews that make the hook and the measure misjudge a text.
 
 # Findings
-* Measure of 2026-10-29 (`issues/measure_the_effect_of_the_language_hint.md`, `# Tracking`): before the hook, 18 of
+* Measure of 2026-10-29 (`issues/done/measure_the_effect_of_the_language_hint.md`, `# Tracking`): before the hook, 18 of
   the 20 breaches of `user-language` were intermediate blocks (assistant text followed by more assistant text before
   the next typed message), 2 were final replies; with the hook, 4 breaches, all intermediate. The hook ran on 157
   stops of 51 sessions and no transcript holds its hint (how a blocking Stop hook shows in `stop_hook_summary` was
@@ -38,7 +38,7 @@ falls, and remove the two skews that make the hook and the measure misjudge a te
 * `specs/language-hint.md`, `specs/rule-breaches.md`, ADR 0005
 * `crates/cardinal/src/tools/language_hint.rs`, `crates/cardinal/src/tools/language.rs`
 * `entries/.claude/settings.json` (where a new hook is declared)
-* `issues/measure_the_effect_of_the_language_hint.md` (the measure and its classification of the breaches)
+* `issues/done/measure_the_effect_of_the_language_hint.md` (the measure and its classification of the breaches)
 
 # Hints
 * A breach the hook caught and the agent then fixed still shows as a breach of BRE-10: count the corrected blocks

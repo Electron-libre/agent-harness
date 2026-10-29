@@ -90,7 +90,7 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
 - decisions needed: none
 
 ## Deliverable 3
-- done: `issues/measure_the_effect_of_the_language_hint.md`, queued last (it needs sessions run with the hook).
+- done: `issues/done/measure_the_effect_of_the_language_hint.md`, queued last (it needs sessions run with the hook).
 - red: none (an issue, no test)
 - Code review: no findings (a diff under `issues/` only needs no review)
 
@@ -112,7 +112,7 @@ Code 2.1.312 sends it), the transcript only as a fallback. The measure needs ses
   - The hook judges the joined blocks of the last line, BRE-10 each block: `last_assistant_message` is one joined
     text already; the measure issue counts final replies apart.
   - `an`/`as` in the English list, exact language names: outside this issue's requirements, recorded in
-    `issues/measure_the_effect_of_the_language_hint.md`.
+    `issues/done/measure_the_effect_of_the_language_hint.md`.
   - The seed's `user_language = "English"` now becomes a gate: by design, the key declares the language; the
     user's projects set French.
 - Code review: no findings
