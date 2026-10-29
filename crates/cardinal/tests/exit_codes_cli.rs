@@ -23,9 +23,9 @@ fn harness(root: &Path, args: &[&str]) -> (Option<i32>, String) {
 #[test]
 fn an_error_of_a_subcommand_exits_3_with_the_error_on_stderr() {
     let root = tempdir().unwrap();
-    // `init` refuses to overwrite the `harness.toml` the first `init` wrote.
+    // `init` refuses to overwrite the configuration the first `init` wrote.
     assert_eq!(harness(root.path(), &["init", "/a/source"]).0, Some(0));
-    fs::write(root.path().join(".claude/harness.toml"), "[harness]\n").unwrap();
+    fs::write(root.path().join(".claude/cardinal.toml"), "[cardinal]\n").unwrap();
     for args in [
         &["sync"][..],
         &["update"][..],

@@ -6,11 +6,24 @@ mod common;
 
 use std::path::Path;
 
-use common::{get, project, put, snapshot, Home, CONFIG, LOCK, NEW_CONFIG, NEW_LOCK};
+use common::{get, put, snapshot, Home, CONFIG as NEW_CONFIG, LOCK as NEW_LOCK};
 use tempfile::{tempdir, TempDir};
 
+/// The configuration and the lock before the format 3.
+const CONFIG: &str = ".claude/harness.toml";
+const LOCK: &str = ".claude/harness.lock";
 const CONFIG_RENAMED: &str = "renamed: .claude/harness.toml -> .claude/cardinal.toml";
 const LOCK_RENAMED: &str = "renamed: .claude/harness.lock -> .claude/cardinal.lock";
+
+/// A source of the format 1 with `files/a.txt`, `files/sub/b.txt` and `seed/s.txt`, and a project of the old names
+/// initialised on it.
+fn project(home: &Home) -> (TempDir, TempDir) {
+    let (source, root) = common::project(home);
+    std::fs::remove_file(source.path().join(common::SOURCE_FORMAT)).unwrap();
+    std::fs::remove_file(root.path().join(NEW_CONFIG)).unwrap();
+    home.ok(root.path(), &["init", source.path().to_str().unwrap()]);
+    (source, root)
+}
 
 fn url(repo: &Path) -> String {
     format!("file://{}", repo.display())

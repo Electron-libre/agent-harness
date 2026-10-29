@@ -6,7 +6,7 @@ mod common;
 
 use std::path::Path;
 
-use common::{get, lock_of, project, put, snapshot, Home, CONFIG, LOCK};
+use common::{get, project, put, snapshot, Home, CONFIG, FORMAT, LOCK, SOURCE_FORMAT};
 use tempfile::{tempdir, TempDir};
 
 /// The format the `cardinal` under test reads: the one of its own revision (SYN-43).
@@ -53,8 +53,7 @@ fn sync_refuses_a_source_of_a_newer_format_and_writes_nothing() {
 fn sync_reads_a_source_of_the_same_or_an_older_format() {
     let home = Home::new();
     let (source, root) = project(&home);
-    // the lower format first: a project the current one migrated refuses it (SYN-48)
-    for declared in ["1".to_string(), format()] {
+    for declared in [FORMAT.trim().to_string(), format()] {
         put(source.path(), "cardinal-format", &format!("{declared}\n"));
         put(source.path(), "files/a.txt", &declared);
         home.ok(root.path(), &["sync"]);
@@ -81,6 +80,7 @@ fn update_refuses_a_revision_of_a_newer_format_and_keeps_the_project_as_it_was()
     let repo = tempdir().unwrap();
     home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
     put(repo.path(), "files/a.txt", "a1");
+    put(repo.path(), SOURCE_FORMAT, FORMAT);
     home.git(repo.path(), &["add", "."]);
     home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
     home.git(repo.path(), &["tag", "v1"]);
@@ -88,7 +88,7 @@ fn update_refuses_a_revision_of_a_newer_format_and_keeps_the_project_as_it_was()
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"{}\"\n", url(repo.path())),
+        &format!("[cardinal]\nsource = \"{}\"\n", url(repo.path())),
     );
     home.ok(root.path(), &["update", "--rev", "v1"]);
     put(repo.path(), "files/a.txt", "a2");
@@ -116,15 +116,12 @@ fn update_refuses_a_revision_of_a_newer_format_and_keeps_the_project_as_it_was()
     }
 }
 
-/// A git source with one commit, holding `cardinal-format` when `declared` is given, a project pinned on it by
-/// `update`, and the commit.
-fn git_project(home: &Home, declared: Option<&str>) -> (TempDir, TempDir, String) {
+/// A git source with one commit declaring the format `declared`, a project on it, and the commit.
+fn git_project(home: &Home, declared: &str) -> (TempDir, TempDir, String) {
     let repo = tempdir().unwrap();
     home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
     put(repo.path(), "files/a.txt", "a1");
-    if let Some(declared) = declared {
-        put(repo.path(), "cardinal-format", declared);
-    }
+    put(repo.path(), SOURCE_FORMAT, declared);
     home.git(repo.path(), &["add", "."]);
     home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
     let commit = home.git(repo.path(), &["rev-parse", "HEAD"]);
@@ -132,7 +129,7 @@ fn git_project(home: &Home, declared: Option<&str>) -> (TempDir, TempDir, String
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"{}\"\n", url(repo.path())),
+        &format!("[cardinal]\nsource = \"{}\"\n", url(repo.path())),
     );
     (repo, root, commit)
 }
@@ -141,7 +138,7 @@ fn git_project(home: &Home, declared: Option<&str>) -> (TempDir, TempDir, String
 #[test]
 fn sync_of_an_unpinned_git_source_names_the_commit_it_checked_out() {
     let home = Home::new();
-    let (repo, root, commit) = git_project(&home, Some("99\n"));
+    let (repo, root, commit) = git_project(&home, "99\n");
     let run = home.harness(root.path(), &["sync"]);
     assert_eq!(run.code, Some(3), "{run:?}");
     let install = format!(
@@ -157,7 +154,7 @@ fn sync_of_an_unpinned_git_source_names_the_commit_it_checked_out() {
 
 /// The `format` lines of the lock of `root`.
 fn format_lines(root: &Path) -> Vec<String> {
-    get(root, lock_of(root))
+    get(root, LOCK)
         .unwrap()
         .lines()
         .filter(|l| l.starts_with("format "))
@@ -171,11 +168,14 @@ fn the_lock_records_the_format_of_its_source_before_every_other_line() {
     let home = Home::new();
     let (source, root) = project(&home);
     home.ok(root.path(), &["sync"]);
-    assert_eq!(format_lines(root.path()), ["format 1"]);
+    assert_eq!(
+        format_lines(root.path()),
+        [format!("format {}", FORMAT.trim())]
+    );
     put(source.path(), "cardinal-format", &format!("{}\n", format()));
     home.ok(root.path(), &["sync"]);
     assert_eq!(format_lines(root.path()), [format!("format {}", format())]);
-    let lock = get(root.path(), lock_of(root.path())).unwrap();
+    let lock = get(root.path(), LOCK).unwrap();
     let first = lock.lines().find(|l| !l.starts_with('#')).unwrap();
     assert_eq!(first, format!("format {}", format()), "{lock}");
 }
@@ -209,7 +209,7 @@ fn check_sync_and_update_refuse_a_lock_of_a_newer_format_and_write_nothing() {
     // a newer format may write lines this one cannot parse, before its format line
     let newer = format!(
         "{}entry  {{\"ask\": \"Bash(x)\"}}\n../outside  h\nformat 99\n",
-        lock.replace("format 1\n", "")
+        lock.replace(&format!("format {FORMAT}"), "")
     );
     put(root.path(), LOCK, &newer);
     put(source.path(), "files/a.txt", "a2");
@@ -234,10 +234,14 @@ fn check_sync_and_update_refuse_a_lock_of_a_newer_format_and_write_nothing() {
 #[test]
 fn update_refuses_a_lock_of_a_newer_format_naming_the_pinned_revision() {
     let home = Home::new();
-    let (repo, root, commit) = git_project(&home, None);
+    let (repo, root, commit) = git_project(&home, FORMAT);
     home.ok(root.path(), &["update"]);
     let lock = get(root.path(), LOCK).unwrap();
-    put(root.path(), LOCK, &lock.replace("format 1", "format 99"));
+    put(
+        root.path(),
+        LOCK,
+        &lock.replace(&format!("format {}", FORMAT.trim()), "format 99"),
+    );
     let before = snapshot(root.path());
 
     let run = home.harness(root.path(), &["update"]);

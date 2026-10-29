@@ -12,7 +12,7 @@ use tempfile::tempdir;
 const FRENCH: &str = "Le livrable est fait : les tests passent et la revue ne trouve rien, donc je committe puis je passe au suivant dans la foulée.";
 const ENGLISH: &str = "The deliverable is done: the tests pass and the review finds nothing, so I commit it and move on to the next one with the plan.";
 
-/// A git repository whose `.claude/harness.toml` names `language` (none when `None`).
+/// A git repository whose `.claude/cardinal.toml` names `language` (none when `None`).
 fn repo(dir: &Path, language: Option<&str>) {
     let ok = Command::new("git")
         .args(["init", "-q"])
@@ -25,8 +25,8 @@ fn repo(dir: &Path, language: Option<&str>) {
         .unwrap_or_default();
     put(
         dir,
-        ".claude/harness.toml",
-        &format!("[harness]\nsource = \"x\"\n\n[project]\n{key}"),
+        ".claude/cardinal.toml",
+        &format!("[cardinal]\nsource = \"x\"\n\n[project]\n{key}"),
     );
 }
 
@@ -114,7 +114,7 @@ fn a_reply_that_cannot_be_judged_passes() {
         .remove("last_assistant_message");
     event["transcript_path"] = json!(dir.path().join("missing.jsonl"));
     assert!(silent_pass(&hook(dir.path(), &event)));
-    put(dir.path(), ".claude/harness.toml", "[project\n");
+    put(dir.path(), ".claude/cardinal.toml", "[project\n");
     assert!(silent_pass(&hook(dir.path(), &stop(dir.path(), ENGLISH))));
 }
 
@@ -174,7 +174,7 @@ fn the_config_is_read_at_the_root_of_the_work_tree_of_the_cwd_else_of_the_projec
     // a cwd in a work tree with no config (a nested clone): CLAUDE_PROJECT_DIR
     let bare = tempdir().unwrap();
     repo(bare.path(), None);
-    std::fs::remove_file(bare.path().join(".claude/harness.toml")).unwrap();
+    std::fs::remove_file(bare.path().join(".claude/cardinal.toml")).unwrap();
     let run = hook(other.path(), &stop(bare.path(), FRENCH));
     assert!(run.stderr.contains("English"), "{run:?}");
 }

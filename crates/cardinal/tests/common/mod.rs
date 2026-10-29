@@ -14,29 +14,19 @@ use std::process::{Command, Stdio};
 
 use tempfile::{tempdir, TempDir};
 
-/// The configuration and the lock of a source below the format 3, which the fixtures declare (SYN-44).
-pub const CONFIG: &str = ".claude/harness.toml";
-pub const LOCK: &str = ".claude/harness.lock";
-/// Their names from the format 3 on.
-pub const NEW_CONFIG: &str = ".claude/cardinal.toml";
-pub const NEW_LOCK: &str = ".claude/cardinal.lock";
+/// The configuration and the lock of a project.
+pub const CONFIG: &str = ".claude/cardinal.toml";
+pub const LOCK: &str = ".claude/cardinal.lock";
+/// The file of a source that declares its format, and the format the fixtures declare: the lowest one `cardinal`
+/// syncs with the names above.
+pub const SOURCE_FORMAT: &str = "cardinal-format";
+pub const FORMAT: &str = "3\n";
 
-/// The configuration `root` has: the new name when that file exists, else the old one (SYN-47).
-pub fn config_of(root: &Path) -> &'static str {
-    if root.join(NEW_CONFIG).is_file() {
-        NEW_CONFIG
-    } else {
-        CONFIG
-    }
-}
-
-/// The lock `root` has, as `config_of`.
-pub fn lock_of(root: &Path) -> &'static str {
-    if root.join(NEW_LOCK).is_file() {
-        NEW_LOCK
-    } else {
-        LOCK
-    }
+/// A new empty source of the format `FORMAT`.
+pub fn source() -> TempDir {
+    let source = tempdir().unwrap();
+    put(source.path(), SOURCE_FORMAT, FORMAT);
+    source
 }
 
 /// The programs of the system the binary and the fakes run.
@@ -281,9 +271,9 @@ pub fn executable(_path: &Path) -> bool {
     false
 }
 
-/// A source with `files/a.txt`, `files/sub/b.txt` and `seed/s.txt`, and a project initialised on it.
+/// A source of `FORMAT` with `files/a.txt`, `files/sub/b.txt` and `seed/s.txt`, and a project initialised on it.
 pub fn project(home: &Home) -> (TempDir, TempDir) {
-    let source = tempdir().unwrap();
+    let source = source();
     put(source.path(), "files/a.txt", "a1");
     put(source.path(), "files/sub/b.txt", "b1");
     put(source.path(), "seed/s.txt", "seed1");

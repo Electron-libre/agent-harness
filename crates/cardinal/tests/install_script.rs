@@ -8,7 +8,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use common::{output, put, script, Run, NEW_CONFIG};
+use common::{output, put, script, Run, CONFIG};
 use tempfile::tempdir;
 
 /// Run the installer in `root` with fakes in `bin`: `cargo` logs its arguments to `<bin>/log`, `curl` finds nothing.
@@ -64,7 +64,7 @@ fn a_path_git_source_is_installed_from_its_file_url_from_the_project_root() {
         let bin = tempdir().unwrap();
         put(
             &root,
-            NEW_CONFIG,
+            CONFIG,
             &format!("[cardinal]\nsource = \"{source}\"\nrev = \"main\"\n"),
         );
 

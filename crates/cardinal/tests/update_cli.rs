@@ -6,13 +6,14 @@ mod common;
 use std::path::Path;
 use std::process::Command;
 
-use common::{get, put, snapshot, Home, CONFIG, LOCK};
+use common::{get, put, snapshot, Home, CONFIG, FORMAT, LOCK, SOURCE_FORMAT};
 use tempfile::{tempdir, TempDir};
 
 /// A git repository with `v1` on its first commit and `main` on its second; returns both hashes.
 fn git_source(home: &Home) -> (TempDir, String, String) {
     let repo = tempdir().unwrap();
     home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), SOURCE_FORMAT, FORMAT);
     put(repo.path(), "files/a.txt", "a1");
     home.git(repo.path(), &["add", "."]);
     home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
@@ -28,13 +29,13 @@ fn url(repo: &Path) -> String {
     format!("file://{}", repo.display())
 }
 
-/// A project whose `harness.toml` points at `repo` under a comment of its own.
+/// A project whose configuration points at `repo` under a comment of its own.
 fn git_project(repo: &Path) -> TempDir {
     let root = tempdir().unwrap();
     put(
         root.path(),
         CONFIG,
-        &format!("# mine\n[harness]\nsource = \"{}\"\n", url(repo)),
+        &format!("# mine\n[cardinal]\nsource = \"{}\"\n", url(repo)),
     );
     root
 }
@@ -113,7 +114,7 @@ fn update_changes_only_the_rev_line() {
     let root = tempdir().unwrap();
     let source = url(repo.path());
     let text = |rev: &str| {
-        format!("# mine\n[harness]\nsource = \"{source}\" # why\nrev = {rev}\n\n[project]\nrev = \"keep\"\n")
+        format!("# mine\n[cardinal]\nsource = \"{source}\" # why\nrev = {rev}\n\n[project]\nrev = \"keep\"\n")
     };
     put(root.path(), CONFIG, &text("\"old\"  # v0"));
     home.ok(root.path(), &["update", "--rev", "v1"]);
@@ -133,13 +134,13 @@ fn update_inserts_a_missing_rev_right_after_source() {
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"{source}\"\n\n[project]\na = 1\n"),
+        &format!("[cardinal]\nsource = \"{source}\"\n\n[project]\na = 1\n"),
     );
     home.ok(root.path(), &["update", "--rev", "v1"]);
     assert_eq!(
         get(root.path(), CONFIG),
         Some(format!(
-            "[harness]\nsource = \"{source}\"\nrev = \"{first}\"  # v1\n\n[project]\na = 1\n"
+            "[cardinal]\nsource = \"{source}\"\nrev = \"{first}\"  # v1\n\n[project]\na = 1\n"
         ))
     );
 }
@@ -152,7 +153,7 @@ fn update_fails_changing_nothing_on_a_quoted_or_dotted_key() {
     let source = url(repo.path());
     for (config, error) in [
         (
-            format!("[harness]\nsource = \"{source}\"\n\"rev\" = \"old\"\n"),
+            format!("[cardinal]\nsource = \"{source}\"\n\"rev\" = \"old\"\n"),
             "cannot rewrite `rev`",
         ),
         (
@@ -241,7 +242,7 @@ fn a_source_ending_in_dot_git_is_cloned_and_any_other_ending_is_a_local_director
         put(
             root.path(),
             CONFIG,
-            &format!("[harness]\nsource = \"{source}\"\n"),
+            &format!("[cardinal]\nsource = \"{source}\"\n"),
         );
         root
     };
@@ -277,6 +278,7 @@ fn a_relative_git_source_is_the_repository_next_to_its_own_project() {
         let repo = dir.path().join("x.git");
         home.git(dir.path(), &["init", "--quiet", "-b", "main", "x.git"]);
         put(&repo, "files/a.txt", text);
+        put(&repo, SOURCE_FORMAT, FORMAT);
         home.git(&repo, &["add", "."]);
         home.git(&repo, &["commit", "--quiet", "-m", text]);
         let root = dir.path().join("project");

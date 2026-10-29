@@ -7,7 +7,7 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{executable, get, output, put, script, Home, Run, CONFIG};
+use common::{executable, get, output, put, script, Home, Run, CONFIG, FORMAT, SOURCE_FORMAT};
 use tempfile::{tempdir, TempDir};
 
 const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -137,7 +137,7 @@ fn pinned(source: &str) -> TempDir {
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"{source}\"\nrev = \"{COMMIT}\"\n"),
+        &format!("[cardinal]\nsource = \"{source}\"\nrev = \"{COMMIT}\"\n"),
     );
     root
 }
@@ -200,7 +200,7 @@ fn a_working_directory_outside_any_project_falls_back_to_the_project_dir() {
         other.path(),
         CONFIG,
         &format!(
-            "[harness]\nsource = \"{SOURCE}\"\nrev = \"{}\"\n",
+            "[cardinal]\nsource = \"{SOURCE}\"\nrev = \"{}\"\n",
             "f".repeat(40)
         ),
     );
@@ -217,7 +217,7 @@ fn run_finds_the_project_by_its_new_configuration_first() {
     let root = tempdir().unwrap();
     put(
         root.path(),
-        ".claude/cardinal.toml",
+        CONFIG,
         &format!("[cardinal]\nsource = \"{SOURCE}\"\nrev = \"{COMMIT}\"\n"),
     );
     let run = l.run(root.path());
@@ -226,7 +226,7 @@ fn run_finds_the_project_by_its_new_configuration_first() {
     // a stale old configuration beside it pins nothing
     put(
         root.path(),
-        CONFIG,
+        ".claude/harness.toml",
         &format!(
             "[harness]\nsource = \"{SOURCE}\"\nrev = \"{}\"\n",
             "f".repeat(40)
@@ -379,7 +379,7 @@ fn run_from_a_subdirectory_builds_a_relative_git_source_from_the_project_root() 
     put(
         &root,
         CONFIG,
-        "[harness]\nsource = \"../x.git\"\nrev = \"main\"\n",
+        "[cardinal]\nsource = \"../x.git\"\nrev = \"main\"\n",
     );
     fs::create_dir_all(root.join("sub")).unwrap();
 
@@ -426,7 +426,7 @@ fn local_project(l: &Launcher) -> (TempDir, TempDir, PathBuf) {
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"{}\"\n", source.path().display()),
+        &format!("[cardinal]\nsource = \"{}\"\n", source.path().display()),
     );
     let built = l.home.path().join("target-cardinal");
     (source, root, built)
@@ -514,6 +514,7 @@ fn git_source(home: &Home) -> (TempDir, TempDir, String) {
     let origin = tempdir().unwrap();
     home.git(origin.path(), &["init", "-q", "-b", "main"]);
     put(origin.path(), "files/a.txt", "a");
+    put(origin.path(), SOURCE_FORMAT, FORMAT);
     home.git(origin.path(), &["add", "."]);
     home.git(origin.path(), &["commit", "-q", "-m", "x"]);
     let commit = home.git(origin.path(), &["rev-parse", "HEAD"]);
@@ -522,7 +523,7 @@ fn git_source(home: &Home) -> (TempDir, TempDir, String) {
         root.path(),
         CONFIG,
         &format!(
-            "[harness]\nsource = \"file://{}\"\n",
+            "[cardinal]\nsource = \"file://{}\"\n",
             origin.path().display()
         ),
     );

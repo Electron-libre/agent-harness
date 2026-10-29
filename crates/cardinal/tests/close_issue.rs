@@ -306,7 +306,7 @@ fn relink_checks(script: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         std::fs::create_dir_all(tmp.join(dir)).unwrap();
     }
     std::fs::write(
-        tmp.join(".claude/harness.toml"),
+        tmp.join(".claude/cardinal.toml"),
         "[project]\nskipped_dirs = [\"vendor\"]\n",
     )
     .unwrap();

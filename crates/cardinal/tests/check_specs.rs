@@ -416,12 +416,12 @@ fn any_layout(case: &Case, report: &dyn Fn(&str, bool)) {
         None,
     );
     case(
-        "the skipped_dirs of harness.toml are not read",
+        "the skipped_dirs of cardinal.toml are not read",
         SPEC,
         TESTS,
         &[
             (
-                ".claude/harness.toml",
+                ".claude/cardinal.toml",
                 "[project]\nskipped_dirs = [\"vendor\"]\n",
             ),
             ("vendor/a/tests/t.rs", &cited("RER-9")),
@@ -429,11 +429,11 @@ fn any_layout(case: &Case, report: &dyn Fn(&str, bool)) {
         None,
     );
     case(
-        "a harness.toml that does not parse is a problem, not an empty skipped_dirs",
+        "a cardinal.toml that does not parse is a problem, not an empty skipped_dirs",
         SPEC,
         TESTS,
-        &[(".claude/harness.toml", "[project\n")],
-        Some(".claude/harness.toml"),
+        &[(".claude/cardinal.toml", "[project\n")],
+        Some(".claude/cardinal.toml"),
     );
 }
 
@@ -477,7 +477,7 @@ fn in_git(script: &Path, report: &dyn Fn(&str, bool)) {
     write("crates/a/src/t.rs", "// spec: RER-1\nfn t() {}\n");
     write("crates/a/src/worktrees/w.rs", "fn w() {}\n");
     write(
-        ".claude/harness.toml",
+        ".claude/cardinal.toml",
         "[project]\nskipped_dirs = [\"vendor\"]\n",
     );
     write("vendor/a/t.rs", "// spec: RER-9\nfn t() {}\n");

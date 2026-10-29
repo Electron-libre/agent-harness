@@ -7,7 +7,7 @@ mod common;
 use std::fs;
 use std::path::Path;
 
-use common::{get, project, put, Home, CONFIG, LOCK};
+use common::{get, project, put, Home, CONFIG, FORMAT, LOCK, SOURCE_FORMAT};
 use tempfile::{tempdir, TempDir};
 
 const SETTINGS: &str = ".claude/settings.json";
@@ -112,6 +112,7 @@ fn check_judges_no_harness_hook_and_no_cardinal_hook_through_the_harness_of_befo
 fn source_with_a_new_hook_command(home: &Home) -> (TempDir, TempDir, String) {
     let repo = tempdir().unwrap();
     home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), SOURCE_FORMAT, FORMAT);
     put(repo.path(), "files/a.txt", "a1");
     home.git(repo.path(), &["add", "."]);
     home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
@@ -120,7 +121,7 @@ fn source_with_a_new_hook_command(home: &Home) -> (TempDir, TempDir, String) {
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"{}\"\n", url(repo.path())),
+        &format!("[cardinal]\nsource = \"{}\"\n", url(repo.path())),
     );
     home.ok(root.path(), &["update", "--rev", "v1"]);
     put(

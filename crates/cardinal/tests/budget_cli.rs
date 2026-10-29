@@ -5,7 +5,7 @@ mod common;
 
 use std::path::Path;
 
-use common::{config_of, get, project, put, Home, Run, CONFIG};
+use common::{get, project, put, Home, Run, CONFIG, FORMAT, SOURCE_FORMAT};
 use tempfile::tempdir;
 
 /// A skill whose front matter counts 1 + 9 = 10 bytes, with a body loaded on demand that counts for nothing.
@@ -21,18 +21,17 @@ fn budget(run: &Run) -> Vec<&str> {
 
 fn over(total: u64, budget: u64, part: &str, bytes: u64) -> String {
     format!(
-        "warning: the fixed context is {total} bytes, over the budget of {budget} (fixed_context_budget in .claude/harness.toml); the largest part is {part} ({bytes} bytes)"
+        "warning: the fixed context is {total} bytes, over the budget of {budget} (fixed_context_budget in .claude/cardinal.toml); the largest part is {part} ({bytes} bytes)"
     )
 }
 
 const NOT_A_NUMBER: &str =
-    "warning: fixed_context_budget in .claude/harness.toml is not a whole number of bytes";
+    "warning: fixed_context_budget in .claude/cardinal.toml is not a whole number of bytes";
 
-/// Sets `fixed_context_budget = <value>` in the `[project]` table of the project's `harness.toml`, replacing the
+/// Sets `fixed_context_budget = <value>` in the `[project]` table of the project's configuration, replacing the
 /// previous value.
 fn set_budget(root: &Path, value: &str) {
-    let name = config_of(root);
-    let config: String = get(root, name)
+    let config: String = get(root, CONFIG)
         .unwrap()
         .lines()
         .filter(|l| !l.starts_with("fixed_context_budget"))
@@ -44,7 +43,7 @@ fn set_budget(root: &Path, value: &str) {
     } else {
         format!("{config}\n[project]\n{line}")
     };
-    put(root, name, &config);
+    put(root, CONFIG, &config);
 }
 
 /// A `CLAUDE.md` of `bytes` bytes that imports `AGENTS.md`.
@@ -162,6 +161,7 @@ fn update_warns_once_judging_the_work_tree_it_leaves() {
     let home = Home::new();
     let repo = tempdir().unwrap();
     home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), SOURCE_FORMAT, FORMAT);
     put(repo.path(), "files/AGENTS.md", &"a".repeat(20));
     home.git(repo.path(), &["add", "."]);
     home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
@@ -170,7 +170,7 @@ fn update_warns_once_judging_the_work_tree_it_leaves() {
         root.path(),
         CONFIG,
         &format!(
-            "[harness]\nsource = \"file://{}\"\n\n[project]\nfixed_context_budget = 25\n",
+            "[cardinal]\nsource = \"file://{}\"\n\n[project]\nfixed_context_budget = 25\n",
             repo.path().display()
         ),
     );

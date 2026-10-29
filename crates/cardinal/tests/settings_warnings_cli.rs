@@ -7,7 +7,9 @@ mod common;
 use std::fs;
 use std::path::Path;
 
-use common::{gated, get, project, put, record_hook, snapshot, Home, Run, CONFIG, LOCK};
+use common::{
+    gated, get, project, put, record_hook, snapshot, Home, Run, CONFIG, FORMAT, LOCK, SOURCE_FORMAT,
+};
 use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
 
@@ -247,6 +249,7 @@ fn a_dry_run_warns_of_the_settings_as_the_sync_would_leave_them() {
 fn git_project(home: &Home) -> (TempDir, TempDir) {
     let repo = tempdir().unwrap();
     home.git(repo.path(), &["init", "--quiet", "-b", "main"]);
+    put(repo.path(), SOURCE_FORMAT, FORMAT);
     put(repo.path(), "files/a.txt", "a1");
     home.git(repo.path(), &["add", "."]);
     home.git(repo.path(), &["commit", "--quiet", "-m", "one"]);
@@ -254,7 +257,10 @@ fn git_project(home: &Home) -> (TempDir, TempDir) {
     put(
         root.path(),
         CONFIG,
-        &format!("[harness]\nsource = \"file://{}\"\n", repo.path().display()),
+        &format!(
+            "[cardinal]\nsource = \"file://{}\"\n",
+            repo.path().display()
+        ),
     );
     put(root.path(), SETTINGS, &running_gone());
     (repo, root)

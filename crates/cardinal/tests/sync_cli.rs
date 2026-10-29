@@ -5,7 +5,7 @@ mod common;
 
 use std::fs;
 
-use common::{get, project, put, snapshot, Home, CONFIG, LOCK};
+use common::{get, project, put, snapshot, source, Home, CONFIG, FORMAT, LOCK, SOURCE_FORMAT};
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 
@@ -186,16 +186,16 @@ fn check_fails_when_the_project_was_never_synced() {
 #[test]
 fn init_writes_the_config_with_the_source_defaults_and_refuses_to_overwrite() {
     let home = Home::new();
-    let source = tempdir().unwrap();
+    let source = source();
     put(
         source.path(),
-        "seed/.claude/harness.toml",
+        "seed/.claude/cardinal.toml",
         "[project]\nname = \"x\"\n",
     );
     let root = tempdir().unwrap();
     home.ok(root.path(), &["init", source.path().to_str().unwrap()]);
     let text = get(root.path(), CONFIG).unwrap();
-    let expected = format!("[harness]\nsource = \"{}\"\n", source.path().display());
+    let expected = format!("[cardinal]\nsource = \"{}\"\n", source.path().display());
     assert!(text.starts_with(&expected), "{text}");
     assert!(text.contains("[project]\nname = \"x\""), "{text}");
 
@@ -211,15 +211,16 @@ fn init_escapes_the_source_and_the_rev_in_the_config() {
     let source = tempdir().unwrap();
     let odd = source.path().join("we\"ird\\dir");
     fs::create_dir_all(odd.join("files")).unwrap();
+    put(&odd, SOURCE_FORMAT, FORMAT);
     let root = tempdir().unwrap();
     home.ok(
         root.path(),
         &["init", odd.to_str().unwrap(), "--rev", "v\"1"],
     );
     let config: toml::Table = get(root.path(), CONFIG).unwrap().parse().unwrap();
-    let harness = config["harness"].as_table().unwrap();
-    assert_eq!(harness["source"].as_str(), odd.to_str());
-    assert_eq!(harness["rev"].as_str(), Some("v\"1"));
+    let table = config["cardinal"].as_table().unwrap();
+    assert_eq!(table["source"].as_str(), odd.to_str());
+    assert_eq!(table["rev"].as_str(), Some("v\"1"));
 }
 
 // spec: SYN-10

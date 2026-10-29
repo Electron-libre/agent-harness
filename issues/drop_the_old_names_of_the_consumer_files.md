@@ -28,3 +28,48 @@ tool loses the fallback and the migration code it keeps for them.
 
 # Hints
 * After `drop_the_harness_alias`: both drop what a consumer of before the rename still needs.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Every consumer (cardinal, RetroDoc, Assistant) is pinned to `50e809d` (format 3) and migrated, checked 2026-10-29.
+`cardinal` then refuses a source below the format 3 (new SYN-51, ADR 0016) and reads and writes the new names only;
+the history readers (`transcripts.rs`, `delivered_quality.rs`) keep both. Out of scope: the `harness` release and
+build of an old commit (`install_cardinal.sh`), the gate mark `# harness: native review gate`.
+
+## Plan
+1. [x] Test fixtures on the new names: `tests/common` names `.claude/cardinal.toml` and `.claude/cardinal.lock`, the
+   fixture sources declare `cardinal-format` 3, the projects the tools and `run` read carry `[cardinal]`; the
+   history fixtures (session metrics, delivered quality, rule breaches, fixed context) keep the old names; no change
+   of behaviour; verified by `just check`. ~500 lines.
+2. [ ] Drop the old names: `init`, `sync` and `update` refuse a source below the format 3; `Names`, `OLD_CONFIG`,
+   `OLD_LOCK`, `Migration`, `table_renamed`, `imports_renamed` go (the history readers keep the old names as their
+   own constants); `run.rs`, the gate script and `install_cardinal.sh` read `.claude/cardinal.toml` only;
+   `names_cli.rs` gives way to the SYN-51 tests; ADR 0016 accepted, ADR 0014 and 0015 marked partly superseded;
+   `docs/usage.md` and `docs/architecture.md` updated; verified by the SYN-51 tests and `just check`; makes true
+   SYN-51 (SYN-44 to SYN-48 withdrawn, SYN-9, SYN-11, SYN-18, SYN-42, BIN-1, LNG-3, TRC-10 amended). ~700 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 70d7eb8222dfa3debc84d44774b249a6ae8ea0e0
+- Answer 1 a: a source below the format 3 is refused (SYN-51, ADR 0016).
+
+## Deliverable 1
+- done: the test fixtures write `.claude/cardinal.toml` (`[cardinal]`) and `.claude/cardinal.lock` and their sources
+  declare the format 3 (`common::source`, `SOURCE_FORMAT`, `FORMAT`); the history fixtures and the tests of the
+  old names (`names_cli.rs`, the SYN-47 tests of `run_cli.rs` and `gate_cli.rs`) keep them until deliverable 2.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | none (tests only) |
+| code review | `low`: no findings |
+
+- red: none (tests only, no change of behaviour)
+- Code review: no findings
+- not verified: nothing
+- decisions needed: none

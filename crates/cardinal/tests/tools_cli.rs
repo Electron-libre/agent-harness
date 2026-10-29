@@ -49,13 +49,13 @@ fn git(dir: &Path, args: &[&str]) {
     assert!(status.success(), "git {args:?}");
 }
 
-/// A git repository whose `.claude/harness.toml` is `toml` (none when `None`).
+/// A git repository whose `.claude/cardinal.toml` is `toml` (none when `None`).
 fn project(toml: Option<&str>) -> TempDir {
     let dir = tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
     if let Some(toml) = toml {
         fs::create_dir_all(dir.path().join(".claude")).unwrap();
-        fs::write(dir.path().join(".claude/harness.toml"), toml).unwrap();
+        fs::write(dir.path().join(".claude/cardinal.toml"), toml).unwrap();
     }
     dir
 }
@@ -269,8 +269,8 @@ fn commit_check_exits_2_when_the_configuration_cannot_be_read() {
     let invalid = project(Some("[project\ncommit_scopes = \n"));
     let not_a_repo = tempdir().unwrap();
     for (dir, hint) in [
-        (missing.path(), "harness.toml"),
-        (invalid.path(), "harness.toml"),
+        (missing.path(), "cannot read"),
+        (invalid.path(), "cardinal.toml"),
         (not_a_repo.path(), "git"),
     ] {
         let (code, _, stderr) = tool(dir, &["commit-check"], "feat(docs): add flag\n");
