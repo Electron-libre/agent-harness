@@ -106,7 +106,7 @@ build of an old commit (`install_cardinal.sh`), the gate mark `# harness: native
 | tests | pass (`just check`) |
 | lint | pass |
 | specs | pass |
-| docs | ADR 0016, `issues/report_what_a_format_migration_leaves_to_the_project.md` |
+| docs | ADR 0016, `issues/done/report_what_a_format_migration_leaves_to_the_project.md` |
 | code review | `high`: 9 findings; `low` on the fixes: no findings |
 
 - red: SYN-10: `error: <source>/gone has the format 1, this cardinal syncs the format 3 and higher` instead of `has no files/ directory`
