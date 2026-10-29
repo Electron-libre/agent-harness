@@ -26,7 +26,7 @@ stable, not required: an internal test is the proof when its citation gives the 
 - **TRC-7** (deterministic) The checker must report as a problem, naming its file and line, a citation whose `(internal: ...)` reason is blank, does not end the line with its `)`, or follows no id.
 - **TRC-8** (deterministic) The checker must read from a citation with a reason the same requirement ids as from that citation without it.
 - **TRC-9** (deterministic) The checker must read the citations of every `.rs` file under the root, whatever its directory (a crate at the root, `src/` and `tests/`, as well as `crates/` and `.claude/`), except under a directory named `.git` or `node_modules`, or a `target` directory beside a `Cargo.toml` (the build output).
-- **TRC-10** (deterministic) The checker must not read the `.rs` files under a directory named like one of the `skipped_dirs` of `.claude/cardinal.toml` (else `.claude/harness.toml`, SYN-47 of `specs/sync.md`).
+- **TRC-10** (deterministic) The checker must not read the `.rs` files under a directory named like one of the `skipped_dirs` of `.claude/cardinal.toml`.
 
 ## Scenarios
 

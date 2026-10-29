@@ -209,33 +209,6 @@ fn a_working_directory_outside_any_project_falls_back_to_the_project_dir() {
     assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
 }
 
-// spec: BIN-1, SYN-47
-#[test]
-fn run_finds_the_project_by_its_new_configuration_first() {
-    let l = Launcher::new();
-    script(&l.cached(COMMIT), TOOL);
-    let root = tempdir().unwrap();
-    put(
-        root.path(),
-        CONFIG,
-        &format!("[cardinal]\nsource = \"{SOURCE}\"\nrev = \"{COMMIT}\"\n"),
-    );
-    let run = l.run(root.path());
-    assert_eq!(run.code, Some(0), "{run:?}");
-    assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
-    // a stale old configuration beside it pins nothing
-    put(
-        root.path(),
-        ".claude/harness.toml",
-        &format!(
-            "[harness]\nsource = \"{SOURCE}\"\nrev = \"{}\"\n",
-            "f".repeat(40)
-        ),
-    );
-    let run = l.run(root.path());
-    assert_eq!(ran(&run), l.cached(COMMIT), "{run:?}");
-}
-
 // spec: BIN-2
 #[test]
 fn a_rev_that_is_no_hash_resolves_in_the_clone_sync_left_without_fetching() {

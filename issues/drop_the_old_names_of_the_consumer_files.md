@@ -44,7 +44,7 @@ build of an old commit (`install_cardinal.sh`), the gate mark `# harness: native
    fixture sources declare `cardinal-format` 3, the projects the tools and `run` read carry `[cardinal]`; the
    history fixtures (session metrics, delivered quality, rule breaches, fixed context) keep the old names; no change
    of behaviour; verified by `just check`. ~500 lines.
-2. [ ] Drop the old names: `init`, `sync` and `update` refuse a source below the format 3; `Names`, `OLD_CONFIG`,
+2. [x] Drop the old names: `init`, `sync` and `update` refuse a source below the format 3; `Names`, `OLD_CONFIG`,
    `OLD_LOCK`, `Migration`, `table_renamed`, `imports_renamed` go (the history readers keep the old names as their
    own constants); `run.rs`, the gate script and `install_cardinal.sh` read `.claude/cardinal.toml` only;
    `names_cli.rs` gives way to the SYN-51 tests; ADR 0016 accepted, ADR 0014 and 0015 marked partly superseded;
@@ -72,4 +72,24 @@ build of an old commit (`install_cardinal.sh`), the gate mark `# harness: native
 - red: none (tests only, no change of behaviour)
 - Code review: no findings
 - not verified: nothing
+- decisions needed: none
+
+## Deliverable 2
+- done: `init`, `sync` and `update` refuse a source below the format 3; `check`, `run`, the tools, the gate and
+  `install_cardinal.sh` read `.claude/cardinal.toml` and `.claude/cardinal.lock` only; the migration is gone; the
+  history readers keep the old names (`transcripts::OLD_CONFIG`, `OLD_LOCK`); ADR 0016 accepted, ADR 0014 and 0015
+  partly superseded; `names_cli.rs` and the two SYN-47 tests are removed.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass (SYN-51 accepted with the spec; SYN-44 to SYN-48 withdrawn) |
+| docs | `docs/usage.md`, `docs/architecture.md`, ADR 0014, 0015, 0016 |
+| code review | `low`: no findings |
+
+- red: SYN-51: `error: .claude/cardinal.toml needs a source of the format 3 or higher, <source> has the format 2`
+  instead of `<source> has the format 2, this cardinal syncs the format 3 and higher`
+- Code review: no findings (its two open points hold: `sync` and `update` call `readable` before `sync_from`, `transcripts::LOCKS` compiles)
+- not verified: the CI run of `install_cardinal.sh` (a push only)
 - decisions needed: none

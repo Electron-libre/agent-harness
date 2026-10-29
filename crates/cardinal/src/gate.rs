@@ -42,7 +42,7 @@ const SCRIPT: &str = r#"#!/bin/sh
 legacy=.claude/hooks/require_code_review.rs
 if [ -f "$legacy" ] && command -v rust-script >/dev/null 2>&1; then
     rust-script "$legacy" native || exit $?
-elif [ ! -f "$legacy" ] && { [ -f .claude/cardinal.toml ] || [ -f .claude/harness.toml ]; } && cardinal help run >/dev/null 2>&1; then
+elif [ ! -f "$legacy" ] && [ -f .claude/cardinal.toml ] && cardinal help run >/dev/null 2>&1; then
     cardinal run review-gate native
     code=$?
     if [ "$code" -eq 3 ]; then

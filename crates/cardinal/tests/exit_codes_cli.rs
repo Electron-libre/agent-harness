@@ -23,8 +23,8 @@ fn harness(root: &Path, args: &[&str]) -> (Option<i32>, String) {
 #[test]
 fn an_error_of_a_subcommand_exits_3_with_the_error_on_stderr() {
     let root = tempdir().unwrap();
-    // `init` refuses to overwrite the configuration the first `init` wrote.
-    assert_eq!(harness(root.path(), &["init", "/a/source"]).0, Some(0));
+    // a configuration with no source; `init` refuses to overwrite it.
+    fs::create_dir_all(root.path().join(".claude")).unwrap();
     fs::write(root.path().join(".claude/cardinal.toml"), "[cardinal]\n").unwrap();
     for args in [
         &["sync"][..],
@@ -44,6 +44,7 @@ fn a_drift_exits_1_not_3() {
     let source = tempdir().unwrap();
     fs::create_dir_all(source.path().join("files")).unwrap();
     fs::write(source.path().join("files/managed.txt"), "managed\n").unwrap();
+    fs::write(source.path().join("cardinal-format"), "3\n").unwrap();
     let root = tempdir().unwrap();
     let source = source.path().to_str().unwrap();
     assert_eq!(harness(root.path(), &["init", source]).0, Some(0));

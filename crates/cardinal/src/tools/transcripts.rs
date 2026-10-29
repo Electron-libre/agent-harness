@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::{CONFIG, LOCK, OLD_CONFIG, OLD_LOCK};
+use crate::{CONFIG, LOCK};
 
 /// Branches that name no issue.
 pub const DEFAULT_BRANCHES: &[&str] = &["main", "master", "HEAD"];
@@ -291,7 +291,11 @@ pub fn default_branch(repo: &Path) -> Option<&'static str> {
     })
 }
 
-/// The configuration of a project under its two names, the new one first (SYN-47 of `specs/sync.md`).
+/// The configuration under its name before the format 3, which past commits hold (ADR 0015).
+pub const OLD_CONFIG: &str = ".claude/harness.toml";
+/// The lock under its name before the format 3.
+pub const OLD_LOCK: &str = ".claude/harness.lock";
+/// The configuration of a project under its two names, the new one first: a commit holds one or the other.
 pub const CONFIGS: [&str; 2] = [CONFIG, OLD_CONFIG];
 /// The lock under its two names, as `CONFIGS`.
 pub const LOCKS: [&str; 2] = [LOCK, OLD_LOCK];

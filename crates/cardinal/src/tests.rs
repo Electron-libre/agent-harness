@@ -2,18 +2,17 @@ use super::*;
 
 #[test]
 fn set_rev_ignores_array_lines_and_refuses_what_it_cannot_edit() {
-    let text = "[harness]\nextra = [\n  [\"a\"],\n]\nsource = \"x\"\nrev = \"old\"\n";
-    let out = set_rev(text, "abc", "v1", OLD).unwrap();
+    let text = "[cardinal]\nextra = [\n  [\"a\"],\n]\nsource = \"x\"\nrev = \"old\"\n";
+    let out = set_rev(text, "abc", "v1").unwrap();
     assert!(out.ends_with("rev = \"abc\"  # v1\n"), "{out}");
     assert_eq!(out.matches("rev =").count(), 1);
     assert!(set_rev(
-        "[harness]\nsource = \"x\"\n\"rev\" = \"old\"\n",
+        "[cardinal]\nsource = \"x\"\n\"rev\" = \"old\"\n",
         "abc",
         "v1",
-        OLD
     )
     .is_err());
-    assert!(set_rev("[harness]\nsource = \"x\"\n", "abc", "a\nb", OLD).is_err());
+    assert!(set_rev("[cardinal]\nsource = \"x\"\n", "abc", "a\nb").is_err());
 }
 
 #[test]

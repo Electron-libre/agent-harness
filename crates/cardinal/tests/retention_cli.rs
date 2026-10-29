@@ -6,7 +6,7 @@ mod common;
 use std::path::Path;
 use std::process::Command;
 
-use common::{output, project, put, Home, Run};
+use common::{output, project, put, source, Home, Run};
 
 const ADVICE: &str = "(cleanupPeriodDays); set it to at least 365 in";
 
@@ -39,7 +39,7 @@ fn the_binary_warns_of_the_retention_once_after_check_sync_and_update_never_afte
     let home = Home::new();
     let user = home.path().join("config/settings.json");
     put(home.path(), "config/settings.json", "{}");
-    let source = tempfile::tempdir().unwrap();
+    let source = source();
     put(source.path(), "files/a.txt", "a");
     let root = tempfile::tempdir().unwrap();
     let init = home.ok(root.path(), &["init", source.path().to_str().unwrap()]);

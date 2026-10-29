@@ -1,6 +1,6 @@
 # 0015. The consumer files are named after the format
 
-Status: Proposed
+Status: Accepted, partly superseded by 0016 (the old names and the migration are dropped)
 Date: 2026-10-28
 
 ## Context

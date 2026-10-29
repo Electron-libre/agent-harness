@@ -3,8 +3,7 @@
 //! A source holds `files/` (managed: overwritten on every sync while untouched locally) and `seed/`
 //! (project-owned: copied once, never again), and may hold `entries/.claude/settings.json`, the entries of the
 //! project's settings it manages (`entries.rs`). `.claude/cardinal.lock` records the hash of each managed file as
-//! written and the managed entries, so a later sync tells a local edit from a source change. A source below the format
-//! 3 keeps the names before the rename, `.claude/harness.toml` and `.claude/harness.lock` (ADR 0015).
+//! written and the managed entries, so a later sync tells a local edit from a source change.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
@@ -21,21 +20,16 @@ use sha2::{Digest, Sha256};
 pub const CONFIG: &str = ".claude/cardinal.toml";
 /// Hashes of the managed files as last written, relative to the project root.
 pub const LOCK: &str = ".claude/cardinal.lock";
-/// The configuration under its name before the format 3, which a `cardinal` of a lower format reads (SYN-44).
-pub const OLD_CONFIG: &str = ".claude/harness.toml";
-/// The lock under its name before the format 3.
-pub const OLD_LOCK: &str = ".claude/harness.lock";
-/// The first format whose project files carry the new names (SYN-44, ADR 0015).
-const NEW_NAMES: u32 = 3;
-/// The names of the project-owned justfile whose `import` lines the migration rewrites, in the order `just` looks for
-/// them (SYN-45).
-const JUSTFILES: [&str; 3] = ["justfile", "Justfile", ".justfile"];
+/// The table of the configuration that names the source and its pinned revision.
+const TABLE: &str = "cardinal";
+/// The lowest format this `cardinal` syncs: the first whose project files carry the names above (SYN-51, ADR 0016).
+const MIN_FORMAT: u32 = 3;
 /// The exit code of a failure that is not the verdict of a hook: `run` that cannot get the tool or does not know it,
 /// the launcher that cannot parse its arguments, an error of the other subcommands. Not 2, which Claude Code reads as
 /// the refusal of a hook (BIN-7, BIN-14, BIN-17, SYN-37).
 pub const NOT_A_REFUSAL: u8 = 3;
-/// The format of the managed content this `cardinal` reads, and every lower one (SYN-40, ADR 0014): equal to the
-/// `cardinal-format` of its revision (SYN-43).
+/// The format of the managed content this `cardinal` reads, and every lower one down to `MIN_FORMAT` (SYN-40): equal
+/// to the `cardinal-format` of its revision (SYN-43).
 pub const FORMAT: u32 = 3;
 /// The file of the source that declares the format its content needs, relative to the source.
 const SOURCE_FORMAT: &str = "cardinal-format";
@@ -50,59 +44,10 @@ pub mod run;
 mod settings;
 pub mod tools;
 
-/// The names of the configuration, of its table and of the lock of a project.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Names {
-    config: &'static str,
-    table: &'static str,
-    lock: &'static str,
-}
-
-const NEW: Names = Names {
-    config: CONFIG,
-    table: "cardinal",
-    lock: LOCK,
-};
-const OLD: Names = Names {
-    config: OLD_CONFIG,
-    table: "harness",
-    lock: OLD_LOCK,
-};
-
-impl Names {
-    /// The names `sync` writes from a source of `format` (SYN-44); a project that has the new configuration keeps it.
-    fn written(root: &Path, format: u32) -> Self {
-        if format >= NEW_NAMES || root.join(CONFIG).is_file() {
-            NEW
-        } else {
-            OLD
-        }
-    }
-
-    /// The names of the configuration the project has (SYN-47): the new one when that file exists.
-    fn read(root: &Path) -> Self {
-        if root.join(CONFIG).is_file() {
-            NEW
-        } else {
-            OLD
-        }
-    }
-}
-
-/// The configuration of the project at `root`: `.claude/cardinal.toml` when that file exists, else
-/// `.claude/harness.toml` (SYN-47).
+/// The configuration of the project at `root`.
 #[must_use]
 pub fn config_of(root: &Path) -> PathBuf {
-    root.join(Names::read(root).config)
-}
-
-/// The lock of the project, relative to its root: the new name when that file exists, else the old one (SYN-47).
-fn lock_of(root: &Path) -> &'static str {
-    if root.join(LOCK).is_file() {
-        LOCK
-    } else {
-        OLD_LOCK
-    }
+    root.join(CONFIG)
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -124,8 +69,6 @@ pub enum Outcome {
     Kept,
     /// A hook of the project's own moved aside so that the managed one can chain it.
     Moved,
-    /// A file of the old names moved to its new name (SYN-45).
-    Renamed,
     /// Not done, for the reason given.
     Skipped(&'static str),
 }
@@ -141,7 +84,6 @@ impl fmt::Display for Outcome {
             Outcome::Conflict => "conflict (modified locally, fix it in the source or use --force)",
             Outcome::Kept => "kept (dropped from the source but modified locally)",
             Outcome::Moved => "moved (your hook now runs after the review gate)",
-            Outcome::Renamed => "renamed",
             Outcome::Skipped(why) => return write!(f, "skipped ({why})"),
         })
     }
@@ -251,8 +193,7 @@ const FORMAT_LINE: &str = "format ";
 /// The lock of the project, `None` when it has none yet; an error when its source has a format this `cardinal` does
 /// not read, judged before any other line (SYN-42).
 fn read_lock(root: &Path) -> Result<Option<Lock>> {
-    let name = lock_of(root);
-    let path = root.join(name);
+    let path = root.join(LOCK);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
@@ -264,7 +205,7 @@ fn read_lock(root: &Path) -> Result<Option<Lock>> {
             .parse()
             .with_context(|| format!("{}: not a format: {format}", path.display()))?;
         if format > FORMAT {
-            bail!("{name} was synced from a source of the format {format}, this one reads up to {FORMAT}: install it with {}", install_hint(root));
+            bail!("{LOCK} was synced from a source of the format {format}, this one reads up to {FORMAT}: install it with {}", install_hint(root));
         }
     }
     let mut lock = Lock::default();
@@ -296,7 +237,7 @@ fn install_hint(root: &Path) -> String {
 }
 
 /// Write the lock of a sync from a source of the format `format`, under the name `name`.
-fn write_lock(root: &Path, lock: &Lock, format: u32, name: &str) -> Result<()> {
+fn write_lock(root: &Path, lock: &Lock, format: u32) -> Result<()> {
     let mut text = String::from(
         "# Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.\n",
     );
@@ -307,7 +248,7 @@ fn write_lock(root: &Path, lock: &Lock, format: u32, name: &str) -> Result<()> {
     for entry in &lock.entries {
         let _ = writeln!(text, "{ENTRY}  {}", entry.to_lock());
     }
-    write(&root.join(name), text.as_bytes())
+    write(&root.join(LOCK), text.as_bytes())
 }
 
 fn write(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -524,10 +465,10 @@ fn checkout(cache: Option<&Path>, url: &str, rev: Option<&str>) -> Result<PathBu
     Ok(dir)
 }
 
-/// The text of the configuration `names` with `rev` set in its table, every other line left as it is.
+/// The text of the configuration with `rev` set in its table, every other line left as it is.
 ///
 /// The line becomes `rev = "<commit>"  # <name>`; a missing `rev` is inserted right after `source`.
-fn set_rev(text: &str, commit: &str, name: &str, names: Names) -> Result<String> {
+fn set_rev(text: &str, commit: &str, name: &str) -> Result<String> {
     if name.contains(char::is_control) {
         bail!("invalid revision name {name:?}");
     }
@@ -541,7 +482,7 @@ fn set_rev(text: &str, commit: &str, name: &str, names: Names) -> Result<String>
             .strip_prefix(key)
             .is_some_and(|rest| rest.trim_start().starts_with('='))
     };
-    let (config, table) = (names.config, names.table);
+    let (config, table) = (CONFIG, TABLE);
     let header = format!("[{table}]");
     let mut in_table = false;
     let mut source_at = None;
@@ -595,127 +536,19 @@ fn is_table_header(line: &str) -> bool {
         && (after.trim().is_empty() || after.trim_start().starts_with('#'))
 }
 
-/// The `source`, resolved (SYN-50), and the pinned `rev` of the table of the configuration (`[cardinal]`, or
-/// `[harness]` of the old name).
+/// The `source`, resolved (SYN-50), and the pinned `rev` of the `[cardinal]` table of the configuration.
 fn source_and_rev(root: &Path) -> Result<(String, Option<String>)> {
     let config = read_config(root)?;
-    let names = Names::read(root);
-    let table = config.get(names.table).and_then(toml::Value::as_table);
+    let table = config.get(TABLE).and_then(toml::Value::as_table);
     let text = |key: &str| {
         table
             .and_then(|t| t.get(key))
             .and_then(toml::Value::as_str)
             .map(str::to_string)
     };
-    let source = text("source").with_context(|| {
-        format!(
-            "{}: missing `source` in the [{}] table",
-            names.config, names.table
-        )
-    })?;
+    let source = text("source")
+        .with_context(|| format!("{CONFIG}: missing `source` in the [{TABLE}] table"))?;
     Ok((resolved(root, &source), text("rev")))
-}
-
-/// What the migration of a project of the old names to the new ones writes (SYN-45), computed before anything is.
-struct Migration {
-    /// The configuration, its table renamed.
-    config: String,
-    /// Whether the project has a lock of the old name.
-    lock: bool,
-    /// The justfile and its new text, when it imports `harness.just`.
-    justfile: Option<(&'static str, String)>,
-}
-
-impl Migration {
-    /// The migration a sync writing `names` makes in the project, if any; an error when its table cannot be renamed.
-    fn of(root: &Path, names: Names) -> Result<Option<Self>> {
-        if names != NEW || root.join(CONFIG).exists() || !root.join(OLD_CONFIG).is_file() {
-            return Ok(None);
-        }
-        let text = fs::read_to_string(root.join(OLD_CONFIG))
-            .with_context(|| format!("reading {OLD_CONFIG}"))?;
-        let justfile = JUSTFILES
-            .iter()
-            .find_map(|name| Some((*name, fs::read_to_string(root.join(name)).ok()?)))
-            .and_then(|(name, text)| {
-                let new = imports_renamed(&text);
-                (new != text).then_some((name, new))
-            });
-        Ok(Some(Self {
-            config: table_renamed(&text)?,
-            lock: root.join(OLD_LOCK).is_file(),
-            justfile,
-        }))
-    }
-
-    /// Rewrite the justfile, then move the configuration, whose new name ends the migration (a failure before leaves
-    /// it to the next sync); the lock is written under its new name by the sync.
-    fn apply(&self, root: &Path) -> Result<()> {
-        if let Some((name, text)) = &self.justfile {
-            write(&root.join(name), text.as_bytes())?;
-        }
-        write(&root.join(CONFIG), self.config.as_bytes())?;
-        fs::remove_file(root.join(OLD_CONFIG))?;
-        Ok(())
-    }
-
-    fn outcomes(&self) -> Vec<(String, Outcome)> {
-        let mut outcomes = vec![(format!("{OLD_CONFIG} -> {CONFIG}"), Outcome::Renamed)];
-        if self.lock {
-            outcomes.push((format!("{OLD_LOCK} -> {LOCK}"), Outcome::Renamed));
-        }
-        if let Some((name, _)) = &self.justfile {
-            outcomes.push(((*name).to_string(), Outcome::Updated));
-        }
-        outcomes
-    }
-}
-
-/// The configuration of the old name with its `[harness]` table line renamed `[cardinal]`, every other byte as it is;
-/// an error when the table is not declared that way (a quoted or dotted key).
-fn table_renamed(text: &str) -> Result<String> {
-    let out: String = text
-        .split_inclusive('\n')
-        .map(|l| {
-            let trimmed = l.trim();
-            let named = trimmed
-                .strip_prefix('[')
-                .and_then(|rest| rest.split_once(']'))
-                .is_some_and(|(name, _)| name.trim() == OLD.table);
-            if is_table_header(trimmed) && named {
-                l.replacen(OLD.table, NEW.table, 1)
-            } else {
-                l.to_string()
-            }
-        })
-        .collect();
-    let renamed = out.parse::<toml::Table>().is_ok_and(|t| {
-        !t.contains_key(OLD.table) && t.get(NEW.table).and_then(|c| c.get("source")).is_some()
-    });
-    if !renamed {
-        bail!("{OLD_CONFIG}: cannot rename its [harness] table automatically: move it to {CONFIG} with the table [cardinal] by hand");
-    }
-    Ok(out)
-}
-
-/// A `justfile` with each `import` or `import?` line of `harness.just` naming `cardinal.just`, every other byte as it is.
-fn imports_renamed(text: &str) -> String {
-    const OLD_JUST: &str = "harness.just";
-    text.split_inclusive('\n')
-        .map(|l| {
-            let Some(rest) = l.trim_start().strip_prefix("import") else {
-                return l.to_string();
-            };
-            let rest = rest.strip_prefix('?').unwrap_or(rest);
-            let path = rest.trim_start();
-            let quoted = [format!("'{OLD_JUST}'"), format!("\"{OLD_JUST}\"")];
-            if path.len() == rest.len() || !quoted.iter().any(|q| path.starts_with(q.as_str())) {
-                return l.to_string();
-            }
-            let at = l.len() - path.len() + 1;
-            [&l[..at], "cardinal.just", &l[at + OLD_JUST.len()..]].concat()
-        })
-        .collect()
 }
 
 /// The format the source in `dir` declares, 1 when it declares none.
@@ -731,47 +564,43 @@ fn format_of(dir: &Path) -> Result<u32> {
     }
 }
 
-/// An error when the source `name` in `dir` needs a newer `cardinal`, which `install` installs (SYN-40), or has the old
-/// names while the project at `root` has the new ones (SYN-48).
-fn readable(root: &Path, dir: &Path, name: &str, install: &str) -> Result<()> {
+/// The format of the source `name` in `dir`; an error when it needs a newer `cardinal`, which `install` installs
+/// (SYN-40), or an older one (SYN-51).
+fn readable(dir: &Path, name: &str, install: &str) -> Result<u32> {
     let format = format_of(dir)?;
     if format > FORMAT {
         bail!("{name} needs a cardinal that reads the format {format}, this one reads up to {FORMAT}: install it with `{install}`");
     }
-    if format < NEW_NAMES && root.join(CONFIG).is_file() {
-        bail!("{CONFIG} needs a source of the format {NEW_NAMES} or higher, {name} has the format {format}");
+    if format < MIN_FORMAT {
+        bail!("{name} has the format {format}, this cardinal syncs the format {MIN_FORMAT} and higher");
     }
-    Ok(())
+    Ok(format)
 }
 
-/// Create the configuration, named after the format of the source (SYN-46), from the source and the project-owned
-/// defaults of the source.
+/// Create the configuration from the source and the project-owned defaults of the source (SYN-9).
 ///
 /// # Errors
 /// When the project already has a configuration or the source cannot be read.
 pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
-    for name in [CONFIG, OLD_CONFIG] {
-        let path = root.join(name);
-        if path.exists() {
-            bail!("{} already exists", path.display());
-        }
+    let path = root.join(CONFIG);
+    if path.exists() {
+        bail!("{} already exists", path.display());
     }
     let dir = if is_git_url(source) {
         checkout(None, &resolved(root, source), rev)?
     } else {
         root.join(source)
     };
-    let names = Names::written(root, format_of(&dir)?);
+    readable(&dir, source, &launcher::install(source, rev))?;
     let mut table = toml::Table::new();
     table.insert("source".into(), source.into());
     if let Some(rev) = rev {
         table.insert("rev".into(), rev.into());
     }
     let mut config = toml::Table::new();
-    config.insert(names.table.into(), table.into());
+    config.insert(TABLE.into(), table.into());
     let mut text = config.to_string();
-    let path = root.join(names.config);
-    if let Ok(defaults) = fs::read_to_string(dir.join("seed").join(names.config)) {
+    if let Ok(defaults) = fs::read_to_string(dir.join("seed").join(CONFIG)) {
         text.push('\n');
         text.push_str(&defaults);
     }
@@ -792,7 +621,6 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
         (root.join(&source), None)
     };
     readable(
-        root,
         &dir,
         &source,
         &launcher::install(&source, commit.as_deref()),
@@ -823,7 +651,7 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         bail!(
             "{} has no files/ directory: is `source` right in {}?",
             source.display(),
-            Names::read(root).config
+            CONFIG
         );
     }
     let Lock {
@@ -831,8 +659,6 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         entries: recorded,
     } = read_lock(root)?.unwrap_or_default();
     let format = format_of(source)?;
-    let names = Names::written(root, format);
-    let migration = Migration::of(root, names)?;
     let wanted = entries::of_source(source)?;
     // decided first: a hook of the user that cannot be chained stops the sync before it writes anything
     let files = list(&managed)?;
@@ -842,12 +668,6 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         gate.install()?;
     }
     let mut report = Report::default();
-    if let Some(migration) = &migration {
-        if !options.dry_run {
-            migration.apply(root)?;
-        }
-        report.entries.extend(migration.outcomes());
-    }
 
     let file_set: BTreeSet<&String> = files.iter().collect();
     let new_lock = write_managed(root, &managed, &files, &lock, options, &mut report)?;
@@ -875,11 +695,7 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         entries: merge.lock,
     };
     if !options.dry_run {
-        write_lock(root, &new_lock, format, names.lock)?;
-        // also the old lock a migration interrupted after it moved the configuration left behind
-        if names == NEW && root.join(OLD_LOCK).is_file() {
-            fs::remove_file(root.join(OLD_LOCK))?;
-        }
+        write_lock(root, &new_lock, format)?;
     }
     // judged on the project as the sync leaves it, or would under `--dry-run`
     let done = |path: &str, outcome| report.outcome(path) == Some(outcome);
@@ -974,11 +790,8 @@ fn write_seeds(
     for rel in list(seeds)? {
         let dst = root.join(&rel);
         // `symlink_metadata`: a dangling symlink is something the project has. A managed path is not a seed, nor the
-        // configuration, which `init` writes and the migration moves.
-        if file_set.contains(&rel)
-            || [CONFIG, OLD_CONFIG].contains(&rel.as_str())
-            || fs::symlink_metadata(&dst).is_ok()
-        {
+        // configuration, which `init` writes.
+        if file_set.contains(&rel) || rel == CONFIG || fs::symlink_metadata(&dst).is_ok() {
             continue;
         }
         if !options.dry_run {
@@ -1033,16 +846,12 @@ fn update_in(
 ) -> Result<UpdateReport> {
     let (source, previous) = source_and_rev(root)?;
     if !is_git_url(&source) {
-        bail!(
-            "{}: `source` is a local directory, which has no revision to update",
-            Names::read(root).config
-        );
+        bail!("{CONFIG}: `source` is a local directory, which has no revision to update");
     }
     let dir = fetch(&cache_or_default(cache)?, &source)?;
     let commit = resolve_in(&dir, &source, rev)?;
     git(Some(&dir), &["checkout", "--quiet", "--detach", &commit])?;
     readable(
-        root,
         &dir,
         &format!("{source} at {commit}"),
         &launcher::install(&source, Some(&commit)),
@@ -1068,14 +877,9 @@ fn update_in(
     if !refused.is_empty() && !options.dry_run {
         bail!("{}", refused.join("\n"));
     }
-    let names = Names::written(root, format_of(&dir)?);
-    // the configuration as the migration of the sync below leaves it (SYN-45)
-    let current = match Migration::of(root, names)? {
-        Some(migration) => migration.config,
-        None => fs::read_to_string(config_of(root))?,
-    };
-    let path = root.join(names.config);
-    let text = set_rev(&current, &commit, rev.unwrap_or("default branch"), names)?;
+    let current = fs::read_to_string(config_of(root))?;
+    let path = root.join(CONFIG);
+    let text = set_rev(&current, &commit, rev.unwrap_or("default branch"))?;
     // Nothing is written before the dry run shows a clean sync.
     let mut preview = sync_from(
         root,
@@ -1163,7 +967,7 @@ fn config_dir_of(config_dir: Option<OsString>, home: Option<OsString>) -> Option
 
 fn check_with(root: &Path, ci: bool) -> Result<Checked> {
     let Some(lock) = read_lock(root)? else {
-        bail!("no {}: run `cardinal sync` first", Names::read(root).lock);
+        bail!("no {LOCK}: run `cardinal sync` first");
     };
     let gated = gate::manages(&lock.entries, lock.files.keys());
     let text = fs::read_to_string(root.join(entries::SETTINGS)).ok();

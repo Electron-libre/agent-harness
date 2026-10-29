@@ -4,9 +4,9 @@
 
 A consumer project holds a `.claude/cardinal.toml`: the `[cardinal]` table (`source`, and `rev` for a git source) and
 its own values (`[project]`, read by the tools and the skills). `cardinal sync` reads the source, writes three kinds of
-files, records them in the lock and installs the review gate ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)). A
-project on a source below the format 3 keeps the names before the rename, `.claude/harness.toml` and its lock, until
-the sync that migrates it ([ADR 0015](adr/0015-the-consumer-files-are-named-after-the-format.md)):
+files, records them in the lock and installs the review gate ([ADR 0001](adr/0001-shared-harness-synced-by-a-rust-tool.md), spec [`specs/sync.md`](../specs/sync.md)). It
+refuses a source below the format 3, whose projects carry the names before the rename
+([ADR 0016](adr/0016-cardinal-syncs-the-format-3-and-higher.md)):
 
 ```mermaid
 flowchart LR

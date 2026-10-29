@@ -1,6 +1,6 @@
 # 0014. The source declares the format cardinal must read
 
-Status: Accepted
+Status: Accepted, partly superseded by 0016 (a `cardinal` reads the lower formats down to 3 only)
 Date: 2026-10-28
 
 ## Context

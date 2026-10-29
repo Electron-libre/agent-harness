@@ -221,6 +221,7 @@ fn update_to_an_unknown_revision_or_an_unreadable_source_changes_nothing() {
 fn update_refuses_a_local_directory_source_and_changes_nothing() {
     let home = Home::new();
     let source = tempdir().unwrap();
+    put(source.path(), SOURCE_FORMAT, FORMAT);
     put(source.path(), "files/a.txt", "a1");
     let root = tempdir().unwrap();
     home.ok(root.path(), &["init", source.path().to_str().unwrap()]);
