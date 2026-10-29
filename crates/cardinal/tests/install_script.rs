@@ -91,3 +91,37 @@ fn a_work_tree_without_the_configuration_fails_naming_it() {
     assert!(run.stderr.contains(CONFIG), "{run:?}");
     assert!(!bin.path().join("log").exists(), "{run:?}");
 }
+
+#[test]
+fn a_configuration_without_a_source_fails_naming_the_key_and_the_file() {
+    let root = tempdir().unwrap();
+    let bin = tempdir().unwrap();
+    put(root.path(), CONFIG, "[cardinal]\nrev = \"main\"\n");
+
+    let run = install(root.path(), bin.path());
+
+    assert_eq!(run.code, Some(1), "{run:?}");
+    assert!(run.stderr.contains("source"), "{run:?}");
+    assert!(run.stderr.contains(CONFIG), "{run:?}");
+    assert!(!bin.path().join("log").exists(), "{run:?}");
+}
+
+#[test]
+fn a_literal_string_source_is_installed() {
+    let root = tempdir().unwrap();
+    let bin = tempdir().unwrap();
+    put(
+        root.path(),
+        CONFIG,
+        "[cardinal]\nsource = 'host:x.git'\nrev = 'main'\n",
+    );
+
+    let run = install(root.path(), bin.path());
+
+    assert_eq!(run.code, Some(0), "{run:?}");
+    let log = fs::read_to_string(bin.path().join("log")).unwrap_or_default();
+    assert_eq!(
+        log, "install --quiet --force --git ssh://host/x.git --rev main --locked\n",
+        "{run:?}"
+    );
+}
