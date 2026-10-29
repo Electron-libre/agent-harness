@@ -235,3 +235,107 @@ fn update_stopped_by_a_conflict_rewrites_nothing() {
     assert_eq!(run.code, Some(1), "{run:?}");
     assert_eq!(snapshot(root.path()), before);
 }
+
+/// The name `check-old` replaced by `check-new` in the format 3.
+const NAME: &str = "[[names]]\nold = \"check-old\"\nnew = \"check-new\"\n";
+
+/// The warning of a line of `path` citing `check-old`.
+fn cites(path_line: &str) -> String {
+    format!("warning: {path_line} cites check-old, named check-new since the format 3")
+}
+
+/// The warnings of stderr that report a cited old name.
+fn leftovers(run: &common::Run) -> Vec<&str> {
+    run.stderr
+        .lines()
+        .filter(|l| l.contains(" cites "))
+        .collect()
+}
+
+/// `synced_at_format_2`, made a git repository that tracks the project files `files` and declares `NAME` and the
+/// justfile rewrite.
+fn tracked(home: &Home, files: &[(&str, &[u8])]) -> (TempDir, TempDir) {
+    let (source, root) = synced_at_format_2(home);
+    put(
+        source.path(),
+        "migrations/3.toml",
+        &format!("{NAME}{JUSTFILE_REWRITE}"),
+    );
+    for (rel, bytes) in files {
+        let path = root.path().join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+    }
+    home.git(root.path(), &["init", "--quiet", "-b", "main"]);
+    home.git(root.path(), &["add", "."]);
+    (source, root)
+}
+
+// spec: SYN-54
+#[test]
+fn sync_warns_of_each_line_of_a_tracked_project_file_citing_an_old_name() {
+    let home = Home::new();
+    let (source, root) = tracked(
+        &home,
+        &[
+            (
+                "README.md",
+                b"run check-old\nnothing\ncheck-old and check-old\n",
+            ),
+            ("docs/x.md", b"just check-old\n"),
+            ("issues/done/old.md", b"check-old\n"),
+            ("docs/adr/0001-x.md", b"check-old\n"),
+            ("bin.dat", b"\xff check-old\n"),
+        ],
+    );
+    put(root.path(), "untracked.md", "check-old\n");
+    // a managed file citing it is the source's to fix
+    put(source.path(), "files/a.txt", "check-old\n");
+    let readme = get(root.path(), "README.md").unwrap();
+
+    let run = home.ok(root.path(), &["sync"]);
+    // the justfile was rewritten first: its first line no longer cites the name, its second still does
+    assert_eq!(
+        leftovers(&run),
+        [
+            cites("README.md:1"),
+            cites("README.md:3"),
+            cites("docs/x.md:1"),
+            cites("justfile:2")
+        ],
+        "{run:?}"
+    );
+    assert_eq!(get(root.path(), "README.md").unwrap(), readme);
+}
+
+// spec: SYN-54
+#[test]
+fn sync_dry_run_warns_of_the_lines_as_the_run_would_leave_them() {
+    let home = Home::new();
+    let (_source, root) = tracked(&home, &[("README.md", b"check-old\n")]);
+    let before = snapshot(root.path());
+
+    let run = home.ok(root.path(), &["sync", "--dry-run"]);
+    assert_eq!(
+        leftovers(&run),
+        [cites("README.md:1"), cites("justfile:2")],
+        "{run:?}"
+    );
+    assert_eq!(snapshot(root.path()), before);
+}
+
+// spec: SYN-54
+#[test]
+fn no_old_name_is_reported_outside_a_git_repository_or_once_the_migration_applied() {
+    let home = Home::new();
+    let (source, root) = synced_at_format_2(&home);
+    put(source.path(), "migrations/3.toml", NAME);
+    put(root.path(), "README.md", "check-old\n");
+    let run = home.ok(root.path(), &["sync"]);
+    assert_eq!(run.stderr, "", "{run:?}");
+
+    let (_source, root) = tracked(&home, &[("README.md", b"check-old\n")]);
+    home.ok(root.path(), &["sync"]);
+    let again = home.ok(root.path(), &["sync"]);
+    assert!(leftovers(&again).is_empty(), "{again:?}");
+}

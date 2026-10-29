@@ -105,6 +105,16 @@ fn strings<const N: usize>(table: &toml::Table, keys: [&str; N]) -> Result<[Stri
     Ok(values)
 }
 
+/// Whether `line` holds `name.old` outside an occurrence of `name.new`, which may contain it.
+pub(crate) fn cites(line: &str, name: &Name) -> bool {
+    let news: Vec<usize> = line.match_indices(&name.new).map(|(i, _)| i).collect();
+    line.match_indices(&name.old).any(|(i, _)| {
+        !news
+            .iter()
+            .any(|&j| j <= i && i + name.old.len() <= j + name.new.len())
+    })
+}
+
 /// `text` with every occurrence of `old` that spans whole lines replaced by `new`, `None` when there is none.
 pub(crate) fn rewritten(text: &str, old: &str, new: &str) -> Option<String> {
     let mut out = String::with_capacity(text.len());
@@ -147,5 +157,17 @@ mod tests {
             rewritten("a\nb\nc", "a\nb\n", "y\n").as_deref(),
             Some("y\nc")
         );
+    }
+
+    // spec: SYN-54 (internal: the matching of a name contained in its replacement, cheaper here than a git project)
+    #[test]
+    fn a_line_that_only_cites_the_new_name_containing_the_old_one_does_not_cite_it() {
+        let name = Name {
+            old: "check".into(),
+            new: "check-new".into(),
+        };
+        assert!(!cites("run check-new", &name));
+        assert!(cites("run check-new and check", &name));
+        assert!(cites("check", &name));
     }
 }

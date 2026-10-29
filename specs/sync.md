@@ -108,6 +108,7 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - (SYN-53) Given a justfile line `check: check-old fmt` and the rewrite of the line `check: check-old`, then the line is left as it is: the project changed it.
 - (SYN-53) Given an `update` that stops on a conflict (SYN-13), then nothing is rewritten.
 - (SYN-54) Given an old name cited twice on one line, then the line is reported once for that name.
+- (SYN-54) Given a new name that contains the old one (`check` named `check-all`), then a line that cites only the new one is not reported.
 - (SYN-54) Given a file that git does not track, or a file that is not valid UTF-8, then it is not read.
 - (SYN-55) Given a `sync` that moves the lock to the format the `cardinal` reads, then no hint is printed.
 

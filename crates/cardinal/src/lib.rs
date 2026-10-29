@@ -719,7 +719,7 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         entries: merge.lock,
         format,
     };
-    rewrite_seeded(root, &migrations, &file_set, options, &mut report)?;
+    let rewritten = rewrite_seeded(root, &migrations, &file_set, options, &mut report)?;
     if !options.dry_run {
         write_lock(root, &new_lock, format)?;
     }
@@ -734,6 +734,9 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         None => settings::warnings(base, gated, &present),
     };
     report.warnings.extend(merge.warning);
+    report
+        .warnings
+        .extend(leftovers(root, &migrations, &new_lock, &rewritten));
     Ok(report)
 }
 
@@ -805,14 +808,15 @@ fn remove_dropped(
     Ok(())
 }
 
-/// Rewrite the seeded texts of `migrations` in the project files, the managed ones and the lock excepted (SYN-53).
+/// Rewrite the seeded texts of `migrations` in the project files, the managed ones and the lock excepted (SYN-53);
+/// returns the new text of each file rewritten, written or not.
 fn rewrite_seeded(
     root: &Path,
     migrations: &[migration::Migration],
     file_set: &BTreeSet<&String>,
     options: SyncOptions,
     report: &mut Report,
-) -> Result<()> {
+) -> Result<BTreeMap<String, String>> {
     let mut texts: BTreeMap<&str, String> = BTreeMap::new();
     let mut changed = Vec::new();
     for rewrite in migrations.iter().flat_map(|m| &m.rewrites) {
@@ -834,13 +838,79 @@ fn rewrite_seeded(
             }
         }
     }
+    let mut done = BTreeMap::new();
     for rel in changed {
         if !options.dry_run {
             write(&root.join(rel), texts[rel].as_bytes())?;
         }
         report.entries.push((rel.to_string(), Outcome::Rewritten));
+        done.insert(rel.to_string(), texts[rel].clone());
     }
-    Ok(())
+    Ok(done)
+}
+
+/// The directories of the project that record its history: an old name stays there (SYN-54).
+const HISTORY: [&str; 2] = ["issues/done/", "docs/adr/"];
+
+/// A warning for each line of a project-owned file git tracks that still cites an old name of `migrations`, the files
+/// judged as `rewritten` leaves them (SYN-54); none outside a git repository.
+fn leftovers(
+    root: &Path,
+    migrations: &[migration::Migration],
+    lock: &Lock,
+    rewritten: &BTreeMap<String, String>,
+) -> Vec<String> {
+    let names: Vec<(u32, &migration::Name)> = migrations
+        .iter()
+        .flat_map(|m| m.names.iter().map(move |name| (m.format, name)))
+        .collect();
+    if names.is_empty() {
+        return Vec::new();
+    }
+    // quiet: outside a git repository, git says so on stderr
+    let listed = match Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-files", "-z"])
+        .stderr(Stdio::null())
+        .output()
+    {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
+        _ => return Vec::new(),
+    };
+    let mut paths: Vec<&str> = listed
+        .split('\0')
+        .filter(|rel| {
+            !rel.is_empty()
+                && *rel != LOCK
+                && !lock.files.contains_key(*rel)
+                && !HISTORY.iter().any(|dir| rel.starts_with(dir))
+        })
+        .collect();
+    paths.sort_unstable();
+    let mut warnings = Vec::new();
+    for rel in paths {
+        let text = match rewritten.get(rel) {
+            Some(text) => text.clone(),
+            None => match fs::read_to_string(root.join(rel)) {
+                Ok(text) => text,
+                Err(_) => continue,
+            },
+        };
+        for (number, line) in text.lines().enumerate() {
+            for (format, name) in &names {
+                if migration::cites(line, name) {
+                    warnings.push(format!(
+                        "warning: {rel}:{} cites {}, named {} since the format {format}",
+                        number + 1,
+                        name.old,
+                        name.new
+                    ));
+                }
+            }
+        }
+    }
+    warnings
 }
 
 /// Copy the seeds of `seeds` the project does not have.

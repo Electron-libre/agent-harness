@@ -58,7 +58,7 @@ of a renamed repository (forge redirect), a migration that renames the configura
 1. [x] Migration declarations and seeded rewrites: read `migrations/<n>.toml` of the applying formats, rewrite the
    whole-line texts, `rewritten:` lines, ADR 0017; verified by binary tests (lock of format 1 or 2, source 3);
    makes true SYN-52, SYN-53. ~400 lines.
-2. [ ] Leftover report: scan the git-tracked project-owned files for the old names after the rewrites, warn
+2. [x] Leftover report: scan the git-tracked project-owned files for the old names after the rewrites, warn
    `path:line`; verified by binary tests; makes true SYN-54. ~300 lines.
 3. [ ] Format hint in `check` and `sync`; verified by binary tests (lock `format 2`); makes true SYN-55, spec
    `accepted`. ~150 lines.
@@ -78,5 +78,14 @@ of a renamed repository (forge redirect), a migration that renames the configura
 - red: SYN-52, SYN-53: `assertion left == right failed: left: None, right: Some("rewritten")` (no outcome for the
   justfile).
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+
+- done: after the rewrites, `sync` and `update` warn `path:line` of each tracked project-owned line citing an old
+  name (managed files, lock, `issues/done/`, `docs/adr/` skipped), judged on the rewritten texts under `--dry-run`.
+- red: SYN-54: `assertion left == right failed: left: [], right: ["warning: README.md:1 cites check-old, …"]`.
+- Code review: 1 findings: an old name contained in its new one reported every migrated line; fixed (`migration::cites` skips the old name inside the new one, unit test and SYN-54 scenario).
 - not verified: none
 - decisions needed: none
