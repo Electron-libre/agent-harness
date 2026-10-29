@@ -6,4 +6,5 @@ re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why he
 
 - [drop_the_harness_alias](drop_the_harness_alias.md) - after the rename: only once every consumer runs `cardinal`
 - [drop_the_old_names_of_the_consumer_files](drop_the_old_names_of_the_consumer_files.md) - after the alias: only once every consumer is migrated to the new names
+- [report_what_a_format_migration_leaves_to_the_project](report_what_a_format_migration_leaves_to_the_project.md) - after the old names are dropped: no consumer is left to migrate, it serves the next format change
 - [measure_the_effect_of_the_language_hint](measure_the_effect_of_the_language_hint.md) - last: needs sessions run with the hook before it can measure anything
