@@ -481,9 +481,10 @@ fn fixed_context(groups: &[Group], context: &[Row]) -> Table {
     })
 }
 
-/// The value of `metric` for group `g` in the table VRD-1 takes it from, as a number (`breached_share` of the rule's
-/// row, its `%` dropped); `None` when that table is not printed or the cell is empty.
-fn metric_value(tables: &[Table], g: usize, metric: &str) -> Option<String> {
+/// The value of `metric` for group `g` in the table VRD-1 takes it from, as printed and as a number
+/// (`breached_share` of the rule's row, its `%` dropped); `None` when that table is not printed or the cell is not a
+/// finite number.
+fn metric_value(tables: &[Table], g: usize, metric: &str) -> Option<(String, f64)> {
     let (title, column, key) = match metric {
         "fixes_after_per_issue" | "findings_per_review" => ("Quality", metric, None),
         "total_bytes" => ("Fixed context", metric, None),
@@ -497,7 +498,8 @@ fn metric_value(tables: &[Table], g: usize, metric: &str) -> Option<String> {
         .find(|t| t.title == title)?
         .cell(g, column, key)?
         .trim_end_matches('%');
-    cell.parse::<f64>().is_ok().then(|| cell.to_string())
+    let number = cell.parse::<f64>().ok().filter(|n| n.is_finite())?;
+    Some((cell.to_string(), number))
 }
 
 /// The most frequent name of `column` over the sessions of a group, the first by name among equals.
@@ -551,7 +553,7 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
         let at = |i: Option<usize>| i.and_then(|i| metric_value(tables, i, metric));
         let (before_value, after_value) = (at(before_index), at(*after_index));
         let verdict = match (before_index, after_index, &before_value, &after_value) {
-            (Some(b), Some(a), Some(bv), Some(av)) => {
+            (Some(b), Some(a), Some((_, bv)), Some((_, av))) => {
                 let (before, after) = (&groups[b], &groups[*a]);
                 let mix_changed = ["models", "versions", "project"]
                     .iter()
@@ -571,11 +573,7 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
                 {
                     "confounded"
                 } else {
-                    moved(
-                        bv.parse().unwrap_or(0.0),
-                        av.parse().unwrap_or(0.0),
-                        direction,
-                    )
+                    moved(*bv, *av, direction)
                 }
             }
             _ => "no data",
@@ -585,8 +583,8 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
             "| {short_change} | {metric} | {direction} | {} | {} | {} | {} | {verdict} |",
             name(before_index),
             name(*after_index),
-            before_value.unwrap_or_default(),
-            after_value.unwrap_or_default(),
+            before_value.map(|(printed, _)| printed).unwrap_or_default(),
+            after_value.map(|(printed, _)| printed).unwrap_or_default(),
         );
     }
     println!();
@@ -705,6 +703,20 @@ fn moved(before: f64, after: f64, direction: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // spec: VRD-6 (internal: the tables of the binary never print a value that is not finite)
+    #[test]
+    fn a_value_that_is_not_finite_is_missing() {
+        let table = |cell: &str| Table {
+            title: "Efficiency",
+            columns: vec!["turns".to_string()],
+            rows: vec![vec![vec![cell.to_string()]]],
+        };
+        let at = |cell: &str| metric_value(&[table(cell)], 0, "turns");
+        assert_eq!(at("NaN"), None);
+        assert_eq!(at("inf"), None);
+        assert_eq!(at("12.50%"), Some(("12.50".to_string(), 12.5)));
+    }
 
     // spec: VRD-6 (internal: a metric of counts never prints `-0.00`, the binary cannot reach this edge)
     #[test]

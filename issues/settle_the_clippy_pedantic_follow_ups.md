@@ -43,6 +43,10 @@ no `Option` and no invariant to break, instead of restoring a panic.
    `untracked_hashes`; the largest part of `budget` taken without an `Option`; verified by `just check` (existing
    tests of check-specs, review-gate, SYN-38) (~50 lines).
 
+3. [x] Fixes of the `high` review: `metric_value` keeps only a finite value and returns it parsed, so `NaN` reads
+   `no data` and the verdict parses once; `problem` takes `impl Display` and formats the two spec problems of
+   `main` too; verified by a unit test of `metric_value` and `just check`; makes true VRD-6 (~40 lines).
+
 ## Decisions
 - Mode: autonomous
 - Base commit: 1a34320a248e9a19920f07f6839020f854d0df7a
@@ -69,6 +73,22 @@ no `Option` and no invariant to break, instead of restoring a panic.
   | docs | none changed: no behaviour change |
   | code review | low, see below |
 - red: none
+- Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 3 (fixes of the `high` review)
+- `high` review of `1a34320..62435df`: 4 findings, all fixed here: `NaN` before and after read `helped` or `hurt`
+  under `==` (a value that is not finite is now missing: `no data`); two spec problems of `main` formatted by hand;
+  `problem(&format!(..))` allocated twice; the verdict parsed each value twice behind a dead `unwrap_or(0.0)`.
+- done: `metric_value` returns the printed value and its finite number; `problem` takes `impl Display`, used by
+  `main` too.
+- | check | result |
+  |---|---|
+  | tests, lint, specs | `just check` green |
+  | docs | none changed: VRD-6 already says a missing value is `no data` |
+  | code review | low, see below |
+- red: VRD-6: `expected Option<String>, found Option<(String, {float})>` (the test asked for the parsed number)
 - Code review: no findings
 - not verified: none
 - decisions needed: none

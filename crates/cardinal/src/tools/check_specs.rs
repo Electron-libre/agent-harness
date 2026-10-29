@@ -174,7 +174,7 @@ fn check_wording(file: &str, id: &str, statement: &str, warn: &mut Vec<String>) 
 }
 
 /// Record the problem `m` of the spec `file` in `out`.
-fn problem(out: &mut Vec<String>, file: &str, m: &str) {
+fn problem(out: &mut Vec<String>, file: &str, m: impl std::fmt::Display) {
     out.push(format!("{file}: {m}"));
 }
 
@@ -227,7 +227,7 @@ fn parse(
                                 .starts_with(&format!("{n}-"))
                         });
                     if !found {
-                        problem(out, file, &format!("adr {n} not found in docs/adr"));
+                        problem(out, file, format_args!("adr {n} not found in docs/adr"));
                     }
                 }
             }
@@ -238,7 +238,7 @@ fn parse(
         problem(
             out,
             file,
-            &format!(
+            format_args!(
                 "front matter `id` must be three capital letters, got `{}`",
                 spec.id
             ),
@@ -255,7 +255,7 @@ fn parse(
         problem(
             out,
             file,
-            &format!(
+            format_args!(
                 "front matter `status` must be draft or accepted, got `{}`",
                 spec.status
             ),
@@ -263,7 +263,7 @@ fn parse(
     }
     for section in SECTIONS {
         if !lines.iter().any(|l| l.trim() == section) {
-            problem(out, file, &format!("missing section `{section}`"));
+            problem(out, file, format_args!("missing section `{section}`"));
         }
     }
     parse_requirements(file, &lines, &mut spec, out, warn);
@@ -296,7 +296,7 @@ fn parse_requirements(
             problem(
                 out,
                 file,
-                &format!(
+                format_args!(
                     "requirement line must start with `- **{}-<n>**`: `{line}`",
                     spec.id
                 ),
@@ -307,14 +307,14 @@ fn parse_requirements(
             problem(
                 out,
                 file,
-                &format!(
+                format_args!(
                     "requirement {id} does not start with the spec id `{}`",
                     spec.id
                 ),
             );
         }
         if !seen.insert(id.to_string()) {
-            problem(out, file, &format!("duplicate requirement {id}"));
+            problem(out, file, format_args!("duplicate requirement {id}"));
         }
         let kind = after
             .trim()
@@ -331,7 +331,7 @@ fn parse_requirements(
             problem(
                 out,
                 file,
-                &format!("requirement {id}: kind must be `(deterministic)`, got `({kind})`"),
+                format_args!("requirement {id}: kind must be `(deterministic)`, got `({kind})`"),
             );
         }
         // with no `(kind)`, the statement was not found: the format problem is enough
@@ -524,10 +524,11 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     let mut ids: BTreeMap<&str, &str> = BTreeMap::new();
     for spec in specs.iter().filter(|s| !s.id.is_empty()) {
         if let Some(other) = ids.insert(&spec.id, &spec.file) {
-            out.push(format!(
-                "{}: spec id `{}` is already used by {other}",
-                spec.file, spec.id
-            ));
+            problem(
+                &mut out,
+                &spec.file,
+                format_args!("spec id `{}` is already used by {other}", spec.id),
+            );
         }
     }
     let files = test_files(root, &mut out);
@@ -548,10 +549,14 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
     for spec in specs.iter().filter(|s| s.status == "accepted") {
         for req in spec.requirements.iter().filter(|r| !r.exempt) {
             if !cited.contains_key(&req.id) {
-                out.push(format!(
-                    "{}: requirement {}: no test cites `// spec: {}`",
-                    spec.file, req.id, req.id
-                ));
+                problem(
+                    &mut out,
+                    &spec.file,
+                    format_args!(
+                        "requirement {}: no test cites `// spec: {}`",
+                        req.id, req.id
+                    ),
+                );
             }
         }
     }
