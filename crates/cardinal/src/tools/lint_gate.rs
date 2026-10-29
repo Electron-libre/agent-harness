@@ -1,10 +1,10 @@
-//! `clippy-gate`, the Stop hook: if Rust files changed, clippy must be warning-free before the agent can finish.
+//! `lint-gate`, the Stop hook: if Rust files changed, clippy must be warning-free before the agent can finish.
 //! Exit 2 sends clippy's diagnostics back to the agent so it fixes the code: one line each (file, line, column,
 //! message), at most `MAX_DIAGNOSTICS`, since every line is billed to the agent. A passing run stamps the Rust state
 //! in the git directory, and clippy does not run again until that state changes. When the agent already retried once
 //! (`stop_hook_active`), let go to avoid an endless loop. It checks the work tree of the event's `cwd` (an agent that
 //! entered an issue worktree is checked there), at the place `CLAUDE_PROJECT_DIR` has in its own. Spec:
-//! `specs/clippy-gate.md`.
+//! `specs/lint-gate.md`.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;

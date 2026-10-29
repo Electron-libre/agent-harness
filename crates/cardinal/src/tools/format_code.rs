@@ -1,4 +1,4 @@
-//! `format-rust`, the `PostToolUse` hook (Edit|Write): run `cargo fmt --all` after a Rust file was edited, from the
+//! `format-code`, the `PostToolUse` hook (Edit|Write): run `cargo fmt --all` after a Rust file was edited, from the
 //! directory of that file, so cargo formats the project holding it (an issue worktree, a crate in a subdirectory), not
 //! the session's.
 

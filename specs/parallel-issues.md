@@ -29,7 +29,7 @@ deliberate step run from the main branch.
 - **PAR-14** (deterministic) `close-issue` (with or without `--relink`) and the spec traceability check must take the files they scan in a git repository from git (the tracked and the untracked files, without the ignored ones), so that they never read or rewrite a file of a worktree nested in the one they scan, whether or not git ignores its directory, while an untracked file of the scanned worktree and a directory named `worktrees` anywhere are still scanned.
 - **PAR-16** (deterministic) Outside a git repository, the spec traceability check must scan every `.rs` file of the root it is given that TRC-9 and TRC-10 let it read, those of `.claude/worktrees/` included.
 - **PAR-15** (deterministic) `finish-issue` must also remove the worktree of an issue started before PAR-1 placed it under `.claude/worktrees/`, at `<repo>-<stem>` next to the main worktree, under the same conditions as PAR-6, PAR-7, PAR-10 and PAR-11.
-- **PAR-12** (deterministic) `cardinal run format-rust` must run `cargo fmt` from the directory of the edited file, so that cargo formats the project holding that file (the main worktree, an issue worktree, a crate in a subdirectory) and not the one of `CLAUDE_PROJECT_DIR`.
+- **PAR-12** (deterministic) `cardinal run format-code` must run `cargo fmt` from the directory of the edited file, so that cargo formats the project holding that file (the main worktree, an issue worktree, a crate in a subdirectory) and not the one of `CLAUDE_PROJECT_DIR`.
 
 ## Scenarios
 

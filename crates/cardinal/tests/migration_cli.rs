@@ -62,9 +62,11 @@ fn sync_rewrites_the_seeded_lines_of_a_migration_above_the_lock_once() {
         get(root.path(), "justfile").unwrap(),
         "check: check-new\ncheck: check-old fmt\nx check: check-old\ncheck: check-new"
     );
-    assert!(get(root.path(), LOCK).unwrap().contains("\nformat 3\n"));
+    assert!(get(root.path(), LOCK)
+        .unwrap()
+        .contains(&format!("\nformat {FORMAT}")));
 
-    // the lock records the format 3 now: the migration is behind the project
+    // the lock records the format of the source now: the migration is behind the project
     put(root.path(), "justfile", "check: check-old\n");
     let again = home.ok(root.path(), &["sync"]);
     assert_eq!(again.outcome("justfile"), None, "{again:?}");
@@ -86,7 +88,7 @@ fn the_migrations_apply_in_increasing_format_from_a_lock_without_a_format() {
     // above the format of the source, or below the one of the lock: not applied
     put(
         source.path(),
-        "migrations/4.toml",
+        "migrations/5.toml",
         &rewrite("three", "four"),
     );
     put(source.path(), "migrations/1.toml", &rewrite("one", "zero"));

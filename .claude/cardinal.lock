@@ -1,12 +1,12 @@
 # Written by `cardinal sync`: hashes of the managed files, then the managed settings entries. Do not edit.
-format 3
+format 4
 ae32a54ad3e59066328e1a2f7f5afff0ca4b13bf194272c376e23280e4a7ce4e  .claude/rules/reports-to-the-user.md
 c3b88f2d59233b045460e7d6dfa7095f33bacaa727eb75f6319b16e4ec41dd0a  .claude/skills/audit-instructions/SKILL.md
 62e77f126f444e4c4e85623d044235473d36db43bd61877acdaf7bab565a7fb0  .claude/skills/commit-message/SKILL.md
 39be44eb1cc9c4caf23cd919dd41f1da9d2941348ad7b324f55e6106cab79491  .claude/skills/create-issue/SKILL.md
 e5c7e210f336a8ec28994671d57d9fb0ddb764228d46127f68775671f175239e  .claude/skills/evaluate-harness/SKILL.md
 7c70c0c9b08cbff4287f15442943189b061f840e8868f53152d5bfdad25842b2  .claude/skills/issue-workflow/SKILL.md
-8b56a6527b297e1824ca6fe3e44f017dc23a5215f713cb4aad48c563642527c7  .claude/skills/issue-workflow/details.md
+58528dde6d7a81b006ae4a01106d3bdb356e5779cec00ba41c8e195e5f5caa25  .claude/skills/issue-workflow/details.md
 28f9767ec4bf136a3d50a1bac3b2d86215ff56156997a67fd83beee9a930469b  .claude/skills/prioritize-issues/SKILL.md
 b627b1f62d4611948416cd01e935d79fb2898692162c09cfc2b50d30000f88af  .claude/skills/update-docs/SKILL.md
 8e77a3c231b051e1553dce195bfe1458a14d8aca9cd7867ede28e77996589d0f  .claude/skills/write-spec/SKILL.md
@@ -22,7 +22,7 @@ entry  {"deny":"Bash(just waive-review *)"}
 entry  {"deny":"Edit(//**/claude-review-waived)"}
 entry  {"event":"PreToolUse","matcher":"Bash","hook":{"type":"command","command":"cardinal run review-gate check"}}
 entry  {"event":"PostToolUse","matcher":"Skill","hook":{"type":"command","command":"cardinal run review-gate record"}}
-entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"cardinal run format-rust"}}
+entry  {"event":"PostToolUse","matcher":"Edit|Write","hook":{"type":"command","command":"cardinal run format-code"}}
 entry  {"event":"PostToolUse","matcher":null,"hook":{"type":"command","command":"cardinal run language-hint"}}
-entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"cardinal run clippy-gate","timeout":600}}
+entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"cardinal run lint-gate","timeout":600}}
 entry  {"event":"Stop","matcher":null,"hook":{"type":"command","command":"cardinal run language-hint","timeout":600}}

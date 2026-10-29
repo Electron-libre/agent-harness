@@ -1,4 +1,4 @@
-//! Behavior test for the Rust hooks `cardinal tool clippy-gate` and `format-rust`: runs them against a throwaway Cargo
+//! Behavior test for the Rust hooks `cardinal tool lint-gate` and `format-code`: runs them against a throwaway Cargo
 //! project. A hook is named by a path holding its tool name.
 
 use std::fs;
@@ -484,8 +484,8 @@ fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static 
 
 #[test]
 fn rust_hooks() {
-    let format_hook = PathBuf::from("format-rust");
-    let gate = PathBuf::from("clippy-gate");
+    let format_hook = PathBuf::from("format-code");
+    let gate = PathBuf::from("lint-gate");
 
     let project: PathBuf = tempfile::tempdir().unwrap().keep();
     fs::create_dir_all(&project).unwrap();

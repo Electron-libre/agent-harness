@@ -10,15 +10,15 @@ mod cardinal_report;
 mod check_commits;
 mod check_issue;
 mod check_specs;
-mod clippy_gate;
 mod close_issue;
 mod commit_check;
 mod delivered_quality;
 mod fixed_context;
-mod format_rust;
+mod format_code;
 mod issue_worktree;
 mod language;
 mod language_hint;
+mod lint_gate;
 mod next_issue;
 mod repo_files;
 mod review_gate;
@@ -69,11 +69,6 @@ pub const TOOLS: &[Tool] = &[
         main: check_specs::main,
     },
     Tool {
-        name: "clippy-gate",
-        about: "Stop hook: block the end of a turn while clippy reports a problem",
-        main: clippy_gate::main,
-    },
-    Tool {
         name: "close-issue",
         about: "move a finished issue to issues/done/ and repoint the documents that cite it",
         main: close_issue::main,
@@ -94,9 +89,9 @@ pub const TOOLS: &[Tool] = &[
         main: fixed_context::main,
     },
     Tool {
-        name: "format-rust",
+        name: "format-code",
         about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
-        main: format_rust::main,
+        main: format_code::main,
     },
     Tool {
         name: "issue-worktree",
@@ -107,6 +102,11 @@ pub const TOOLS: &[Tool] = &[
         name: "language-hint",
         about: "Stop hook: send the agent back once when its last reply is not in the user_language",
         main: language_hint::main,
+    },
+    Tool {
+        name: "lint-gate",
+        about: "Stop hook: block the end of a turn while clippy reports a problem",
+        main: lint_gate::main,
     },
     Tool {
         name: "next-issue",
