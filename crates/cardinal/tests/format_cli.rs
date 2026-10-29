@@ -349,8 +349,8 @@ fn hint() -> String {
 #[test]
 fn check_and_sync_hint_at_update_while_the_lock_is_below_the_format_of_the_cardinal() {
     let home = Home::new();
-    let (_source, root) = project(&home);
-    home.ok(root.path(), &["sync"]);
+    let (_repo, root, _commit) = git_project(&home, FORMAT);
+    home.ok(root.path(), &["update"]);
     lock_at_format_2(root.path());
     for args in [&["check"][..], &["sync", "--dry-run"]] {
         let run = home.ok(root.path(), args);
@@ -373,4 +373,17 @@ fn update_does_not_hint_at_itself() {
     let run = home.ok(root.path(), &["update", "--dry-run"]);
     assert!(!run.stderr.contains("hint:"), "{run:?}");
     assert!(home.ok(root.path(), &["check"]).stderr.contains(&hint()));
+}
+
+// spec: SYN-55
+#[test]
+fn a_local_directory_source_gets_no_hint_since_it_has_no_revision_to_update() {
+    let home = Home::new();
+    let (_source, root) = project(&home);
+    home.ok(root.path(), &["sync"]);
+    lock_at_format_2(root.path());
+    for args in [&["check"][..], &["sync", "--dry-run"]] {
+        let run = home.ok(root.path(), args);
+        assert!(!run.stderr.contains("hint:"), "{args:?} {run:?}");
+    }
 }

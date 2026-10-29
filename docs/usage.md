@@ -58,11 +58,11 @@ new = "check: check-new"
 `sync` and `update` apply the migrations above the format of the lock, up to the one of the source, in increasing
 format (SYN-52): each `rewrite` replaces its text where the project left it as seeded, printed `rewritten: <path>`,
 and leaves a line the project changed as it is (SYN-53). Then each line of a file git tracks, outside the managed
-files, `issues/done/` and `docs/adr/`, that still cites an old name of `names` is printed on stderr as
+files, `issues/done/` and `docs/adr/`, that still cites an old name of `names` as a word is printed on stderr as
 `warning: <path>:<line> cites <old>, named <new> since the format <n>`, for the agent or the user to edit: the run
 that applies the migration is the only one to print it (SYN-54). Until a project moves, `check` and `sync` print
 `hint: .claude/cardinal.lock is of the format <a>, this cardinal reads the format <m>: run `cardinal update` …` when
-its lock is of a lower format than the installed `cardinal` reads (SYN-55). A migration that cannot be read fails them, writing
+its lock is of a lower format than the installed `cardinal` reads and its source is a git one (SYN-55). A migration that cannot be read fails them, writing
 nothing.
 
 ## Evaluating Cardinal

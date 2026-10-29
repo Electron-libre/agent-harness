@@ -62,6 +62,10 @@ of a renamed repository (forge redirect), a migration that renames the configura
    `path:line`; verified by binary tests; makes true SYN-54. ~300 lines.
 3. [x] Format hint in `check` and `sync`; verified by binary tests (lock `format 2`); makes true SYN-55, spec
    `accepted`. ~150 lines.
+4. [x] Fixes of the `high` review: `--dry-run` judges the files as the run leaves them (removed, merged settings),
+   CRLF line ends, old names as words, chained renames named by the last one, no hint for a local source, `update`
+   always edits the configuration as the sync left it, the hint from the sync's own lock format; verified by binary
+   tests; SYN-53, SYN-54, SYN-55 amended.
 
 ## Decisions
 - Mode: autonomous
@@ -97,4 +101,18 @@ of a renamed repository (forge redirect), a migration that renames the configura
 - red: SYN-55: `assertion left == right failed: ["check"] … left: 0, right: 1` (no hint printed).
 - Code review: no findings
 - not verified: the hint of a `sync` that leaves a lock below the format (no source below 3 is synced any more).
+- decisions needed: none
+
+## Deliverable 4
+
+- done: eight of the ten `high` review findings fixed, spec amended (scenarios of SYN-53, SYN-54, SYN-55).
+- red: SYN-53, SYN-54, SYN-55: `left: "check: check-old\r\n…"`, `cites x-old, named check-old since the format 2`,
+  `.claude/settings.json:8 cites check-old` under `--dry-run`, `hint:` printed for a local source.
+- `high` review (`62fdd8d..86df30f`): 10 findings. Fixed: dry-run on removed files, dry-run on merged settings,
+  CRLF, chained renames, word boundary, hint for a local source, `update` re-reads the configuration, `sync` reads
+  the lock format from its own run. Not fixed: the preview of a conflicting `update` prints `rewritten:` and the
+  leftovers, as it prints every other outcome it would apply, under `conflicts: nothing written`; the double read of
+  the tracked files by `update` (preview, then sync) is the price of SYN-13's preview, `update` is rare.
+- Code review: no findings
+- not verified: none
 - decisions needed: none

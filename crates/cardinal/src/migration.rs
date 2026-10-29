@@ -105,13 +105,43 @@ fn strings<const N: usize>(table: &toml::Table, keys: [&str; N]) -> Result<[Stri
     Ok(values)
 }
 
-/// Whether `line` holds `name.old` outside an occurrence of `name.new`, which may contain it.
+/// Each old name of `migrations` with the format and the name of the last migration that renamed it, following a name
+/// a later migration renamed again (SYN-54).
+pub(crate) fn renamed(migrations: &[Migration]) -> Vec<(u32, Name)> {
+    let mut names = Vec::new();
+    for (at, migration) in migrations.iter().enumerate() {
+        for name in &migration.names {
+            let (mut format, mut new) = (migration.format, name.new.clone());
+            for later in &migrations[at + 1..] {
+                if let Some(next) = later.names.iter().find(|n| n.old == new) {
+                    (format, new) = (later.format, next.new.clone());
+                }
+            }
+            names.push((
+                format,
+                Name {
+                    old: name.old.clone(),
+                    new,
+                },
+            ));
+        }
+    }
+    names
+}
+
+/// Whether a letter, a digit or `_` borders `line[start..end]`: the match is part of a longer word.
+fn in_a_word(line: &str, start: usize, end: usize) -> bool {
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    line[..start].chars().next_back().is_some_and(word)
+        || line[end..].chars().next().is_some_and(word)
+}
+
+/// Whether `line` holds `name.old` as a word, outside an occurrence of `name.new`, which may contain it.
 pub(crate) fn cites(line: &str, name: &Name) -> bool {
     let news: Vec<usize> = line.match_indices(&name.new).map(|(i, _)| i).collect();
     line.match_indices(&name.old).any(|(i, _)| {
-        !news
-            .iter()
-            .any(|&j| j <= i && i + name.old.len() <= j + name.new.len())
+        let end = i + name.old.len();
+        !in_a_word(line, i, end) && !news.iter().any(|&j| j <= i && end <= j + name.new.len())
     })
 }
 
@@ -125,7 +155,10 @@ pub(crate) fn rewritten(text: &str, old: &str, new: &str) -> Option<String> {
         let start = from + found;
         let end = start + old.len();
         let starts_a_line = start == 0 || text.as_bytes()[start - 1] == b'\n';
-        let ends_a_line = old.ends_with('\n') || end == text.len() || text.as_bytes()[end] == b'\n';
+        let ends_a_line = old.ends_with('\n')
+            || end == text.len()
+            || text[end..].starts_with('\n')
+            || text[end..].starts_with("\r\n");
         if starts_a_line && ends_a_line {
             out.push_str(&text[rest..start]);
             out.push_str(new);

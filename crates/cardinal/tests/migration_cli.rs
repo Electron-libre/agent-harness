@@ -339,3 +339,100 @@ fn no_old_name_is_reported_outside_a_git_repository_or_once_the_migration_applie
     let again = home.ok(root.path(), &["sync"]);
     assert!(leftovers(&again).is_empty(), "{again:?}");
 }
+
+// spec: SYN-53
+#[test]
+fn a_seeded_line_ending_in_crlf_is_rewritten() {
+    let home = Home::new();
+    let (source, root) = synced_at_format_2(&home);
+    put(source.path(), "migrations/3.toml", JUSTFILE_REWRITE);
+    put(root.path(), "justfile", "check: check-old\r\nfmt:\r\n");
+
+    home.ok(root.path(), &["sync"]);
+    assert_eq!(
+        get(root.path(), "justfile").unwrap(),
+        "check: check-new\r\nfmt:\r\n"
+    );
+}
+
+// spec: SYN-54
+#[test]
+fn an_old_name_is_cited_as_a_word_and_named_by_the_last_migration_that_renamed_it() {
+    let home = Home::new();
+    let (source, root) = tracked(
+        &home,
+        &[(
+            "README.md",
+            b"x-old\nprecheck-older\ncheck-old_x\n(check-old)\n",
+        )],
+    );
+    set_lock_format(root.path(), None);
+    put(
+        source.path(),
+        "migrations/2.toml",
+        "[[names]]\nold = \"x-old\"\nnew = \"check-old\"\n",
+    );
+    put(source.path(), "migrations/3.toml", NAME);
+
+    let run = home.ok(root.path(), &["sync"]);
+    assert_eq!(
+        leftovers(&run),
+        [
+            "warning: README.md:1 cites x-old, named check-new since the format 3".to_string(),
+            cites("README.md:4"),
+            cites("justfile:1"),
+            cites("justfile:2"),
+        ],
+        "{run:?}"
+    );
+}
+
+// spec: SYN-53, SYN-54
+#[test]
+fn sync_dry_run_judges_neither_a_removed_managed_file_nor_the_settings_it_merges() {
+    let home = Home::new();
+    let (source, root) = synced_at_format_2(&home);
+    let hook = |command: &str| {
+        format!(
+            r#"{{"hooks": {{"Stop": [{{"hooks": [{{"type": "command", "command": "{command}"}}]}}]}}}}"#
+        )
+    };
+    put(
+        source.path(),
+        "entries/.claude/settings.json",
+        &hook("run check-old"),
+    );
+    put(source.path(), "seed/.claude/settings.json", "{}");
+    put(source.path(), "files/old.txt", "check-old\n");
+    // synced at the format 3, then set back: the settings run the old hook, the old managed file is there
+    home.ok(root.path(), &["sync"]);
+    set_lock_format(root.path(), Some(2));
+    std::fs::remove_file(source.path().join("files/old.txt")).unwrap();
+    put(
+        source.path(),
+        "entries/.claude/settings.json",
+        &hook("run check-new"),
+    );
+    let rewrite_old = "[[rewrite]]\npath = \"old.txt\"\nold = \"check-old\"\nnew = \"x\"\n";
+    put(
+        source.path(),
+        "migrations/3.toml",
+        &format!("{NAME}{rewrite_old}"),
+    );
+    home.git(root.path(), &["init", "--quiet", "-b", "main"]);
+    home.git(root.path(), &["add", "."]);
+    let before = snapshot(root.path());
+
+    let dry = home.ok(root.path(), &["sync", "--dry-run"]);
+    assert_eq!(snapshot(root.path()), before);
+    let run = home.ok(root.path(), &["sync"]);
+    assert_eq!(run.outcome("old.txt"), Some("removed"), "{run:?}");
+    for run in [&dry, &run] {
+        assert_eq!(
+            leftovers(run),
+            [cites("justfile:1"), cites("justfile:2")],
+            "{run:?}"
+        );
+        assert!(!run.stdout.contains("rewritten: old.txt"), "{run:?}");
+    }
+}

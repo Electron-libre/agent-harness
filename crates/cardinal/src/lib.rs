@@ -98,6 +98,8 @@ pub struct Report {
     pub entries: Vec<(String, Outcome)>,
     /// What the project's settings lack or run in vain once synced (SYN-27): printed, never a failure.
     pub warnings: Vec<String>,
+    /// The format the lock records once synced (as it is under `--dry-run`), `None` without a lock.
+    lock_format: Option<u32>,
 }
 
 impl Report {
@@ -643,10 +645,10 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
         &launcher::install(&source, commit.as_deref()),
     )?;
     let mut report = sync_from(root, &dir, *options)?;
-    // the lock as the sync left it, or as it is under `--dry-run`
-    report
-        .warnings
-        .extend(read_lock(root)?.and_then(|lock| format_hint(&lock)));
+    if is_git_url(&source) {
+        let hint = report.lock_format.and_then(format_hint);
+        report.warnings.extend(hint);
+    }
     if let (Some(commit), false) = (&commit, options.dry_run) {
         report.warnings.extend(prefetch(
             &cache_dir()?,
@@ -658,12 +660,12 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
     Ok(report)
 }
 
-/// The hint at `cardinal update` of a lock of a lower format than this `cardinal` reads (SYN-55).
-fn format_hint(lock: &Lock) -> Option<String> {
-    (lock.format < FORMAT).then(|| {
+/// The hint at `cardinal update` of a lock of a lower format than this `cardinal` reads (SYN-55); the caller gives it
+/// to a git source only, a local directory has no revision to update.
+fn format_hint(format: u32) -> Option<String> {
+    (format < FORMAT).then(|| {
         format!(
-            "hint: {LOCK} is of the format {}, this cardinal reads the format {FORMAT}: run `cardinal update` to move the project to a newer revision",
-            lock.format
+            "hint: {LOCK} is of the format {format}, this cardinal reads the format {FORMAT}: run `cardinal update` to move the project to a newer revision"
         )
     })
 }
@@ -686,6 +688,7 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         );
     }
     let previous = read_lock(root)?;
+    let lock_format = previous.as_ref().map(|lock| lock.format);
     let format = format_of(source)?;
     // read before anything is written: a migration that cannot be read stops the sync (SYN-52)
     let migrations = match &previous {
@@ -733,7 +736,24 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
         entries: merge.lock,
         format,
     };
-    let rewritten = rewrite_seeded(root, &migrations, &file_set, options, &mut report)?;
+    // a project file as this run leaves it: a removed one is gone, the settings are merged
+    let removed: BTreeSet<String> = report
+        .entries
+        .iter()
+        .filter(|(_, outcome)| *outcome == Outcome::Removed)
+        .map(|(rel, _)| rel.clone())
+        .collect();
+    let merged = merge.write.clone().filter(|_| options.dry_run);
+    let as_left = |rel: &str| -> Option<String> {
+        if removed.contains(rel) {
+            return None;
+        }
+        match (&merged, rel == entries::SETTINGS) {
+            (Some(text), true) => Some(text.clone()),
+            _ => fs::read_to_string(root.join(rel)).ok(),
+        }
+    };
+    let rewritten = rewrite_seeded(root, &migrations, &file_set, &as_left, options, &mut report)?;
     if !options.dry_run {
         write_lock(root, &new_lock, format)?;
     }
@@ -750,7 +770,14 @@ fn sync_from(root: &Path, source: &Path, options: SyncOptions) -> Result<Report>
     report.warnings.extend(merge.warning);
     report
         .warnings
-        .extend(leftovers(root, &migrations, &new_lock, &rewritten));
+        .extend(leftovers(root, &migrations, &new_lock, &|rel| {
+            rewritten.get(rel).cloned().or_else(|| as_left(rel))
+        }));
+    report.lock_format = if options.dry_run {
+        lock_format
+    } else {
+        Some(format)
+    };
     Ok(report)
 }
 
@@ -828,6 +855,7 @@ fn rewrite_seeded(
     root: &Path,
     migrations: &[migration::Migration],
     file_set: &BTreeSet<&String>,
+    as_left: &dyn Fn(&str) -> Option<String>,
     options: SyncOptions,
     report: &mut Report,
 ) -> Result<BTreeMap<String, String>> {
@@ -839,7 +867,7 @@ fn rewrite_seeded(
             continue;
         }
         if !texts.contains_key(rel) {
-            let Ok(text) = fs::read_to_string(root.join(rel)) else {
+            let Some(text) = as_left(rel) else {
                 continue;
             };
             texts.insert(rel, text);
@@ -866,18 +894,15 @@ fn rewrite_seeded(
 /// The directories of the project that record its history: an old name stays there (SYN-54).
 const HISTORY: [&str; 2] = ["issues/done/", "docs/adr/"];
 
-/// A warning for each line of a project-owned file git tracks that still cites an old name of `migrations`, the files
-/// judged as `rewritten` leaves them (SYN-54); none outside a git repository.
+/// A warning for each line of a project-owned file git tracks that still cites an old name of `migrations`, each file
+/// judged as `as_left` gives it, the run done (SYN-54); none outside a git repository.
 fn leftovers(
     root: &Path,
     migrations: &[migration::Migration],
     lock: &Lock,
-    rewritten: &BTreeMap<String, String>,
+    as_left: &dyn Fn(&str) -> Option<String>,
 ) -> Vec<String> {
-    let names: Vec<(u32, &migration::Name)> = migrations
-        .iter()
-        .flat_map(|m| m.names.iter().map(move |name| (m.format, name)))
-        .collect();
+    let names = migration::renamed(migrations);
     if names.is_empty() {
         return Vec::new();
     }
@@ -904,12 +929,8 @@ fn leftovers(
     paths.sort_unstable();
     let mut warnings = Vec::new();
     for rel in paths {
-        let text = match rewritten.get(rel) {
-            Some(text) => text.clone(),
-            None => match fs::read_to_string(root.join(rel)) {
-                Ok(text) => text,
-                Err(_) => continue,
-            },
+        let Some(text) = as_left(rel) else {
+            continue;
         };
         for (number, line) in text.lines().enumerate() {
             for (format, name) in &names {
@@ -1027,7 +1048,8 @@ fn update_in(
     }
     let path = config_of(root);
     let current = fs::read_to_string(&path)?;
-    let text = set_rev(&current, &commit, rev.unwrap_or("default branch"))?;
+    // judged before anything is written: a configuration `update` cannot edit stops it (SYN-12)
+    set_rev(&current, &commit, rev.unwrap_or("default branch"))?;
     // Nothing is written before the dry run shows a clean sync.
     let mut preview = sync_from(
         root,
@@ -1044,14 +1066,11 @@ fn update_in(
     let sync = if applied {
         let sync = sync_from(root, &dir, options)?;
         // the configuration as the sync left it: a migration may have rewritten it (SYN-53)
-        let text = match sync.outcome(CONFIG) {
-            Some(Outcome::Rewritten) => set_rev(
-                &fs::read_to_string(&path)?,
-                &commit,
-                rev.unwrap_or("default branch"),
-            )?,
-            _ => text,
-        };
+        let text = set_rev(
+            &fs::read_to_string(&path)?,
+            &commit,
+            rev.unwrap_or("default branch"),
+        )?;
         write(&path, text.as_bytes())?;
         sync
     } else {
@@ -1152,7 +1171,9 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
         }))
         .collect();
     let mut warnings = settings::warnings(root, gated, &|path| root.join(path).is_file());
-    warnings.extend(format_hint(&lock));
+    if source_and_rev(root).is_ok_and(|(source, _)| is_git_url(&source)) {
+        warnings.extend(format_hint(lock.format));
+    }
     Ok(Checked { problems, warnings })
 }
 
