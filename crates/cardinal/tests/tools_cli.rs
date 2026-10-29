@@ -323,41 +323,39 @@ fn run_exits_3_when_it_cannot_get_the_tool() {
     assert!(stderr.contains("cardinal.toml"), "{stderr}");
 }
 
-// spec: BIN-17, BIN-18
+// spec: BIN-17
 #[test]
-fn the_launcher_and_its_alias_exit_3_when_they_cannot_parse_their_arguments() {
+fn the_launcher_exits_3_when_it_cannot_parse_its_arguments() {
     let dir = tempdir().unwrap();
-    let alias = Path::new(env!("CARGO_BIN_EXE_cardinal")).with_file_name("harness");
-    for bin in [Path::new(env!("CARGO_BIN_EXE_cardinal")), &alias] {
-        let launch = |args: &[&str]| {
-            Command::new(bin)
-                .args(args)
-                .current_dir(dir.path())
-                .output()
-                .unwrap()
-        };
-        for args in [
-            &["newcmd"][..],
-            &["check", "--no-such-flag"],
-            &["init"],
-            &[],
-        ] {
-            let out = launch(args);
-            assert_eq!(out.status.code(), Some(3), "{bin:?} {args:?}");
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            assert!(stderr.contains("Usage:"), "{bin:?} {args:?}: {stderr}");
-        }
-        for args in [
-            &["--help"][..],
-            &["--version"],
-            &["help", "check"],
-            &["help", "run"],
-            &["help", "update"],
-        ] {
-            let out = launch(args);
-            assert_eq!(out.status.code(), Some(0), "{bin:?} {args:?}");
-            assert!(!out.stdout.is_empty(), "{bin:?} {args:?}: nothing printed");
-        }
+    let bin = Path::new(env!("CARGO_BIN_EXE_cardinal"));
+    let launch = |args: &[&str]| {
+        Command::new(bin)
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap()
+    };
+    for args in [
+        &["newcmd"][..],
+        &["check", "--no-such-flag"],
+        &["init"],
+        &[],
+    ] {
+        let out = launch(args);
+        assert_eq!(out.status.code(), Some(3), "{bin:?} {args:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("Usage:"), "{bin:?} {args:?}: {stderr}");
+    }
+    for args in [
+        &["--help"][..],
+        &["--version"],
+        &["help", "check"],
+        &["help", "run"],
+        &["help", "update"],
+    ] {
+        let out = launch(args);
+        assert_eq!(out.status.code(), Some(0), "{bin:?} {args:?}");
+        assert!(!out.stdout.is_empty(), "{bin:?} {args:?}: nothing printed");
     }
 }
 

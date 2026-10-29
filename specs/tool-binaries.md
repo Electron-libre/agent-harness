@@ -1,6 +1,6 @@
 ---
 id: BIN
-status: accepted
+status: draft
 adrs: [0002, 0010]
 ---
 
@@ -10,8 +10,8 @@ adrs: [0002, 0010]
 
 The hooks, checks and transcript readers of Cardinal run in every consumer, Rust or not. They ship as the
 `cardinal` binary of the pinned revision, fetched prebuilt, so a project needs only `cardinal` and `just`, and runs the
-tools of the revision its managed files come from. The binary was named `harness` before: a `harness` alias keeps the
-projects synced before the rename running until their next sync.
+tools of the revision its managed files come from. The binary was named `harness` before: the releases and the builds of the commits
+from before the rename keep that name (BIN-3, BIN-5).
 
 ## Requirements
 
@@ -23,16 +23,16 @@ projects synced before the rename running until their next sync.
 - **BIN-6** (deterministic) With a local directory source, `run` must build the `cardinal` crate of that directory with `cargo` and run the result, so the tools of the repository that develops them are those of its working tree.
 - **BIN-7** (deterministic) `run` with no tool or an unknown tool must exit 3, as BIN-14, and print the names of the tools on stderr, so that a hook command naming a tool the pinned binary does not know (mistyped, or from a newer revision) never blocks the agent.
 - **BIN-8** (deterministic) The hook commands of the source's `entries/.claude/settings.json`, the recipes of `files/cardinal.just`, the commands the skills of `files/` give and the git `pre-commit` gate `sync` installs must call the tools through `cardinal run`, never through `harness run` or `rust-script`, except the gate in a work tree that still holds the review hook script of an older revision (SYN-18).
-- **BIN-9** (deterministic) The `pre-commit` gate must run the review gate through `cardinal` when it is on the path, else through `harness` (the alias, or a launcher installed before the rename), and print a warning on stderr and let the commit through when neither is, as it does when the review hook is missing.
+- **BIN-9** (deterministic) The `pre-commit` gate must run the review gate through `cardinal` when it is on the path, and print a warning on stderr and let the commit through when it is not, as it does when the review hook is missing.
 - **BIN-10** (deterministic) A downloaded asset whose SHA-256 differs from its digest must fail the fetch, naming the commit, and leave no binary in the cache.
 - **BIN-11** (deterministic) When the download fails and `cargo` is not on the path or its build fails, the fetch must fail with a message naming the commit, the platform and `cardinal update`, leaving no binary in the cache.
 - **BIN-12** (deterministic) With a local directory source whose build fails, `run` must run the last binary built from that source, with a one-line warning on stderr, and exit 3 (BIN-14) with the build's errors only when there is none, so that a working tree that does not compile does not block every hook.
 - **BIN-13** (deterministic) `sync` and `update` must print a fetch that fails as a warning on stderr, without failing because of it, since `run` fetches again; under `--dry-run` they fetch nothing.
 - **BIN-14** (deterministic) When `run` cannot get the binary of the tool (no configuration, a fetch or a build that fails), it must exit 3 with the reason on stderr, a code Claude Code does not read as a refusal (it blocks on 2), so that a hook that cannot run never blocks the agent.
-- **BIN-15** (deterministic) `check` must fail with one line per hook command of the project's `.claude/settings.json` whose first word is `cardinal` or `harness` and whose second word is a subcommand the binary of that name on the path refuses (`<name> help <subcommand>` exits non-zero), a `cardinal` command counting as refused when no `cardinal` is on the path but `harness` is, the line naming the command and the install of the project's `cardinal` (`cargo install --force --git <source> --rev <rev> --locked`, or `--force --path <source>/crates/cardinal` for a local source: `--force` replaces a `harness` installed before the rename), and look at nothing when neither `cardinal` nor `harness` is on the path, as BIN-9.
-- **BIN-16** (deterministic) `update` must write nothing and fail when a hook command of the managed entries of the target revision names a subcommand the binary on the path refuses (as BIN-15 judges it), naming each command and, once, the install of the target, `cargo install --force --git <source> --rev <commit> --locked`, except under `--dry-run`, which prints the same lines as warnings without failing.
-- **BIN-17** (deterministic) When the `cardinal` launcher (or its `harness` alias) cannot parse its arguments (an unknown subcommand, an unknown flag, a missing argument), it must print the parser's message on stderr and exit 3, as BIN-14, so that a hook command the installed launcher cannot parse never blocks the agent, whatever path brought it to the project; `--help` and `--version` keep exit 0. A tool the pinned binary does not know is BIN-7's.
-- **BIN-18** (deterministic) The install of the source (`cargo install`) must put a `harness` binary next to `cardinal` that accepts the same subcommands and behaves as `cardinal` does, so that the hooks, recipes and git gate of a project synced before the rename keep running until its next sync.
+- **BIN-15** (deterministic) `check` must fail with one line per hook command of the project's `.claude/settings.json` whose first word is `cardinal` and whose second word is a subcommand the `cardinal` on the path refuses (`cardinal help <subcommand>` exits non-zero), the line naming the command and the install of the project's `cardinal` (`cargo install --force --git <source> --rev <rev> --locked`, or `--force --path <source>/crates/cardinal` for a local source: `--force` reinstalls the same version), and look at nothing when no `cardinal` is on the path, as BIN-9.
+- **BIN-16** (deterministic) `update` must write nothing and fail when a hook command of the managed entries of the target revision names a subcommand the `cardinal` on the path refuses (as BIN-15 judges it), naming each command and, once, the install of the target, `cargo install --force --git <source> --rev <commit> --locked`, except under `--dry-run`, which prints the same lines as warnings without failing.
+- **BIN-17** (deterministic) When the `cardinal` launcher cannot parse its arguments (an unknown subcommand, an unknown flag, a missing argument), it must print the parser's message on stderr and exit 3, as BIN-14, so that a hook command the installed launcher cannot parse never blocks the agent, whatever path brought it to the project; `--help` and `--version` keep exit 0. A tool the pinned binary does not know is BIN-7's.
+- **BIN-18** (deterministic) withdrawn: the install of the source no longer puts a `harness` alias next to `cardinal`; every consumer runs `cardinal`, and a project whose hooks still call `harness` moves them with one `sync`.
 
 ## Scenarios
 
@@ -52,13 +52,11 @@ projects synced before the rename running until their next sync.
 - (BIN-15) Given a branch whose settings gained the hook `cardinal newcmd`, with an installed `cardinal` that has no
   `newcmd`, when `cardinal check` of the branch's code runs in its worktree before the merge, then it fails naming the
   hook; once the branch's `cardinal` is installed, it passes.
-- (BIN-16) Given only a `harness` installed before the rename and a target revision whose hooks call `cardinal run`,
+- (BIN-16) Given an installed `cardinal` that has no `newcmd` and a target revision whose hooks call `cardinal newcmd`,
   when `update` runs, then nothing is written and the error names `cargo install --force --git <source> --rev
   <commit> --locked`; after that install, the same `update` succeeds.
 - (BIN-3) Given a project pinned to a commit from before the rename, when `cardinal run` fetches it, then it installs
   the asset of the release `harness-<commit>`.
-- (BIN-18) Given a project whose hooks still call `harness run`, when the `cardinal` of the source is installed, then
-  its hooks run through the `harness` installed with it.
 - (BIN-17) Given an installed `cardinal` with no `newcmd` and a hook `cardinal newcmd` written in
   `settings.local.json`, when the hook runs, then it exits 3 with clap's message and the agent's command goes on.
 
@@ -70,7 +68,6 @@ projects synced before the rename running until their next sync.
 - The release workflow itself: it runs on the source's CI and is checked by its own run, not by a test.
 - Checking the words after the subcommand (the tool of `cardinal run`): the pinned binary runs them (BIN-1), not the
   installed one.
-- Hook commands that start with neither `cardinal` nor `harness`, and an installed `harness` older than BIN-15 and
-  BIN-16, or older than the rename: it cannot refuse what it does not check (an older `update` writes `cardinal` hooks
-  without checking that `cardinal` is installed; they fail as a missing command, which never blocks the agent).
-- Keeping the `harness` alias forever: it is dropped once the consumers moved to `cardinal` (follow-up issue).
+- Hook commands that do not start with `cardinal`, such as the `harness` hooks of a project synced before the rename
+  (they fail as a missing command, which never blocks the agent, until `sync` moves them to `cardinal`), and an
+  installed `cardinal` older than BIN-15 and BIN-16: it cannot refuse what it does not check.

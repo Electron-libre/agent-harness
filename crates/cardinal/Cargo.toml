@@ -10,11 +10,6 @@ description = "Cardinal: synchronise the shared agent harness (skills, hooks, sc
 name = "cardinal"
 path = "src/main.rs"
 
-# The name of the binary before the rename, so the hooks of a project synced before it keep running (BIN-18).
-[[bin]]
-name = "harness"
-path = "src/bin/harness.rs"
-
 [dependencies]
 anyhow = "1"
 chrono = "0.4"

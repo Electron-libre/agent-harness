@@ -12,6 +12,8 @@ one binary.
 * The git gate runs `cardinal`, else `harness` (BIN-9); `check` and `update` judge the `harness` hooks and count a
   missing `cardinal` as refused when `harness` is there (BIN-15, BIN-16); `gate::REVIEW_TOOLS` recognises the review
   hook under both names (SYN-22, SYN-23).
+* The installed `pre-commit` gate still opens with the mark line `# harness: native review gate` (`gate::MARK`),
+  seen in the gate of both consumers after their migration on 2026-10-29.
 
 # Approach
 1. Measure first: list the consumers whose lock still records a `harness run` hook or whose machine has no
@@ -19,12 +21,13 @@ one binary.
 2. Remove the `harness` bin, the `harness-<commit>` publication and link, and the `harness` fallbacks of the gate,
    `check`, `update` and `REVIEW_TOOLS`, with their tests, and the recipe `check-harness` of `cardinal.just`
    (renamed `check-cardinal`).
+   Write the gate's mark line `# cardinal: native review gate`, still recognising the old one as the managed gate.
 3. Keep reading the `harness-<commit>` releases of the commits from before the rename (BIN-3) and the `harness run`
    refusals of old transcripts (EVA-5): old pins and old sessions stay readable.
 
 # Specs
-* `specs/tool-binaries.md`: BIN-18 withdrawn, BIN-9, BIN-15, BIN-16 amended; `specs/sync.md`: SYN-22, SYN-23
-  amended.
+* `specs/tool-binaries.md`: BIN-18 withdrawn, BIN-9, BIN-15, BIN-16, BIN-17 amended; `specs/sync.md`: SYN-18,
+  SYN-22, SYN-23 amended.
 
 # Resources
 * `issues/done/rename_the_binary_to_cardinal.md` (the transition and its decisions)
@@ -34,3 +37,47 @@ one binary.
 # Hints
 * The cache moved to `<cache>/cardinal`: the old `<cache>/harness` (clones, binaries) can be deleted then.
 * A gate already installed calls `harness` when `cardinal` is missing: `sync` reinstalls it with the new script.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Every consumer now runs `cardinal` (measured 2026-10-29: both locks are `cardinal.lock`, all hooks `cardinal run`,
+migrations committed). Drop the `harness` bin, its release and CI link, and the `harness` fallbacks of the gate,
+`check`, `update` and the review hook detection. Out of scope: the `harness-<commit>` releases and builds of old
+commits (BIN-3, BIN-5), the old transcripts and commits (EVA-5, BRE-9), the old file names (next issue).
+
+## Plan
+1. [x] Drop the `harness` binary: remove `src/bin/harness.rs` and its `[[bin]]`, the `harness-<commit>` publication
+   of `release.yml`, the `harness` links of `install_cardinal.sh` (keeping its fallback to the `harness` release and
+   build of an old commit), the BIN-18 test; verified by `just check` and the install script tests; makes true BIN-18
+   (withdrawn). ~80 lines.
+2. [ ] Drop the `harness` fallbacks: the gate script runs `cardinal` only and writes the mark
+   `# cardinal: native review gate` (the old mark still recognised), `launcher::LAUNCHERS` and the "missing
+   `cardinal` but `harness` there" refusal go, `gate::REVIEW_TOOLS` keeps `cardinal run review-gate` only, the
+   recipe `check-harness` leaves `files/cardinal.just`; tests amended, docs (`docs/usage.md`, `docs/architecture.md`,
+   README, CLAUDE.md) updated; verified by the gate, launcher and sync CLI tests; makes true BIN-9, BIN-15, BIN-16,
+   BIN-17, SYN-18, SYN-22, SYN-23. ~250 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 300d92b57383b6a51237a38d947c9b0116e09ab9
+- No new ADR: the drop is the end of step 2 of ADR 0012.
+- Machine cleanup (old cache, old binary): the commands are given to the user at the end, not run (answer 1 a).
+
+## Deliverable 1
+- done: no `harness` bin, `release.yml` publishes `cardinal-<commit>` only, `install_cardinal.sh` links no `harness`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass (BIN-18 withdrawn) |
+| docs | updated (architecture, usage, README, CLAUDE.md) |
+| code review | `low`: no findings |
+
+- red: none (a removal: the BIN-18 half of the BIN-17 test is dropped, no new test)
+- Code review: no findings
+- not verified: `release.yml` runs on the push to the main branch only.
+- decisions needed: none

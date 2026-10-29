@@ -65,8 +65,7 @@ consumers run none.
 
 The installed `cardinal` is only a launcher (`crates/cardinal/src/run.rs`): it finds the pinned revision and replaces
 itself (`exec`) by that revision's binary, so input, output and exit code are the tool's. The binary was named `harness`
-before: the crate also installs a `harness` binary that does the same (BIN-18), so the hooks, recipes and git gate of a
-project synced before the rename keep running until its next sync.
+before: the release or the build of a commit from before the rename still carries that name (BIN-3, BIN-5).
 
 ```mermaid
 flowchart TD
@@ -110,10 +109,9 @@ higher one with the install to run (SYN-40, ADR 0014).
 
 This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): each push to the main
 branch builds `cardinal` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever
-the glibc) and `aarch64-apple-darwin`, and creates the release `cardinal-<commit>` with each binary and its `.sha256`,
-and the same binary as the release `harness-<commit>`, the name a launcher installed before the rename fetches. The CI
-of a consumer (`.github/install_cardinal.sh`) installs that asset with a `harness` link to it, or builds it with
-`cargo` when there is none, so its
+the glibc) and `aarch64-apple-darwin`, and creates the release `cardinal-<commit>` with each binary and its `.sha256`
+(a commit from before the rename has its `harness-<commit>` release instead). The CI of a consumer
+(`.github/install_cardinal.sh`) installs that asset, or builds it with `cargo` when there is none, so its
 jobs need no Rust when the source publishes the commit.
 
 ## Hooks and their declaration

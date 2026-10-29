@@ -39,7 +39,7 @@ flowchart LR
 ## Install
 
 ```sh
-cargo install --force --path crates/cardinal --locked   # from a clone (--force: over a `harness` of before)
+cargo install --force --path crates/cardinal --locked   # from a clone
 cd my-project
 cardinal init <git-url-or-path> [--rev main]    # writes .claude/cardinal.toml
 cardinal sync                                   # copies, seeds, merges the settings, installs the review gate

@@ -2,9 +2,8 @@ name: Release
 
 # Publish the `cardinal` binary of every commit of the main branch, so a project pinned to it runs its tools without
 # Rust (ADR 0010, specs/tool-binaries.md BIN-3): release `cardinal-<commit>`, assets `cardinal-<target>` and
-# `cardinal-<target>.sha256`. The same binary is also published under the name before the rename, release
-# `harness-<commit>` with the assets `harness-<target>`, so a `harness` launcher installed before it still fetches the
-# new revisions (until the alias is dropped).
+# `cardinal-<target>.sha256`. The commits from before the rename keep their `harness-<commit>` releases, which
+# `cardinal run` still reads.
 
 on:
   push:
@@ -40,10 +39,8 @@ jobs:
           mkdir dist
           cd dist
           if command -v sha256sum >/dev/null; then sum=sha256sum; else sum="shasum -a 256"; fi
-          for name in cardinal harness; do
-            cp "../target/${{ matrix.target }}/release/cardinal" "$name-${{ matrix.target }}"
-            $sum "$name-${{ matrix.target }}" > "$name-${{ matrix.target }}.sha256"
-          done
+          cp "../target/${{ matrix.target }}/release/cardinal" "cardinal-${{ matrix.target }}"
+          $sum "cardinal-${{ matrix.target }}" > "cardinal-${{ matrix.target }}.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: cardinal-${{ matrix.target }}
@@ -57,20 +54,18 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: Create the releases of the commit (or complete them, on a re-run)
+      - name: Create the release of the commit (or complete it, on a re-run)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for name in cardinal harness; do
-            tag="$name-${{ github.sha }}"
-            if gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-              gh release upload "$tag" dist/"$name"-* --repo "${{ github.repository }}" --clobber
-            else
-              gh release create "$tag" dist/"$name"-* \
-                --repo "${{ github.repository }}" \
-                --target "${{ github.sha }}" \
-                --title "$name ${{ github.sha }}" \
-                --notes "The cardinal binary of ${{ github.sha }}, fetched by \`cardinal run\` (\`$name\` assets)." \
-                --latest=false
-            fi
-          done
+          tag="cardinal-${{ github.sha }}"
+          if gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/cardinal-* --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$tag" dist/cardinal-* \
+              --repo "${{ github.repository }}" \
+              --target "${{ github.sha }}" \
+              --title "cardinal ${{ github.sha }}" \
+              --notes "The cardinal binary of ${{ github.sha }}, fetched by \`cardinal run\`." \
+              --latest=false
+          fi
