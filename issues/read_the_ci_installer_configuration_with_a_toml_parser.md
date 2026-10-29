@@ -26,7 +26,7 @@ In both cases keep the `no source read from` error and its tests in `crates/card
 
 # Resources
 * `files/.github/install_cardinal.sh`, `crates/cardinal/tests/install_script.rs`
-* `issues/fail_the_ci_installer_when_the_source_is_empty.md`
+* `issues/done/fail_the_ci_installer_when_the_source_is_empty.md`
 * ADR 0010 (the prebuilt binary of the CI)
 
 # Hints
