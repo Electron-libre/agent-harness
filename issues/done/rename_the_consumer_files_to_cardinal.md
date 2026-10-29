@@ -109,7 +109,7 @@ format-2 revision keeps the old names its tools read; readers without a source f
 
 - done: the new names in `files/` (skills, `AGENTS.md`, `cardinal.just`, `specs/README.md`), `seed/`, `docs/`,
   `README.md`, `CLAUDE.md` and the doc comments, synced; follow-up
-  `issues/drop_the_old_names_of_the_consumer_files.md`, queued after `drop_the_harness_alias`.
+  `issues/done/drop_the_old_names_of_the_consumer_files.md`, queued after `drop_the_harness_alias`.
 
 | check | result |
 |---|---|
