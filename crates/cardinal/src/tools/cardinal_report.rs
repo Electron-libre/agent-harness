@@ -571,15 +571,11 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
                 {
                     "confounded"
                 } else {
-                    let (bv, av): (f64, f64) =
-                        (bv.parse().unwrap_or(0.0), av.parse().unwrap_or(0.0));
-                    if av.total_cmp(&bv).is_eq() {
-                        "no observed effect"
-                    } else if (av > bv) == (direction == "up") {
-                        "helped"
-                    } else {
-                        "hurt"
-                    }
+                    moved(
+                        bv.parse().unwrap_or(0.0),
+                        av.parse().unwrap_or(0.0),
+                        direction,
+                    )
                 }
             }
             _ => "no data",
@@ -692,4 +688,30 @@ pub(super) fn main(args: &[String]) -> u8 {
         verdicts(&groups, &tables, changes, options.min_sessions);
     }
     0
+}
+
+/// The verdict of a value that went from `before` to `after` when the change expected it to go `direction` (VRD-6).
+#[allow(clippy::float_cmp)] // `-0.0` equals `0.0`, as VRD-6 reads two printed values; `total_cmp` would order them
+fn moved(before: f64, after: f64, direction: &str) -> &'static str {
+    if after == before {
+        "no observed effect"
+    } else if (after > before) == (direction == "up") {
+        "helped"
+    } else {
+        "hurt"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // spec: VRD-6 (internal: a metric of counts never prints `-0.00`, the binary cannot reach this edge)
+    #[test]
+    fn equal_values_are_no_observed_effect_whatever_their_sign() {
+        assert_eq!(moved(0.0, -0.0, "up"), "no observed effect");
+        assert_eq!(moved(-0.0, 0.0, "down"), "no observed effect");
+        assert_eq!(moved(1.0, 2.0, "up"), "helped");
+        assert_eq!(moved(1.0, 2.0, "down"), "hurt");
+    }
 }

@@ -25,3 +25,37 @@ change of behaviour at the edges and three fixes that moved a problem instead of
 # Resources
 * `git show e5352ff`
 * `crates/cardinal/src/tools/cardinal_report.rs`, `check_specs.rs`, `review_gate.rs`, `crates/cardinal/src/budget.rs`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Undo the four side effects of `e5352ff` without losing clippy pedantic. No spec change: VRD-6 already says `equal`,
+the fix makes the code match it again. In `budget`, the means differs: fold over the fixed array of three parts, so
+no `Option` and no invariant to break, instead of restoring a panic.
+
+## Plan
+1. [x] Verdict equality: extract the verdict of two values into a function comparing with `==` under
+   `#[allow(clippy::float_cmp)]` and its reason; verified by a unit test (`-0.0` after `0.0` is `no observed effect`);
+   makes true VRD-6 at the edge (~30 lines).
+2. [ ] Pedantic cleanups: one `problem` helper shared by `parse` and `parse_requirements`; one buffer in
+   `untracked_hashes`; the largest part of `budget` taken without an `Option`; verified by `just check` (existing
+   tests of check-specs, review-gate, SYN-38) (~50 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 1a34320a248e9a19920f07f6839020f854d0df7a
+- `budget`: fold over the three parts, no `Option` (answer 1 a).
+
+## Deliverable 1
+- done: `moved` gives the verdict of two values, equal under `==` (`float_cmp` allowed with its reason).
+- | check | result |
+  |---|---|
+  | tests, lint, specs | `just check` green |
+  | docs | none changed: VRD-6 already says equal |
+  | code review | low, see below |
+- red: VRD-6: `assertion left == right failed, left: "hurt", right: "no observed effect"`
+- Code review: no findings
+- not verified: none
+- decisions needed: none
