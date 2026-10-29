@@ -17,6 +17,10 @@ skipped_dirs = []
 # `lint_files` changed (every file when absent); without it, `cargo clippy` over the `.rs` files; "" turns it off.
 # lint_command = "npx eslint ."
 # lint_files = ["*.ts", "*.tsx"]
+# The format the hook `format-code` runs after an edit of a file named like one of `format_files` (every file when
+# absent), with that file as last argument, from the root of the work tree; without it, `cargo fmt` for a `.rs` file.
+# format_command = "npx prettier --write"
+# format_files = ["*.ts", "*.tsx"]
 # Where the agent finds the context of the project (issue-workflow, create-issue, prioritize-issues).
 roadmap = ["docs/TODO.md"]
 architecture = "docs/architecture.md"

@@ -482,6 +482,7 @@ fn format_hook_follows_cwd(format_hook: &Path, project: &Path) -> Vec<(&'static 
     checks
 }
 
+// spec: FMT-1
 #[test]
 fn rust_hooks() {
     let format_hook = PathBuf::from("format-code");

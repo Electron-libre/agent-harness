@@ -90,7 +90,7 @@ pub const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "format-code",
-        about: "PostToolUse hook: cargo fmt the project of an edited .rs file",
+        about: "PostToolUse hook: format an edited file with the project's format command, else cargo fmt",
         main: format_code::main,
     },
     Tool {
@@ -105,7 +105,7 @@ pub const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "lint-gate",
-        about: "Stop hook: block the end of a turn while clippy reports a problem",
+        about: "Stop hook: block the end of a turn while the project's lint, else clippy, reports a problem",
         main: lint_gate::main,
     },
     Tool {
@@ -190,6 +190,77 @@ fn repo_root() -> Result<PathBuf, String> {
     }
     let root = String::from_utf8_lossy(&out.stdout);
     Ok(root.strip_suffix('\n').unwrap_or(&root).into())
+}
+
+/// The root of the work tree holding `dir`, empty outside git.
+fn toplevel(dir: &Path) -> String {
+    Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .current_dir(dir)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+/// A command a project declares for a hook, run by `sh -c`, or its default (`None`), and the file-name patterns of the
+/// files it acts on, every file when empty.
+struct Declared {
+    command: Option<String>,
+    patterns: Vec<String>,
+}
+
+impl Declared {
+    /// The string `command_key` and the list `files_key` of the `[project]` table of the `.claude/cardinal.toml` of the
+    /// work tree of `dir`; the default, over `default_patterns`, when the project declares no command, or when the file
+    /// is missing, does not parse or gives a key of another type (CLG-7, FMT-1).
+    fn of(dir: &Path, command_key: &str, files_key: &str, default_patterns: &[&str]) -> Declared {
+        let default = Declared {
+            command: None,
+            patterns: default_patterns.iter().map(|&p| p.into()).collect(),
+        };
+        let root = toplevel(dir);
+        if root.is_empty() {
+            return default;
+        }
+        let Ok(table) = std::fs::read_to_string(crate::config_of(Path::new(&root)))
+            .unwrap_or_default()
+            .parse::<toml::Table>()
+        else {
+            return default;
+        };
+        let project = table.get("project");
+        let Some(command) = project
+            .and_then(|p| p.get(command_key))
+            .and_then(toml::Value::as_str)
+        else {
+            return default;
+        };
+        let patterns = match project.and_then(|p| p.get(files_key)) {
+            None => Some(Vec::new()),
+            Some(files) => files.as_array().and_then(|a| {
+                a.iter()
+                    .map(|v| v.as_str().map(String::from))
+                    .collect::<Option<Vec<_>>>()
+            }),
+        };
+        match patterns {
+            Some(patterns) => Declared {
+                command: Some(command.into()),
+                patterns,
+            },
+            None => default,
+        }
+    }
+
+    /// Whether the command acts on the file `path`: its name matches one of the patterns, or there are none.
+    fn names(&self, path: &str) -> bool {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        self.patterns.is_empty()
+            || self
+                .patterns
+                .iter()
+                .any(|p| check_specs::name_matches(p, name))
+    }
 }
 
 /// Strings of `key = ["a", "b"]` in the `[project]` table of the configuration (`crate::config_of`); empty when the key is absent.

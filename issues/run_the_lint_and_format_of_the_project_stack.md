@@ -53,7 +53,7 @@ per project (one command, the project chains them), parsing a non-clippy output 
 2. [x] Generic lint gate: `lint_command`, `lint_files`, the stamp over the declared patterns and the command, output cut
    to 40 lines, clippy kept as default; verified by tests with a fake linter; makes true CLG-1, CLG-4, CLG-5, CLG-7,
    CLG-8. ~400 lines.
-3. [ ] Generic format hook: `format_command`, `format_files`, file appended, run from the work tree root, silent;
+3. [x] Generic format hook: `format_command`, `format_files`, file appended, run from the work tree root, silent;
    verified by tests with a fake formatter; makes true FMT-1 to FMT-4. ~250 lines.
 4. [ ] Reword `issue-workflow` (step 3.3, 3.5) and its `details.md` around "the lint gate" and `just check`; document
    the keys in `seed/.claude/cardinal.toml` and `docs/architecture.md`; verified by `just check` (skills tests);
@@ -82,4 +82,14 @@ per project (one command, the project chains them), parsing a non-clippy output 
   lint never ran.
 - Code review: no findings
 - not verified: a real linter (eslint, ruff) in a consumer.
+- decisions needed: none.
+
+## Deliverable 3
+- done: `format-code` runs the `format_command` over the `format_files` with the edited file as last argument, from
+  the root of its work tree, silent; `cargo fmt` stays the default; the reading of the declared commands is shared by
+  both hooks (`Declared` in `tools/mod.rs`).
+- check | result: tests ok, lint ok, specs ok (`format-hook.md` accepted), docs ok, code review: see below.
+- red: FMT-1, FMT-3: `assertion left == right failed`, `fmt.log` empty, the declared format never ran.
+- Code review: no findings
+- not verified: a real formatter (prettier, ruff) in a consumer.
 - decisions needed: none.

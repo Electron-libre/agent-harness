@@ -40,7 +40,7 @@ The fix belongs in this repository, then `sync` everywhere; there is deliberatel
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/cardinal.toml`
 (`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`, `internal_dirs`), the hooks the project's commands
-(`lint_command`, `lint_files`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
+(`lint_command`, `lint_files`, `format_command`, `format_files`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
@@ -124,7 +124,7 @@ jobs need no Rust when the source publishes the commit.
 |---|---|---|---|---|
 | `PreToolUse` | `Bash` | `review-gate check` | refuses a command that would skip the git hook | [`review-gate.md`](../specs/review-gate.md) REV-12 |
 | `PostToolUse` | `Skill` | `review-gate record` | records what the code review saw | [`review-gate.md`](../specs/review-gate.md) |
-| `PostToolUse` | `Edit\|Write` | `format-code` | `cargo fmt` the project of an edited `.rs` file | |
+| `PostToolUse` | `Edit\|Write` | `format-code` | formats an edited file with the project's format command, else `cargo fmt` the project of an edited `.rs` file | [`format-hook.md`](../specs/format-hook.md) |
 | `PostToolUse` | | `language-hint` | adds a context, once per turn, when the text written before the call is not in the `user_language` | [`language-hint.md`](../specs/language-hint.md) |
 | `Stop` | | `lint-gate` | blocks the end of a turn while the project's lint (else clippy) reports a problem | [`lint-gate.md`](../specs/lint-gate.md) |
 | `Stop` | | `language-hint` | sends the agent back once when its last reply is not in the `user_language`, judged as rule `user-language` of `rule-breaches` (`tools/language.rs`) | [`language-hint.md`](../specs/language-hint.md) |
@@ -205,7 +205,9 @@ directory) when a file named like one of its `lint_files` changed outside the `.
 in a project with a `Cargo.toml` and a changed `.rs` file; in both cases only when the lint state (command, commit,
 changed files) changed since the last passing run (CLG-1, CLG-4, CLG-7). What it prints is billed to the agent at each
 turn: one short line per clippy diagnostic, at most 40 (CLG-2, CLG-3), the first 40 non-blank lines of another lint
-(CLG-8). An empty `lint_command` turns the gate off.
+(CLG-8). An empty `lint_command` turns the gate off. `format-code` runs after an edit the `format_command`, with the
+edited file as last argument, from the root of its work tree, when the file is named like one of the `format_files`,
+else `cargo fmt` for a `.rs` file; it prints nothing (FMT-1 to FMT-4).
 
 The hooks that run cargo do not trust `CLAUDE_PROJECT_DIR`: a session that entered another worktree keeps it on the
 main one, where another agent may work. `lint-gate` checks the work tree of the event's `cwd` (CLG-6) and

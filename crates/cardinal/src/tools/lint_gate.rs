@@ -15,6 +15,8 @@ use std::io::Read;
 use std::path::Path;
 use std::process::Command;
 
+use super::Declared;
+
 const MAX_DIAGNOSTICS: usize = 40;
 /// The first word of the lines cargo prints to show its progress.
 const PROGRESS: [&str; 10] = [
@@ -61,63 +63,9 @@ fn work_tree(event: &serde_json::Value) -> String {
         .into_owned()
 }
 
-/// The lint of a project: the command it declares, run by `sh -c`, or clippy (`None`), and the file-name patterns of
-/// the files it checks, every file when empty (CLG-7).
-struct Lint {
-    command: Option<String>,
-    patterns: Vec<String>,
-}
-
-/// The lint declared in the `.claude/cardinal.toml` of the work tree of `dir`; clippy over `*.rs` when it declares no
-/// `lint_command`, or when the file is missing, does not parse or gives a key of another type.
-fn lint_of(dir: &str) -> Lint {
-    let clippy = Lint {
-        command: None,
-        patterns: vec!["*.rs".into()],
-    };
-    let root = git(dir, &["rev-parse", "--show-toplevel"]);
-    let Ok(table) = std::fs::read_to_string(crate::config_of(Path::new(root.trim())))
-        .unwrap_or_default()
-        .parse::<toml::Table>()
-    else {
-        return clippy;
-    };
-    let project = table.get("project");
-    let Some(command) = project
-        .and_then(|p| p.get("lint_command"))
-        .and_then(toml::Value::as_str)
-    else {
-        return clippy;
-    };
-    let patterns = match project.and_then(|p| p.get("lint_files")) {
-        None => Vec::new(),
-        Some(files) => match files.as_array().and_then(|a| {
-            a.iter()
-                .map(|v| v.as_str().map(String::from))
-                .collect::<Option<Vec<_>>>()
-        }) {
-            Some(patterns) => patterns,
-            None => return clippy,
-        },
-    };
-    Lint {
-        command: Some(command.into()),
-        patterns,
-    }
-}
-
-/// Whether the lint checks the file `path`: its name matches one of the patterns, or there are none.
-fn checks(patterns: &[String], path: &str) -> bool {
-    let name = path.rsplit('/').next().unwrap_or(path);
-    patterns.is_empty()
-        || patterns
-            .iter()
-            .any(|p| super::check_specs::name_matches(p, name))
-}
-
 /// The changed and untracked files the lint checks, outside the `.claude` directories whose scripts are not project
 /// code.
-fn changed_files(dir: &str, patterns: &[String]) -> Vec<String> {
+fn changed_files(dir: &str, lint: &Declared) -> Vec<String> {
     let status = git(
         dir,
         &["status", "--porcelain", "-z", "--untracked-files=all"],
@@ -134,7 +82,7 @@ fn changed_files(dir: &str, patterns: &[String]) -> Vec<String> {
         files.extend(
             paths
                 .into_iter()
-                .filter(|p| checks(patterns, p) && !p.split('/').any(|c| c == ".claude"))
+                .filter(|p| lint.names(p) && !p.split('/').any(|c| c == ".claude"))
                 .map(String::from),
         );
     }
@@ -180,13 +128,13 @@ pub(super) fn main(_args: &[String]) -> u8 {
         return 0;
     }
     let dir = work_tree(&event);
-    let lint = lint_of(&dir);
+    let lint = Declared::of(Path::new(&dir), "lint_command", "lint_files", &["*.rs"]);
     match lint.command.as_deref() {
         Some("") => return 0,
         None if !Path::new(&dir).join("Cargo.toml").exists() => return 0,
         _ => {}
     }
-    let files = changed_files(&dir, &lint.patterns);
+    let files = changed_files(&dir, &lint);
     if files.is_empty() {
         return 0;
     }
