@@ -7,7 +7,7 @@
 //! Usage: `cardinal run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the
 //! current directory, the `projects/` of the configuration directory (EVA-15) and 30 days).
 
-use super::check_specs::{citation, is_req_id};
+use super::check_specs::{citation, citation_list, is_req_id};
 use super::transcripts;
 
 use chrono::{DateTime, Duration, FixedOffset};
@@ -256,9 +256,10 @@ fn cited(list: &str) -> impl Iterator<Item = String> + '_ {
         .map(str::to_string)
 }
 
-/// The requirement ids the commits `own` cite on the citation lines (`// spec:` opening the trimmed line) they add
-/// to the files of the issue, less, in each commit, those cited on the citation lines it removes, renames detected (QUA-11): a moved
-/// or extended citation traces only its new ids. `None` when git cannot show the diffs.
+/// The requirement ids the commits `own` cite on the citation lines (a `spec:` citation of `check-specs` for the
+/// file's extension, QUA-13) they add to the files of the issue, less, in each commit, those cited on the citation
+/// lines it removes, renames detected (QUA-11): a moved or extended citation traces only its new ids. `None` when git
+/// cannot show the diffs.
 fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
     let mut args = vec![
         "-c",
@@ -268,7 +269,7 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
         "-U0",
         "--no-color",
         "--format=%x1e",
-        "-G// spec:",
+        "-G spec:",
     ];
     args.extend(own.iter().map(|c| c.hash.as_str()));
     args.extend(["--", "."]);
@@ -281,15 +282,35 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
     let diffs = git(repo, &args)?;
     let mut traced = BTreeSet::new();
     for diff in diffs.split('\x1e') {
-        let citations = |sign: char| -> BTreeSet<String> {
-            diff.lines()
-                .filter_map(|l| l.strip_prefix(sign))
-                .filter_map(|l| l.trim().strip_prefix("// spec:"))
-                .flat_map(cited)
-                .collect()
-        };
-        let removed = citations('-');
-        traced.extend(citations('+').difference(&removed).cloned());
+        let (mut added, mut removed) = (BTreeSet::new(), BTreeSet::new());
+        // the old and new paths of the file the hunks below belong to, read from its header
+        let (mut old, mut new, mut header) = (String::new(), String::new(), false);
+        for line in diff.lines() {
+            if line.starts_with("diff --git ") {
+                header = true;
+            } else if header && line.starts_with("@@") {
+                header = false;
+            } else if header {
+                if let Some(path) = line.strip_prefix("--- ") {
+                    old = path.strip_prefix("a/").unwrap_or(path).to_string();
+                } else if let Some(path) = line.strip_prefix("+++ ") {
+                    new = path.strip_prefix("b/").unwrap_or(path).to_string();
+                }
+            } else if let Some(text) = line.strip_prefix('+') {
+                added.extend(
+                    citation_list(Path::new(&new), text)
+                        .into_iter()
+                        .flat_map(cited),
+                );
+            } else if let Some(text) = line.strip_prefix('-') {
+                removed.extend(
+                    citation_list(Path::new(&old), text)
+                        .into_iter()
+                        .flat_map(cited),
+                );
+            }
+        }
+        traced.extend(added.difference(&removed).cloned());
     }
     Some(traced)
 }

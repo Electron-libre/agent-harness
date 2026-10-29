@@ -608,7 +608,38 @@ fn traced_fixture(tmp: &Path) -> PathBuf {
         "docs: close eta",
         &[("issues/eta.md", None), ("issues/done/eta.md", Some(eta))],
     );
+    theta_commits(&repo);
     repo
+}
+
+/// An issue whose tests cite with the marker of their language (QUA-13).
+fn theta_commits(repo: &Path) {
+    let theta = "# theta\n\n# Tracking\n\n## Plan\n1. [x] one\n";
+    commit_at(
+        repo,
+        "2026-01-08T00:00:00Z",
+        "feat(files): theta",
+        &[
+            (
+                "tests/test_a.py",
+                Some("# spec: ABC-1\ndef test_a():\n    pass\n"),
+            ),
+            (
+                "src/lib.rs",
+                Some("const T: &str = r\"\n# spec: ABC-2\n\";\n"),
+            ),
+            ("issues/theta.md", Some(theta)),
+        ],
+    );
+    commit_at(
+        repo,
+        "2026-01-09T00:00:00Z",
+        "docs: close theta",
+        &[
+            ("issues/theta.md", None),
+            ("issues/done/theta.md", Some(theta)),
+        ],
+    );
 }
 
 // spec: QUA-11
@@ -635,6 +666,17 @@ fn traced_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
             has(&r, "eta", "traced", "1") && has(&r, "eta", "traced_without_red", "1"),
         ),
     ]
+}
+
+// spec: QUA-13
+fn traced_marker_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let repo = traced_fixture(&tmp.join("traced_markers"));
+    let (_, out) = run(dir, &repo, &[]);
+    let r = rows(&out);
+    vec![(
+        "a citation is read with the marker of its file's extension".to_string(),
+        has(&r, "theta", "traced", "1"),
+    )]
 }
 
 /// A transcript line of `kind` in `cwd` at `ts`, with `fields` merged in.
@@ -798,6 +840,7 @@ fn delivered_quality() {
         .chain(start_checks(&dir, &tmp))
         .chain(unread_checks(&dir, &tmp))
         .chain(traced_checks(&dir, &tmp))
+        .chain(traced_marker_checks(&dir, &tmp))
         .chain(session_checks(&dir, &tmp))
         .chain(summary_checks(&dir, &tmp))
         .collect();

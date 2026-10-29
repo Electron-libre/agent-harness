@@ -52,7 +52,7 @@ boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comm
    outside `.rs`, a bad pattern reported; `spec-coverage` counts a non-`.rs` file as a test; `files/specs/README.md`
    and `seed/.claude/cardinal.toml` document them; verified by tests through the binary; makes true TRC-11, TRC-12,
    TRC-13, TRC-15, COV-12.
-2. [ ] `traced` of `delivered-quality` reads the citations with the marker of each file's extension; verified by a
+2. [x] `traced` of `delivered-quality` reads the citations with the marker of each file's extension; verified by a
    test on a fixture repository; makes true QUA-13.
 3. [ ] `internal_dirs` replaces `src` in the boundary rule when set; documented in the README and the seed; verified
    by a test through the binary; makes true TRC-14, and sets TRC, COV and QUA back to `accepted`.
@@ -73,4 +73,12 @@ boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comm
   `left: (Some(0), "no test file found\n")`.
 - Code review: no findings
 - not verified: a real consumer in another language.
+- decisions needed: none.
+
+## Deliverable 2
+- done: `traced` of `delivered-quality` reads each diff line with the citation markers of its file (old path for a
+  removed line, new path for an added one); QUA-11 points to QUA-13 for the citation lines.
+- red: QUA-13: `FAIL - a citation is read with the marker of its file's extension`.
+- Code review: no findings
+- not verified: none.
 - decisions needed: none.
