@@ -3,7 +3,7 @@
 //! so the agent gives it again in that language. It lets go when the agent already retried (`stop_hook_active`) and
 //! whenever the reply cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
-use super::language::Language;
+use super::language::{Language, HINT_MARK};
 use super::transcripts::{git, typed_text};
 use serde_json::Value;
 use std::io::Read;
@@ -76,8 +76,6 @@ pub(super) fn main(_args: &[String]) -> u8 {
         return 0;
     }
     let name = language.name;
-    eprintln!(
-        "Your last reply is not in {name}, the user_language of .claude/cardinal.toml: give it again in {name}."
-    );
+    eprintln!("Your last reply is not in {name}, {HINT_MARK}: give it again in {name}.");
     2
 }

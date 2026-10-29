@@ -652,7 +652,7 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         sub.write(&projects.join(format!("-{name}/s/subagents/agent-y.jsonl")));
         if name == "fr" {
             expected.push(format!(
-                "s\tfr\tr1\tuser-language\tbreach\ts.jsonl:{english}\t"
+                "s\tfr\tr1\tuser-language\tbreach\ts.jsonl:{english}\tintermediate"
             ));
         }
     }
@@ -671,6 +671,59 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+const HINT: &str =
+    "Your text is not in French, the user_language of .claude/cardinal.toml: write in French.";
+
+// spec: BRE-13
+fn language_kind_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("kinds");
+    let projects = tmp.join("projects");
+    let repo = new_repo(&tmp.join("k"));
+    commit_at(
+        &repo,
+        "2026-01-01T00:00:00Z",
+        "chore: sync",
+        &[(
+            ".claude/cardinal.toml",
+            "[cardinal]\nsource = \"x\"\nrev = \"r1\"\n\n[project]\nuser_language = \"French\"\n",
+        )],
+    );
+    let mut t = Transcript::new(&repo, "2026-02-01T10:00:00.000Z");
+    t.typed("go");
+    let hinted_tool = t.text("e1", ENGLISH);
+    t.push(json!({"type": "attachment", "attachment": {"type": "hook_additional_context", "content": [HINT], "hookName": "PostToolUse:Bash"}}));
+    t.text("f1", FRENCH);
+    t.typed("go");
+    let intermediate = t.text("e2", ENGLISH);
+    t.text("f2", "Fini.");
+    t.typed("go");
+    let last = t.text("e3", ENGLISH);
+    t.typed("go");
+    let hinted_stop = t.text("e4", ENGLISH);
+    t.push(json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": format!("Stop hook feedback:\n[cardinal run language-hint]: {HINT}")}}));
+    let end = t.text("e5", ENGLISH);
+    t.write(&projects.join("-k/s.jsonl"));
+    let row = |line: usize, kind: &str| {
+        format!("s\tk\tr1\tuser-language\tbreach\ts.jsonl:{line}\t{kind}")
+    };
+    let expected = vec![
+        row(hinted_tool, "hinted"),
+        row(intermediate, "intermediate"),
+        row(last, "final"),
+        row(hinted_stop, "hinted"),
+        row(end, "final"),
+    ];
+    let (ok, out) = run(dir, &projects, false);
+    let rows: Vec<String> = out.lines().skip(1).map(str::to_string).collect();
+    if rows != expected {
+        println!("{out}");
+    }
+    vec![
+        ("the language kinds succeed".to_string(), ok),
+        ("a language breach is hinted when the hook's hint follows it in the turn, else final or intermediate".to_string(), rows == expected),
+    ]
+}
+
 #[test]
 fn rule_breaches() {
     let dir = std::path::PathBuf::from("/tools");
@@ -681,6 +734,7 @@ fn rule_breaches() {
         .chain(summary_checks(&dir, &tmp))
         .chain(commit_checks(&dir, &tmp))
         .chain(language_checks(&dir, &tmp))
+        .chain(language_kind_checks(&dir, &tmp))
         .collect();
     let mut failed = false;
     for (name, ok) in checks {

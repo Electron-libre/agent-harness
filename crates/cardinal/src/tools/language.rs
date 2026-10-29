@@ -14,6 +14,9 @@ const ENGLISH_WORDS: &[&str] = &[
     "will", "can",
 ];
 
+/// The words every hint of the `language-hint` hook holds, by which `rule-breaches` finds it in a transcript.
+pub(super) const HINT_MARK: &str = "the user_language of .claude/cardinal.toml";
+
 /// The fewest words a text needs for its language to be judged.
 const MIN_WORDS: usize = 20;
 

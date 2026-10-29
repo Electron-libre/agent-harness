@@ -68,7 +68,7 @@ breaches apart. Out of scope: the measure after the change, which needs sessions
 ## Plan
 1. [x] Stop words and language name: drop `an` and `as` from the English list, match `user_language` without case;
    verified by tests through the binaries of `rule-breaches` and `language-hint`; makes true BRE-10.
-2. [ ] Kinds of language breach: `detail` `hinted`, `final` or `intermediate`, then the baseline re-run with the new
+2. [x] Kinds of language breach: `detail` `hinted`, `final` or `intermediate`, then the baseline re-run with the new
    lists on the transcripts kept, recorded here; verified by a `rule-breaches` test; makes true BRE-13.
 3. [ ] `PostToolUse` mode of `language-hint`, declared for every tool in `entries/.claude/settings.json`, synced and
    installed; verified by `language-hint` tests through the binary; makes true LNG-1, LNG-2, LNG-5, LNG-7 to LNG-10.
@@ -88,6 +88,34 @@ breaches apart. Out of scope: the measure after the change, which needs sessions
 - Code review: no findings (`low`)
 - not verified: none
 - decisions needed: none
+
+## Deliverable 2
+- done: a `user-language` breach carries `detail` `hinted`, `final` or `intermediate`; both hints share the mark
+  `HINT_MARK` of `language.rs`; baseline below.
+
+| check | result |
+|---|---|
+| `just check` | pass |
+| docs | none to change (`docs/usage.md` and `docs/architecture.md` do not list the detail column) |
+| code review | `low`, see below |
+
+- red: BRE-13: `rule_breaches` FAIL, every `user-language` row had an empty `detail`.
+- Code review: no findings (`low`)
+- not verified: none
+- decisions needed: none
+
+### Baseline (2026-10-29, new lists)
+Revisions split by `git merge-base --is-ancestor ad56d2a <revision>`, on the transcripts still kept.
+
+| group | sessions applied | sessions breached | breaches | final | intermediate | hinted |
+|---|---|---|---|---|---|---|
+| before the hook | 89 | 9 | 21 | 2 | 19 | 0 |
+| with the Stop hook | 29 | 4 | 4 | 0 | 4 | 0 |
+
+* The old lists (base `503e634`, built apart) give the same summary on these transcripts: dropping `an` and `as`
+  changes no count here.
+* The counts differ from the table of 2026-10-29 (72 and 32 sessions applied) by the grouping above and the sessions
+  run since; the comparison of the follow-up measure starts from this table.
 
 ## Decisions
 - Mode: autonomous

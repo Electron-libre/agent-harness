@@ -8,7 +8,7 @@
 //! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::commit_check::BUILT_IN_SCOPES;
-use super::language::Language;
+use super::language::{Language, HINT_MARK};
 use super::transcripts;
 
 use chrono::{DateTime, FixedOffset};
@@ -82,6 +82,8 @@ enum Event {
         location: String,
         text: String,
     },
+    /// A hint of the `language-hint` hook: Stop hook feedback or added context (the session's own transcript only).
+    Hint,
 }
 
 /// The events of one transcript file, in order.
@@ -141,6 +143,13 @@ impl Transcript {
                     if main && (typed_text(line).is_some() || user_command(line)) {
                         t.events.push(Event::Typed);
                     }
+                    let feedback = line["message"]["content"].as_str().unwrap_or_default();
+                    if main
+                        && line["isMeta"].as_bool() == Some(true)
+                        && feedback.contains(HINT_MARK)
+                    {
+                        t.events.push(Event::Hint);
+                    }
                     for block in blocks.iter().filter(|b| b["type"] == "tool_result") {
                         let error = block["is_error"].as_bool() == Some(true);
                         let call = block["tool_use_id"]
@@ -156,6 +165,15 @@ impl Transcript {
                                 call,
                             });
                         }
+                    }
+                }
+                Some("attachment") => {
+                    let attachment = &line["attachment"];
+                    if main
+                        && attachment["type"] == "hook_additional_context"
+                        && attachment["content"].to_string().contains(HINT_MARK)
+                    {
+                        t.events.push(Event::Hint);
                     }
                 }
                 _ => {}
@@ -339,11 +357,14 @@ impl Verdict {
         let mut flagged: HashSet<usize> = HashSet::new();
         let mut refused = false;
         let mut plan_proposed = false;
+        // the language breaches of the turn not yet hinted, each with whether a text block came after it (BRE-13)
+        let mut unhinted: Vec<(usize, bool)> = Vec::new();
         for event in &t.events {
             match event {
                 Event::Typed => {
                     refused = false;
                     plan_proposed = false;
+                    self.settle_language(&mut unhinted);
                 }
                 Event::Call(i) => {
                     let call = &t.calls[*i];
@@ -367,12 +388,21 @@ impl Verdict {
                     }
                 }
                 Event::Text { location, text } => {
+                    for (_, followed) in &mut unhinted {
+                        *followed = true;
+                    }
                     let Some(breach) = context.language.and_then(|l| l.breached_by(text)) else {
                         continue;
                     };
                     self.applied.insert("user-language");
                     if breach {
+                        unhinted.push((self.findings.len(), false));
                         self.add("user-language", false, location, String::new());
+                    }
+                }
+                Event::Hint => {
+                    for (i, _) in unhinted.drain(..) {
+                        self.findings[i].detail = "hinted".into();
                     }
                 }
                 Event::Error {
@@ -393,6 +423,15 @@ impl Verdict {
                     }
                 }
             }
+        }
+        self.settle_language(&mut unhinted);
+    }
+
+    /// Ends a turn: its language breaches no hint followed are `intermediate` when a text block came after them,
+    /// else `final` (BRE-13).
+    fn settle_language(&mut self, unhinted: &mut Vec<(usize, bool)>) {
+        for (i, followed) in unhinted.drain(..) {
+            self.findings[i].detail = if followed { "intermediate" } else { "final" }.into();
         }
     }
 }
