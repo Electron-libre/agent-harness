@@ -2,16 +2,16 @@
 //! `user-language` (BRE-10, `specs/rule-breaches.md`), shared by `rule-breaches` and the `language-hint` hook
 //! (`specs/language-hint.md`) so the measure and the hook agree on what a breach is.
 
-/// Frequent words of one language only (`a`, `on`, `or`, `plus` are both French and English).
+/// Frequent words of one language only (`a`, `an`, `as`, `on`, `or`, `plus` are both French and English).
 const FRENCH_WORDS: &[&str] = &[
     "le", "la", "les", "un", "une", "des", "du", "de", "et", "est", "que", "qui", "dans", "pour",
     "pas", "sur", "avec", "ce", "cette", "il", "elle", "je", "tu", "nous", "vous", "au", "aux",
     "ou", "mais", "par", "sont", "fait", "sans", "comme", "se", "ne", "en", "donc", "puis",
 ];
 const ENGLISH_WORDS: &[&str] = &[
-    "the", "an", "and", "is", "are", "that", "which", "in", "for", "not", "with", "this", "it",
-    "i", "you", "we", "of", "to", "be", "by", "was", "but", "as", "at", "from", "have", "has",
-    "so", "then", "will", "can",
+    "the", "and", "is", "are", "that", "which", "in", "for", "not", "with", "this", "it", "i",
+    "you", "we", "of", "to", "be", "by", "was", "but", "at", "from", "have", "has", "so", "then",
+    "will", "can",
 ];
 
 /// The fewest words a text needs for its language to be judged.
@@ -26,15 +26,15 @@ pub(super) struct Language {
 }
 
 impl Language {
-    /// The language named by `user_language`; `None` for a language with no list.
+    /// The language named by `user_language`, in any case; `None` for a language with no list.
     pub(super) fn named(name: &str) -> Option<Language> {
-        match name {
-            "French" => Some(Language {
+        match name.to_lowercase().as_str() {
+            "french" => Some(Language {
                 name: "French",
                 own: FRENCH_WORDS,
                 other: ENGLISH_WORDS,
             }),
-            "English" => Some(Language {
+            "english" => Some(Language {
                 name: "English",
                 own: ENGLISH_WORDS,
                 other: FRENCH_WORDS,

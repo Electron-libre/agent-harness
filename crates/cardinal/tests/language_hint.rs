@@ -11,6 +11,8 @@ use tempfile::tempdir;
 
 const FRENCH: &str = "Le livrable est fait : les tests passent et la revue ne trouve rien, donc je committe puis je passe au suivant dans la foulée.";
 const ENGLISH: &str = "The deliverable is done: the tests pass and the review finds nothing, so I commit it and move on to the next one with the plan.";
+/// French with no French stop word and many `an` and `as`, also French words.
+const AN_AS: &str = "Bilan : an premier, an deuxième, an troisième, an quatrième, an cinquième, an sixième ; as gagnant, as perdant, as volant, as rouge, as noir, as vert.";
 
 /// A git repository whose `.claude/cardinal.toml` names `language` (none when `None`).
 fn repo(dir: &Path, language: Option<&str>) {
@@ -177,4 +179,15 @@ fn the_config_is_read_at_the_root_of_the_work_tree_of_the_cwd_else_of_the_projec
     std::fs::remove_file(bare.path().join(".claude/cardinal.toml")).unwrap();
     let run = hook(other.path(), &stop(bare.path(), FRENCH));
     assert!(run.stderr.contains("English"), "{run:?}");
+}
+
+// spec: LNG-3, LNG-4
+#[test]
+fn the_language_name_is_read_in_any_case_and_an_as_are_not_english() {
+    let dir = tempdir().unwrap();
+    repo(dir.path(), Some("french"));
+    let run = hook(dir.path(), &stop(dir.path(), ENGLISH));
+    assert_eq!(run.code, Some(2), "{run:?}");
+    assert!(run.stderr.contains("French"), "{run:?}");
+    assert!(silent_pass(&hook(dir.path(), &stop(dir.path(), AN_AS))));
 }

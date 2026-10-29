@@ -606,6 +606,8 @@ fn commit_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
 
 const FRENCH: &str = "Le livrable est fait : les tests passent et la revue ne trouve rien, donc je committe puis je passe au suivant dans la foulée.";
 const ENGLISH: &str = "The deliverable is done: the tests pass and the review finds nothing, so I commit it and move on to the next one with the plan.";
+/// French with no French stop word and many `an` and `as`, also French words: an English block for the old lists.
+const AN_AS: &str = "Bilan : an premier, an deuxième, an troisième, an quatrième, an cinquième, an sixième ; as gagnant, as perdant, as volant, as rouge, as noir, as vert.";
 
 // spec: BRE-10
 fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
@@ -613,7 +615,7 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let projects = tmp.join("projects");
     let mut expected = Vec::new();
     for (name, language) in [
-        ("fr", Some("French")),
+        ("fr", Some("french")),
         ("de", Some("German")),
         ("none", None),
     ] {
@@ -633,6 +635,7 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         let mut t = Transcript::new(&repo, "2026-02-01T10:00:00.000Z");
         t.typed("SECRET");
         t.text("m1", FRENCH);
+        t.text("m7", AN_AS);
         let english = t.text("m2", ENGLISH);
         t.text("m3", "The tests pass, so I commit it and move on.");
         t.text(
@@ -663,8 +666,8 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     }
     vec![
         ("the language rule succeeds".to_string(), ok && !out.contains("SECRET") && !out.contains("deliverable")),
-        ("a long block of the session in the other language is a breach; short, code and sub-agent blocks are not".to_string(), rows == expected),
-        ("the language rule applies only with a French or English user_language".to_string(), summary == want_summary),
+        ("a long block of the session in the other language is a breach; short, code, sub-agent blocks and French with `an` and `as` are not".to_string(), rows == expected),
+        ("the language rule applies only with a French or English user_language, in any case".to_string(), summary == want_summary),
     ]
 }
 

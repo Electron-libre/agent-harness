@@ -48,3 +48,52 @@ falls, and remove the two skews that make the hook and the measure misjudge a te
 * Changing the stop-word lists changes what BRE-10 counts: re-run the baseline with the new lists on the transcripts
   still kept (pruning removes the old ones) before comparing with the table of 2026-10-29.
 * One hint per turn at most: a hook firing on every tool call of a long turn floods the context.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Judge the text the agent writes before a tool call in a `PostToolUse` mode of `language-hint` (one added context per
+turn, the call never fails), fix the two skews of BRE-10, and let `rule-breaches` tell final, intermediate and hinted
+breaches apart. Out of scope: the measure after the change, which needs sessions run with it (a follow-up issue).
+
+## Findings (preparation)
+* A blocking Stop hook shows as a user line with `isMeta: true` whose content starts with `Stop hook feedback:\n[<command>]: <stderr>`;
+  `typed_text` already skips it.
+* A `PostToolUse` hook printing `hookSpecificOutput.additionalContext` shows as an `attachment` line of type
+  `hook_additional_context` (seen for the formatter); the transcript writes the text and `tool_use` lines of a message
+  before its tool results, so the text before a call is on disk when its `PostToolUse` runs.
+
+## Plan
+1. [x] Stop words and language name: drop `an` and `as` from the English list, match `user_language` without case;
+   verified by tests through the binaries of `rule-breaches` and `language-hint`; makes true BRE-10.
+2. [ ] Kinds of language breach: `detail` `hinted`, `final` or `intermediate`, then the baseline re-run with the new
+   lists on the transcripts kept, recorded here; verified by a `rule-breaches` test; makes true BRE-13.
+3. [ ] `PostToolUse` mode of `language-hint`, declared for every tool in `entries/.claude/settings.json`, synced and
+   installed; verified by `language-hint` tests through the binary; makes true LNG-1, LNG-2, LNG-5, LNG-7 to LNG-10.
+4. [ ] Follow-up issue to measure the change once sessions ran with it (`skill:create-issue`); verified by its checker.
+
+## Deliverable 1
+- done: `an` and `as` left the English list; `user_language` read without case (`french` works).
+
+| check | result |
+|---|---|
+| `just check` | pass |
+| docs | none to change (the lists are not documented outside the code) |
+| code review | `low`, see below |
+
+- red: BRE-10, LNG-3, LNG-4: `rule_breaches` FAIL on the `french` project and the `an`/`as` block; `language_hint`
+  exit `Some(0)` instead of `Some(2)` for `user_language = "french"`.
+- Code review: no findings (`low`)
+- not verified: none
+- decisions needed: none
+
+## Decisions
+- Mode: autonomous
+- Base commit: 503e63421de559e6e4ae59ec7e931533fa03cbfd
+- Event (1 a): `PostToolUse`, the text before the call is on disk and the hint comes with the tool result.
+- Language name (2 a): matched without case; an unknown name stays silent.
+- Tools (3 a): every tool, no matcher.
+- Cost (asked at validation): no token while the language is kept, one line of ~40 tokens per turn at most; ~40 ms
+  per tool call measured on a 14 MB transcript with the Stop mode, accepted.
