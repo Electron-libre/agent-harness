@@ -4,6 +4,7 @@
 
 use std::fs;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -118,12 +119,29 @@ fn without_format_files_every_edited_file_is_formatted() {
 
 // spec: FMT-2
 #[test]
-fn an_empty_format_command_formats_nothing() {
-    let root = project("format_command = \"\"");
+fn an_empty_or_blank_format_command_formats_nothing() {
+    for command in ["", "  "] {
+        let root = project(&format!("format_command = \"{command}\""));
+        let dir = root.path();
+        fs::write(dir.join("fmt.sh"), "#!/bin/sh\necho ran > ran.log\n").unwrap();
+        fs::set_permissions(dir.join("fmt.sh"), fs::Permissions::from_mode(0o755)).unwrap();
+        let out = hook(dir, &edit(&dir.join("fmt.sh")));
+        assert_eq!((out.code, out.stderr.as_str()), (0, ""), "{command:?}");
+        assert!(
+            !dir.join("ran.log").exists(),
+            "{command:?} ran the edited file"
+        );
+    }
+}
+
+// spec: FMT-2
+#[test]
+fn a_declared_format_leaves_the_claude_directories_alone() {
+    let root = project("format_command = \"sh fmt.sh\"");
     let dir = root.path();
-    fs::write(dir.join("src/a.ts"), "x\n").unwrap();
-    let out = hook(dir, &edit(&dir.join("src/a.ts")));
-    assert_eq!((out.code, out.stderr.as_str()), (0, ""));
+    fs::create_dir_all(dir.join(".claude/skills")).unwrap();
+    fs::write(dir.join(".claude/skills/x.md"), "x\n").unwrap();
+    assert_eq!(hook(dir, &edit(&dir.join(".claude/skills/x.md"))).code, 0);
     assert_eq!(log(dir), "");
 }
 

@@ -14,7 +14,7 @@ project's format command, `cargo fmt` when the project declares none, so the age
 ## Requirements
 
 - **FMT-1** (deterministic) The hook must read the format command from the string `format_command` and the format patterns from the list of strings `format_files` of the `[project]` table of the `.claude/cardinal.toml` at the root of the work tree holding the edited file (`tool_input.file_path` of the event), each pattern matching a file name, `*` standing for any run of characters; `format_files` absent, every file name matches. Without `format_command`, or when the file is missing, does not parse or gives a key of another type, the format command is `cargo fmt --all` over the patterns `*.rs`.
-- **FMT-2** (deterministic) The hook must run nothing when the event has no `file_path`, when the name of the edited file matches no format pattern, and when the declared format command is empty.
+- **FMT-2** (deterministic) The hook must run nothing when the event has no `file_path`, when the edited file is under a `.claude` directory of its work tree (Cardinal's copies) or its name matches no format pattern, and when the declared format command is empty or blank.
 - **FMT-3** (deterministic) The hook must run a declared format command with `sh -c`, from the root of the work tree holding the edited file, with the path of the edited file as its last argument.
 - **FMT-4** (deterministic) The hook must exit 0 and print nothing, whatever the format command prints or returns: formatting is best-effort, and a syntax error mid-edit does not block the agent.
 

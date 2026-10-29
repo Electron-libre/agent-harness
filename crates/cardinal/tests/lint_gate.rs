@@ -51,7 +51,7 @@ fn git(project: &Path, args: &[&str]) {
 
 /// A committed git project whose `.claude/cardinal.toml` holds the `[project]` lines `config`, with the fake linter
 /// `lint.sh`: it logs each run to `lint.log` (ignored by git), prints `out.txt` and `err.txt` when they exist and
-/// exits with the code in `code.txt`, 0 when it is absent.
+/// exits with the code in `code.txt`, 0 when it is absent; while `fix.txt` exists, it changes `a.ts` as a fixer does.
 fn project(config: &str) -> TempDir {
     let root = tempdir().unwrap();
     let dir = root.path();
@@ -64,13 +64,13 @@ fn project(config: &str) -> TempDir {
     .unwrap();
     fs::write(
         dir.join("lint.sh"),
-        "echo run >> lint.log\n[ -e out.txt ] && cat out.txt\n[ -e err.txt ] && cat err.txt >&2\n\
+        "echo run >> lint.log\n[ -e fix.txt ] && echo '// fixed' >> a.ts\n[ -e out.txt ] && cat out.txt\n[ -e err.txt ] && cat err.txt >&2\n\
          exit $(cat code.txt 2>/dev/null || echo 0)\n",
     )
     .unwrap();
     fs::write(
         dir.join(".gitignore"),
-        "lint.log\nout.txt\nerr.txt\ncode.txt\n",
+        "lint.log\nout.txt\nerr.txt\ncode.txt\nfix.txt\n",
     )
     .unwrap();
     fs::write(dir.join("a.ts"), "let a = 1;\n").unwrap();
@@ -117,12 +117,16 @@ fn without_lint_files_every_changed_file_runs_the_lint() {
 
 // spec: CLG-1
 #[test]
-fn an_empty_lint_command_disables_the_gate() {
-    let root = project("lint_command = \"\"\nlint_files = [\"*.ts\"]");
-    let dir = root.path();
-    fs::write(dir.join("a.ts"), "let a = 2;\n").unwrap();
-    let out = gate(dir, "{}");
-    assert_eq!((out.code, out.stderr.as_str()), (0, ""));
+fn an_empty_or_blank_lint_command_disables_the_gate() {
+    for command in ["", "  "] {
+        let root = project(&format!(
+            "lint_command = \"{command}\"\nlint_files = [\"*.ts\"]"
+        ));
+        let dir = root.path();
+        fs::write(dir.join("a.ts"), "let a = 2;\n").unwrap();
+        let out = gate(dir, "{}");
+        assert_eq!((out.code, out.stderr.as_str()), (0, ""), "{command:?}");
+    }
 }
 
 // spec: CLG-7
@@ -200,4 +204,35 @@ fn a_passing_lint_is_stamped_until_the_files_or_the_command_change() {
     .unwrap();
     assert_eq!(gate(dir, "{}").code, 0);
     assert_eq!(runs(dir), 6, "a changed command runs the lint");
+}
+
+// spec: CLG-4
+#[test]
+fn the_stamp_records_the_files_as_a_fixing_lint_leaves_them() {
+    let root = project(TS);
+    let dir = root.path();
+    fs::write(dir.join("fix.txt"), "").unwrap();
+    fs::write(dir.join("a.ts"), "let a = 2;\n").unwrap();
+    assert_eq!(gate(dir, "{}").code, 0);
+    assert_eq!(gate(dir, "{}").code, 0);
+    assert_eq!(runs(dir), 1, "the fix of the passing run is in the stamp");
+}
+
+// spec: CLG-5, CLG-6
+#[test]
+fn a_project_in_a_subdirectory_lints_again_after_each_edit() {
+    let root = project(TS);
+    let dir = root.path();
+    let web = dir.join("web");
+    fs::create_dir_all(&web).unwrap();
+    fs::copy(dir.join("lint.sh"), web.join("lint.sh")).unwrap();
+    fs::write(web.join("b.ts"), "let b = 1;\n").unwrap();
+    git(dir, &["add", "-A"]);
+    git(dir, &["commit", "-qm", "web"]);
+
+    fs::write(web.join("b.ts"), "let b = 2;\n").unwrap();
+    assert_eq!(gate(&web, "{}").code, 0);
+    fs::write(web.join("b.ts"), "let b = 3;\n").unwrap();
+    assert_eq!(gate(&web, "{}").code, 0);
+    assert_eq!(runs(&web), 2, "a new edit of a dirty file runs the lint");
 }

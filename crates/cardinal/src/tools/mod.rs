@@ -203,8 +203,9 @@ fn toplevel(dir: &Path) -> String {
 }
 
 /// A command a project declares for a hook, run by `sh -c`, or its default (`None`), and the file-name patterns of the
-/// files it acts on, every file when empty.
+/// files it acts on, every file when empty; `root` is the work tree it was read from, empty outside git.
 struct Declared {
+    root: String,
     command: Option<String>,
     patterns: Vec<String>,
 }
@@ -212,13 +213,15 @@ struct Declared {
 impl Declared {
     /// The string `command_key` and the list `files_key` of the `[project]` table of the `.claude/cardinal.toml` of the
     /// work tree of `dir`; the default, over `default_patterns`, when the project declares no command, or when the file
-    /// is missing, does not parse or gives a key of another type (CLG-7, FMT-1).
+    /// is missing, does not parse or gives a key of another type (CLG-7, FMT-1). A blank command is read as empty: it
+    /// turns the hook off (CLG-1, FMT-2).
     fn of(dir: &Path, command_key: &str, files_key: &str, default_patterns: &[&str]) -> Declared {
+        let root = toplevel(dir);
         let default = Declared {
+            root: root.clone(),
             command: None,
             patterns: default_patterns.iter().map(|&p| p.into()).collect(),
         };
-        let root = toplevel(dir);
         if root.is_empty() {
             return default;
         }
@@ -245,16 +248,21 @@ impl Declared {
         };
         match patterns {
             Some(patterns) => Declared {
-                command: Some(command.into()),
+                root,
+                command: Some(command.trim().into()),
                 patterns,
             },
             None => default,
         }
     }
 
-    /// Whether the command acts on the file `path`: its name matches one of the patterns, or there are none.
-    fn names(&self, path: &str) -> bool {
+    /// Whether the command acts on the file `path`, relative to `root`: it is outside the `.claude` directories, whose
+    /// files are Cardinal's copies, and its name matches one of the patterns, or there are none.
+    fn acts_on(&self, path: &str) -> bool {
         let name = path.rsplit('/').next().unwrap_or(path);
+        if path.split('/').any(|c| c == ".claude") {
+            return false;
+        }
         self.patterns.is_empty()
             || self
                 .patterns

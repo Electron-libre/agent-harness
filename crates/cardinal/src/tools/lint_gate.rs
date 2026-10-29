@@ -82,21 +82,22 @@ fn changed_files(dir: &str, lint: &Declared) -> Vec<String> {
         files.extend(
             paths
                 .into_iter()
-                .filter(|p| lint.names(p) && !p.split('/').any(|c| c == ".claude"))
+                .filter(|p| lint.acts_on(p))
                 .map(String::from),
         );
     }
     files
 }
 
-/// A hash of what the lint sees: its command, the commit, and the path and content of each changed file it checks.
-fn lint_state(dir: &str, command: Option<&str>, files: &[String]) -> String {
+/// A hash of what the lint sees: its command, the commit, and the path and content of each changed file it checks
+/// (the paths of `git status`, relative to the root of the work tree).
+fn lint_state(dir: &str, lint: &Declared, files: &[String]) -> String {
     let mut hasher = DefaultHasher::new();
-    command.hash(&mut hasher);
+    lint.command.hash(&mut hasher);
     git(dir, &["rev-parse", "HEAD"]).hash(&mut hasher);
     for file in files {
         file.hash(&mut hasher);
-        std::fs::read(Path::new(dir).join(file))
+        std::fs::read(Path::new(&lint.root).join(file))
             .unwrap_or_default()
             .hash(&mut hasher);
     }
@@ -148,7 +149,7 @@ pub(super) fn main(_args: &[String]) -> u8 {
         ],
     );
     let stamp = stamp.trim();
-    let state = lint_state(&dir, lint.command.as_deref(), &files);
+    let state = lint_state(&dir, &lint, &files);
     if !stamp.is_empty() && std::fs::read_to_string(stamp).is_ok_and(|s| s == state) {
         return 0;
     }
@@ -160,6 +161,8 @@ pub(super) fn main(_args: &[String]) -> u8 {
         return 2;
     }
     if !stamp.is_empty() {
+        // the state as the lint left it: a lint that fixes files must not run again for its own fix
+        let state = lint_state(&dir, &lint, &changed_files(&dir, &lint));
         let _ = std::fs::write(stamp, state);
     }
     0

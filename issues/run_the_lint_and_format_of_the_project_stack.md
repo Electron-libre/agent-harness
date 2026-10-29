@@ -58,10 +58,18 @@ per project (one command, the project chains them), parsing a non-clippy output 
 4. [x] Reword `issue-workflow` (step 3.3, 3.5) and its `details.md` around "the lint gate" and `just check`; document
    the keys in `seed/.claude/cardinal.toml` and `docs/architecture.md`; verified by `just check` (skills tests);
    makes true none (docs). ~60 lines.
+5. [x] Fixes of the high review: verified by `lint_gate` and `format_code` tests; makes true CLG-1, CLG-4, CLG-5, FMT-2.
 
 ## Decisions
 - Mode: autonomous
 - Base commit: d9753896d8ac2e7f6ef9d82673568be7198c1298
+- High review of the issue (10 findings): fixed in deliverable 5: the stamp read the files from the project directory
+  instead of the work tree root (CLG-5 broken in a subdirectory), `format-code` formatted the `.claude` copies, a blank
+  command ran the edited file, a fixing lint ran again for its own fix, a second `git rev-parse` per edit. Not fixed:
+  path patterns (`web/*.ts`) never match (the keys are file-name patterns, as `spec_files`); a command ending in a
+  comment or `;` loses the file (the project's own command); a monorepo lints on a change outside its directory
+  (as clippy did); no top-level fallback of the keys (the spec names the `[project]` table); `toplevel` beside
+  `repo_root` (different callers, cwd vs dir).
 - Hook names: `lint-gate` and `format-code`, the format raised to 4 with `migrations/4.toml` (1 a).
 - The format command gets the edited file as its last argument (2 a).
 
@@ -99,6 +107,15 @@ per project (one command, the project chains them), parsing a non-clippy output 
   specs; `details.md` already neutral since deliverable 1; the keys were documented by deliverables 2 and 3.
 - check | result: tests ok, lint ok, specs ok, docs ok, code review: see below.
 - red: none (wording of a skill, no test).
+- Code review: no findings
+- not verified: nothing.
+- decisions needed: none.
+
+## Deliverable 5
+- done: the fixes of the high review listed in `## Decisions`.
+- check | result: tests ok, lint ok, specs ok, docs ok (specs amended), code review: see below.
+- red: CLG-4, CLG-5, FMT-2: `the fix of the passing run is in the stamp` (2 runs), `a new edit of a dirty file runs the
+  lint` (1 run), `.claude/skills/x.md` and the blank command ran the formatter.
 - Code review: no findings
 - not verified: nothing.
 - decisions needed: none.

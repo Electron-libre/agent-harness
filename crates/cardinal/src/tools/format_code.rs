@@ -22,7 +22,19 @@ pub(super) fn main(_args: &[String]) -> u8 {
         .filter(|d| d.is_dir())
         .unwrap_or(Path::new("."));
     let format = Declared::of(dir, "format_command", "format_files", &["*.rs"]);
-    if !format.names(file) {
+    // judged relative to the work tree, which may itself sit under a `.claude/worktrees` directory
+    let name = Path::new(file).file_name().unwrap_or_default();
+    let relative = dir
+        .canonicalize()
+        .ok()
+        .and_then(|d| {
+            d.join(name)
+                .strip_prefix(&format.root)
+                .ok()
+                .map(Path::to_path_buf)
+        })
+        .unwrap_or_else(|| name.into());
+    if !format.acts_on(&relative.to_string_lossy()) {
         return 0;
     }
     let mut run = match &format.command {
@@ -31,7 +43,7 @@ pub(super) fn main(_args: &[String]) -> u8 {
         Some(command) => {
             let mut sh = Command::new("sh");
             sh.args(["-c", &format!("{command} \"$@\""), "sh", file])
-                .current_dir(super::toplevel(dir));
+                .current_dir(&format.root);
             sh
         }
         None => {
