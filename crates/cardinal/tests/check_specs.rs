@@ -63,6 +63,8 @@ fn check_specs() {
     tree_checks(&case);
     outside_git(&case);
     any_layout(&case, &report);
+    any_language(&case);
+    any_language_placement(&case);
 
     deprecation_checks(&case, &report);
 
@@ -434,6 +436,141 @@ fn any_layout(case: &Case, report: &dyn Fn(&str, bool)) {
         TESTS,
         &[(".claude/cardinal.toml", "[project\n")],
         Some(".claude/cardinal.toml"),
+    );
+}
+
+// spec: TRC-11, TRC-12, TRC-15
+/// The test files a project declares are read with the comment marker of their extension, the `.rs` files staying
+/// the default.
+fn any_language(case: &Case) {
+    let config = |patterns: &str| {
+        (
+            ".claude/cardinal.toml",
+            format!("[project]\nspec_files = [{patterns}]\n"),
+        )
+    };
+    let py = config("\"test_*.py\"");
+    case(
+        "the spec_files are read instead of the .rs files",
+        SPEC,
+        "// spec: RER-1\n#[test]\nfn t() {}\n",
+        &[
+            (py.0, &py.1),
+            (
+                "tests/test_cli.py",
+                "# spec: RER-1, RER-2\ndef test_x():\n    pass\n",
+            ),
+            (
+                "tests/helper.py",
+                "# spec: RER-9\ndef helper():\n    pass\n",
+            ),
+        ],
+        None,
+    );
+    case(
+        "a .rs file is not read when spec_files leaves it out",
+        SPEC,
+        "// spec: RER-1, RER-2\n#[test]\nfn t() {}\n",
+        &[(py.0, &py.1)],
+        Some("requirement RER-1: no test cites"),
+    );
+    let go = config("\"*_test.go\"");
+    case(
+        "a Go test beside the code is read with //",
+        SPEC,
+        "",
+        &[
+            (go.0, &go.1),
+            (
+                "pkg/a/x_test.go",
+                "// spec: RER-1, RER-2\nfunc TestX(t *testing.T) {\n}\n",
+            ),
+        ],
+        None,
+    );
+    let mixed = config("\"*.rs\", \"*.py\", \"*.foo\"");
+    case(
+        "a # line of a .rs file is no citation",
+        SPEC,
+        "// spec: RER-1\n#[test]\nfn t() {}\n",
+        &[
+            (mixed.0, &mixed.1),
+            ("crates/a/src/u.rs", "# spec: RER-2\nfn u() {}\n"),
+        ],
+        Some("requirement RER-2: no test cites"),
+    );
+    case(
+        "a // line of a .py file is no citation",
+        SPEC,
+        "",
+        &[
+            (mixed.0, &mixed.1),
+            (
+                "t/test_a.py",
+                "# spec: RER-1\ndef test_a():\n    pass\n// spec: RER-9\n",
+            ),
+        ],
+        Some("requirement RER-2: no test cites"),
+    );
+    case(
+        "an unknown extension takes any of the four markers",
+        SPEC,
+        "",
+        &[
+            (mixed.0, &mixed.1),
+            ("t/a.foo", "-- spec: RER-1\nx\n; spec: RER-2\ny\n"),
+        ],
+        None,
+    );
+    let bad = config("\"tests/*.py\"");
+    case(
+        "a spec_files pattern holding a / is a problem",
+        SPEC,
+        TESTS,
+        &[(bad.0, &bad.1)],
+        Some("`tests/*.py`"),
+    );
+}
+
+// spec: TRC-13
+/// Outside a `.rs` file, a citation sits right above a code line, past comments and decorators.
+fn any_language_placement(case: &Case) {
+    let mixed = (
+        ".claude/cardinal.toml",
+        "[project]\nspec_files = [\"*.rs\", \"*.py\"]\n",
+    );
+    case(
+        "comments and decorators may sit between a citation and its test",
+        SPEC,
+        "",
+        &[
+            mixed,
+            (
+                "t/test_a.py",
+                "# spec: RER-1, RER-2\n# slow\n@pytest.mark.slow\ndef test_a():\n    pass\n",
+            ),
+        ],
+        None,
+    );
+    case(
+        "a citation on the last line of a .py file is a problem",
+        SPEC,
+        TESTS,
+        &[
+            mixed,
+            ("t/test_a.py", "def test_a():\n    pass\n# spec: RER-1\n"),
+        ],
+        Some("t/test_a.py:3:"),
+    );
+    case(
+        "a citation above a blank line of a .py file is a problem",
+        SPEC,
+        TESTS,
+        &[
+            mixed,
+            ("t/test_a.py", "# spec: RER-1\n\ndef test_a():\n    pass\n"),
+        ],
+        Some("t/test_a.py:1:"),
     );
 }
 

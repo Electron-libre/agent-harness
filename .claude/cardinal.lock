@@ -14,7 +14,7 @@ b627b1f62d4611948416cd01e935d79fb2898692162c09cfc2b50d30000f88af  .claude/skills
 bc32a7e12c24311ccc036b49232f3458f44997761b6a1099cdfe4db1bb738121  .github/workflows/cardinal.yml
 71a0ea0c7e9530936b006d503e89994cd45992911127a9c239b2a560d5de6cef  AGENTS.md
 f8f8a1a2b5dc550d0e488229e337f4a3d4e792b3ccefda52b133c5dcb13d4a7a  cardinal.just
-06f900c7d03de7d7ba67fb8f2a648d52b78f3d9a905b002536bee49795420d17  specs/README.md
+9b370caeaf4323c7cf4ac0379523539e51ea2be0a9f4b9f7aa3604cb06166644  specs/README.md
 66c02d6a40b353ab64053572558e258ee2a65c4272abf394d2375356958e21f5  specs/TEMPLATE.md
 entry  {"allow":"Bash(cardinal run *)"}
 entry  {"deny":"Bash(just waive-review)"}

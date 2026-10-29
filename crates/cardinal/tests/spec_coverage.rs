@@ -207,3 +207,24 @@ fn fails_when_git_cannot_list_the_files() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("git ls-files"));
     assert_eq!(out.stdout, [] as [u8; 0]);
 }
+
+// spec: COV-12
+#[test]
+fn a_declared_test_file_of_another_language_is_a_test_file() {
+    let dir = root(&[
+        (
+            ".claude/cardinal.toml",
+            "[project]\nspec_files = [\"*.rs\", \"test_*.py\"]\n",
+        ),
+        ("tests/test_cli.py", "def test_x():\n    pass\n"),
+        (
+            "tests/test_ok.py",
+            "# spec: RER-1\ndef test_y():\n    pass\n",
+        ),
+        ("src/lib.rs", "fn helper() {}\n"),
+    ]);
+    assert_eq!(
+        report(dir.path()),
+        (Some(0), "2\ttests/test_cli.py\n".to_string())
+    );
+}

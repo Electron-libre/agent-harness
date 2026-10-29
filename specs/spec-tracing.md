@@ -1,6 +1,6 @@
 ---
 id: TRC
-status: accepted
+status: draft
 adrs: []
 ---
 
@@ -27,6 +27,11 @@ stable, not required: an internal test is the proof when its citation gives the 
 - **TRC-8** (deterministic) The checker must read from a citation with a reason the same requirement ids as from that citation without it.
 - **TRC-9** (deterministic) The checker must read the citations of every `.rs` file under the root, whatever its directory (a crate at the root, `src/` and `tests/`, as well as `crates/` and `.claude/`), except under a directory named `.git` or `node_modules`, or a `target` directory beside a `Cargo.toml` (the build output).
 - **TRC-10** (deterministic) The checker must not read the `.rs` files under a directory named like one of the `skipped_dirs` of `.claude/cardinal.toml`.
+- **TRC-11** (deterministic) When `.claude/cardinal.toml` sets `spec_files`, the checker must read, instead of the `.rs` files, the files whose name matches one of its patterns, with the exclusions of TRC-9 and TRC-10; a pattern matches the file name alone, `*` standing for any run of characters.
+- **TRC-12** (deterministic) The checker must read as a citation a line whose trimmed text starts with the line-comment marker of its file's extension followed by ` spec:`: `//` for `rs`, `ts`, `tsx`, `js`, `jsx`, `mjs`, `cjs`, `go`, `java`, `kt`, `kts`, `scala`, `swift`, `c`, `cc`, `cpp`, `h`, `hpp`, `cs`, `dart` and `php`; `#` for `py`, `sh`, `bash`, `zsh`, `bats`, `rb`, `pl`, `r` (either case), `ex`, `exs` and `nix`; `--` for `lua`, `sql`, `hs` and `elm`; `;` for `clj`, `cljs`, `lisp`, `el`, `scm` and `rkt`; any of the four for another extension.
+- **TRC-13** (deterministic) The checker must report as a problem, naming its file and line, a citation of a file other than a `.rs` one whose next line, past the comment lines (any marker of TRC-12) and the decorator lines (trimmed text starting with `@`), is blank or missing; a citation of a `.rs` file keeps the rule of `specs/README.md`, a `fn` past the attributes and comments.
+- **TRC-14** (deterministic) When `.claude/cardinal.toml` sets `internal_dirs`, the checker must count as calling the code from inside (TRC-1 to TRC-6) the tests under a directory named like one of its entries, instead of those under a `src` directory.
+- **TRC-15** (deterministic) The checker must report as a problem a pattern of `spec_files` that holds a `/` or a `\`, naming the pattern.
 
 ## Scenarios
 
@@ -52,6 +57,22 @@ stable, not required: an internal test is the proof when its citation gives the 
 - (TRC-8) Given `// spec: SYN-2, SYN-3 (internal: the SYN-9 fixture is slow)`, when the checker runs, then it reads
   `SYN-2` and `SYN-3`, flags no unknown id, and `SYN-9` is not cited.
 
+- (TRC-11) Given `spec_files = ["test_*.py"]`, `// spec: SYN-1` in `src/lib.rs` and `# spec: SYN-2` above `def
+  test_x():` in `tests/test_cli.py`, when the checker runs, then `SYN-2` is traced and `SYN-1` is not.
+- (TRC-11) Given `spec_files = ["*_test.go"]` and `// spec: SYN-1` above `func TestX(t *testing.T) {` in
+  `pkg/a/x_test.go`, when the checker runs, then `SYN-1` is traced.
+- (TRC-11) Given no `spec_files` key, when the checker runs, then it reads the `.rs` files as TRC-9 says.
+- (TRC-12) Given `spec_files = ["*.rs", "*.py"]` and a line `# spec: SYN-1` in a `.rs` file, when the checker runs,
+  then `SYN-1` is not cited by that line.
+- (TRC-12) Given `-- spec: SYN-1` in `t/a.foo` matched by `spec_files = ["*.foo"]`, when the checker runs, then
+  `SYN-1` is cited.
+- (TRC-13) Given `# spec: SYN-1`, then `@pytest.mark.slow`, then `def test_x():` in a `.py` test file, when the
+  checker runs, then it reports no problem; given `# spec: SYN-1` on the last line, or followed by a blank line, it
+  fails naming the file and line.
+- (TRC-14) Given `internal_dirs = ["lib"]`, `SYN-1` cited only in `lib/a_test.py` and `SYN-2` only in `src/b_test.py`,
+  when the checker runs, then the boundary warning names `SYN-1` alone.
+- (TRC-15) Given `spec_files = ["tests/*.py"]`, when the checker runs, then it fails naming `tests/*.py`.
+
 ## Non-goals
 
 - Checking that a test outside `src` really runs the program: the place of the test is the convention.
@@ -60,3 +81,8 @@ stable, not required: an internal test is the proof when its citation gives the 
 - The other format and traceability checks of `check-specs`.
 - Telling the build output in another place than a `target` beside a `Cargo.toml` (a custom `target-dir`), or `.rs`
   fixtures, from the tests: the `skipped_dirs` of `.claude/cardinal.toml` leave them out.
+- The build output of the other stacks (`dist`, `build`, `.venv`, `__pycache__`): git ignores it, and outside git the
+  `skipped_dirs` leave it out.
+- Telling a test declaration from other code in a file other than a `.rs` one: the line after the citation only has
+  to be there.
+- Block comments (`/* */`, `"""`) as citations: the citation is one line comment.

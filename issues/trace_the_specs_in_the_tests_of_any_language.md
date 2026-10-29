@@ -37,3 +37,40 @@ that specs, traceability and the `traced` columns of `delivered-quality` work on
 # Hints
 * A new key read by an older `cardinal` is ignored, not misread; check whether it still needs `cardinal-format`
   (ADR 0014).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Let a project declare its test files (`spec_files`, default `*.rs`) and read their citations with the comment marker
+of each extension, in `check-specs`, `spec-coverage` and `delivered-quality`; make the internal directories of the
+boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comments, the build output of other stacks.
+
+## Plan
+1. [x] Test files and markers of `check-specs`: `spec_files` patterns, marker by extension, the placement rule
+   outside `.rs`, a bad pattern reported; `spec-coverage` counts a non-`.rs` file as a test; `files/specs/README.md`
+   and `seed/.claude/cardinal.toml` document them; verified by tests through the binary; makes true TRC-11, TRC-12,
+   TRC-13, TRC-15, COV-12.
+2. [ ] `traced` of `delivered-quality` reads the citations with the marker of each file's extension; verified by a
+   test on a fixture repository; makes true QUA-13.
+3. [ ] `internal_dirs` replaces `src` in the boundary rule when set; documented in the README and the seed; verified
+   by a test through the binary; makes true TRC-14, and sets TRC, COV and QUA back to `accepted`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 0bea4593b300242fe33eea66165affbed59f72f7
+- No `cardinal-format` raise: the new keys are ignored by an older `cardinal`, and the managed content holds no
+  citation outside `//` (ADR 0014).
+- Markers: the one of the file's extension, the four for an unknown extension (question 1 a).
+- After a citation outside `.rs`: any code line past the comments and the `@` decorators (question 2 a).
+- `internal_dirs` in this issue, deliverable 3 (question 3 a).
+
+## Deliverable 1
+- done: `check-specs` reads the `spec_files` patterns with the marker of each extension, checks the placement outside
+  `.rs` and reports a pattern holding a path separator; `spec-coverage` counts a declared non-`.rs` file as a test.
+- red: TRC-11, TRC-12, TRC-13, TRC-15: `FAIL - the spec_files are read instead of the .rs files` (8 cases); COV-12:
+  `left: (Some(0), "no test file found\n")`.
+- Code review: no findings
+- not verified: a real consumer in another language.
+- decisions needed: none.

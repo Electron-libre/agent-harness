@@ -51,17 +51,19 @@ fn uncovered(root: &Path) -> Result<Found, String> {
     Ok(Found::Uncovered(found))
 }
 
-/// The line count and relative path of `file` when it holds a test attribute: `#[test]`, or one whose path ends in
-/// `::test` (`#[tokio::test]`), arguments allowed.
+/// The line count and relative path of `file` when it is a test file: a `.rs` one holding a test attribute,
+/// `#[test]` or one whose path ends in `::test` (`#[tokio::test]`), arguments allowed; any other file `check-specs`
+/// reads (COV-12).
 fn test_file(root: &Path, file: &Path) -> Option<(usize, String)> {
     let text = std::fs::read_to_string(file).ok()?;
+    let rust = file.extension().is_some_and(|e| e == "rs");
     let is_test = |line: &str| {
         line.trim()
             .strip_prefix("#[")
             .and_then(|a| a.split(['(', ']']).next())
             .is_some_and(|path| path.trim() == "test" || path.trim().ends_with("::test"))
     };
-    if !text.lines().any(is_test) {
+    if rust && !text.lines().any(is_test) {
         return None;
     }
     let name = file

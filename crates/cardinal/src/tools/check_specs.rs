@@ -1,4 +1,5 @@
-//! Validate `specs/*.md` against `specs/README.md` and trace them to the tests (`// spec: ID`).
+//! Validate `specs/*.md` against `specs/README.md` and trace them to the tests (`// spec: ID`, or the comment marker of
+//! the test file's language, TRC-12).
 //! Usage: `just check-specs` (from the repo root; an optional argument is another root; `--strict` also flags the
 //! citations of managed tests (under `.claude/`) whose spec the project lacks: for the repository that ships them).
 //! Prints one line per problem, exit 1 if any; a `[NEEDS CLARIFICATION: ...]` marker is a problem in an `accepted`
@@ -378,10 +379,69 @@ pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>)
     (ids, reason)
 }
 
-/// The `.rs` files of the root that may hold tests, whatever the layout of the project (TRC-9): all but those under
-/// `.git`, `node_modules`, a `target` beside a `Cargo.toml` (the build output) or a directory named like one of the
-/// `skipped_dirs` of `.claude/cardinal.toml` (TRC-10); a failure of git, or a `cardinal.toml` that does not parse, is a
-/// problem in `out`.
+/// The line-comment markers a citation may open with (TRC-12).
+const MARKERS: &[&str] = &["//", "#", "--", ";"];
+
+/// The markers of `file`, by its extension (TRC-12): the four for an extension the table does not know.
+fn markers(file: &Path) -> &'static [&'static str] {
+    const ANY: &[&str] = MARKERS;
+    let ext = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "rs" | "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "go" | "java" | "kt" | "kts"
+        | "scala" | "swift" | "c" | "cc" | "cpp" | "h" | "hpp" | "cs" | "dart" | "php" => &ANY[..1],
+        "py" | "sh" | "bash" | "zsh" | "bats" | "rb" | "pl" | "r" | "ex" | "exs" | "nix" => {
+            &ANY[1..2]
+        }
+        "lua" | "sql" | "hs" | "elm" => &ANY[2..3],
+        "clj" | "cljs" | "lisp" | "el" | "scm" | "rkt" => &ANY[3..],
+        _ => ANY,
+    }
+}
+
+/// The id list of `line` when it is a citation of `file`: its trimmed text opens with a marker of the file's
+/// extension, then ` spec:` (TRC-12).
+pub(super) fn citation_list<'a>(file: &Path, line: &'a str) -> Option<&'a str> {
+    markers(file)
+        .iter()
+        .find_map(|m| line.trim().strip_prefix(m)?.strip_prefix(" spec:"))
+}
+
+/// Whether the file name `name` matches the glob `pattern`, `*` standing for any run of characters (TRC-11).
+fn name_matches(pattern: &str, name: &str) -> bool {
+    match pattern.split_once('*') {
+        None => pattern == name,
+        Some((head, rest)) => name.strip_prefix(head).is_some_and(|name| {
+            (0..=name.len())
+                .filter(|&i| name.is_char_boundary(i))
+                .any(|i| name_matches(rest, &name[i..]))
+        }),
+    }
+}
+
+/// The file-name patterns of the test files, the `spec_files` of `.claude/cardinal.toml` or `*.rs` (TRC-11); a
+/// pattern holding a path separator is a problem in `out` (TRC-15).
+fn spec_patterns(root: &Path, out: &mut Vec<String>) -> Vec<String> {
+    let patterns = super::config_list(root, "spec_files").unwrap_or_default();
+    for p in patterns.iter().filter(|p| p.contains(['/', '\\'])) {
+        out.push(format!(
+            "{}: `spec_files` pattern `{p}` must match a file name, not a path",
+            crate::config_of(root).display()
+        ));
+    }
+    if patterns.is_empty() {
+        return vec!["*.rs".to_string()];
+    }
+    patterns
+}
+
+/// The test files of the root, whatever the layout of the project (TRC-9, TRC-11): those whose name matches a pattern
+/// of `spec_patterns`, but those under `.git`, `node_modules`, a `target` beside a `Cargo.toml` (the build output) or
+/// a directory named like one of the `skipped_dirs` of `.claude/cardinal.toml` (TRC-10); a failure of git, or a
+/// `cardinal.toml` that does not parse, is a problem in `out`.
 pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     let mut names = vec![".git".to_string(), "node_modules".to_string()];
     match super::config_list(root, "skipped_dirs") {
@@ -390,6 +450,7 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
         Err(e) if crate::config_of(root).exists() => out.push(e),
         Err(_) => {}
     }
+    let patterns = spec_patterns(root, out);
     let skipped = |dir: &Path| {
         dir.file_name().is_some_and(|name| {
             names.iter().any(|n| name == n.as_str())
@@ -397,8 +458,10 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
         })
     };
     // in a git repository the files git lists, so never those of a nested worktree (ADR 0008) nor the ignored ones
-    // git's `*` also matches `/`: the `.rs` files at any depth
-    let files: Vec<PathBuf> = match repo_files::repo_files(root, &["*.rs"]) {
+    // git's `*` also matches `/`: `*<pattern>` lists a superset of the matching names at any depth
+    let pathspecs: Vec<String> = patterns.iter().map(|p| format!("*{p}")).collect();
+    let pathspecs: Vec<&str> = pathspecs.iter().map(String::as_str).collect();
+    let files: Vec<PathBuf> = match repo_files::repo_files(root, &pathspecs) {
         Ok(Some(files)) => files
             .into_iter()
             .filter(|f| {
@@ -421,7 +484,11 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
     };
     files
         .into_iter()
-        .filter(|f| f.extension().is_some_and(|e| e == "rs"))
+        .filter(|f| {
+            f.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| patterns.iter().any(|p| name_matches(p, n)))
+        })
         .collect()
 }
 
@@ -451,16 +518,25 @@ pub(super) fn citations(
             .to_string();
         let lines: Vec<&str> = text.lines().collect();
         for (i, line) in lines.iter().enumerate() {
-            let Some(list) = line.trim().strip_prefix("// spec:") else {
+            let Some(list) = citation_list(file, line) else {
                 continue;
             };
-            let next = lines[i + 1..]
-                .iter()
-                .map(|l| l.trim())
-                .find(|l| !l.starts_with("#[") && !l.starts_with("//"));
-            if !next.is_some_and(|l| l.contains("fn ")) {
+            let rust = file.extension().is_some_and(|e| e == "rs");
+            let next = lines[i + 1..].iter().map(|l| l.trim()).find(|l| {
+                if rust {
+                    !l.starts_with("#[") && !l.starts_with("//")
+                } else {
+                    !l.starts_with('@') && !MARKERS.iter().any(|m| l.starts_with(m))
+                }
+            });
+            if rust && !next.is_some_and(|l| l.contains("fn ")) {
                 out.push(format!(
                     "{name}:{}: `// spec:` must sit right above a test `fn`",
+                    i + 1
+                ));
+            } else if !rust && next.is_none_or(str::is_empty) {
+                out.push(format!(
+                    "{name}:{}: a `spec:` citation must sit right above its test",
                     i + 1
                 ));
             }

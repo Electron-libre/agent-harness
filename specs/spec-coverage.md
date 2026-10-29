@@ -1,6 +1,6 @@
 ---
 id: COV
-status: accepted
+status: draft
 adrs: [0009]
 ---
 
@@ -25,6 +25,7 @@ worth a spec read back from their code and tests (`skill:write-spec`).
 - **COV-9** (deterministic) The report must print `no test file found` when it finds no test file.
 - **COV-10** (deterministic) The report must exit 1, with git's message on stderr, when git cannot list the files of the repository.
 - **COV-11** (deterministic) The report must list the test files of a crate at the root, under `src/` and `tests/`.
+- **COV-12** (deterministic) The report must count as a test file every file other than a `.rs` one that `check-specs` reads (TRC-11), whatever it holds.
 
 ## Scenarios
 
@@ -40,6 +41,8 @@ worth a spec read back from their code and tests (`skill:write-spec`).
   runs, then it lists both.
 - (COV-6) Given a nested worktree `.claude/worktrees/x/crates/a/tests/t.rs` holding a `#[test]`, when the report runs
   in the git repository, then it does not list it.
+- (COV-12) Given `spec_files = ["*.rs", "test_*.py"]`, `tests/test_cli.py` holding no citation and `src/lib.rs`
+  holding no test attribute, when the report runs, then it lists `tests/test_cli.py` alone.
 
 ## Non-goals
 

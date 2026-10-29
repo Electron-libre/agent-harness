@@ -39,7 +39,7 @@ hash differs from the lock was edited locally: `sync` reports a conflict instead
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/cardinal.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
+(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
@@ -288,8 +288,9 @@ the design:
   `check-specs`, `spec-coverage`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
   [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md)), which never lists a nested worktree.
   `close-issue` also drops `.git`, `target`, `node_modules` and the `skipped_dirs` of `.claude/cardinal.toml` by name;
-  `check-specs` and `spec-coverage` read every `.rs` file of the root whatever its layout, but those under `.git`,
-  `node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs` (TRC-9, TRC-10).
+  `check-specs` and `spec-coverage` read every test file of the root (the `.rs` files, or the `spec_files` patterns)
+  whatever its layout, but those under `.git`, `node_modules`, a `target` beside a `Cargo.toml` and the `skipped_dirs`
+  (TRC-9 to TRC-11).
 - **Hooks** act on the work tree of the event's `cwd`: a session launched in the worktree has it as
   `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `cardinal run` takes the revision of the
   `cardinal.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,

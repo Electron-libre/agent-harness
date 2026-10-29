@@ -8,6 +8,9 @@ commit_scopes = []
 root_docs = ["README.md"]
 # Directories that scripts do not scan besides .git, node_modules and the build output (target).
 skipped_dirs = []
+# File-name patterns of the test files whose `spec:` citations `check-specs` reads (default ["*.rs"]), e.g.
+# ["test_*.py", "*_test.go"]; each is read with the line-comment marker of its extension.
+# spec_files = ["*.rs"]
 # Where the agent finds the context of the project (issue-workflow, create-issue, prioritize-issues).
 roadmap = ["docs/TODO.md"]
 architecture = "docs/architecture.md"
