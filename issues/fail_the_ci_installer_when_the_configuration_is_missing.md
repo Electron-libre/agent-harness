@@ -18,3 +18,36 @@ without `cardinal` and the real cause is never named. Make it fail naming the mi
 # Resources
 * `files/.github/install_cardinal.sh`, `crates/cardinal/tests/install_script.rs`
 * ADR 0010 (the prebuilt binary of the CI)
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+`install_cardinal.sh` must exit non-zero, naming `.claude/cardinal.toml`, when the work tree lacks it, instead of
+reaching the local-path branch and exiting 0. Out of scope: any other check of the configuration's content.
+
+## Plan
+1. [x] Guard the missing configuration: `[ -f "$config" ] || …; exit 1` after `config=` in
+   `files/.github/install_cardinal.sh`, then `just sync`; verified by a test of `crates/cardinal/tests/install_script.rs`
+   (no configuration: status 1, stderr names it, `cargo` never called).
+
+## Decisions
+- Mode: autonomous
+- Base commit: b0ef0c27c28292662e9356b07d42d6389869f9fd
+- Spec: none (a fix of an error path of the CI installer; only SYN-50 covers the installer, for its URL)
+
+## Summary of deliverable 1
+- done: `install_cardinal.sh` exits 1 with `no .claude/cardinal.toml: cardinal not installed` on stderr when the
+  configuration is missing; copy synced.
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| docs | n/a: no document describes the installer's missing-configuration path |
+| code review | `low` run |
+
+- red: none traced (no spec): `left: Some(0) right: Some(1)`, stdout `source '' is a local path outside this repository: cardinal not installed`
+- Code review: no findings
+- not verified: a real GitHub Actions run
+- decisions needed: none

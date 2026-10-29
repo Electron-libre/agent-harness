@@ -7,6 +7,7 @@
 set -eu
 
 config=.claude/cardinal.toml
+[ -f "$config" ] || { echo "no $config: cardinal not installed" >&2; exit 1; }
 value() { sed -n "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" "$config" | head -n 1; }
 source=$(value source)
 rev=$(value rev)

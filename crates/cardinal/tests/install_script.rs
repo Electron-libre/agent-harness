@@ -79,3 +79,15 @@ fn a_path_git_source_is_installed_from_its_file_url_from_the_project_root() {
         );
     }
 }
+
+#[test]
+fn a_work_tree_without_the_configuration_fails_naming_it() {
+    let root = tempdir().unwrap();
+    let bin = tempdir().unwrap();
+
+    let run = install(root.path(), bin.path());
+
+    assert_eq!(run.code, Some(1), "{run:?}");
+    assert!(run.stderr.contains(CONFIG), "{run:?}");
+    assert!(!bin.path().join("log").exists(), "{run:?}");
+}
