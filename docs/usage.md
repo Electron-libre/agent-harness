@@ -23,6 +23,11 @@ cardinal run <tool> [args]
 With a local directory source (this repository), `cardinal run` builds the source's crate with `cargo`, so a hook runs
 the tools of the working tree, or of the last build that compiled.
 
+The seeded `.claude/settings.json` allows `just` and the read-only `git` commands only: the project adds the rules
+of its own stack (`cargo test`, `npm test`…), or runs them through `just`. A project seeded before allows `cargo
+build`, `cargo test`, `cargo clippy`, `cargo fmt` and `cargo check`: it owns the file, so a project of another stack
+removes them by hand.
+
 ### The installed launcher
 
 The installed `cardinal` is the launcher of every project of the machine, not a binary of the pinned revision. A

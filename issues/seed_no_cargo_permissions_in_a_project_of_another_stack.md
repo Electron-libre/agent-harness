@@ -25,3 +25,41 @@ from the project.
 # Resources
 * `seed/.claude/settings.json`, `entries/.claude/settings.json`, `crates/cardinal/tests/settings_hygiene.rs`.
 * `docs/adr/0007-sync-manages-entries-of-the-seeded-settings.md`, `docs/adr/0013-sync-manages-the-allow-rules-too.md`.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The seeded `.claude/settings.json` allows only stack-neutral commands (`just`, read-only `git`); the stack rules
+come from the project. Option 1 of the issue: no stack detection in `init`, so no spec change. Out of scope: the
+settings of existing projects (owned), which the docs tell what to remove by hand.
+
+## Plan
+1. [x] Drop the five `cargo` rules from `seed/.claude/settings.json`; `tests/settings_hygiene.rs` checks that every
+   `Bash` allow rule of the seed is a `just` or `git` one; `docs/usage.md` says a project of another stack may drop
+   the `cargo` rules it was seeded with and add its own (this repository keeps its own); verified by the hygiene
+   test (red with the current seed); ~40 lines.
+
+## Decisions
+- Mode: autonomous
+- Option 1 (drop the `cargo` rules, rely on `just`), no stack detection.
+- Base commit: 031c837978832802ff5842623f2316edeb925299
+
+## Summary of deliverable 1
+done: the seed allows `just` and read-only `git` only; the hygiene test guards it; `docs/usage.md` says what a
+project seeded before removes by hand; `.claude/update-docs-map.md` gains the row of a changed seeded file.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass, no spec touched (option 1) |
+| docs | `docs/usage.md`, `.claude/update-docs-map.md` |
+| code review | low, see below |
+
+red: none traced (no spec): `FAIL - seeded allowlist has a rule of one stack (only `just` and `git`): Bash(cargo build *)` and the four other `cargo` rules
+
+Code review: no findings (low; the test change was out of its scope).
+
+not verified: none. decisions needed: none.

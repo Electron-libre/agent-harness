@@ -1,6 +1,6 @@
 //! Hygiene test of the Claude Code settings of this repository: hooks point to real scripts or tools, the shared allowlist
-//! covers the dev commands without opening arbitrary execution, and the personal
-//! `settings.local.json` is git-ignored and free of dangerous rules.
+//! covers the dev commands without opening arbitrary execution, the seeded allowlist holds no rule of one stack, and the
+//! personal `settings.local.json` is git-ignored and free of dangerous rules.
 //!
 
 use serde_json::Value;
@@ -117,6 +117,18 @@ fn settings_hygiene() {
         if rule.contains("/home/") || rule.contains("~/") {
             failures.push(format!(
                 "shared allowlist has a machine specific path: {rule}"
+            ));
+        }
+    }
+
+    // seeded allowlist: stack-neutral, the stack rules come from the project
+    let seed: Value =
+        serde_json::from_str(&fs::read_to_string(root.join("seed/.claude/settings.json")).unwrap())
+            .unwrap_or(Value::Null);
+    for rule in allow(&seed).iter().filter(|r| r.starts_with("Bash(")) {
+        if !(rule.starts_with("Bash(just") || rule.starts_with("Bash(git ")) {
+            failures.push(format!(
+                "seeded allowlist has a rule of one stack (only `just` and `git`): {rule}"
             ));
         }
     }
