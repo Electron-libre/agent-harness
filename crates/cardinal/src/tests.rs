@@ -52,6 +52,7 @@ fn a_git_source_is_a_url_or_ends_with_dot_git() {
 }
 
 // spec: SYN-50 (internal: a scp-like source needs a remote the binary tests cannot reach)
+#[cfg(unix)]
 #[test]
 fn a_path_git_source_becomes_an_absolute_file_url_and_any_other_source_is_kept() {
     let root = Path::new("/p/q");
@@ -72,4 +73,25 @@ fn a_path_git_source_becomes_an_absolute_file_url_and_any_other_source_is_kept()
     ] {
         assert_eq!(resolved(root, kept), kept);
     }
+}
+
+// spec: SYN-50 (internal: the binary tests see the URL only through a clone or the log of a fake cargo)
+#[cfg(unix)]
+#[test]
+fn a_path_git_source_is_resolved_from_the_physical_root_and_its_raw_bytes() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let real = dir.path().join("real");
+    fs::create_dir_all(real.join("project")).unwrap();
+    std::os::unix::fs::symlink(&real, dir.path().join("link")).unwrap();
+    assert_eq!(
+        resolved(&dir.path().join("link/project"), "../x.git"),
+        resolved(&real.join("project"), "../x.git")
+    );
+    assert_eq!(
+        resolved(Path::new(OsStr::from_bytes(b"/caf\xe9")), "x.git"),
+        "file:///caf%E9/x.git"
+    );
 }

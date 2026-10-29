@@ -52,6 +52,10 @@ Out of scope: scp-like `host:path` (kept as written), any change to local direct
 2. [x] Align `files/.github/install_cardinal.sh`: `*.git` is git (SYN-49), a path one resolved to the same URL;
    verified by a Rust test that runs the script with a stub `cargo` and checks the `--git` URL it gets; makes true
    SYN-50. ~150 lines.
+3. [x] Fixes of the `high` review: one scp-like predicate (`is_scp_like`) for `resolved` and `cargo_url`, a
+   `host:path` with no user given to cargo as `ssh://host/path` (Rust and installer), the installer resolving a `git@`
+   path with no `:` like `cardinal`, the root read with its symlinks resolved (`sync` and `run` share one clone),
+   the raw bytes of the path encoded; verified by unit, `run_cli` and `install_script` tests; makes true SYN-50, BIN-5.
 
 ## Decisions
 - Mode: autonomous
@@ -77,3 +81,15 @@ Out of scope: scp-like `host:path` (kept as written), any change to local direct
 - Code review: no findings
 - red: SYN-50: `source '../x.git' is a local path outside this repository: cardinal not installed`, `cargo` never called.
 - not verified: a full CI run on GitHub.
+
+## Deliverable 3
+
+- done: the fixes of the `high` review (plan line 3); SYN-50 and BIN-5 amended (symlinks resolved, `[user@]host:path`).
+- checks: `just check` ok, `just check-cardinal` ok.
+- Code review: no findings
+- red: SYN-50, BIN-5: `left: "file:///tmp/.../link/x.git" right: ".../real/x.git"`, the installer kept
+  `git@mirror/x.git` as written; the `backup:o/r.git` case of BIN-5 was added before the fix (old `cargo_url` needed an `@`).
+- high review, not fixed: the messages built from the source show the resolved URL, not the source as written (an
+  absolute path the user still recognizes); `file_url` forks per byte of the path (a few dozen forks per CI job);
+  Windows paths (`Prefix` dropped): no Windows release, the unit test is `cfg(unix)`; a TMPDIR holding a byte to
+  encode would break the binary tests' expected URL.

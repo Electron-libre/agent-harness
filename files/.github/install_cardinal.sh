@@ -12,10 +12,10 @@ value() { sed -n "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" "$config" | head -n 1; }
 source=$(value source)
 rev=$(value rev)
 
-# A path git source as the absolute `file://` URL of that path from the top of the work tree, as `cardinal` reads it
-# (SYN-50): `.` and `..` removed, every byte outside `A-Za-z0-9-._~/` percent-encoded.
+# A path git source as the absolute `file://` URL of that path from the top of the work tree, its symlinks resolved, as
+# `cardinal` reads it (SYN-50): `.` and `..` removed, every byte outside `A-Za-z0-9-._~/` percent-encoded.
 file_url() {
-  case "$1" in /*) path=$1 ;; *) path=$(pwd)/$1 ;; esac
+  case "$1" in /*) path=$1 ;; *) path=$(pwd -P)/$1 ;; esac
   out=""
   set -f; ifs=$IFS; IFS=/
   for part in $path; do
@@ -39,8 +39,8 @@ file_url() {
 # git as `cardinal` reads it (SYN-49): a URL, `git@`, or ending with `.git`; a path one resolved (SYN-50), a scp-like
 # `host:path` kept
 case "$source" in
-  *://*|git@*) ;;
-  *.git) case "${source%%/*}" in *:*) ;; *) source=$(file_url "$source") ;; esac ;;
+  *://*) ;;
+  git@*|*.git) case "${source%%/*}" in *:*) ;; *) source=$(file_url "$source") ;; esac ;;
   *)
     if [ -f "$source/crates/cardinal/Cargo.toml" ]; then
       exec cargo install --quiet --force --path "$source/crates/cardinal" --locked
@@ -66,8 +66,8 @@ case "$source" in
   *) on_github="" ;;
 esac
 repo=$(printf '%s' "$source" | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#/$##; s#\.git$##')
-# cargo reads no scp-style `git@host:path`
-cargo_url=$(printf '%s' "$source" | sed -E '/:\/\//!s#^([^/:]+@[^:]+):/?#ssh://\1/#')
+# cargo reads no scp-style `[user@]host:path`
+cargo_url=$(printf '%s' "$source" | sed -E '/:\/\//!s#^([^/:]+):/?#ssh://\1/#')
 dir="${XDG_CACHE_HOME:-$HOME/.cache}/cardinal/bin/$full/$target"
 releases="https://github.com/$repo/releases/download"
 

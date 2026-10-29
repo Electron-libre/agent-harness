@@ -4,6 +4,7 @@
 
 mod common;
 
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -38,8 +39,28 @@ fn a_path_git_source_is_installed_from_its_file_url_from_the_project_root() {
     let dir = tempdir().unwrap();
     let base = dir.path().join("a bé%");
     let root = base.join("project");
-    let url = format!("file://{}/a%20b%C3%A9%25/x.git", dir.path().display());
-    for source in ["../x.git", &format!("{}/./x.git", base.display())] {
+    fs::create_dir_all(&root).unwrap();
+    // the root is read with its symlinks resolved, a path source as written
+    let physical = fs::canonicalize(dir.path()).unwrap();
+    let encoded = "a%20b%C3%A9%25";
+    for (source, url) in [
+        (
+            "../x.git".to_string(),
+            format!("file://{}/{encoded}/x.git", physical.display()),
+        ),
+        (
+            format!("{}/./x.git", base.display()),
+            format!("file://{}/{encoded}/x.git", dir.path().display()),
+        ),
+        (
+            "git@mirror/x.git".to_string(),
+            format!(
+                "file://{}/{encoded}/project/git%40mirror/x.git",
+                physical.display()
+            ),
+        ),
+        ("host:x.git".to_string(), "ssh://host/x.git".to_string()),
+    ] {
         let bin = tempdir().unwrap();
         put(
             &root,
@@ -50,7 +71,7 @@ fn a_path_git_source_is_installed_from_its_file_url_from_the_project_root() {
         let run = install(&root, bin.path());
 
         assert_eq!(run.code, Some(0), "{source}: {run:?}");
-        let log = std::fs::read_to_string(bin.path().join("log")).unwrap_or_default();
+        let log = fs::read_to_string(bin.path().join("log")).unwrap_or_default();
         assert_eq!(
             log,
             format!("install --quiet --force --git {url} --rev main --locked\n"),

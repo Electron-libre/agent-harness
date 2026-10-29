@@ -16,8 +16,8 @@ use std::process::{Command, Stdio};
 use anyhow::{bail, Context, Result};
 
 use crate::{
-    cache_dir, clone_dir, fetch, hash, is_full_hash, is_git_url, resolve_in, set_executable,
-    source_and_rev, CONFIG, OLD_CONFIG,
+    cache_dir, clone_dir, fetch, hash, is_full_hash, is_git_url, is_scp_like, resolve_in,
+    set_executable, source_and_rev, CONFIG, OLD_CONFIG,
 };
 
 /// The external programs the launcher runs, replaced by fakes in the tests.
@@ -196,10 +196,10 @@ fn download(programs: &Programs, url: &str, to: &Path) -> Option<String> {
     })
 }
 
-/// The URL cargo reads for a git source: a scp-style `git@host:path` becomes `ssh://git@host/path`.
+/// The URL cargo reads for a git source: a scp-style `[user@]host:path` becomes `ssh://[user@]host/path`.
 pub(crate) fn cargo_url(source: &str) -> String {
     match source.split_once(':') {
-        Some((host, path)) if !source.contains("://") && host.contains('@') => {
+        Some((host, path)) if is_scp_like(source) => {
             format!("ssh://{host}/{}", path.trim_start_matches('/'))
         }
         _ => source.to_string(),

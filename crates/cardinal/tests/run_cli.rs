@@ -331,6 +331,8 @@ fn with_no_asset_the_binary_is_built_with_cargo_install() {
             "ssh://git@gitlab.com/o/r.git",
             false,
         ),
+        // a host alias of the ssh configuration, with no user
+        ("backup:o/r.git", "ssh://backup/o/r.git", false),
     ] {
         for bin in ["cardinal", "harness"] {
             let l = Launcher::new().with_cargo_building(bin);
@@ -364,6 +366,7 @@ fn with_no_asset_the_binary_is_built_with_cargo_install() {
 fn run_from_a_subdirectory_builds_a_relative_git_source_from_the_project_root() {
     let l = Launcher::new().with_cargo();
     let dir = tempdir().unwrap();
+    let physical = fs::canonicalize(dir.path()).unwrap();
     let base = dir.path().join("a b");
     l.home
         .git(dir.path(), &["init", "-q", "-b", "main", "a b/x.git"]);
@@ -383,7 +386,7 @@ fn run_from_a_subdirectory_builds_a_relative_git_source_from_the_project_root() 
     let run = l.run_in(&root.join("sub"), None, &["t", "0"], "");
 
     assert_eq!(run.code, Some(0), "{run:?}");
-    let url = format!("file://{}/a%20b/x.git", dir.path().display());
+    let url = format!("file://{}/a%20b/x.git", physical.display());
     let log = l.log();
     assert!(
         log.contains(&format!("--git {url} --rev {commit} --root")),

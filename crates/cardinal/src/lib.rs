@@ -362,22 +362,28 @@ fn is_git_url(source: &str) -> bool {
     source.contains("://") || source.starts_with("git@") || source.ends_with(".git")
 }
 
+/// A scp-like `[user@]host:path` git source: no `://`, and a `:` before its first `/`, as git reads it.
+pub(crate) fn is_scp_like(source: &str) -> bool {
+    !source.contains("://")
+        && source
+            .split('/')
+            .next()
+            .is_some_and(|head| head.contains(':'))
+}
+
 /// The source as git and cargo read it (SYN-50): a git source that is a path becomes the absolute `file://` URL of
-/// `root.join(source)`, so the clone, its cache key and `cargo install --git` do not depend on the working directory;
-/// a URL, a scp-like `host:path` and a local directory are returned as written.
+/// `root.join(source)`, `root` with its symlinks resolved, so the clone, its cache key and `cargo install --git` do not
+/// depend on the working directory nor on the path the root was reached by; a URL, a scp-like `host:path` and a local
+/// directory are returned as written.
 fn resolved(root: &Path, source: &str) -> String {
-    let scp_like = source
-        .split('/')
-        .next()
-        .is_some_and(|head| head.contains(':'));
-    if !is_git_url(source) || source.contains("://") || scp_like {
+    if !is_git_url(source) || source.contains("://") || is_scp_like(source) {
         return source.to_string();
     }
+    let Ok(root) = fs::canonicalize(root).or_else(|_| std::path::absolute(root)) else {
+        return source.to_string();
+    };
     let mut path = PathBuf::from("/");
-    for part in std::path::absolute(root.join(source))
-        .unwrap_or_else(|_| root.join(source))
-        .components()
-    {
+    for part in root.join(source).components() {
         match part {
             Component::Normal(name) => path.push(name),
             Component::ParentDir => {
@@ -387,7 +393,7 @@ fn resolved(root: &Path, source: &str) -> String {
         }
     }
     let mut url = String::from("file://");
-    for byte in path.to_string_lossy().bytes() {
+    for &byte in path_bytes(&path).iter() {
         if byte.is_ascii_alphanumeric() || b"-._~/".contains(&byte) {
             url.push(char::from(byte));
         } else {
@@ -395,6 +401,18 @@ fn resolved(root: &Path, source: &str) -> String {
         }
     }
     url
+}
+
+/// The bytes of `path` as the system names it: its raw bytes on unix, its UTF-8 elsewhere.
+#[cfg(unix)]
+fn path_bytes(path: &Path) -> std::borrow::Cow<'_, [u8]> {
+    use std::os::unix::ffi::OsStrExt;
+    path.as_os_str().as_bytes().into()
+}
+
+#[cfg(not(unix))]
+fn path_bytes(path: &Path) -> std::borrow::Cow<'_, [u8]> {
+    path.to_string_lossy().into_owned().into_bytes().into()
 }
 
 fn git(dir: Option<&Path>, args: &[&str]) -> Result<()> {
