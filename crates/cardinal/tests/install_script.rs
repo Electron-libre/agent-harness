@@ -92,28 +92,62 @@ fn a_work_tree_without_the_configuration_fails_naming_it() {
     assert!(!bin.path().join("log").exists(), "{run:?}");
 }
 
+// spec: SYN-57
 #[test]
 fn a_configuration_without_a_source_fails_naming_the_key_and_the_file() {
+    for config in [
+        "[cardinal]\nrev = \"main\"\n",
+        "[cardinal]\nsource = \"\"\n",
+        "[cardinal]\nsource = 1\n",
+        "[other]\nsource = \"host:x.git\"\n",
+        "[cardinal]\nsource = \"host:x.git\n",
+    ] {
+        let root = tempdir().unwrap();
+        let bin = tempdir().unwrap();
+        put(root.path(), CONFIG, config);
+
+        let run = install(root.path(), bin.path());
+
+        assert_eq!(run.code, Some(1), "{config}: {run:?}");
+        assert!(
+            run.stderr
+                .contains(&format!("no source read from {CONFIG}")),
+            "{config}: {run:?}"
+        );
+        assert!(!bin.path().join("log").exists(), "{config}: {run:?}");
+    }
+}
+
+// spec: SYN-58
+#[test]
+fn a_runner_without_tomllib_fails_naming_python() {
     let root = tempdir().unwrap();
     let bin = tempdir().unwrap();
-    put(root.path(), CONFIG, "[cardinal]\nrev = \"main\"\n");
+    put(root.path(), CONFIG, "[cardinal]\nsource = \"host:x.git\"\n");
+    script(
+        &bin.path().join("python3"),
+        "echo \"ModuleNotFoundError: No module named 'tomllib'\" >&2\nexit 1\n",
+    );
 
     let run = install(root.path(), bin.path());
 
     assert_eq!(run.code, Some(1), "{run:?}");
-    assert!(
-        run.stderr
-            .contains(&format!("no source read from {CONFIG}")),
-        "{run:?}"
-    );
+    assert!(run.stderr.contains("Python 3.11"), "{run:?}");
     assert!(!bin.path().join("log").exists(), "{run:?}");
 }
 
+// spec: SYN-56
 #[test]
-fn a_literal_or_indented_source_is_installed() {
+fn every_toml_form_of_the_source_and_rev_is_installed() {
     for config in [
         "[cardinal]\nsource = 'host:x.git'\nrev = 'main'\n",
         "[cardinal]\n  source\t= \"host:x.git\"\n\trev = \"main\"\n",
+        "[other]\nsource = \"elsewhere:y.git\"\nrev = \"other\"\n[cardinal]\nsource = \"host:x.git\"\nrev = \"main\"\n",
+        "cardinal = { source = \"host:x.git\", rev = \"main\" }\n",
+        "cardinal.source = \"host:x.git\"\ncardinal.rev = \"main\"\n",
+        "[cardinal]\n\"source\" = \"host:x.git\"\n'rev' = \"main\"\n",
+        "[cardinal]\nsource = '''\nhost:x.git'''\nrev = \"\"\"main\"\"\"\n",
+        "[cardinal]\nsource = \"\\u0068ost:x.git\" # a comment\nrev = \"main\"\n",
     ] {
         let root = tempdir().unwrap();
         let bin = tempdir().unwrap();
@@ -128,4 +162,25 @@ fn a_literal_or_indented_source_is_installed() {
             "{config}: {run:?}"
         );
     }
+}
+
+// spec: SYN-56
+#[test]
+fn an_escaped_quote_and_a_rev_that_is_no_string_are_read_as_cardinal_reads_them() {
+    let root = tempdir().unwrap();
+    let bin = tempdir().unwrap();
+    put(
+        root.path(),
+        CONFIG,
+        "[cardinal]\nsource = \"host:x\\\"y.git\"\nrev = 1\n",
+    );
+
+    let run = install(root.path(), bin.path());
+
+    assert_eq!(run.code, Some(0), "{run:?}");
+    let log = fs::read_to_string(bin.path().join("log")).unwrap_or_default();
+    assert_eq!(
+        log, "install --quiet --force --git ssh://host/x\"y.git --locked\n",
+        "{run:?}"
+    );
 }

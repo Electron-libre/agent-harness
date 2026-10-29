@@ -69,6 +69,9 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - **SYN-53** (deterministic) For each `rewrite` of an applied migration, `sync` and `update` must replace in the project file `path` every occurrence of `old` that starts at the start of a line and ends at the end of a line (or of the file) by `new`, and print `rewritten: <path>` once per file they change; a `path` that is a managed file, the lock, outside the project or missing, and a file that does not hold `old` so, are left untouched without an error. `--dry-run` must print the same lines and write nothing.
 - **SYN-54** (deterministic) After the rewrites, `sync` and `update` must print to stderr `warning: <path>:<line> cites <old>, named <new> since the format <n>` for each line of a project-owned file that contains the `old` of a `names` table of an applied migration as a word (no letter, digit nor `_` right before or after it) outside an occurrence of its `new`, once per line and name, `<new>` and `<n>` the name and the format of the last applied migration that renamed it (a later one may rename the `new` of an earlier one), in the order of the paths then of the lines, and must not change the file nor fail because of it. The project-owned files are the files git tracks in the project, other than the managed files, the lock and the files under `issues/done/` or `docs/adr/` (they record the history), that are valid UTF-8; a project that is not a git repository gets no such warning. They judge the files as the run leaves them, and under `--dry-run` as it would.
 - **SYN-55** (deterministic) `check` and `sync` must print to stderr `hint: <lock> is of the format <a>, this cardinal reads the format <m>: run `cardinal update` to move the project to a newer revision` once, when the source is a git source (SYN-49; a local directory has no revision to update) and the format the lock records (as the run leaves it for `sync`, as it is under `--dry-run`) is lower than the format the running `cardinal` reads, and must not fail because of it; `update` does not print it.
+- **SYN-56** (deterministic) `.github/install_cardinal.sh` must read `source` and `rev` from the `[cardinal]` table of `.claude/cardinal.toml` as a TOML parser does, so that every valid form of the file (a key quoted or in another table, an inline table, a multi-line or escaped string) gives the values `cardinal` reads, a `rev` that is not a string read as none.
+- **SYN-57** (deterministic) When `.claude/cardinal.toml` is not valid TOML or its `[cardinal].source` is not a non-empty string, `.github/install_cardinal.sh` must fail (exit 1) with `no source read from .claude/cardinal.toml` on stderr and run no install.
+- **SYN-58** (deterministic) When the runner has no `python3` of version 3.11 or later (the first with `tomllib`), `.github/install_cardinal.sh` must fail (exit 1) with an error on stderr that names Python 3.11 and run no install.
 
 ## Scenarios
 
@@ -114,6 +117,9 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - (SYN-54) Given the format 2 renaming `a` to `b` and the format 3 `b` to `c`, both applied, then a line citing `a` is named `c` since the format 3.
 - (SYN-54) Given a file that git does not track, or a file that is not valid UTF-8, then it is not read.
 - (SYN-55) Given a `sync` that moves the lock to the format the `cardinal` reads, then no hint is printed.
+- (SYN-56) Given a `source` key in a table before `[cardinal]`, when the installer runs, then it installs from `[cardinal].source`, as `cardinal` does.
+- (SYN-56) Given a `rev` that is not a string, when the installer runs, then it installs with no `rev`, as `cardinal` reads none.
+- (SYN-57) Given a `source = ""` or a `source = 1`, when the installer runs, then it fails with the no-source error.
 
 ## Non-goals
 

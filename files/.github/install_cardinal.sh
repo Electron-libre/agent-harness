@@ -8,13 +8,25 @@ set -eu
 
 config=.claude/cardinal.toml
 [ -f "$config" ] || { echo "no $config: cardinal not installed" >&2; exit 1; }
-# a basic or a literal TOML string, the key indented or not
+# The configuration read through a TOML parser, as `cardinal` reads it (SYN-56); `-I`: no module of the work tree
+python3 -I -c 'import tomllib' 2>/dev/null \
+  || { echo "Python 3.11 or later (tomllib) is needed to read $config: cardinal not installed" >&2; exit 1; }
+# the string `[cardinal].<key>`, empty when it is missing, not a string or the file not valid TOML
 value() {
-  key="^[[:space:]]*$1[[:space:]]*=[[:space:]]*"
-  sed -n -e "s/$key\"\([^\"]*\)\".*/\1/p" -e "s/$key'\([^']*\)'.*/\1/p" "$config" | head -n 1
+  python3 -I -c '
+import sys, tomllib
+try:
+    with open(sys.argv[1], "rb") as f:
+        table = tomllib.load(f).get("cardinal")
+except (OSError, tomllib.TOMLDecodeError):
+    sys.exit()
+value = table.get(sys.argv[2]) if isinstance(table, dict) else None
+if isinstance(value, str):
+    sys.stdout.write(value)
+' "$config" "$1"
 }
 source=$(value source)
-# no key, another form of string or an unreadable file: the local-path branch below would take '' for a path
+# no key, not a string or an invalid file: the local-path branch below would take '' for a path
 [ -n "$source" ] || { echo "no source read from $config: cardinal not installed" >&2; exit 1; }
 rev=$(value rev)
 

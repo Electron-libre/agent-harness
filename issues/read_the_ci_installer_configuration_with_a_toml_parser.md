@@ -31,3 +31,41 @@ In both cases keep the `no source read from` error and its tests in `crates/card
 
 # Hints
 * The installer runs before `cardinal` exists, so it can't call `cardinal` to read its own configuration.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The installer reads `[cardinal].source` and `[cardinal].rev` with Python's `tomllib` (`python3 -c`), the values
+`cardinal` reads through `toml`; the `sed` reader goes. `ubuntu-latest` (24.04) ships Python 3.12; a runner without
+Python 3.11+ fails with its own error. Out of scope: the rest of the installer (URL resolution, release fetch).
+
+## Plan
+1. [x] Read the configuration with `tomllib`: `value()` becomes a `python3 -c` over `[cardinal]`, a check of
+   Python 3.11+ before it; verified by `install_script.rs` tests (another table's key, inline table, quoted key,
+   multi-line and escaped strings, non-string `rev`, empty or non-string `source`, invalid TOML, a fake `python3`
+   without `tomllib`); makes true SYN-56, SYN-57, SYN-58. ~150 lines.
+
+## Decisions
+- Mode: autonomous
+- No Python 3.11+: fail naming it, no `sed` fallback (one reader, the one `cardinal` matches).
+- Base commit: 2f0fd164623f8087a6262e923729efe004709622
+
+## Deliverable 1
+- done: `install_cardinal.sh` reads `[cardinal].source` and `rev` through `python3 -I` and `tomllib`, after a check of
+  Python 3.11+; SYN-56 to SYN-58 added to `specs/sync.md`, traced, spec `accepted`; `docs/architecture.md` names the need.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | `docs/architecture.md` |
+| code review | see below |
+
+- red: SYN-56, SYN-57, SYN-58: `rev 'other' is not a full commit hash` (a `source` of another table won), exit 0
+  instead of 1 for an empty, non-string or invalid `source` and for a runner without `tomllib`.
+- Code review: no findings
+- not verified: a real `ubuntu-latest` run of the installer (Python 3.12 assumed from the runner image).
+- decisions needed: none

@@ -115,8 +115,9 @@ This repository publishes the binaries (`.github/workflows/release.yml`, its own
 branch builds `cardinal` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever
 the glibc) and `aarch64-apple-darwin`, and creates the release `cardinal-<commit>` with each binary and its `.sha256`
 (a commit from before the rename has its `harness-<commit>` release instead). The CI of a consumer
-(`.github/install_cardinal.sh`) installs that asset, or builds it with `cargo` when there is none, so its
-jobs need no Rust when the source publishes the commit.
+(`.github/install_cardinal.sh`) reads `source` and `rev` with the runner's Python 3.11+ (`tomllib`, SYN-56), then
+installs that asset, or builds it with `cargo` when there is none, so its jobs need no Rust when the source publishes
+the commit.
 
 ## Hooks and their declaration
 
