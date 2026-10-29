@@ -1,5 +1,5 @@
 //! `.github/install_cardinal.sh`, the CI installer of the managed content, run with `sh` and a fake `cargo` and `curl`
-//! first on the path.
+//! first on the path; it reads the configuration with the real `python3`, 3.11 or later (`tomllib`).
 #![cfg(unix)]
 
 mod common;
@@ -101,10 +101,17 @@ fn a_configuration_without_a_source_fails_naming_the_key_and_the_file() {
         "[cardinal]\nsource = 1\n",
         "[other]\nsource = \"host:x.git\"\n",
         "[cardinal]\nsource = \"host:x.git\n",
+        "[cardinal]\nsource = \"host:x.git\"\n# \u{ff}\n",
     ] {
         let root = tempdir().unwrap();
         let bin = tempdir().unwrap();
-        put(root.path(), CONFIG, config);
+        // `\u{ff}` stands for a byte that is not UTF-8
+        let bytes: Vec<u8> = config
+            .chars()
+            .map(|c| if c == '\u{ff}' { 0xff } else { c as u8 })
+            .collect();
+        fs::create_dir_all(root.path().join(".claude")).unwrap();
+        fs::write(root.path().join(CONFIG), bytes).unwrap();
 
         let run = install(root.path(), bin.path());
 
@@ -181,6 +188,22 @@ fn an_escaped_quote_and_a_rev_that_is_no_string_are_read_as_cardinal_reads_them(
     let log = fs::read_to_string(bin.path().join("log")).unwrap_or_default();
     assert_eq!(
         log, "install --quiet --force --git ssh://host/x\"y.git --locked\n",
+        "{run:?}"
+    );
+}
+
+// spec: SYN-56
+#[test]
+fn a_source_of_a_newline_is_read_as_a_source() {
+    let root = tempdir().unwrap();
+    let bin = tempdir().unwrap();
+    put(root.path(), CONFIG, "[cardinal]\nsource = \"\\n\"\n");
+
+    let run = install(root.path(), bin.path());
+
+    assert_eq!(run.code, Some(0), "{run:?}");
+    assert!(
+        run.stdout.contains("source '\n' is a local path"),
         "{run:?}"
     );
 }

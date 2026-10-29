@@ -46,6 +46,9 @@ Python 3.11+ fails with its own error. Out of scope: the rest of the installer (
    Python 3.11+ before it; verified by `install_script.rs` tests (another table's key, inline table, quoted key,
    multi-line and escaped strings, non-string `rev`, empty or non-string `source`, invalid TOML, a fake `python3`
    without `tomllib`); makes true SYN-56, SYN-57, SYN-58. ~150 lines.
+2. [x] Fixes of the `high` review: one `python3` call printing `shlex`-quoted assignments (trailing newlines kept,
+   bytes written whatever the locale), `ValueError` caught (a file not UTF-8); verified by `install_script.rs`;
+   makes true SYN-56, SYN-57.
 
 ## Decisions
 - Mode: autonomous
@@ -68,4 +71,24 @@ Python 3.11+ fails with its own error. Out of scope: the rest of the installer (
   instead of 1 for an empty, non-string or invalid `source` and for a runner without `tomllib`.
 - Code review: no findings
 - not verified: a real `ubuntu-latest` run of the installer (Python 3.12 assumed from the runner image).
+- decisions needed: none
+
+## Deliverable 2
+- done: the `high` review's findings fixed in `install_cardinal.sh`; the test module names its `python3` need.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass |
+| docs | none (the comments of the script) |
+| code review | see below |
+
+- red: SYN-56, SYN-57: `source = "\\n"` read as no source; a byte 0xff gave a `UnicodeDecodeError` traceback, not the
+  no-source error.
+- High review: 6 findings: not UTF-8 (fixed), trailing newline (fixed; a NUL byte stays lost, the shell holds none),
+  its missing test (added), locale encoding (fixed, `stdout.buffer`), tests need Python 3.11+ (stated in the test
+  module doc; `ubuntu-latest` has it), three interpreter starts (one now).
+- Code review: no findings
+- not verified: a real `ubuntu-latest` run.
 - decisions needed: none
