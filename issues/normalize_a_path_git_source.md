@@ -49,7 +49,7 @@ Out of scope: scp-like `host:path` (kept as written), any change to local direct
    `clone_dir`, `cargo_url` and `launcher::install` see the URL; verified by binary tests (`sync` of two projects
    with `../x.git` next to different repositories, `cardinal run` from a subdirectory, the install command printed);
    makes true SYN-50. ~250 lines.
-2. [ ] Align `files/.github/install_cardinal.sh`: `*.git` is git (SYN-49), a path one resolved to the same URL;
+2. [x] Align `files/.github/install_cardinal.sh`: `*.git` is git (SYN-49), a path one resolved to the same URL;
    verified by a Rust test that runs the script with a stub `cargo` and checks the `--git` URL it gets; makes true
    SYN-50. ~150 lines.
 
@@ -67,3 +67,13 @@ Out of scope: scp-like `host:path` (kept as written), any change to local direct
 - checks: `just check` ok (fmt, clippy, tests, specs); docs updated.
 - Code review: no findings
 - not verified: a source path that is not valid UTF-8 (read lossily).
+
+## Deliverable 2
+
+- done: `install_cardinal.sh` counts `*.git` as git (SYN-49) and turns a path one into the same `file://` URL as
+  `cardinal` (`file_url`); scp-like `host:path` kept.
+- checks: `just check` ok, `just check-cardinal` ok; `file_url` gives the same URL under bash, dash and busybox `sh`
+  (by hand, in containers).
+- Code review: no findings
+- red: SYN-50: `source '../x.git' is a local path outside this repository: cardinal not installed`, `cargo` never called.
+- not verified: a full CI run on GitHub.

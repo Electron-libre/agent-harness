@@ -12,8 +12,35 @@ value() { sed -n "s/^$1 *= *\"\([^\"]*\)\".*/\1/p" "$config" | head -n 1; }
 source=$(value source)
 rev=$(value rev)
 
+# A path git source as the absolute `file://` URL of that path from the top of the work tree, as `cardinal` reads it
+# (SYN-50): `.` and `..` removed, every byte outside `A-Za-z0-9-._~/` percent-encoded.
+file_url() {
+  case "$1" in /*) path=$1 ;; *) path=$(pwd)/$1 ;; esac
+  out=""
+  set -f; ifs=$IFS; IFS=/
+  for part in $path; do
+    case "$part" in
+      ''|.) ;;
+      ..) out=${out%/*} ;;
+      *) out="$out/$part" ;;
+    esac
+  done
+  IFS=$ifs; set +f
+  printf 'file://'
+  printf '%s' "${out:-/}" | od -An -v -tx1 | tr -s ' ' '\n' | while read -r byte; do
+    case "$byte" in
+      '') ;;
+      2d|2e|2f|3[0-9]|4[1-9a-f]|5[0-9a]|5f|6[1-9a-f]|7[0-9a]|7e) printf "\\$(printf '%03o' "0x$byte")" ;;
+      *) printf '%%%s' "$(printf '%s' "$byte" | tr a-f A-F)" ;;
+    esac
+  done
+}
+
+# git as `cardinal` reads it (SYN-49): a URL, `git@`, or ending with `.git`; a path one resolved (SYN-50), a scp-like
+# `host:path` kept
 case "$source" in
   *://*|git@*) ;;
+  *.git) case "${source%%/*}" in *:*) ;; *) source=$(file_url "$source") ;; esac ;;
   *)
     if [ -f "$source/crates/cardinal/Cargo.toml" ]; then
       exec cargo install --quiet --force --path "$source/crates/cardinal" --locked
