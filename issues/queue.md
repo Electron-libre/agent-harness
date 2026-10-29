@@ -4,7 +4,6 @@ Open issues in the order to work on them: the first is the next one. Read by `ju
 `just close-issue` removes a line, `skill:create-issue` inserts one at its rank, `skill:prioritize-issues`
 re-ranks the whole list. Line format: `- [<file stem>](<file stem>.md) - <why here>`.
 
-- [fail_the_ci_installer_when_the_configuration_is_missing](fail_the_ci_installer_when_the_configuration_is_missing.md) - a pre-existing gap of the CI install, no consumer lacks its configuration today
 - [fail_the_ci_installer_when_the_source_is_empty](fail_the_ci_installer_when_the_source_is_empty.md) - the rest of the silent CI install gap closed by the issue before it, a small fix; before the other stacks
 - [trace_the_specs_in_the_tests_of_any_language](trace_the_specs_in_the_tests_of_any_language.md) - first of the other stacks, which no consumer has yet: without it the spec workflow and the quality measures fail outside Rust; before the team issues, which are comfort
 - [run_the_lint_and_format_of_the_project_stack](run_the_lint_and_format_of_the_project_stack.md) - after the tracing: a missing lint gate leaves a project working, a missing tracing does not
