@@ -125,6 +125,21 @@ pub fn typed_text(line: &Value) -> Option<String> {
     (!t.is_empty() && !injected).then_some(text)
 }
 
+/// A command the user typed: a slash command or a `!` shell command, which `typed_text` reads as injected text.
+pub fn user_command(line: &Value) -> bool {
+    let own = line["type"] == "user"
+        && line["isMeta"].as_bool() != Some(true)
+        && line["isSidechain"].as_bool() != Some(true);
+    own && line["message"]["content"].as_str().is_some_and(|t| {
+        t.contains("<command-name>/") || t.trim_start().starts_with("<bash-input>")
+    })
+}
+
+/// Whether a line opens a turn of the user: a message or a command they typed.
+pub fn user_turn(line: &Value) -> bool {
+    typed_text(line).is_some() || user_command(line)
+}
+
 /// The text of a tool result: its string content, or its text parts joined.
 pub fn result_text(block: &Value) -> String {
     match &block["content"] {

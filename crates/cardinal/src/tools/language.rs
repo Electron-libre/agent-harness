@@ -2,6 +2,8 @@
 //! `user-language` (BRE-10, `specs/rule-breaches.md`), shared by `rule-breaches` and the `language-hint` hook
 //! (`specs/language-hint.md`) so the measure and the hook agree on what a breach is.
 
+use serde_json::Value;
+
 /// Frequent words of one language only (`a`, `an`, `as`, `on`, `or`, `plus` are both French and English).
 const FRENCH_WORDS: &[&str] = &[
     "le", "la", "les", "un", "une", "des", "du", "de", "et", "est", "que", "qui", "dans", "pour",
@@ -17,6 +19,21 @@ const ENGLISH_WORDS: &[&str] = &[
 /// The words every hint of the `language-hint` hook holds, by which `rule-breaches` finds it in a transcript.
 pub(super) const HINT_MARK: &str = "the user_language of .claude/cardinal.toml";
 
+/// Whether a transcript line is a hint of the `language-hint` hook: the context it added after a tool call, or the
+/// feedback of its Stop hook.
+pub(super) fn is_hint(line: &Value) -> bool {
+    let attachment = &line["attachment"];
+    let added = line["type"] == "attachment"
+        && attachment["type"] == "hook_additional_context"
+        && attachment["content"].to_string().contains(HINT_MARK);
+    let feedback = line["type"] == "user"
+        && line["isMeta"].as_bool() == Some(true)
+        && line["message"]["content"]
+            .as_str()
+            .is_some_and(|t| t.starts_with("Stop hook feedback:") && t.contains(HINT_MARK));
+    added || feedback
+}
+
 /// The fewest words a text needs for its language to be judged.
 const MIN_WORDS: usize = 20;
 
@@ -29,9 +46,9 @@ pub(super) struct Language {
 }
 
 impl Language {
-    /// The language named by `user_language`, in any case; `None` for a language with no list.
+    /// The language named by `user_language`, in any case and blanks around it ignored; `None` for a language with no list.
     pub(super) fn named(name: &str) -> Option<Language> {
-        match name.to_lowercase().as_str() {
+        match name.trim().to_lowercase().as_str() {
             "french" => Some(Language {
                 name: "French",
                 own: FRENCH_WORDS,

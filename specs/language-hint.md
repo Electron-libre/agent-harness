@@ -22,8 +22,8 @@ the measure agree on what a breach is.
 - **LNG-4** (deterministic) The hook must judge the text with the same function as BRE-10: at least 20 words once inline code and fenced code blocks are removed, and more stop words of the other language than of `user_language`.
 - **LNG-5** (deterministic) On a Stop event, when the text breaks the test of LNG-4, the hook must exit 2 with exactly one line on stderr that names `user_language`, holds `the user_language of .claude/cardinal.toml` and asks to give the reply again in it, quoting no text of the reply.
 - **LNG-6** (deterministic) The hook must exit 0 and print nothing when the text passes the test of LNG-4, holds fewer than 20 words of prose, or cannot be judged (an unreadable event, transcript or config, no `user_language`, a language with no stop words).
-- **LNG-7** (deterministic) On a `PostToolUse` event, the hook must judge the text blocks of the assistant lines of the transcript at `transcript_path` that come before the line holding the `tool_use` block of the event's `tool_use_id`, back to the previous user line (a tool result or a typed message), joined by a blank line, and nothing when that `tool_use` block is not in the transcript or another `tool_use` block comes between those texts and it (a parallel call of the same message).
-- **LNG-8** (deterministic) On a `PostToolUse` event, the hook must judge nothing when an `attachment` line of type `hook_additional_context` whose content holds `the user_language of .claude/cardinal.toml` comes after the last message the user typed (the filter of `transcripts.rs`) in the transcript: one hint per turn.
+- **LNG-7** (deterministic) On a `PostToolUse` event, the hook must judge the text blocks of the assistant lines of the transcript at `transcript_path` that come before the line holding the `tool_use` block of the event's `tool_use_id`, back to the previous tool result or user turn (BRE-5: a message or a command the user typed), joined by a blank line, and nothing when that `tool_use` block is not in the transcript or another `tool_use` block comes between those texts and it (a parallel call of the same message).
+- **LNG-8** (deterministic) On a `PostToolUse` event, the hook must judge nothing when a hint of the hook (an `attachment` line of type `hook_additional_context`, or a meta user line starting with `Stop hook feedback:`, holding `the user_language of .claude/cardinal.toml`) comes after the last user turn (BRE-5) in the transcript: one hint per turn.
 - **LNG-9** (deterministic) On a `PostToolUse` event, when the text breaks the test of LNG-4, the hook must exit 0 and print on stdout one JSON object whose `hookSpecificOutput` holds `hookEventName` `PostToolUse` and an `additionalContext` of one line that names `user_language`, holds `the user_language of .claude/cardinal.toml` and asks to write the next texts to the user in it, quoting no text of the agent.
 - **LNG-10** (deterministic) On a `PostToolUse` event, the hook must exit 0 and print nothing when the text passes the test of LNG-4, holds fewer than 20 words of prose, or cannot be judged (the cases of LNG-6).
 
@@ -52,6 +52,8 @@ the measure agree on what a breach is.
 - Rewriting the text blocks already shown: the `PostToolUse` hint asks for the next texts, the user read the others.
 - A second `PostToolUse` hint in a turn after the first, even when later blocks breach again: a hint on every call of
   a long turn floods the context.
+- The text before a call that failed: Claude Code reports it as `PostToolUseFailure`, not `PostToolUse`; the next call
+  that succeeds judges the text written before it.
 - The text written by a sub-agent: the user does not read it, and its calls are not in the session's transcript.
 - Judging again after another Stop hook sent the agent back in the same turn: Claude Code sets `stop_hook_active`
   for every hook, and the hook lets go to avoid a loop.

@@ -190,7 +190,7 @@ fn the_config_is_read_at_the_root_of_the_work_tree_of_the_cwd_else_of_the_projec
 #[test]
 fn the_language_name_is_read_in_any_case_and_an_as_are_not_english() {
     let dir = tempdir().unwrap();
-    repo(dir.path(), Some("french"));
+    repo(dir.path(), Some(" french "));
     let run = hook(dir.path(), &stop(dir.path(), ENGLISH));
     assert_eq!(run.code, Some(2), "{run:?}");
     assert!(run.stderr.contains("French"), "{run:?}");
@@ -340,4 +340,60 @@ fn text_before_a_call_that_passes_or_cannot_be_judged_adds_nothing() {
     }
     let event = json!({"hook_event_name": "PostToolUse", "cwd": dir.path(), "transcript_path": dir.path().join("missing.jsonl"), "tool_use_id": "t1"});
     assert!(silent_pass(&hook(dir.path(), &event)));
+}
+
+fn command(name: &str) -> Value {
+    json!({"type": "user", "message": {"role": "user", "content": format!("<command-name>/{name}</command-name>")}})
+}
+
+fn stop_feedback(text: &str) -> Value {
+    json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": format!("Stop hook feedback:\n[cardinal run language-hint]: {text}")}})
+}
+
+// spec: LNG-7, LNG-8
+#[test]
+fn a_command_the_user_typed_opens_a_turn_and_a_stop_hint_counts() {
+    let dir = tempdir().unwrap();
+    repo(dir.path(), Some("French"));
+    let hint = context(&after_call(
+        dir.path(),
+        &[typed("go"), text("m1", ENGLISH), call("m1", "t1")],
+        "t1",
+    ))
+    .unwrap();
+    // a slash command opens a new turn: the hint of the turn before does not count
+    let lines = [
+        typed("go"),
+        text("m1", ENGLISH),
+        call("m1", "t1"),
+        result("t1"),
+        added_context(&hint),
+        command("issue-workflow"),
+        text("m2", ENGLISH),
+        call("m2", "t2"),
+    ];
+    assert!(context(&after_call(dir.path(), &lines, "t2")).is_some());
+    // nor is the reply of the turn before joined to the text of the command's turn
+    let split = [
+        typed("go"),
+        text("m1", &ENGLISH[..60]),
+        command("x"),
+        text("m2", &ENGLISH[60..]),
+        call("m2", "t1"),
+    ];
+    assert!(silent_pass(&after_call(dir.path(), &split, "t1")));
+    // the hint of the Stop hook counts in its turn
+    let lines = [
+        typed("go"),
+        text("m1", ENGLISH),
+        stop_feedback(&hint),
+        text("m2", ENGLISH),
+        call("m2", "t1"),
+    ];
+    assert!(silent_pass(&after_call(dir.path(), &lines, "t1")));
+    // a meta line holding the words but not Stop hook feedback is no hint
+    let other =
+        json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": hint}});
+    let lines = [typed("go"), other, text("m2", ENGLISH), call("m2", "t1")];
+    assert!(context(&after_call(dir.path(), &lines, "t1")).is_some());
 }

@@ -73,6 +73,8 @@ breaches apart. Out of scope: the measure after the change, which needs sessions
 3. [x] `PostToolUse` mode of `language-hint`, declared for every tool in `entries/.claude/settings.json`, synced and
    installed; verified by `language-hint` tests through the binary; makes true LNG-1, LNG-2, LNG-5, LNG-7 to LNG-10.
 4. [x] Follow-up issue to measure the change once sessions ran with it (`skill:create-issue`); verified by its checker.
+5. [x] Fixes of the `high` review of the issue; verified by the `language-hint` and `rule-breaches` tests; makes
+   true LNG-7, LNG-8, BRE-10, BRE-13.
 
 ## Deliverable 1
 - done: `an` and `as` left the English list; `user_language` read without case (`french` works).
@@ -149,6 +151,33 @@ Revisions split by `git merge-base --is-ancestor ad56d2a <revision>`, on the tra
 
 - red: none (issue files only)
 - Code review: no findings (`low`; issue files only)
+- not verified: none
+- decisions needed: none
+
+## Deliverable 5
+- done: fixes of the `high` review (`503e634..28e0441`, 9 findings).
+
+| # | finding | done |
+|---|---|---|
+| 1 | a slash or `!` command did not open a turn for the hook | `user_turn` shared in `transcripts.rs` (LNG-7, LNG-8) |
+| 2 | a hint marked every unhinted breach of the turn | a hint covers the run of blocks it judged (BRE-13) |
+| 3 | every line of the turn parsed on each call | only user, assistant and hint lines parsed: ~7 ms per call in release on a 14 MB transcript |
+| 4 | a failed call (`PostToolUseFailure`) judges nothing | non-goal of `specs/language-hint.md`: the next call that succeeds judges the text |
+| 5 | a Stop hint did not count for the once-per-turn rule | `is_hint` counts both kinds (LNG-8) |
+| 6 | any meta line holding the mark counted as a hint | Stop feedback must start with `Stop hook feedback:` |
+| 7 | the hint test was copied in two files | `language::is_hint`, shared |
+| 8 | dead turn check in `hinted_this_turn` | removed with it, the scan stops at the hint |
+| 9 | `user_language` not trimmed | trimmed (BRE-10) |
+
+| check | result |
+|---|---|
+| `just check` | pass |
+| docs | n/a (the hook table and Gates line still hold) |
+| code review | `low`, see below |
+
+- red: LNG-7, LNG-8, BRE-10, BRE-13: the hint was withheld after a slash command, `" french "` read as no language, the
+  blocks of later calls were `hinted`.
+- Code review: no findings (`low`)
 - not verified: none
 - decisions needed: none
 

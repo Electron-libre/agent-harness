@@ -615,7 +615,7 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let projects = tmp.join("projects");
     let mut expected = Vec::new();
     for (name, language) in [
-        ("fr", Some("french")),
+        ("fr", Some(" french ")),
         ("de", Some("German")),
         ("none", None),
     ] {
@@ -702,6 +702,19 @@ fn language_kind_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     let hinted_stop = t.text("e4", ENGLISH);
     t.push(json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": format!("Stop hook feedback:\n[cardinal run language-hint]: {HINT}")}}));
     let end = t.text("e5", ENGLISH);
+    // each hint covers the run of blocks it judged: the blocks of later calls in the turn are not hinted
+    t.typed("go");
+    let first_run = t.text("e6", ENGLISH);
+    t.run("c1", "Read", &json!({}), None);
+    t.push(json!({"type": "attachment", "attachment": {"type": "hook_additional_context", "content": [HINT], "hookName": "PostToolUse:Read"}}));
+    let second_run = t.text("e7", ENGLISH);
+    t.run("c2", "Read", &json!({}), None);
+    let third_run = t.text("e8", ENGLISH);
+    t.run("c3", "Read", &json!({}), None);
+    // a meta line that is not Stop hook feedback is no hint, even holding its words
+    t.push(json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": format!("Read {HINT}")}}));
+    let reply = t.text("e9", ENGLISH);
+    t.push(json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": format!("Stop hook feedback:\n[cardinal run language-hint]: {HINT}")}}));
     t.write(&projects.join("-k/s.jsonl"));
     let row = |line: usize, kind: &str| {
         format!("s\tk\tr1\tuser-language\tbreach\ts.jsonl:{line}\t{kind}")
@@ -712,6 +725,10 @@ fn language_kind_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         row(last, "final"),
         row(hinted_stop, "hinted"),
         row(end, "final"),
+        row(first_run, "hinted"),
+        row(second_run, "intermediate"),
+        row(third_run, "intermediate"),
+        row(reply, "hinted"),
     ];
     let (ok, out) = run(dir, &projects, false);
     let rows: Vec<String> = out.lines().skip(1).map(str::to_string).collect();

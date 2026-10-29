@@ -5,9 +5,9 @@
 //! one-line context, once per turn, so the next texts are in that language; the call never fails. It lets go whenever
 //! the text cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
-use super::language::{Language, HINT_MARK};
-use super::transcripts::{git, typed_text};
-use serde_json::Value;
+use super::language::{is_hint, Language, HINT_MARK};
+use super::transcripts::{git, typed_text, user_turn};
+use serde_json::{json, Value};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -78,7 +78,7 @@ fn text_before_call(lines: &[Value], id: &str) -> Option<String> {
                 .into_iter()
                 .flatten()
                 .any(|b| b["type"] == "tool_result");
-            if result || typed_text(line).is_some() {
+            if result || user_turn(line) {
                 break;
             }
             continue;
@@ -100,23 +100,6 @@ fn text_before_call(lines: &[Value], id: &str) -> Option<String> {
     (found && !texts.is_empty()).then(|| texts.join("\n\n"))
 }
 
-/// Whether a hint of this hook was added since the last message the user typed (LNG-8).
-fn hinted_this_turn(lines: &[Value]) -> bool {
-    for line in lines.iter().rev() {
-        if typed_text(line).is_some() {
-            return false;
-        }
-        let attachment = &line["attachment"];
-        if line["type"] == "attachment"
-            && attachment["type"] == "hook_additional_context"
-            && attachment["content"].to_string().contains(HINT_MARK)
-        {
-            return true;
-        }
-    }
-    false
-}
-
 /// The `PostToolUse` mode: the text before the call, judged once per turn, gets an added context (LNG-7 to LNG-10).
 fn after_call(event: &Value, language: Language) -> u8 {
     let (Some(path), Some(id)) = (
@@ -129,36 +112,39 @@ fn after_call(event: &Value, language: Language) -> u8 {
         return 0;
     };
     // the lines of the turn only, read back from the end: a long session holds megabytes of earlier turns, and a
-    // long turn megabytes of tool results, which only mark where the text before a call starts
+    // long turn megabytes of tool results (which only mark where the text before a call starts) and of other lines
     let mut lines: Vec<Value> = Vec::new();
     for line in transcript.lines().rev() {
         if line.contains(r#""type":"tool_result""#) {
-            lines.push(serde_json::json!({"type": "user", "message": {"content": [{"type": "tool_result"}]}}));
+            lines.push(json!({"type": "user", "message": {"content": [{"type": "tool_result"}]}}));
             continue;
         }
-        if line.contains(r#""type":"attachment""#) && !line.contains(HINT_MARK) {
+        let own = [r#""type":"user""#, r#""type":"assistant""#]
+            .iter()
+            .any(|t| line.contains(t));
+        if !own && !line.contains(HINT_MARK) {
             continue;
         }
         let Ok(line) = serde_json::from_str::<Value>(line) else {
             continue;
         };
-        let typed = typed_text(&line).is_some();
-        lines.push(line);
-        if typed {
+        if is_hint(&line) {
+            return 0;
+        }
+        if user_turn(&line) {
             break;
         }
+        lines.push(line);
     }
     lines.reverse();
-    if hinted_this_turn(&lines)
-        || text_before_call(&lines, id).and_then(|text| language.breached_by(&text)) != Some(true)
-    {
+    if text_before_call(&lines, id).and_then(|text| language.breached_by(&text)) != Some(true) {
         return 0;
     }
     let name = language.name;
     let hint = format!(
         "Your text before this tool call is not in {name}, {HINT_MARK}: write your next texts to the user in {name}."
     );
-    let output = serde_json::json!({
+    let output = json!({
         "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": hint}
     });
     println!("{output}");

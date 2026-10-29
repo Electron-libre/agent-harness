@@ -8,7 +8,7 @@
 //! (default the `projects/` of the configuration directory, EVA-15).
 
 use super::commit_check::BUILT_IN_SCOPES;
-use super::language::{Language, HINT_MARK};
+use super::language::{is_hint, Language};
 use super::transcripts;
 
 use chrono::{DateTime, FixedOffset};
@@ -17,8 +17,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use transcripts::{
     committed_config, committed_file, for_each_numbered_line, git, project_name, projects,
-    projects_root, repository, result_text, revision, sessions, shown, subagents, typed_text,
-    Place, CONFIGS, LOCKS,
+    projects_root, repository, result_text, revision, sessions, shown, subagents, user_turn, Place,
+    CONFIGS, LOCKS,
 };
 
 const HEADER: &str = "session\tproject\trevision\trule\tkind\tlocation\tdetail";
@@ -55,16 +55,6 @@ impl Call {
     fn commits(&self) -> bool {
         self.has("git") && self.has("commit")
     }
-}
-
-/// A command the user typed: a slash command or a `!` shell command, which `typed_text` reads as injected text.
-fn user_command(line: &Value) -> bool {
-    let own = line["type"] == "user"
-        && line["isMeta"].as_bool() != Some(true)
-        && line["isSidechain"].as_bool() != Some(true);
-    own && line["message"]["content"].as_str().is_some_and(|t| {
-        t.contains("<command-name>/") || t.trim_start().starts_with("<bash-input>")
-    })
 }
 
 enum Event {
@@ -140,14 +130,10 @@ impl Transcript {
                     }
                 }
                 Some("user") => {
-                    if main && (typed_text(line).is_some() || user_command(line)) {
+                    if main && user_turn(line) {
                         t.events.push(Event::Typed);
                     }
-                    let feedback = line["message"]["content"].as_str().unwrap_or_default();
-                    if main
-                        && line["isMeta"].as_bool() == Some(true)
-                        && feedback.contains(HINT_MARK)
-                    {
+                    if main && is_hint(line) {
                         t.events.push(Event::Hint);
                     }
                     for block in blocks.iter().filter(|b| b["type"] == "tool_result") {
@@ -167,15 +153,7 @@ impl Transcript {
                         }
                     }
                 }
-                Some("attachment") => {
-                    let attachment = &line["attachment"];
-                    if main
-                        && attachment["type"] == "hook_additional_context"
-                        && attachment["content"].to_string().contains(HINT_MARK)
-                    {
-                        t.events.push(Event::Hint);
-                    }
-                }
+                Some("attachment") if main && is_hint(line) => t.events.push(Event::Hint),
                 _ => {}
             }
         });
@@ -357,16 +335,21 @@ impl Verdict {
         let mut flagged: HashSet<usize> = HashSet::new();
         let mut refused = false;
         let mut plan_proposed = false;
-        // the language breaches of the turn not yet hinted, each with whether a text block came after it (BRE-13)
+        // the language breaches of the turn not yet hinted, each with whether a text block came after it, and where
+        // those of the last run of text blocks start: a hint covers that run only (BRE-13)
         let mut unhinted: Vec<(usize, bool)> = Vec::new();
+        let mut run_start = 0;
+        let mut called = false;
         for event in &t.events {
             match event {
                 Event::Typed => {
                     refused = false;
                     plan_proposed = false;
                     self.settle_language(&mut unhinted);
+                    run_start = 0;
                 }
                 Event::Call(i) => {
+                    called = true;
                     let call = &t.calls[*i];
                     let blocked = call.error == Some(true);
                     let before = self.findings.len();
@@ -388,6 +371,10 @@ impl Verdict {
                     }
                 }
                 Event::Text { location, text } => {
+                    if called {
+                        run_start = unhinted.len();
+                        called = false;
+                    }
                     for (_, followed) in &mut unhinted {
                         *followed = true;
                     }
@@ -401,7 +388,7 @@ impl Verdict {
                     }
                 }
                 Event::Hint => {
-                    for (i, _) in unhinted.drain(..) {
+                    for (i, _) in unhinted.drain(run_start..) {
                         self.findings[i].detail = "hinted".into();
                     }
                 }
