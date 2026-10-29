@@ -382,15 +382,18 @@ pub(super) fn citation(list: &str) -> (impl Iterator<Item = &str>, Option<&str>)
 /// The line-comment markers a citation may open with (TRC-12).
 const MARKERS: &[&str] = &["//", "#", "--", ";"];
 
-/// The markers of `file`, by its extension (TRC-12): the four for an extension the table does not know.
-fn markers(file: &Path) -> &'static [&'static str] {
-    const ANY: &[&str] = MARKERS;
-    let ext = file
-        .extension()
+/// The extension of `file`, lowercased.
+fn extension(file: &Path) -> String {
+    file.extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
-        .to_ascii_lowercase();
-    match ext.as_str() {
+        .to_ascii_lowercase()
+}
+
+/// The markers of `file`, by its extension (TRC-12): the four for an extension the table does not know.
+pub(super) fn markers(file: &Path) -> &'static [&'static str] {
+    const ANY: &[&str] = MARKERS;
+    match extension(file).as_str() {
         "rs" | "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "go" | "java" | "kt" | "kts"
         | "scala" | "swift" | "c" | "cc" | "cpp" | "h" | "hpp" | "cs" | "dart" | "php" => &ANY[..1],
         "py" | "sh" | "bash" | "zsh" | "bats" | "rb" | "pl" | "r" | "ex" | "exs" | "nix" => {
@@ -402,16 +405,24 @@ fn markers(file: &Path) -> &'static [&'static str] {
     }
 }
 
-/// The id list of `line` when it is a citation of `file`: its trimmed text opens with a marker of the file's
-/// extension, then ` spec:` (TRC-12).
-pub(super) fn citation_list<'a>(file: &Path, line: &'a str) -> Option<&'a str> {
-    markers(file)
-        .iter()
-        .find_map(|m| line.trim().strip_prefix(m)?.strip_prefix(" spec:"))
+/// The id list of `line` when it is a citation: its trimmed text opens with one of `markers` (`;` once or more),
+/// then ` spec:` (TRC-12).
+pub(super) fn citation_list<'a>(markers: &[&str], line: &'a str) -> Option<&'a str> {
+    let line = line.trim();
+    markers.iter().find_map(|m| {
+        let rest = line.strip_prefix(m)?;
+        let rest = if *m == ";" {
+            rest.trim_start_matches(';')
+        } else {
+            rest
+        };
+        rest.strip_prefix(" spec:")
+    })
 }
 
-/// Whether the file name `name` matches the glob `pattern`, `*` standing for any run of characters (TRC-11).
-fn name_matches(pattern: &str, name: &str) -> bool {
+/// Whether the file name `name` matches the glob `pattern`, `*` standing for any run of characters and every other
+/// character for itself (TRC-11).
+pub(super) fn name_matches(pattern: &str, name: &str) -> bool {
     match pattern.split_once('*') {
         None => pattern == name,
         Some((head, rest)) => name.strip_prefix(head).is_some_and(|name| {
@@ -422,20 +433,59 @@ fn name_matches(pattern: &str, name: &str) -> bool {
     }
 }
 
-/// The file-name patterns of the test files, the `spec_files` of `.claude/cardinal.toml` or `*.rs` (TRC-11); a
-/// pattern holding a path separator is a problem in `out` (TRC-15).
-fn spec_patterns(root: &Path, out: &mut Vec<String>) -> Vec<String> {
-    let patterns = super::config_list(root, "spec_files").unwrap_or_default();
-    for p in patterns.iter().filter(|p| p.contains(['/', '\\'])) {
-        out.push(format!(
-            "{}: `spec_files` pattern `{p}` must match a file name, not a path",
-            crate::config_of(root).display()
+/// The names of the list `key` of `.claude/cardinal.toml`, `default` when it is absent or empty, and the problems
+/// of the key: a value that is not a list of strings (TRC-16), an entry holding a path separator (TRC-15). A
+/// `cardinal.toml` that does not parse gives the default, its problem being reported with the `skipped_dirs`.
+fn config_names(root: &Path, key: &str, default: &str) -> (Vec<String>, Vec<String>) {
+    let path = crate::config_of(root);
+    let table: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| text.parse().ok())
+        .unwrap_or_default();
+    let value = table
+        .get("project")
+        .and_then(|p| p.get(key))
+        .or_else(|| table.get(key));
+    let mut problems = Vec::new();
+    let names: Vec<String> = match value.map(|v| {
+        v.as_array().map(|a| {
+            a.iter()
+                .map(toml::Value::as_str)
+                .collect::<Option<Vec<_>>>()
+        })
+    }) {
+        None => Vec::new(),
+        Some(Some(Some(names))) => names.into_iter().map(str::to_string).collect(),
+        Some(_) => {
+            problems.push(format!(
+                "{}: `{key}` must be a list of strings",
+                path.display()
+            ));
+            Vec::new()
+        }
+    };
+    for name in names.iter().filter(|n| n.contains(['/', '\\'])) {
+        problems.push(format!(
+            "{}: `{key}` entry `{name}` must be a name, not a path",
+            path.display()
         ));
     }
-    if patterns.is_empty() {
-        return vec!["*.rs".to_string()];
+    if names.is_empty() {
+        return (vec![default.to_string()], problems);
     }
-    patterns
+    (names, problems)
+}
+
+/// The file-name patterns of the test files, the `spec_files` of `.claude/cardinal.toml` or `*.rs` (TRC-11), with
+/// the problems of the key.
+pub(super) fn spec_patterns(root: &Path) -> (Vec<String>, Vec<String>) {
+    config_names(root, "spec_files", "*.rs")
+}
+
+/// The directories of the internal tests, the `internal_dirs` of `.claude/cardinal.toml` or `src` (TRC-14), with the
+/// problems of the key.
+fn internal_dirs(root: &Path) -> (Vec<String>, Vec<String>) {
+    config_names(root, "internal_dirs", "src")
 }
 
 /// The test files of the root, whatever the layout of the project (TRC-9, TRC-11): those whose name matches a pattern
@@ -450,7 +500,7 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
         Err(e) if crate::config_of(root).exists() => out.push(e),
         Err(_) => {}
     }
-    let patterns = spec_patterns(root, out);
+    let patterns = spec_patterns(root).0;
     let skipped = |dir: &Path| {
         dir.file_name().is_some_and(|name| {
             names.iter().any(|n| name == n.as_str())
@@ -458,10 +508,8 @@ pub(super) fn test_files(root: &Path, out: &mut Vec<String>) -> Vec<PathBuf> {
         })
     };
     // in a git repository the files git lists, so never those of a nested worktree (ADR 0008) nor the ignored ones
-    // git's `*` also matches `/`: `*<pattern>` lists a superset of the matching names at any depth
-    let pathspecs: Vec<String> = patterns.iter().map(|p| format!("*{p}")).collect();
-    let pathspecs: Vec<&str> = pathspecs.iter().map(String::as_str).collect();
-    let files: Vec<PathBuf> = match repo_files::repo_files(root, &pathspecs) {
+    // every file, the patterns being matched below: a pathspec would read their other characters as globs
+    let files: Vec<PathBuf> = match repo_files::repo_files(root, &[]) {
         Ok(Some(files)) => files
             .into_iter()
             .filter(|f| {
@@ -517,11 +565,11 @@ pub(super) fn citations(
             .display()
             .to_string();
         let lines: Vec<&str> = text.lines().collect();
+        let (markers, rust) = (markers(file), extension(file) == "rs");
         for (i, line) in lines.iter().enumerate() {
-            let Some(list) = citation_list(file, line) else {
+            let Some(list) = citation_list(markers, line) else {
                 continue;
             };
-            let rust = file.extension().is_some_and(|e| e == "rs");
             let next = lines[i + 1..].iter().map(|l| l.trim()).find(|l| {
                 if rust {
                     !l.starts_with("#[") && !l.starts_with("//")
@@ -628,25 +676,14 @@ fn problems(root: &Path, strict: bool) -> Vec<String> {
                 problem(
                     &mut out,
                     &spec.file,
-                    format_args!(
-                        "requirement {}: no test cites `// spec: {}`",
-                        req.id, req.id
-                    ),
+                    format_args!("requirement {}: no test cites `spec: {}`", req.id, req.id),
                 );
             }
         }
     }
-    // `internal_dirs` replaces `src` when set (TRC-14); a `cardinal.toml` that does not parse is already a problem
-    let mut internal = super::config_list(root, "internal_dirs").unwrap_or_default();
-    for d in internal.iter().filter(|d| d.contains(['/', '\\'])) {
-        out.push(format!(
-            "{}: `internal_dirs` entry `{d}` must be a directory name, not a path",
-            crate::config_of(root).display()
-        ));
-    }
-    if internal.is_empty() {
-        internal.push("src".to_string());
-    }
+    let (internal, internal_problems) = internal_dirs(root);
+    out.extend(spec_patterns(root).1);
+    out.extend(internal_problems);
     boundary_warnings(&specs, &cited, &internal);
     out
 }
@@ -694,7 +731,7 @@ fn boundary_warnings(
             let plural = if internal.len() == 1 { "" } else { "s" };
             eprintln!(
                 "warning: {}: {} requirement{plural} proven only by tests under {dirs} with no reason: {} \
-                 (give it as `// spec: ID (internal: <reason>)`)",
+                 (give it as `spec: ID (internal: <reason>)` after the comment marker)",
                 spec.file,
                 internal.len(),
                 internal.join(", ")

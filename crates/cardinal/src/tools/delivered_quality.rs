@@ -7,7 +7,9 @@
 //! Usage: `cardinal run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the
 //! current directory, the `projects/` of the configuration directory (EVA-15) and 30 days).
 
-use super::check_specs::{citation, citation_list, is_req_id};
+use super::check_specs::{
+    citation, citation_list, is_req_id, markers, name_matches, spec_patterns,
+};
 use super::transcripts;
 
 use chrono::{DateTime, Duration, FixedOffset};
@@ -280,11 +282,28 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
         .collect();
     args.extend(excluded.iter().map(String::as_str));
     let diffs = git(repo, &args)?;
+    let patterns = spec_patterns(repo).0;
+    // the markers of a path of a diff header: none when it is no test file (QUA-13)
+    let markers_of = |header: &str| -> &'static [&'static str] {
+        // git ends a name holding a space with a tab, and quotes one holding a special character
+        let path = header.trim_end_matches('\t');
+        let path = path
+            .strip_prefix('"')
+            .and_then(|p| p.strip_suffix('"'))
+            .unwrap_or(path);
+        let path = Path::new(path.split_once('/').map_or(path, |(_, p)| p));
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if patterns.iter().any(|p| name_matches(p, name)) {
+            markers(path)
+        } else {
+            &[]
+        }
+    };
     let mut traced = BTreeSet::new();
     for diff in diffs.split('\x1e') {
         let (mut added, mut removed) = (BTreeSet::new(), BTreeSet::new());
         // the old and new paths of the file the hunks below belong to, read from its header
-        let (mut old, mut new, mut header) = (String::new(), String::new(), false);
+        let (mut old, mut new, mut header): (&[&str], &[&str], bool) = (&[], &[], false);
         for line in diff.lines() {
             if line.starts_with("diff --git ") {
                 header = true;
@@ -292,22 +311,14 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
                 header = false;
             } else if header {
                 if let Some(path) = line.strip_prefix("--- ") {
-                    old = path.strip_prefix("a/").unwrap_or(path).to_string();
+                    old = markers_of(path);
                 } else if let Some(path) = line.strip_prefix("+++ ") {
-                    new = path.strip_prefix("b/").unwrap_or(path).to_string();
+                    new = markers_of(path);
                 }
             } else if let Some(text) = line.strip_prefix('+') {
-                added.extend(
-                    citation_list(Path::new(&new), text)
-                        .into_iter()
-                        .flat_map(cited),
-                );
+                added.extend(citation_list(new, text).into_iter().flat_map(cited));
             } else if let Some(text) = line.strip_prefix('-') {
-                removed.extend(
-                    citation_list(Path::new(&old), text)
-                        .into_iter()
-                        .flat_map(cited),
-                );
+                removed.extend(citation_list(old, text).into_iter().flat_map(cited));
             }
         }
         traced.extend(added.difference(&removed).cloned());

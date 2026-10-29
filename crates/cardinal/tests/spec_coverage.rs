@@ -228,3 +228,19 @@ fn a_declared_test_file_of_another_language_is_a_test_file() {
         (Some(0), "2\ttests/test_cli.py\n".to_string())
     );
 }
+
+// spec: COV-8
+#[test]
+fn a_problem_of_the_configuration_is_no_failure() {
+    let dir = root(&[
+        (
+            ".claude/cardinal.toml",
+            "[project]\nspec_files = [\"tests/*.py\", \"*.rs\"]\n",
+        ),
+        ("tests/cli.rs", "#[test]\nfn t() {}\n"),
+    ]);
+    assert_eq!(
+        report(dir.path()),
+        (Some(0), "2\ttests/cli.rs\n".to_string())
+    );
+}

@@ -37,9 +37,10 @@ functions) proves the requirement; what only a model's output could show is not 
 former `quality` kind is read untraced, with a warning: reword it for a test or withdraw it). The test carries a
 `// spec: RER-1` comment right above it, attributes and other comments included, and directly above a `fn` (several
 ids: `// spec: RER-1, RER-2`). A project whose tests are in another language lists their file-name patterns in
-`spec_files` of `.claude/cardinal.toml` (`["*.rs"]` when absent, e.g. `["test_*.py", "*_test.go"]`), and the citation
+`spec_files` of `.claude/cardinal.toml` (`["*.rs"]` when absent, e.g. `["test_*.py", "*_test.go"]`; `*` is the
+only wildcard), and the citation
 opens with the line-comment marker of the file's extension (`# spec: RER-1` in Python or shell, `-- spec:` in Lua or
-SQL, `; spec:` in a Lisp; any of the four for an extension `check-specs` does not know), right above the test: past
+SQL, `;; spec:` in a Lisp; any of the four for an extension `check-specs` does not know), right above the test: past
 comments and decorators (`@`), the next line must not be blank. A test under `.claude/` (a managed one) may cite a spec the project does not have: the repository that ships it traces it. Only a prefix with no spec in the project is exempt: an unknown id of a spec the project has, and any citation outside `.claude/`, are still flagged. The repository that ships those tests runs the script with `--strict`, which removes the exemption.
 
 A spec and its tests must survive a rewrite of the code, so a requirement is proven by a test that drives the

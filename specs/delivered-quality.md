@@ -27,7 +27,7 @@ reports signals, not verdicts: a fix after a feature may come from a new need.
 - **QUA-10** (deterministic) The output must hold no text of a message, of a commit or of an issue: only stems, revisions, dates and counts.
 - **QUA-11** (deterministic) `traced` must count the distinct requirement ids (`ABC-n`, as `check-specs` reads them) cited on the citation lines (QUA-13) that the commits of the issue add to its files (QUA-4), renames detected, less, commit by commit, the ids cited on the citation lines that commit removes (a moved or extended citation traces only its new ids); `traced_without_red` counts those of them absent from the id list that opens each `red:` item of the `# Tracking` section (ending at the next line starting with `# ` outside a fenced code block, QUA-12), an item being a line whose trimmed text, list marker removed, starts with `red:`, with its indented continuation lines, and its list the ids that follow `red:`, separated by commas or spaces, up to the first other word; both are empty when the diffs of the issue cannot be read.
 - **QUA-12** (deterministic) The sections of an issue file that QUA-3, QUA-6 and QUA-11 read must start at the first line equal to their heading (trailing spaces ignored) outside a fenced code block and end as each requirement says, a line inside a fenced code block never starting or ending one; a fenced code block opens at a line whose text, leading whitespace removed, starts with at least three backticks (the rest of the line holding no backtick, else it is inline code) or three tildes, and closes at the next line whose text, leading and trailing whitespace removed, is only the same character, at least as many times; a block left open runs to the end of the file. A section whose heading the file holds only inside a fenced code block is unread: the columns read from it (`deliverables` when neither of its headings stands outside a fence, `reviews` and `review_findings`, `traced_without_red`) must be empty, not 0; a heading the file does not hold at all reads as an empty section.
-- **QUA-13** (deterministic) The citation lines of QUA-11 must be, in each file, those `check-specs` reads as citations for its extension (TRC-12), so that a `# spec:` line of a `.py` file counts and one of a `.rs` file does not.
+- **QUA-13** (deterministic) The citation lines of QUA-11 must be those `check-specs` reads: in the files whose name matches the test-file patterns (TRC-11, at the revision the report runs on), the lines it reads as citations for their extension (TRC-12), so that a `# spec:` line of a `.py` test file counts and one of a `.rs` file or of a non-test file does not.
 
 ## Scenarios
 
@@ -46,7 +46,8 @@ reports signals, not verdicts: a fix after a feature may come from a new need.
 - (QUA-12) Given an issue file whose fence opened in the Goal is left open before its `# Tracking` section, when the row is printed, then `deliverables`, `reviews`, `review_findings` and `traced_without_red` are empty; given an issue file with no `# Tracking` nor `## Plan` heading, then `deliverables` and `reviews` are 0.
 - (QUA-12) Given an issue file whose Goal quotes `# Tracking` in a backtick fence and whose `# Tracking` holds, in an indented `~~~` fence, a line `# build` followed by `Code review: 2 findings` after the fence, when the row is printed, then `reviews` is 1 and `review_findings` 2.
 - (QUA-13) Given an issue whose commits add `# spec: ABC-1` to `tests/test_a.py` and `# spec: ABC-2` inside a string
-  of `src/lib.rs`, when the row is printed, then `traced` is 1.
+  of `src/lib.rs`, with `spec_files = ["*.rs", "test_*.py"]`, when the row is printed, then `traced` is 1; a `# spec:
+  ABC-3` added to `ci.yml` or `scripts/gen.py` does not count.
 
 ## Non-goals
 

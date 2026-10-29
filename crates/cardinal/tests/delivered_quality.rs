@@ -628,6 +628,16 @@ fn theta_commits(repo: &Path) {
                 "src/lib.rs",
                 Some("const T: &str = r\"\n# spec: ABC-2\n\";\n"),
             ),
+            ("ci.yml", Some("# spec: ABC-3\n")),
+            ("scripts/gen.py", Some("# spec: ABC-3\n")),
+            (
+                "src/my mod.rs",
+                Some("const T: &str = r\"\n# spec: ABC-4\n\";\n"),
+            ),
+            (
+                ".claude/cardinal.toml",
+                Some("[project]\nspec_files = [\"*.rs\", \"test_*.py\"]\n"),
+            ),
             ("issues/theta.md", Some(theta)),
         ],
     );

@@ -508,10 +508,10 @@ fn any_language(case: &Case) {
             (mixed.0, &mixed.1),
             (
                 "t/test_a.py",
-                "# spec: RER-1\ndef test_a():\n    pass\n// spec: RER-9\n",
+                "# spec: RER-1, RER-2\ndef test_a():\n    pass\n// spec: RER-9\n",
             ),
         ],
-        Some("requirement RER-2: no test cites"),
+        None,
     );
     case(
         "an unknown extension takes any of the four markers",
@@ -533,6 +533,55 @@ fn any_language(case: &Case) {
     );
 }
 
+// spec: TRC-11, TRC-12, TRC-16
+/// The Lisp marker repeated, the literal characters of a pattern and the type of the keys.
+fn any_language_forms(case: &Case) {
+    case(
+        "a ;; line of a Lisp file is a citation",
+        SPEC,
+        "",
+        &[
+            (
+                ".claude/cardinal.toml",
+                "[project]\nspec_files = [\"*.clj\"]\n",
+            ),
+            (
+                "test/a.clj",
+                ";; spec: RER-1, RER-2\n(deftest a (is true))\n",
+            ),
+        ],
+        None,
+    );
+    case(
+        "every character of a pattern but * stands for itself",
+        SPEC,
+        "",
+        &[
+            (
+                ".claude/cardinal.toml",
+                "[project]\nspec_files = [\"t[1]_?.py\"]\n",
+            ),
+            (
+                "t/t[1]_?.py",
+                "# spec: RER-1, RER-2\ndef test_a():\n    pass\n",
+            ),
+            ("t/t1_a.py", "# spec: RER-9\ndef test_a():\n    pass\n"),
+        ],
+        None,
+    );
+    for key in ["spec_files", "internal_dirs"] {
+        case(
+            "a key that is not a list of strings is a problem",
+            SPEC,
+            TESTS,
+            &[(
+                ".claude/cardinal.toml",
+                &format!("[project]\n{key} = \"x\"\n"),
+            )],
+            Some(&format!("`{key}`")),
+        );
+    }
+}
 // spec: TRC-13
 /// Outside a `.rs` file, a citation sits right above a code line, past comments and decorators.
 fn any_language_placement(case: &Case) {
@@ -573,6 +622,7 @@ fn any_language_placement(case: &Case) {
         ],
         Some("t/test_a.py:1:"),
     );
+    any_language_forms(case);
 }
 
 // spec: TRC-9
@@ -943,7 +993,7 @@ fn internal_dirs_checks(case: &Case, report: &dyn Fn(&str, bool)) {
 fn warning(count: &str, ids: &str) -> String {
     format!(
         "warning: specs/rerun.md: {count} proven only by tests under `src` with no reason: {ids} \
-         (give it as `// spec: ID (internal: <reason>)`)"
+         (give it as `spec: ID (internal: <reason>)` after the comment marker)"
     )
 }
 

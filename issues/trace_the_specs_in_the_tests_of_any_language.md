@@ -56,6 +56,7 @@ boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comm
    test on a fixture repository; makes true QUA-13.
 3. [x] `internal_dirs` replaces `src` in the boundary rule when set; documented in the README and the seed; verified
    by a test through the binary; makes true TRC-14, and sets TRC, COV and QUA back to `accepted`.
+4. [x] Fixes of the `high` review of the issue; verified by tests; makes true TRC-11, TRC-12, TRC-16, QUA-13, COV-8.
 
 ## Decisions
 - Mode: autonomous
@@ -90,4 +91,18 @@ boundary rule a value (`internal_dirs`, default `src`). Out of scope: block comm
 - Code review: 1 finding: an `internal_dirs` entry holding a `/` never matched; fixed, reported as a problem
   (TRC-15 extended).
 - not verified: the red run of the TRC-15 case added by the fix.
+- decisions needed: none.
+
+## Deliverable 4
+- done: fixes of the `high` review (10 findings): `traced` reads only the test files of `spec_files`, with the
+  marker of each file, a header path ending in a tab or quoted read right; `spec_files` and `internal_dirs` that are
+  not lists of strings are problems (TRC-16), checked by `check-specs` only, so `spec-coverage` no longer fails on
+  them (COV-8); every pattern character but `*` is literal (all files listed, then matched); `;;` accepted (TRC-12);
+  markers computed once per file, `.RS` read as Rust; the hints no longer name `//`; one `config_names` helper for
+  both keys; the `//`-in-`.py` case now fails when `//` is read.
+- red: TRC-12, TRC-16, QUA-13, COV-8: `FAIL - a ;; line of a Lisp file is a citation`, `FAIL - a key that is not a
+  list of strings is a problem`, `FAIL - a citation is read with the marker of its file's extension`,
+  `left: (Some(1), "")`.
+- Code review: no findings
+- not verified: the wildcard case passed before the fix outside git (the fixture is not a git repository).
 - decisions needed: none.

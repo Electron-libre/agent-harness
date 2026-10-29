@@ -27,11 +27,12 @@ stable, not required: an internal test is the proof when its citation gives the 
 - **TRC-8** (deterministic) The checker must read from a citation with a reason the same requirement ids as from that citation without it.
 - **TRC-9** (deterministic) The checker must read the citations of every `.rs` file under the root, whatever its directory (a crate at the root, `src/` and `tests/`, as well as `crates/` and `.claude/`), except under a directory named `.git` or `node_modules`, or a `target` directory beside a `Cargo.toml` (the build output).
 - **TRC-10** (deterministic) The checker must not read the `.rs` files under a directory named like one of the `skipped_dirs` of `.claude/cardinal.toml`.
-- **TRC-11** (deterministic) When `.claude/cardinal.toml` sets `spec_files`, the checker must read, instead of the `.rs` files, the files whose name matches one of its patterns, with the exclusions of TRC-9 and TRC-10; a pattern matches the file name alone, `*` standing for any run of characters.
-- **TRC-12** (deterministic) The checker must read as a citation a line whose trimmed text starts with the line-comment marker of its file's extension followed by ` spec:`: `//` for `rs`, `ts`, `tsx`, `js`, `jsx`, `mjs`, `cjs`, `go`, `java`, `kt`, `kts`, `scala`, `swift`, `c`, `cc`, `cpp`, `h`, `hpp`, `cs`, `dart` and `php`; `#` for `py`, `sh`, `bash`, `zsh`, `bats`, `rb`, `pl`, `r` (either case), `ex`, `exs` and `nix`; `--` for `lua`, `sql`, `hs` and `elm`; `;` for `clj`, `cljs`, `lisp`, `el`, `scm` and `rkt`; any of the four for another extension.
+- **TRC-11** (deterministic) When `.claude/cardinal.toml` sets `spec_files`, the checker must read, instead of the `.rs` files, the files whose name matches one of its patterns, with the exclusions of TRC-9 and TRC-10; a pattern matches the file name alone, `*` standing for any run of characters and every other character for itself.
+- **TRC-12** (deterministic) The checker must read as a citation a line whose trimmed text starts with the line-comment marker of its file's extension followed by ` spec:`: `//` for `rs`, `ts`, `tsx`, `js`, `jsx`, `mjs`, `cjs`, `go`, `java`, `kt`, `kts`, `scala`, `swift`, `c`, `cc`, `cpp`, `h`, `hpp`, `cs`, `dart` and `php`; `#` for `py`, `sh`, `bash`, `zsh`, `bats`, `rb`, `pl`, `r` (either case), `ex`, `exs` and `nix`; `--` for `lua`, `sql`, `hs` and `elm`; `;`, once or more, for `clj`, `cljs`, `lisp`, `el`, `scm` and `rkt`; any of the four for another extension.
 - **TRC-13** (deterministic) The checker must report as a problem, naming its file and line, a citation of a file other than a `.rs` one whose next line, past the comment lines (any marker of TRC-12) and the decorator lines (trimmed text starting with `@`), is blank or missing; a citation of a `.rs` file keeps the rule of `specs/README.md`, a `fn` past the attributes and comments.
 - **TRC-14** (deterministic) When `.claude/cardinal.toml` sets `internal_dirs`, the checker must count as calling the code from inside (TRC-1 to TRC-6) the tests under a directory named like one of its entries, instead of those under a `src` directory.
 - **TRC-15** (deterministic) The checker must report as a problem a pattern of `spec_files` or an entry of `internal_dirs` that holds a `/` or a `\`, naming it.
+- **TRC-16** (deterministic) The checker must report as a problem a `spec_files` or an `internal_dirs` of `.claude/cardinal.toml` that is not a list of strings, naming the key.
 
 ## Scenarios
 
@@ -73,6 +74,10 @@ stable, not required: an internal test is the proof when its citation gives the 
   when the checker runs, then the boundary warning names `SYN-1` alone.
 - (TRC-15) Given `spec_files = ["tests/*.py"]`, when the checker runs, then it fails naming `tests/*.py`; given
   `internal_dirs = ["tests/unit"]`, it fails naming `tests/unit`.
+- (TRC-16) Given `spec_files = "test_*.py"`, when the checker runs, then it fails naming `spec_files`.
+- (TRC-11) Given `spec_files = ["t[1]_?.py"]`, when the checker runs, then it reads `t[1]_?.py` and not `t1_a.py`.
+- (TRC-12) Given `;; spec: SYN-1` above `(deftest a ...)` in a `.clj` test file, when the checker runs, then `SYN-1` is
+  cited.
 
 ## Non-goals
 
