@@ -362,6 +362,41 @@ fn is_git_url(source: &str) -> bool {
     source.contains("://") || source.starts_with("git@") || source.ends_with(".git")
 }
 
+/// The source as git and cargo read it (SYN-50): a git source that is a path becomes the absolute `file://` URL of
+/// `root.join(source)`, so the clone, its cache key and `cargo install --git` do not depend on the working directory;
+/// a URL, a scp-like `host:path` and a local directory are returned as written.
+fn resolved(root: &Path, source: &str) -> String {
+    let scp_like = source
+        .split('/')
+        .next()
+        .is_some_and(|head| head.contains(':'));
+    if !is_git_url(source) || source.contains("://") || scp_like {
+        return source.to_string();
+    }
+    let mut path = PathBuf::from("/");
+    for part in std::path::absolute(root.join(source))
+        .unwrap_or_else(|_| root.join(source))
+        .components()
+    {
+        match part {
+            Component::Normal(name) => path.push(name),
+            Component::ParentDir => {
+                path.pop();
+            }
+            Component::Prefix(_) | Component::RootDir | Component::CurDir => {}
+        }
+    }
+    let mut url = String::from("file://");
+    for byte in path.to_string_lossy().bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~/".contains(&byte) {
+            url.push(char::from(byte));
+        } else {
+            let _ = write!(url, "%{byte:02X}");
+        }
+    }
+    url
+}
+
 fn git(dir: Option<&Path>, args: &[&str]) -> Result<()> {
     let mut cmd = Command::new("git");
     if let Some(dir) = dir {
@@ -542,7 +577,8 @@ fn is_table_header(line: &str) -> bool {
         && (after.trim().is_empty() || after.trim_start().starts_with('#'))
 }
 
-/// The `source` and the pinned `rev` of the table of the configuration (`[cardinal]`, or `[harness]` of the old name).
+/// The `source`, resolved (SYN-50), and the pinned `rev` of the table of the configuration (`[cardinal]`, or
+/// `[harness]` of the old name).
 fn source_and_rev(root: &Path) -> Result<(String, Option<String>)> {
     let config = read_config(root)?;
     let names = Names::read(root);
@@ -559,7 +595,7 @@ fn source_and_rev(root: &Path) -> Result<(String, Option<String>)> {
             names.config, names.table
         )
     })?;
-    Ok((source, text("rev")))
+    Ok((resolved(root, &source), text("rev")))
 }
 
 /// What the migration of a project of the old names to the new ones writes (SYN-45), computed before anything is.
@@ -703,7 +739,7 @@ pub fn init(root: &Path, source: &str, rev: Option<&str>) -> Result<()> {
         }
     }
     let dir = if is_git_url(source) {
-        checkout(None, source, rev)?
+        checkout(None, &resolved(root, source), rev)?
     } else {
         root.join(source)
     };

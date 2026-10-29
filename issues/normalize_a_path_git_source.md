@@ -34,3 +34,36 @@ installer included.
 * `crates/cardinal/src/lib.rs` (`is_git_url`, `clone_dir`, `fetch`), `run.rs` (`cargo_url`, `build`), `launcher.rs`
 * `files/.github/install_cardinal.sh`
 * `issues/done/restore_the_git_source_detection.md`
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+A path git source (`../x.git`, `/x/.git`) becomes one absolute, percent-encoded `file://` URL resolved against the
+project root, used to clone, as the cache key and by `cargo install --git`, in the binary and in the CI installer.
+Out of scope: scp-like `host:path` (kept as written), any change to local directory sources or to what SYN-49 counts as git.
+
+## Plan
+1. [x] Resolve a path git source in `cardinal`: `source_and_rev` and `init` resolve it (`lib.rs`), so `fetch`,
+   `clone_dir`, `cargo_url` and `launcher::install` see the URL; verified by binary tests (`sync` of two projects
+   with `../x.git` next to different repositories, `cardinal run` from a subdirectory, the install command printed);
+   makes true SYN-50. ~250 lines.
+2. [ ] Align `files/.github/install_cardinal.sh`: `*.git` is git (SYN-49), a path one resolved to the same URL;
+   verified by a Rust test that runs the script with a stub `cargo` and checks the `--git` URL it gets; makes true
+   SYN-50. ~150 lines.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 9cf4dd7af648b815b82b37633704549853485be8
+- Dot segments removed lexically (1 a): the URL does not depend on the repository existing or on symlinks.
+
+## Deliverable 1
+
+- done: `resolved` (`lib.rs`) turns a path git source into its absolute `file://` URL from the project root, applied
+  by `source_and_rev` and `init`; `docs/architecture.md` names both forms and the `cardinal` cache directory.
+- red: SYN-50: `fatal: repository '../x.git' does not exist` (`init --root`, and `cardinal run` from a subdirectory);
+  the unit test did not compile (`resolved` missing).
+- checks: `just check` ok (fmt, clippy, tests, specs); docs updated.
+- Code review: no findings
+- not verified: a source path that is not valid UTF-8 (read lossily).

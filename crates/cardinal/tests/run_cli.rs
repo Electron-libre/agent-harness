@@ -359,6 +359,38 @@ fn with_no_asset_the_binary_is_built_with_cargo_install() {
     }
 }
 
+// spec: SYN-50
+#[test]
+fn run_from_a_subdirectory_builds_a_relative_git_source_from_the_project_root() {
+    let l = Launcher::new().with_cargo();
+    let dir = tempdir().unwrap();
+    let base = dir.path().join("a b");
+    l.home
+        .git(dir.path(), &["init", "-q", "-b", "main", "a b/x.git"]);
+    let repo = base.join("x.git");
+    put(&repo, "files/a.txt", "a");
+    l.home.git(&repo, &["add", "."]);
+    l.home.git(&repo, &["commit", "-q", "-m", "x"]);
+    let commit = l.home.git(&repo, &["rev-parse", "HEAD"]);
+    let root = base.join("project");
+    put(
+        &root,
+        CONFIG,
+        "[harness]\nsource = \"../x.git\"\nrev = \"main\"\n",
+    );
+    fs::create_dir_all(root.join("sub")).unwrap();
+
+    let run = l.run_in(&root.join("sub"), None, &["t", "0"], "");
+
+    assert_eq!(run.code, Some(0), "{run:?}");
+    let url = format!("file://{}/a%20b/x.git", dir.path().display());
+    let log = l.log();
+    assert!(
+        log.contains(&format!("--git {url} --rev {commit} --root")),
+        "{log}"
+    );
+}
+
 // spec: BIN-11
 #[test]
 fn with_no_asset_nor_a_build_the_fetch_fails_naming_the_commit_the_platform_and_update() {

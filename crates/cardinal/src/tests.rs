@@ -50,3 +50,26 @@ fn a_git_source_is_a_url_or_ends_with_dot_git() {
         assert!(!is_git_url(local), "{local}");
     }
 }
+
+// spec: SYN-50 (internal: a scp-like source needs a remote the binary tests cannot reach)
+#[test]
+fn a_path_git_source_becomes_an_absolute_file_url_and_any_other_source_is_kept() {
+    let root = Path::new("/p/q");
+    for (source, url) in [
+        ("../x.git", "file:///p/x.git"),
+        ("./a/../b c/x.git", "file:///p/q/b%20c/x.git"),
+        ("/x/.git", "file:///x/.git"),
+        ("/x/%é.git", "file:///x/%25%C3%A9.git"),
+    ] {
+        assert_eq!(resolved(root, source), url, "{source}");
+    }
+    for kept in [
+        "git@host:x.git",
+        "host:x.git",
+        "file:///x",
+        "https://host/x",
+        "../x",
+    ] {
+        assert_eq!(resolved(root, kept), kept);
+    }
+}

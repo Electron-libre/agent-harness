@@ -267,6 +267,30 @@ fn a_source_ending_in_dot_git_is_cloned_and_any_other_ending_is_a_local_director
     }
 }
 
+// spec: SYN-50
+#[test]
+fn a_relative_git_source_is_the_repository_next_to_its_own_project() {
+    let home = Home::new();
+    let mut projects = Vec::new();
+    for text in ["one", "two"] {
+        let dir = tempdir().unwrap();
+        let repo = dir.path().join("x.git");
+        home.git(dir.path(), &["init", "--quiet", "-b", "main", "x.git"]);
+        put(&repo, "files/a.txt", text);
+        home.git(&repo, &["add", "."]);
+        home.git(&repo, &["commit", "--quiet", "-m", text]);
+        let root = dir.path().join("project");
+        home.ok(&root, &["init", "../x.git"]);
+        projects.push((dir, root, text));
+    }
+    // the second project fetches its own repository, not the clone of the first
+    for (_dir, root, text) in &projects {
+        let run = home.ok(root, &["sync"]);
+        assert_eq!(run.outcome("a.txt"), Some("added"), "{run:?}");
+        assert_eq!(get(root, "a.txt").as_deref(), Some(*text));
+    }
+}
+
 // spec: SYN-15
 #[test]
 fn update_dry_run_reports_the_target_and_writes_nothing() {

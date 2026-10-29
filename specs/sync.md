@@ -63,6 +63,7 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - **SYN-47** (deterministic) `check`, `run`, the tools and the native gate, which read no source, must read `.claude/cardinal.toml` and `.claude/cardinal.lock` when the file exists, else `.claude/harness.toml` and `.claude/harness.lock`.
 - **SYN-48** (deterministic) When the project has `.claude/cardinal.toml` and its source has a format below 3, `sync` and `update` must fail with the error `<config> needs a source of the format 3 or higher, <source> has the format <n>` (exit 3) and write nothing, `--dry-run` included: the tools of that source read only the old names.
 - **SYN-49** (deterministic) `init`, `sync`, `update`, `cardinal run` and the launcher must treat the source as a git repository to clone when it contains `://`, starts with `git@` or ends with `.git` (case sensitive, nothing after it), and as a local directory read in place otherwise.
+- **SYN-50** (deterministic) A git source of SYN-49 that is a path (it contains no `://` and no `:` before its first `/`, which git reads as `host:path`) must be resolved against the project root into an absolute `file://` URL, its `.` and `..` components removed lexically and every byte outside `A-Z a-z 0-9 - . _ ~ /` percent-encoded; `init`, `sync`, `update`, `cardinal run`, the launcher and `.github/install_cardinal.sh` must clone that URL, key the cache clone by it and pass it to the `cargo install --git` they run or print, whatever the working directory; the configuration keeps the source as written.
 
 ## Scenarios
 
@@ -98,6 +99,8 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - (SYN-45) Given a source that seeds `.claude/cardinal.toml`, when `sync --dry-run` would migrate the project, then it does not report that file as seeded.
 - (SYN-45) Given a migrated project, when `sync` runs again, then it renames nothing.
 - (SYN-49) Given the source `/x/.git`, then it is cloned; given `../x.git/` (trailing slash) or `/x/X.GIT`, then it is read as a local directory.
+- (SYN-50) Given two projects whose source is `../x.git`, each next to a different repository, when `sync` runs in each, then each gets its own repository; given `cardinal run` started from a subdirectory of such a project, then it clones the repository next to the project root.
+- (SYN-50) Given the source `git@host:x.git` or `host:x.git`, then it is passed to git as written.
 
 ## Non-goals
 

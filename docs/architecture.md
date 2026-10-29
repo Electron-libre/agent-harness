@@ -46,8 +46,9 @@ language-specific recipes of the `justfile`) stays in the project.
 
 ## Sources
 
-A source is a directory (relative to the project) or a git URL. A git source is cloned in `$XDG_CACHE_HOME/harness`
-and checked out at `rev` (default: the remote's default branch), which pins a commit, not a moving name
+A source is a directory (relative to the project) or a git repository: a URL, or a path ending with `.git` (SYN-49),
+which is read as the absolute `file://` URL of that path from the project root (SYN-50). A git source is cloned in
+`$XDG_CACHE_HOME/cardinal` and checked out at `rev` (default: the remote's default branch), which pins a commit, not a moving name
 ([ADR 0002](adr/0002-rev-pins-the-resolved-commit.md)). `cardinal update [--rev <name>]` resolves a name to a commit,
 previews the sync, and only then syncs and writes the commit to `rev` (SYN-11 to SYN-17); a local directory has no
 revision. `check` compares the project with its lock and never reads the source.
