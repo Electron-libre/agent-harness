@@ -33,4 +33,4 @@ installer included.
 # Resources
 * `crates/cardinal/src/lib.rs` (`is_git_url`, `clone_dir`, `fetch`), `run.rs` (`cargo_url`, `build`), `launcher.rs`
 * `files/.github/install_cardinal.sh`
-* `issues/restore_the_git_source_detection.md`
+* `issues/done/restore_the_git_source_detection.md`
