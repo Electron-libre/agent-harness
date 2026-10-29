@@ -326,3 +326,51 @@ fn a_source_path_that_holds_nothing_is_reported_as_such_not_as_an_old_format() {
     assert_eq!(run.code, Some(3), "{run:?}");
     assert!(run.stderr.contains("has no files/ directory"), "{run:?}");
 }
+
+/// Make the lock of `root` record the format 2.
+fn lock_at_format_2(root: &Path) {
+    let lock = get(root, LOCK).unwrap();
+    put(
+        root,
+        LOCK,
+        &lock.replace(&format!("format {FORMAT}"), "format 2\n"),
+    );
+}
+
+/// The hint of a lock of the format 2 printed by `check` and `sync`.
+fn hint() -> String {
+    format!(
+        "hint: {LOCK} is of the format 2, this cardinal reads the format {}: run `cardinal update` to move the project to a newer revision",
+        format()
+    )
+}
+
+// spec: SYN-55
+#[test]
+fn check_and_sync_hint_at_update_while_the_lock_is_below_the_format_of_the_cardinal() {
+    let home = Home::new();
+    let (_source, root) = project(&home);
+    home.ok(root.path(), &["sync"]);
+    lock_at_format_2(root.path());
+    for args in [&["check"][..], &["sync", "--dry-run"]] {
+        let run = home.ok(root.path(), args);
+        assert_eq!(run.stderr.matches(&hint()).count(), 1, "{args:?} {run:?}");
+    }
+    // the sync moves the lock to the format of its source, the one this cardinal reads
+    for args in [&["sync"][..], &["check"]] {
+        let run = home.ok(root.path(), args);
+        assert!(!run.stderr.contains("hint:"), "{args:?} {run:?}");
+    }
+}
+
+// spec: SYN-55
+#[test]
+fn update_does_not_hint_at_itself() {
+    let home = Home::new();
+    let (_repo, root, _commit) = git_project(&home, FORMAT);
+    home.ok(root.path(), &["update"]);
+    lock_at_format_2(root.path());
+    let run = home.ok(root.path(), &["update", "--dry-run"]);
+    assert!(!run.stderr.contains("hint:"), "{run:?}");
+    assert!(home.ok(root.path(), &["check"]).stderr.contains(&hint()));
+}

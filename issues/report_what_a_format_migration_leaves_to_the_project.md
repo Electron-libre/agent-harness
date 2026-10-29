@@ -60,7 +60,7 @@ of a renamed repository (forge redirect), a migration that renames the configura
    makes true SYN-52, SYN-53. ~400 lines.
 2. [x] Leftover report: scan the git-tracked project-owned files for the old names after the rewrites, warn
    `path:line`; verified by binary tests; makes true SYN-54. ~300 lines.
-3. [ ] Format hint in `check` and `sync`; verified by binary tests (lock `format 2`); makes true SYN-55, spec
+3. [x] Format hint in `check` and `sync`; verified by binary tests (lock `format 2`); makes true SYN-55, spec
    `accepted`. ~150 lines.
 
 ## Decisions
@@ -88,4 +88,13 @@ of a renamed repository (forge redirect), a migration that renames the configura
 - red: SYN-54: `assertion left == right failed: left: [], right: ["warning: README.md:1 cites check-old, …"]`.
 - Code review: 1 findings: an old name contained in its new one reported every migrated line; fixed (`migration::cites` skips the old name inside the new one, unit test and SYN-54 scenario).
 - not verified: none
+- decisions needed: none
+
+## Deliverable 3
+
+- done: `check` and `sync` print the `cardinal update` hint on stderr while the lock is below the binary's format
+  (`sync` judges the lock it leaves); `update` does not; spec `accepted`.
+- red: SYN-55: `assertion left == right failed: ["check"] … left: 0, right: 1` (no hint printed).
+- Code review: no findings
+- not verified: the hint of a `sync` that leaves a lock below the format (no source below 3 is synced any more).
 - decisions needed: none

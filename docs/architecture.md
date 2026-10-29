@@ -107,7 +107,8 @@ cannot run. `check` names the
 its format in `cardinal-format`, `cardinal` reads up to the `FORMAT` compiled in it, and `sync` and `update` refuse a
 higher one with the install to run (SYN-40, ADR 0014). The source that raises its format declares the names it
 replaced and the seeded texts to rewrite in `migrations/<n>.toml`, which `sync` and `update` apply above the format
-of the lock, warning of each line of a tracked project file that still cites an old name (`crates/cardinal/src/migration.rs`, SYN-52, ADR 0017).
+of the lock, warning of each line of a tracked project file that still cites an old name; `check` and `sync` hint at
+`cardinal update` while the lock is below the `FORMAT` of the binary (`crates/cardinal/src/migration.rs`, SYN-52, ADR 0017).
 
 This repository publishes the binaries (`.github/workflows/release.yml`, its own, not managed): each push to the main
 branch builds `cardinal` for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (static, so they run whatever

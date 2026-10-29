@@ -643,6 +643,10 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
         &launcher::install(&source, commit.as_deref()),
     )?;
     let mut report = sync_from(root, &dir, *options)?;
+    // the lock as the sync left it, or as it is under `--dry-run`
+    report
+        .warnings
+        .extend(read_lock(root)?.and_then(|lock| format_hint(&lock)));
     if let (Some(commit), false) = (&commit, options.dry_run) {
         report.warnings.extend(prefetch(
             &cache_dir()?,
@@ -652,6 +656,16 @@ pub fn sync(root: &Path, options: &SyncOptions) -> Result<Report> {
         ));
     }
     Ok(report)
+}
+
+/// The hint at `cardinal update` of a lock of a lower format than this `cardinal` reads (SYN-55).
+fn format_hint(lock: &Lock) -> Option<String> {
+    (lock.format < FORMAT).then(|| {
+        format!(
+            "hint: {LOCK} is of the format {}, this cardinal reads the format {FORMAT}: run `cardinal update` to move the project to a newer revision",
+            lock.format
+        )
+    })
 }
 
 /// Fetch the tools binary of `commit` into the cache, as `cardinal run` would: a warning when it fails (BIN-13).
@@ -1137,10 +1151,9 @@ fn check_with(root: &Path, ci: bool) -> Result<Checked> {
             )
         }))
         .collect();
-    Ok(Checked {
-        problems,
-        warnings: settings::warnings(root, gated, &|path| root.join(path).is_file()),
-    })
+    let mut warnings = settings::warnings(root, gated, &|path| root.join(path).is_file());
+    warnings.extend(format_hint(&lock));
+    Ok(Checked { problems, warnings })
 }
 
 #[cfg(test)]
