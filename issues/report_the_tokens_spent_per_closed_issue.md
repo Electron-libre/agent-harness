@@ -33,7 +33,7 @@ Lean agent loop
 # Resources
 * `specs/delivered-quality.md` (QUA-1, QUA-7, QUA-8), `specs/cardinal-report.md` (REP-6).
 * `crates/cardinal/src/tools/delivered_quality.rs`, `transcripts.rs`.
-* `issues/measure_the_main_context_peak_of_an_advised_message.md`: the usage of an advised message counts its
+* `issues/done/measure_the_main_context_peak_of_an_advised_message.md`: the usage of an advised message counts its
   iterations; the same trap applies to a token sum.
 
 # Hints

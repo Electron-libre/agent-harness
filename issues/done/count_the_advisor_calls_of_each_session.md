@@ -107,7 +107,7 @@ a set advisor was attached (spec non-goal).
   verdict was `helped`).
 - Code review (high): 6 findings.
   1. The peak is doubled on a message with an advisor call: outside EVA-18 to EVA-20, so it is filed as
-     `issues/measure_the_main_context_peak_of_an_advised_message.md`.
+     `issues/done/measure_the_main_context_peak_of_an_advised_message.md`.
   2. A change of the advisor set does not confound: fixed (VRD-10).
   3. A set advisor that is never attached counts in `advisor_sessions`: not fixed, a non-goal of the spec (the
      transcript cannot tell); the probe showed an equal Opus advisor attached.
