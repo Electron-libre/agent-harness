@@ -1,5 +1,5 @@
 //! `language-hint`, a Stop hook: when the last reply of the agent is not in the `user_language` of
-//! `.claude/cardinal.toml`, as the test of rule `user-language` judges it (`language.rs`), it exits 2 with a one-line
+//! `.claude/cardinal.local.toml`, else of `.claude/cardinal.toml`, as the test of rule `user-language` judges it (`language.rs`), it exits 2 with a one-line
 //! hint so the agent gives it again, letting go once the agent retried (`stop_hook_active`). It lets go whenever the
 //! text cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
@@ -9,20 +9,26 @@ use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// The configuration at the root of the work tree holding `dir` (`crate::config_of`), when there is one.
-fn config_at(dir: &Path) -> Option<PathBuf> {
-    let root = git(dir, &["rev-parse", "--show-toplevel"]).filter(|r| !r.is_empty())?;
-    Some(crate::config_of(Path::new(&root))).filter(|c| c.exists())
+/// The root of the work tree holding `dir`, when it has a configuration (`crate::config_of`).
+fn root_at(dir: &Path) -> Option<PathBuf> {
+    let root =
+        PathBuf::from(git(dir, &["rev-parse", "--show-toplevel"]).filter(|r| !r.is_empty())?);
+    Some(root).filter(|r| crate::config_of(r).exists())
 }
 
-/// The language of the config of the work tree of the event's `cwd`, else of `CLAUDE_PROJECT_DIR` (LNG-3).
+/// The language of the configuration of the work tree of the event's `cwd`, else of `CLAUDE_PROJECT_DIR` (LNG-3),
+/// its personal value first (LNG-12).
 fn user_language(event: &Value) -> Option<Language> {
     let project = std::env::var("CLAUDE_PROJECT_DIR").unwrap_or_else(|_| ".".into());
-    let config = event["cwd"]
+    let root = event["cwd"]
         .as_str()
-        .and_then(|cwd| config_at(Path::new(cwd)))
-        .or_else(|| config_at(Path::new(&project)))?;
-    Language::of_config(&std::fs::read_to_string(config).ok()?.parse().ok()?)
+        .and_then(|cwd| root_at(Path::new(cwd)))
+        .or_else(|| root_at(Path::new(&project)))?;
+    let shared = std::fs::read_to_string(crate::config_of(&root))
+        .ok()?
+        .parse()
+        .ok()?;
+    Language::of(&root, Some(&shared))
 }
 
 /// The text blocks of the last assistant line holding text in the transcript, joined by a blank line; `None` when a

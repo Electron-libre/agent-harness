@@ -323,3 +323,34 @@ mod unix {
         assert!(!target.exists());
     }
 }
+
+// spec: SYN-59
+#[test]
+fn the_personal_configuration_is_ignored_by_git_and_never_managed() {
+    let home = Home::new();
+    let (source, root) = project(&home);
+    let shipped = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../files/.claude/.gitignore"
+    );
+    put(
+        source.path(),
+        "files/.claude/.gitignore",
+        &fs::read_to_string(shipped).unwrap(),
+    );
+    home.git(root.path(), &["init", "-q"]);
+    home.ok(root.path(), &["sync"]);
+    put(root.path(), ".claude/cardinal.local.toml", "[project]\n");
+    home.git(
+        root.path(),
+        &["check-ignore", "-q", ".claude/cardinal.local.toml"],
+    );
+    for args in [&["sync"][..], &["check"]] {
+        let run = home.ok(root.path(), args);
+        assert!(
+            !format!("{run:?}").contains("cardinal.local"),
+            "{args:?}: {run:?}"
+        );
+    }
+    assert!(!get(root.path(), LOCK).unwrap().contains("cardinal.local"));
+}

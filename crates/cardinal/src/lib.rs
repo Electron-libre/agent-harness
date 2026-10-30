@@ -18,6 +18,9 @@ use sha2::{Digest, Sha256};
 
 /// Project configuration, relative to the project root.
 pub const CONFIG: &str = ".claude/cardinal.toml";
+/// The personal configuration of the person at the keyboard, relative to the project root: git ignores it and Cardinal
+/// never manages it; its `[project]` values override those of `CONFIG` for the personal keys (ADR 0018).
+pub const PERSONAL_CONFIG: &str = ".claude/cardinal.local.toml";
 /// Hashes of the managed files as last written, relative to the project root.
 pub const LOCK: &str = ".claude/cardinal.lock";
 /// The table of the configuration that names the source and its pinned revision.

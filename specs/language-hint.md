@@ -1,7 +1,7 @@
 ---
 id: LNG
 status: accepted
-adrs: [0005]
+adrs: [0005, 0018]
 ---
 
 # Language hint
@@ -26,6 +26,7 @@ what a breach is.
 - **LNG-9** (deterministic) withdrawn: the hint after a tool call, dropped because Claude Code often runs `PostToolUse` before it writes the text and the call to the transcript.
 - **LNG-10** (deterministic) withdrawn: the hint after a tool call, dropped because Claude Code often runs `PostToolUse` before it writes the text and the call to the transcript.
 - **LNG-11** (deterministic) On any event but Stop (such as the `PostToolUse` declaration an older Cardinal left in the settings), the hook must exit 0 and print nothing.
+- **LNG-12** (deterministic) When the personal configuration `.claude/cardinal.local.toml` at the root LNG-3 picks is valid TOML and its `[project]` table holds a string `user_language`, the hook must judge the reply against that value instead of the one of `.claude/cardinal.toml`, even when it names a language with no stop words (LNG-6).
 
 ## Scenarios
 
@@ -38,6 +39,9 @@ what a breach is.
   follows that block and the turn holds no text, nothing is judged.
 - (LNG-3) Given an agent that entered a nested clone with no configuration, when it stops, then the
   `user_language` of the project of `CLAUDE_PROJECT_DIR` is read.
+- (LNG-12) Given `user_language = "French"` in `.claude/cardinal.toml` and `user_language = "English"` in
+  `.claude/cardinal.local.toml`, when the agent stops on a reply of 30 English words, then the hook exits 0, and exits 2
+  on 30 French words; given a personal file that is not valid TOML or has no `user_language`, the shared value is read.
 - (LNG-11) Given a `PostToolUse` declaration left in the settings and an English text before a call, when the call
   returns, then the hook prints nothing.
 

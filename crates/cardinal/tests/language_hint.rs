@@ -220,3 +220,39 @@ fn an_event_but_stop_such_as_a_call_left_declared_by_an_older_cardinal_gets_noth
     let run = hook(dir.path(), &event);
     assert!(silent_pass(&run), "{run:?}");
 }
+
+// spec: LNG-12
+#[test]
+fn the_personal_language_wins_over_the_shared_one() {
+    let dir = tempdir().unwrap();
+    repo(dir.path(), Some("French"));
+    put(
+        dir.path(),
+        ".claude/cardinal.local.toml",
+        "[project]\nuser_language = \"English\"\n",
+    );
+    assert!(silent_pass(&hook(dir.path(), &stop(dir.path(), ENGLISH))));
+    let run = hook(dir.path(), &stop(dir.path(), FRENCH));
+    assert_eq!(run.code, Some(2), "{run:?}");
+    assert!(run.stderr.contains("English"), "{run:?}");
+
+    put(
+        dir.path(),
+        ".claude/cardinal.local.toml",
+        "[project]\nuser_language = \"German\"\n",
+    );
+    assert!(
+        silent_pass(&hook(dir.path(), &stop(dir.path(), ENGLISH))),
+        "a personal language with no stop words is not judged"
+    );
+
+    for personal in ["[project\n", "[project]\ncommit_scopes = []\n"] {
+        put(dir.path(), ".claude/cardinal.local.toml", personal);
+        let run = hook(dir.path(), &stop(dir.path(), ENGLISH));
+        assert_eq!(
+            run.code,
+            Some(2),
+            "shared value read with {personal:?}: {run:?}"
+        );
+    }
+}

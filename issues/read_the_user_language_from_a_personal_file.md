@@ -39,3 +39,53 @@ staying the default.
 # Hints
 * A personal file must never be managed: `sync` and `check` hash only what the source writes.
 * Keep the shared value as the fallback, so a solo project changes nothing.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Read `user_language` from a git-ignored `.claude/cardinal.local.toml` (its `[project]` table overrides the shared one
+key by key), the shared value staying the default; the hook, rule `user-language` and the skills read it. Out of
+scope: any other key (the shared ones stay shared), a user-level file outside the repository.
+
+## Plan
+1. [x] Personal file and hook: managed `files/.claude/.gitignore` ignoring `cardinal.local.toml`, one reader of the
+   personal value in `language.rs`, used by `language-hint`; ADR 0018 and the spec amendments; verified by tests
+   through the binary (hook with both files, `sync` then `git check-ignore`); makes true LNG-12, SYN-59.
+2. [ ] `rule-breaches`: the personal value of the repository root, as it is at measure time, wins over the committed
+   one; verified by a test through the binary; makes true BRE-10, BRE-14.
+3. [ ] Skills, seed comment and docs point at `.claude/cardinal.local.toml`, else `.claude/cardinal.toml`
+   (`issue-workflow`, `prioritize-issues`, `create-issue`, `audit-instructions`, `evaluate-harness`,
+   `docs/architecture.md`); verified by `just check-cardinal` and a reread.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 703b389ce5a67d5e34200e84ac3a8ec9dfb9be18
+- Personal file: `.claude/cardinal.local.toml` per clone (1 a).
+- Ignored by a managed `.claude/.gitignore`, never by an edit of the project's `.gitignore` (2 a).
+- BRE-10 reads the personal value at measure time, else the committed one (3 a).
+- The hint keeps `the user_language of .claude/cardinal.toml` (the mark BRE-13 finds in older transcripts).
+- A personal `user_language` wins even when it names a language with no stop words (no judgement then).
+
+## Deliverable 1
+
+done: `.claude/cardinal.local.toml` read first by `language-hint`, ignored by the managed `.claude/.gitignore`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | LNG and SYN `accepted`, BRE `draft` until deliverable 2 |
+| docs | `docs/architecture.md`, ADR 0018 |
+| code review | see below |
+
+red: LNG-12, SYN-59: the hook exited 2 on an English reply with `user_language = "English"` in the personal file;
+`files/.claude/.gitignore` did not exist.
+
+Code review: no findings
+
+not verified: a consumer that already has its own `.claude/.gitignore` gets a sync conflict on it (SYN-3), as for
+any managed path.
+
+decisions needed: none

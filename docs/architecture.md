@@ -29,7 +29,7 @@ flowchart LR
 
 | Kind | From | Examples | Owner |
 |---|---|---|---|
-| Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `cardinal.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
+| Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `.claude/.gitignore` (ignores the personal configuration), `cardinal.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
 | Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`, `ROADMAP.md` (the milestones the `roadmap` key points at), `CHANGELOG.md` (the header of the sections `release` writes) | the project, from the first copy |
 | Entries | `entries/.claude/settings.json` | the hooks, the deny rules of the review waiver and the allow rule of `cardinal run` | the source, inside a file the project owns ("Hooks and their declaration") |
 
@@ -45,6 +45,10 @@ Everything that differs between projects is a value, not code. The tools read li
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
+
+A preference of the person rather than of the project (`user_language` today) is read first from the `[project]`
+table of `.claude/cardinal.local.toml`, a file each person writes, git ignores and Cardinal never manages, then from
+`.claude/cardinal.toml`, which keeps the default ([ADR 0018](adr/0018-personal-preferences-live-in-a-git-ignored-file.md)).
 
 ## Sources
 

@@ -1,8 +1,10 @@
-//! Whether a reply is in the conversation language (`user_language` of `.claude/cardinal.toml`): the test of rule
+//! Whether a reply is in the conversation language (`user_language` of `.claude/cardinal.local.toml`, else of
+//! `.claude/cardinal.toml`): the test of rule
 //! `user-language` (BRE-10, `specs/rule-breaches.md`), shared by `rule-breaches` and the `language-hint` hook
 //! (`specs/language-hint.md`) so the measure and the hook agree on what a breach is.
 
 use serde_json::Value;
+use std::path::Path;
 
 /// Frequent words of one language only (`a`, `an`, `as`, `on`, `or`, `plus` are both French and English).
 const FRENCH_WORDS: &[&str] = &[
@@ -65,7 +67,20 @@ impl Language {
 
     /// The language named by the `user_language` of the `[project]` table of a `.claude/cardinal.toml`.
     pub(super) fn of_config(config: &toml::Table) -> Option<Language> {
-        Language::named(config.get("project")?.get("user_language")?.as_str()?)
+        Language::named(name_in(config)?)
+    }
+
+    /// The language named by the personal configuration of the project at `root` when it is valid TOML and names one,
+    /// else by the shared configuration `shared`; `None` when the one that names it has no stop words (LNG-12).
+    pub(super) fn of(root: &Path, shared: Option<&toml::Table>) -> Option<Language> {
+        let personal = std::fs::read_to_string(root.join(crate::PERSONAL_CONFIG))
+            .ok()
+            .and_then(|text| text.parse::<toml::Table>().ok());
+        let name = personal
+            .as_ref()
+            .and_then(name_in)
+            .or_else(|| shared.and_then(name_in))?;
+        Language::named(name)
     }
 
     /// Whether `text` holds more stop words of the other language than of this one; `None` when it holds fewer
@@ -78,6 +93,11 @@ impl Language {
         let count = |list: &[&str]| words.iter().filter(|w| list.contains(&w.as_str())).count();
         Some(count(self.other) > count(self.own))
     }
+}
+
+/// The `user_language` of the `[project]` table of a configuration.
+fn name_in(config: &toml::Table) -> Option<&str> {
+    config.get("project")?.get("user_language")?.as_str()
 }
 
 /// The lower-cased words of a text once fenced code blocks (the fence rule of QUA-12) and inline code are removed.

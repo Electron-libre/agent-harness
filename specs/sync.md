@@ -1,7 +1,7 @@
 ---
 id: SYN
 status: accepted
-adrs: [0002, 0004, 0005, 0007, 0013, 0014, 0015, 0016, 0017]
+adrs: [0002, 0004, 0005, 0007, 0013, 0014, 0015, 0016, 0017, 0018]
 ---
 
 # Cardinal synchronisation
@@ -72,6 +72,7 @@ without merging by hand, and learns at once when a managed file drifted from it.
 - **SYN-56** (deterministic) `.github/install_cardinal.sh` must read `source` and `rev` from the `[cardinal]` table of `.claude/cardinal.toml` as a TOML parser does, so that every valid form of the file (a key quoted or in another table, an inline table, a multi-line or escaped string) gives the values `cardinal` reads, a `rev` that is not a string read as none.
 - **SYN-57** (deterministic) When `.claude/cardinal.toml` is not valid TOML or its `[cardinal].source` is not a non-empty string, `.github/install_cardinal.sh` must fail (exit 1) with `no source read from .claude/cardinal.toml` on stderr and run no install.
 - **SYN-58** (deterministic) When the runner has no `python3` of version 3.11 or later (the first with `tomllib`), `.github/install_cardinal.sh` must fail (exit 1) with an error on stderr that names Python 3.11 and run no install.
+- **SYN-59** (deterministic) After `sync` into a git repository, git must ignore `.claude/cardinal.local.toml`, the personal configuration (ADR 0018), which `sync` and `check` never read, write nor report.
 
 ## Scenarios
 
