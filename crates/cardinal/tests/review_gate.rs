@@ -859,6 +859,102 @@ fn first_commit_checks(hook: &Path, project: &Path) -> Vec<(&'static str, bool)>
     out
 }
 
+/// A repository with `issues/foo.md` cited from the roadmap, a doc and another issue, closed by `close-issue` and
+/// staged, then changed by `edit` (which stages what the commit records); whether `native` lets the commit through without any review.
+fn close_passes(hook: &Path, edit: impl Fn(&Path)) -> bool {
+    let project = tempfile::tempdir().unwrap().keep();
+    for dir in ["issues", "docs"] {
+        fs::create_dir_all(project.join(dir)).unwrap();
+    }
+    sh(&project, &["init", "-q", "."]);
+    fs::write(project.join("issues/foo.md"), "---\nrank: 1\n---\n# Foo\n").unwrap();
+    fs::write(
+        project.join("issues/bar.md"),
+        "---\nrank: 2\n---\n# Bar\nAfter [foo](foo.md).\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("ROADMAP.md"),
+        "# Roadmap\n\n## Milestone: open\n- [Foo](issues/foo.md)\n- [Bar](issues/bar.md)\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("docs/a.md"),
+        "See [foo](../issues/foo.md#goal).\n",
+    )
+    .unwrap();
+    sh(&project, &["add", "-A"]);
+    sh(&project, &["commit", "-qm", "init"]);
+    let closed = Command::new(hook)
+        .args(["tool", "close-issue", "issues/foo.md"])
+        .current_dir(&project)
+        .output()
+        .unwrap();
+    assert!(closed.status.success(), "close-issue failed");
+    sh(&project, &["add", "-A"]);
+    edit(&project);
+    let passes = native_run(hook, &project, &[]).0 == 0;
+    let _ = fs::remove_dir_all(&project);
+    passes
+}
+
+/// Replaces `from` by `to` in the file `name` of `project`, and stages it when `staged`.
+fn replace_in(project: &Path, name: &str, from: &str, to: &str, staged: bool) {
+    let path = project.join(name);
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains(from), "{name} lacks {from}");
+    fs::write(path, text.replacen(from, to, 1)).unwrap();
+    if staged {
+        sh(project, &["add", "--", name]);
+    }
+}
+
+// spec: REV-20
+/// The commit of a close holds, outside `issues/`, the rewrites `close-issue` made: it needs no review, and anything
+/// else in it does.
+fn close_checks(hook: &Path) -> Vec<(&'static str, bool)> {
+    vec![
+        (
+            "native lets through the close of an issue with the references close-issue rewrote",
+            close_passes(hook, |_| {}),
+        ),
+        (
+            "native refuses a close that also sets a milestone done",
+            !close_passes(hook, |p| {
+                replace_in(p, "ROADMAP.md", "Milestone: open", "Milestone: done", true);
+            }),
+        ),
+        (
+            "native refuses a close with an edited word on a rewritten line",
+            !close_passes(hook, |p| replace_in(p, "docs/a.md", "See", "Read", true)),
+        ),
+        (
+            "native refuses a close with a file added outside issues/",
+            !close_passes(hook, |p| {
+                fs::write(p.join("new.md"), "x\n").unwrap();
+                sh(p, &["add", "--", "new.md"]);
+            }),
+        ),
+        (
+            "native refuses a close with a file deleted outside issues/",
+            !close_passes(hook, |p| sh(p, &["rm", "-qf", "--", "docs/a.md"])),
+        ),
+        (
+            "native refuses rewritten references when the move of the issue is not staged",
+            !close_passes(hook, |p| {
+                sh(p, &["mv", "issues/done/foo.md", "issues/foo.md"]);
+            }),
+        ),
+        (
+            "native lets through a close while an unstaged change waits in the work tree",
+            close_passes(hook, |p| {
+                replace_in(p, "docs/a.md", "See", "Read", false);
+                fs::write(p.join("new.md"), "x\n").unwrap();
+            }),
+        ),
+    ]
+}
+
 #[test]
 fn review_gate() {
     let hook = Path::new(env!("CARGO_BIN_EXE_cardinal")).to_path_buf();
@@ -961,6 +1057,7 @@ fn review_gate() {
         cheap_checks,
         streaming_checks,
         untracked_content_checks,
+        close_checks,
     ] {
         for (name, ok) in checks(&hook) {
             check(name, ok);

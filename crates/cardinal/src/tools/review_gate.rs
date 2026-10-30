@@ -9,7 +9,9 @@
 //! A commit moves `HEAD`, which retires the marker. `code-review` runs forked, so its `PostToolUse` fires when
 //! the review is over, not when the skill loads. Changes made afterwards (the fixes of the review) pass as long
 //! as they stay in files the review saw. A commit with nothing to commit, an amend of a clean tree
-//! included, one that only touches `issues/` (the work tree, or the index it records), and a machine without `git` are not gated. The user waives the
+//! included, one that only touches `issues/` (the work tree, or the index it records), one whose index changes nothing
+//! outside `issues/` but the references `close-issue` rewrote for the issues it moves to `issues/done/`, and a machine
+//! without `git` are not gated. The user waives the
 //! review of the next commit by creating `claude-review-waived` in the git directory (`just waive-review`); the hook
 //! stamps it with `HEAD` when it lets a commit through and removes it, without using it, at the first check after
 //! `HEAD` moved (a command that does not commit, such as `--dry-run`, leaves it usable; after a commit the user
@@ -20,6 +22,9 @@
 //! `core.hooksPath`, so `check` refuses a commit carrying either and any command that sets `core.hooksPath` (`--get`
 //! and the words of a message excepted). It reads the text only: the gate catches mistakes, not deliberate bypasses.
 
+use super::close_issue;
+
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -395,28 +400,80 @@ enum Waiver {
     Text(PathBuf, String),
 }
 
+/// The output of `git args` run on the index git commits (`index`, when git handed one, else the repository's).
+fn on_index(cwd: &Path, index: Option<&Path>, args: &[&str]) -> Vec<u8> {
+    let mut git = Command::new("git");
+    git.args(args).current_dir(cwd).stderr(Stdio::null());
+    if let Some(index) = index {
+        git.env("GIT_INDEX_FILE", index);
+    }
+    git.output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| o.stdout)
+        .unwrap_or_default()
+}
+
+/// What the index git commits changes against `HEAD`: the status letter and the path of each file.
+fn staged(cwd: &Path, index: Option<&Path>) -> Vec<(String, String)> {
+    let fields = names(&on_index(
+        cwd,
+        index,
+        &[
+            "diff",
+            "--cached",
+            "HEAD",
+            "--name-status",
+            "--no-renames",
+            "-z",
+        ],
+    ));
+    let (pairs, _) = fields.as_chunks::<2>();
+    pairs
+        .iter()
+        .map(|[status, path]| (status.clone(), path.clone()))
+        .collect()
+}
+
 /// Whether the index git commits (the temporary one of `commit -a` or `commit -- <paths>` when git handed one)
 /// differs from `HEAD` under `issues/` only: the other changes of the work tree stay out of the commit.
-fn records_issues_only(cwd: &Path, head: &str, index: Option<&Path>) -> bool {
-    if head.is_empty() {
+fn records_issues_only(staged: &[(String, String)]) -> bool {
+    !staged.is_empty() && staged.iter().all(|(_, f)| f.starts_with(ISSUES_DIR))
+}
+
+/// Whether the index git commits differs from `HEAD`, outside `issues/`, only by the rewrites `close-issue` makes for
+/// the issues whose move to `issues/done/` it records: each such file is modified, and equal to its `HEAD` content
+/// rewritten (REV-20).
+fn records_close_only(cwd: &Path, index: Option<&Path>, staged: &[(String, String)]) -> bool {
+    let done = format!("{ISSUES_DIR}done/");
+    let closed: HashSet<String> = staged
+        .iter()
+        .filter(|(status, path)| status == "D" && path.starts_with(ISSUES_DIR))
+        .filter_map(|(_, path)| path[ISSUES_DIR.len()..].strip_suffix(".md"))
+        .filter(|stem| !stem.contains('/'))
+        .filter(|stem| staged.contains(&("A".to_string(), format!("{done}{stem}.md"))))
+        .map(str::to_string)
+        .collect();
+    if closed.is_empty() {
         return false;
     }
-    let mut diff = Command::new("git");
-    diff.args([
-        "diff",
-        "--cached",
-        "HEAD",
-        "--name-only",
-        "--no-renames",
-        "-z",
-    ])
-    .current_dir(cwd)
-    .stderr(Stdio::null());
-    if let Some(index) = index {
-        diff.env("GIT_INDEX_FILE", index);
-    }
-    let staged = names(&diff.output().map(|o| o.stdout).unwrap_or_default());
-    !staged.is_empty() && staged.iter().all(|f| f.starts_with(ISSUES_DIR))
+    let issues = [ISSUES_DIR.trim_end_matches('/').to_string()];
+    staged
+        .iter()
+        .filter(|(_, path)| !path.starts_with(ISSUES_DIR))
+        .all(|(status, path)| {
+            if status != "M" {
+                return false;
+            }
+            let text = |rev: &str| {
+                String::from_utf8(on_index(cwd, index, &["show", &format!("{rev}:{path}")])).ok()
+            };
+            let (Some(before), Some(after)) = (text("HEAD"), text("")) else {
+                return false;
+            };
+            let parts: Vec<String> = path.split('/').map(str::to_string).collect();
+            close_issue::rewritten(&parts, &before, &issues, &closed, false) == after
+        })
 }
 
 /// The waiver of `cwd`; one gone before the read is absent, content that is not UTF-8 is content, not a read failure.
@@ -450,9 +507,15 @@ fn refusal(cwd: &Path, index: Option<&Path>) -> Option<Refusal> {
             waiver = Waiver::Absent;
         }
     }
+    let staged = if snap.head.is_empty() {
+        Vec::new()
+    } else {
+        staged(cwd, index)
+    };
     if snap.files.is_empty()
         || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR))
-        || records_issues_only(cwd, &snap.head, index)
+        || records_issues_only(&staged)
+        || records_close_only(cwd, index, &staged)
     {
         return None;
     }

@@ -278,11 +278,19 @@ fn relink_links(
     out
 }
 
-/// Rewrite the references to the given closed issues of the `issues/` directory `issues` (relative to `root`) in
-/// every text file under `root`; `moved` is the stem of the issue just moved, whose own links are rebased.
-fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option<&str>) {
-    let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
-    skipped.extend(config_list(root, "skipped_dirs"));
+/// The text of the file `path` (components from the root) once the references to the closed issues `stems` of the
+/// `issues/` directory `issues` are rewritten (CLS-1, CLS-2); `moved` when it is the issue just moved to
+/// `issues/done/`, whose own links are rebased (CLS-4). The commit gate replays it (`review_gate`, REV-20).
+pub(super) fn rewritten(
+    path: &[String],
+    text: &str,
+    issues: &[String],
+    stems: &HashSet<String>,
+    moved: bool,
+) -> String {
+    if !moved && !stems.iter().any(|stem| text.contains(stem.as_str())) {
+        return text.to_string();
+    }
     let in_issues = |parts: &[&str]| -> RepoPath {
         let mut path = issues.to_vec();
         path.extend(parts.iter().map(|p| (*p).to_string()));
@@ -295,24 +303,34 @@ fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option
             (in_issues(&[&name]), in_issues(&["done", &name]))
         })
         .collect();
-    let moved = moved.map(|stem| in_issues(&["done", &format!("{stem}.md")]));
+    let dir = &path[..path.len().saturating_sub(1)];
+    if path
+        .last()
+        .is_some_and(|name| Path::new(name).extension().is_some_and(|e| e == "md"))
+    {
+        let old_dir = if moved { issues } else { dir };
+        relink_text(&relink_links(text, old_dir, dir, &relocations), stems)
+    } else {
+        relink_text(text, stems)
+    }
+}
+
+/// Rewrite the references to the given closed issues of the `issues/` directory `issues` (relative to `root`) in
+/// every text file under `root`; `moved` is the stem of the issue just moved, whose own links are rebased.
+fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option<&str>) {
+    let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
+    skipped.extend(config_list(root, "skipped_dirs"));
+    let moved = moved.map(|stem| {
+        let mut path = issues.to_vec();
+        path.extend(["done".to_string(), format!("{stem}.md")]);
+        path
+    });
     for file in text_files(root, &skipped) {
         let Ok(text) = std::fs::read_to_string(&file) else {
             continue;
         };
         let path = components(file.strip_prefix(root).unwrap_or(&file));
-        let dir = &path[..path.len().saturating_sub(1)];
-        let is_moved = moved.as_ref() == Some(&path);
-        let cites = is_moved || stems.iter().any(|stem| text.contains(stem.as_str()));
-        if !cites {
-            continue;
-        }
-        let updated = if file.extension().is_some_and(|e| e == "md") {
-            let old_dir = if is_moved { issues } else { dir };
-            relink_text(&relink_links(&text, old_dir, dir, &relocations), stems)
-        } else {
-            relink_text(&text, stems)
-        };
+        let updated = rewritten(&path, &text, issues, stems, moved.as_ref() == Some(&path));
         if updated == text {
             continue;
         }

@@ -46,3 +46,45 @@ Longer autonomy
 # Hints
 * The exemption must never let through a change the tool did not make: a link rewrite next to an edited sentence on
   the same line is a review case.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The native hook lets through a commit whose changes outside `issues/` are exactly what `close-issue` would rewrite in
+the `HEAD` content for the issues whose move to `issues/done/` is staged. Out of scope: the milestone set `done`
+(stays gated). Means: approach 1, made strict: the gate calls the rewrite of `close-issue` on the `HEAD` blob and
+requires the index blob to be equal (no normalisation, no record under `.git/`).
+
+## Plan
+1. [x] Close exemption: extract the per-file rewrite of `close_issue::relink` into a pure function; `review_gate`
+   finds the staged moves (`issues/<stem>.md` deleted, `issues/done/<stem>.md` added) and accepts the index when every
+   other path outside `issues/` is modified and equals the rewrite of its `HEAD` content; the docs of the waiver of
+   `issue-workflow` say so; verified by tests of `native` in a temporary repository (close passes; milestone edit,
+   edited word on a rewritten line, added file, no staged move refused); makes true REV-20.
+
+## Decisions
+- Mode: autonomous
+- Base commit: c9bc30e
+- Milestone set `done` in the close commit: stays in that commit and stays gated (1 a).
+- Detection: strict equality with the rewrite of `close-issue` on the `HEAD` content (2 a).
+
+## Deliverable 1
+
+- done: `native` lets a close through when its index, outside `issues/`, equals the rewrite `close_issue::rewritten`
+  (extracted from `relink`) gives of the `HEAD` content for the staged moves; docs: `issue-workflow` step 3.5,
+  `docs/architecture.md`, the module doc of `review_gate.rs`.
+
+| check | result |
+|---|---|
+| tests | `just check` green (`close_checks`: 7 cases) |
+| lint | clippy -D warnings clean |
+| specs | REV-20 traced |
+| docs | skill, architecture, module doc |
+| code review | see below |
+
+- red: REV-20: `FAIL - native lets through the close of an issue with the references close-issue rewrote`
+- Code review: no findings (`low`; the test file was out of its scope).
+- not verified: a real close through the installed hook (needs `cargo install` after the commit).
+- decisions needed: none.
