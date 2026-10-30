@@ -57,5 +57,6 @@ The work done before this file existed is in `issues/done/`.
 - Why: one session per issue works today; chaining them saves the user the restarts.
 - State: in issues
 - Issues:
+  - [let_the_close_of_an_issue_commit_without_a_review](issues/let_the_close_of_an_issue_commit_without_a_review.md)
   - [drive_several_issues_in_a_row_from_one_session](issues/drive_several_issues_in_a_row_from_one_session.md)
   - [link_the_next_issue_when_closing_one](issues/done/link_the_next_issue_when_closing_one.md)
