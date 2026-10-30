@@ -26,6 +26,10 @@ stack (`cargo test`, `npm test`…), or runs them through `just`. A project seed
 test`, `cargo clippy`, `cargo fmt` and `cargo check`: it owns the file, so a project of another stack removes them by
 hand.
 
+The seeded `roadmap` key names `ROADMAP.md`, the milestones `skill:create-issue` and `skill:prioritize-issues` keep. A
+project seeded before names `docs/TODO.md`, which nothing seeds: `sync` copies `ROADMAP.md` when it is missing, and
+the project points its key at it by hand.
+
 With a local directory source (this repository), `cardinal run` builds the source's crate with `cargo`, so a hook runs
 the tools of the working tree, or of the last build that compiled.
 

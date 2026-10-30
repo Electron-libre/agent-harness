@@ -7,7 +7,8 @@ procedure (`.claude/skills/<name>/SKILL.md`); this page shows how they fit toget
 
 ```mermaid
 flowchart LR
-  idea["idea, smoke run,<br/>review finding"] -->|create-issue| file["issues/NAME.md"]
+  roadmap["ROADMAP.md<br/>milestones"] -->|create-issue| file["issues/NAME.md"]
+  idea["idea, smoke run,<br/>review finding"] -->|create-issue| file
   file -->|ranked| queue["issues/queue.md"]
   queue -.->|prioritize-issues| queue
   queue -->|just next-issue| work["issue-workflow"]
@@ -17,11 +18,12 @@ flowchart LR
 
 | Step | Who | Tool |
 |---|---|---|
-| Write the issue (Goal, Findings, Approach, Resources) | agent | `skill:create-issue`, checked by `just check-issue` |
+| Plan the milestones | user orders them, agent drafts | the `roadmap` documents of `.claude/cardinal.toml` (`ROADMAP.md` when seeded); `skill:create-issue` cuts a shaped one into issues |
+| Write the issue (Goal, Findings, Approach, Resources) | agent, attached to a milestone | `skill:create-issue`, checked by `just check-issue` |
 | Rank it | agent proposes, user decides | `issues/queue.md`, `skill:prioritize-issues` to re-rank all |
 | Pick the next one | anyone | `just next-issue`: the first entry no branch or worktree has taken |
 | Drive it to done | agent, with one validation stop | `skill:issue-workflow` |
-| Close it | agent in the main worktree, on the user's agreement; the user after a parallel issue | `just close-issue issues/NAME.md`: moves it to `issues/done/`, drops its queue line |
+| Close it | agent in the main worktree, on the user's agreement; the user after a parallel issue | `just close-issue issues/NAME.md`: moves it to `issues/done/`, drops its queue line; the agent sets its milestone `done` when it was the last |
 
 ## Inside issue-workflow
 

@@ -70,7 +70,7 @@ format does not change and the `roadmap` value of an existing project is its own
    milestone), seeded `roadmap = ["ROADMAP.md"]`, this repository's key moved to `ROADMAP.md`, the seeded table of
    `docs/architecture.md`; verified by a test of `tests/skills.rs` that every file the seeded `roadmap`
    key lists is seeded by `seed/` (~60 lines).
-2. [ ] Keep the roadmap from the skills: `create-issue` attaches each new issue to a milestone (link under it, an
+2. [x] Keep the roadmap from the skills: `create-issue` attaches each new issue to a milestone (link under it, an
    optional `# Milestone` section in the issue) or says it has none, and cuts a `shaped` milestone into issues sized by
    the limit of `issue-workflow` step 1 (state set to `in issues`); `prioritize-issues` ranks along the order of the
    milestones and never reorders them; the closing rule of `issue-workflow` sets a milestone `done` when its last
@@ -98,4 +98,20 @@ format does not change and the `roadmap` value of an existing project is its own
 - red: none (no spec id); the test failed first with `the seeded roadmap 'docs/TODO.md' is not seeded`.
 - Code review: no findings
 - not verified: a real `cardinal init` in a fresh project (SYN-4 already copies any file of `seed/`).
+- decisions needed: none.
+
+## Summary of deliverable 2
+- done: `create-issue` attaches each issue to a milestone (`# Milestone` section, link in the roadmap) and cuts a shaped milestone into issues; `prioritize-issues` ranks along the milestones and never reorders them; `issue-workflow` sets a milestone `done` at the close of its last issue; `docs/workflow.md` and `docs/usage.md` follow.
+
+| check | result |
+|---|---|
+| tests | pass (4 new `REQUIRED_PASSAGES`) |
+| lint | pass |
+| specs | pass (no spec: harness content) |
+| docs | `docs/workflow.md`, `docs/usage.md` (projects seeded before keep `docs/TODO.md`) |
+| code review | low, clean |
+
+- red: none (no spec id); the test failed first with the 4 `FAIL - <skill>: missing '<passage>'` lines.
+- Code review: no findings
+- not verified: an agent following the new steps in a real session.
 - decisions needed: none.

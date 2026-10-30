@@ -12,6 +12,26 @@ const BUILT_IN_ROOT_DOCS: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     (
         "create-issue",
+        "attach it to a milestone",
+        "an issue says which milestone of the roadmap it serves",
+    ),
+    (
+        "create-issue",
+        "## Cut a shaped milestone into issues",
+        "a shaped milestone turns into issues sized for the workflow",
+    ),
+    (
+        "prioritize-issues",
+        "never reorder the milestones",
+        "the order of the milestones is the user's call",
+    ),
+    (
+        "issue-workflow",
+        "set that milestone `done`",
+        "the roadmap says when a milestone is finished",
+    ),
+    (
+        "create-issue",
         "commit the issue files alone",
         "the user no longer types \"commit\" after each new issue",
     ),
