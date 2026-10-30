@@ -26,6 +26,30 @@ The work done before this file existed is in `issues/done/`.
   - [read_the_user_language_from_a_personal_file](issues/done/read_the_user_language_from_a_personal_file.md)
   - [rank_the_issues_without_a_shared_queue_file](issues/done/rank_the_issues_without_a_shared_queue_file.md)
 
+## Advisor
+
+- Goal: let a session consult a stronger advisor model at the moments where advice pays, and measure what it brings.
+- Why: an advisor is configured but no call is seen in the transcripts, no skill says when to consult it, and the
+  evaluation cannot tell an advised session from a solo one.
+- State: in issues
+- Issues:
+  - [count_the_advisor_calls_of_each_session](issues/count_the_advisor_calls_of_each_session.md)
+  - [tell_the_issue_workflow_when_to_consult_the_advisor](issues/tell_the_issue_workflow_when_to_consult_the_advisor.md)
+  - [compare_an_advised_executor_with_a_solo_model](issues/compare_an_advised_executor_with_a_solo_model.md)
+
+## Lean agent loop
+
+- Goal: keep one agent loop driven by skills and tools, with a subagent only where a measure justifies it, and judge
+  each change of the instructions before it spreads.
+- Why: the one subagent of the workflow never got its verdict, a skill missed when due is not counted, the
+  instructions grew one issue at a time, and every verdict is observational.
+- State: in issues
+- Issues:
+  - [judge_the_delegated_exploration_before_keeping_it](issues/judge_the_delegated_exploration_before_keeping_it.md)
+  - [count_the_skills_a_session_should_have_loaded](issues/count_the_skills_a_session_should_have_loaded.md)
+  - [audit_the_shared_instructions_for_conflicts_and_stale_guidance](issues/audit_the_shared_instructions_for_conflicts_and_stale_guidance.md)
+  - [replay_a_reference_task_set_to_compare_two_harness_variants](issues/replay_a_reference_task_set_to_compare_two_harness_variants.md)
+
 ## Longer autonomy
 
 - Goal: let one session drive several issues in a row, stopping the user once for the plans of the batch.

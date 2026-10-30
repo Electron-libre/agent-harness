@@ -19,6 +19,10 @@ independent issues done in one session, with one grouped plan validation up fron
   `.claude/worktrees/`).
 * Not verified: whether `/code-review high`, run at the end of each issue, works inside a subagent (it may start
   subagents of its own).
+* The article on folding subagents into the main loop (see Resources) keeps a subagent only for a measured context
+  degradation, parallel work on fresh contexts, or tool confusion; the chain here is sequential, and each handoff from
+  orchestrator to subagent loses detail. When a subagent stays, it is called as a tool: a fixed answer schema, and the
+  main agent verifies its claims on real data.
 
 # Approach
 Sequential, in the main worktree, so the review marker, the hooks and `next-issue` work as they do now.
@@ -41,11 +45,17 @@ Sequential, in the main worktree, so the review marker, the hooks and `next-issu
 Candidate forms: a new skill (e.g. `drive-queue`) or a mode of `skill:issue-workflow`. To settle first: whether
 `/code-review high` runs in a subagent; if not, the orchestrator runs it itself after each subagent returns.
 
+Alternative to weigh at step 1, no orchestrator: one loop chains the issues itself, compacting its context between two
+issues, and the stale plan check of point 4, a judgment, becomes an advisor call that may answer stop
+(`issues/tell_the_issue_workflow_when_to_consult_the_advisor.md`). If subagents stay, their answer is the 3.6 summary
+schema, and the orchestrator checks it against `just check`, `git log` and the ticked `# Tracking`.
+
 Non-goal: parallel issues driven by the agent; parallelism stays one session per worktree opened by the user.
 
 # Resources
 * `files/.claude/skills/issue-workflow/SKILL.md` (steps 2 and 3, Autonomous mode) and its `details.md`.
 * `docs/adr/0011-the-user-opens-the-issue-worktree.md`, `specs/parallel-issues.md`.
+* https://claude.com/fr/resources/articles/building-agents-when-to-fold-subagents-into-your-main-agent-loop
 * `issues/done/issue_workflow_autonomous_mode.md`, `issues/done/run_agents_in_parallel_on_different_issues.md`,
   `issues/done/delegate_the_exploration_of_the_issue_workflow_to_a_subagent.md`.
 
