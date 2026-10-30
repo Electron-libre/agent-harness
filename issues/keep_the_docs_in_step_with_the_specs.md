@@ -73,7 +73,7 @@ is already near 0 (3 commits per consumer) and would not move. Out of scope: rew
 1. [x] Measure: `spec_lines` and `doc_lines` in `delivered-quality`, `doc_lines_per_spec_line` in the quality
    table of `cardinal-report` and among the metrics of `Expected-effect`; verified by tests of the binary on
    git fixtures; makes true QUA-14, QUA-1, REP-6, VRD-1.
-2. [ ] Route the docs: the generic behaviour row of `update-docs` names the `docs/` page of the capability and the
+2. [x] Route the docs: the generic behaviour row of `update-docs` names the `docs/` page of the capability and the
    `architecture` document; `issue-workflow` runs `update-docs` once on `base..HEAD` after the last deliverable,
    reading those pages whole; `Expected-effect: doc_lines_per_spec_line up`; verified by `just check-cardinal`
    and `just check`.
@@ -101,4 +101,21 @@ is already near 0 (3 commits per consumer) and would not move. Out of scope: rew
 - Measured on the two consumers, per revision, `doc_lines / spec_lines`: 0.36, 2.45, 2.06, 1.24 in one, 0.70, 0.29,
   0.39, 0.19 in the other: the column separates the revisions.
 - not verified: the zero divisor of `doc_lines_per_spec_line` is covered by the shared `ratio`, not by its own check.
+- decisions needed: none.
+
+## Deliverable 2
+
+- done: the generic behaviour row of `update-docs` names the user page and the `architecture` document;
+  `update-docs` reads a commit range and rewrites a page touched over it whole; `issue-workflow` runs it on
+  `base..HEAD` before the `high` review; `docs/workflow.md` diagram and note; synced.
+- | check | result |
+  |---|---|
+  | tests | pass (`just check`) |
+  | lint | pass |
+  | specs | n/a (skill text, no capability of the binary) |
+  | docs | `docs/workflow.md` |
+  | code review | see below |
+- red: none (skill text, verified by `just check-cardinal`).
+- Code review: no findings
+- not verified: the effect on the consumers, until issues run with this revision (`doc_lines_per_spec_line`).
 - decisions needed: none.

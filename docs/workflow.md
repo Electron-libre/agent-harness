@@ -41,8 +41,9 @@ flowchart TD
   human --> track["3.7 Tick the plan line"]
   track --> commit["3.8 Commit: commit-message"]
   commit -->|next deliverable| gather
-  commit -->|last one| high["/code-review high<br/>on base..HEAD"]
-  high -->|"findings: one more deliverable,<br/>from 3.2"| red
+  commit -->|last one| issuedocs["update-docs<br/>on base..HEAD"]
+  issuedocs --> high["/code-review high<br/>on base..HEAD"]
+  high -->|"docs edits or findings:<br/>one more deliverable, from 3.2"| red
   high -->|clean| ask[["Ask: close the issue?"]]
 ```
 
@@ -59,6 +60,9 @@ flowchart TD
   and the tests of step 3.2 carry their `// spec: ID` ([specs/README.md](../specs/README.md)). A capability older than its spec gets one
   read back from its code and tests (`skill:write-spec`, "Bootstrap the spec of an existing capability"), picked from
   `just spec-coverage`.
+- **Docs over the issue**: after the last deliverable, `update-docs` reads the user pages and the `architecture`
+  document the issue touched whole, so the patches of each deliverable add up to a consistent page;
+  `doc_lines_per_spec_line` in `cardinal-report` measures the effect.
 - **Gates**: a commit fails while its diff holds a file the last review never saw; only the user can waive it, with
   `just waive-review` ([architecture](architecture.md#the-review-gate)).
 
