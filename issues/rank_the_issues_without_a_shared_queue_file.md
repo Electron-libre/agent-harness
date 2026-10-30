@@ -52,7 +52,7 @@ the consumer (no merge commit, rebase then fast-forward; none in the session tra
 1. [x] Spec NXT, ADR 0019, `next-issue` orders the files by their `rank`, reports the missing ranks and the ties,
    keeps reading `issues/queue.md` while it exists; PAR-4 says "the first free issue" instead of "of the queue";
    verified by `tests/next_issue.rs`; makes true NXT-1, NXT-2, NXT-3, NXT-4 (~350 lines).
-2. [ ] `next-issue --convert` writes the ranks from `issues/queue.md` and deletes it; verified by
+2. [x] `next-issue --convert` writes the ranks from `issues/queue.md` and deletes it; verified by
    `tests/next_issue.rs`; makes true NXT-5 (~200 lines).
 3. [ ] Format 5: `cardinal-format` and `FORMAT` to 5, `migrations/5.toml` (warns the citations of
    `issues/queue.md`), `seed/issues/queue.md` dropped, `create-issue`, `prioritize-issues`, `issue-workflow`
@@ -79,5 +79,30 @@ the consumer (no merge commit, rebase then fast-forward; none in the session tra
 
 - red: NXT-1, NXT-2, NXT-3: `no issues/queue.md` (exit 2) where the ranks were expected.
 - Code review: no findings
+- not verified: none
+- decisions needed: none
+
+## Deliverable 2
+- done: `next-issue --convert` writes `rank` (100 per position) and `why` in the front matter of each issue of
+  `issues/queue.md`, keeping the other keys and the body, then deletes the queue; spec NXT `accepted`.
+
+| check | result |
+|---|---|
+| tests | pass (`tests/next_issue.rs`, 6 tests) |
+| lint | pass |
+| specs | pass (NXT accepted, every requirement traced) |
+| docs | n/a here: `--convert` is documented with the format 5 (deliverable 3) |
+| code review | low, run |
+
+- red: NXT-5: `left: "# Title B\n\nBody.\n"` where the front matter `rank: 100` was expected.
+- Code review: 3 findings
+  1. the queue is deleted when a line has no file: not fixed, such a line names no issue to rank and is reported
+     (NXT-5).
+  2. a CRLF front matter is not found by the writer and gets a second one above it: not fixed, the reader takes the
+     first block, so the rank written is the one read; the issue files are written with LF.
+  3. `front_matter` made private: no other caller, `just check` passes.
+  A second `low` run (the issue file joined the diff) added: a front matter closed at the end of the file without
+  a newline is doubled (not fixed: an issue file holds its title and body after it, `check-issue`), and a queue line
+  with no reason keeps an older `why` of the file (not fixed: the files of a format 4 queue hold no `why`).
 - not verified: none
 - decisions needed: none

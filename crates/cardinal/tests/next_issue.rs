@@ -378,6 +378,46 @@ fn the_queue_file_wins_over_the_ranks_while_it_exists() {
     );
 }
 
+// spec: NXT-5
+/// `--convert` turns a format 4 queue into the ranks of the files, keeping the rest of each file, then drops it.
+#[test]
+fn convert_writes_the_ranks_of_the_queue_and_drops_it() {
+    let root = issues_dir(&[
+        ("a.md", "---\nmilestone: m1\nrank: 7\n---\n# Title A\n\nBody.\n"),
+        ("b.md", "# Title B\n\nBody.\n"),
+        ("c.md", "# Title C\n"),
+        (
+            "queue.md",
+            "# Queue\n\nProse.\n\n- [b](b.md) - needed first\n- [ghost](ghost.md) - gone\n- [a](a.md) - second\n",
+        ),
+    ]);
+    let out = tool_command("next_issue.rs")
+        .args(["--convert", "issues"])
+        .current_dir(root.path())
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&out.stderr);
+    let read = |f: &str| std::fs::read_to_string(root.path().join("issues").join(f)).unwrap();
+    assert_eq!(
+        read("b.md"),
+        "---\nrank: 100\nwhy: needed first\n---\n# Title B\n\nBody.\n"
+    );
+    assert_eq!(
+        read("a.md"),
+        "---\nmilestone: m1\nrank: 300\nwhy: second\n---\n# Title A\n\nBody.\n"
+    );
+    assert_eq!(read("c.md"), "# Title C\n");
+    assert!(err.contains("queue line without a file: ghost"), "{err}");
+    assert!(!root.path().join("issues/queue.md").exists());
+
+    let (_, next, err) = next_in(root.path());
+    assert!(
+        next.contains("Next: issues/b.md") && next.contains("  2. a\n  3. c\n"),
+        "{next}"
+    );
+    assert!(err.contains("issue without a rank: c"), "{err}");
+}
+
 /// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script

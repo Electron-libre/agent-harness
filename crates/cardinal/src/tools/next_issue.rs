@@ -6,7 +6,8 @@
 //! a branch holds work that is not on the branch of the main worktree (patch-equivalent commits and a squash of any
 //! number of commits count as on it: merging the branch would change no file). A branch with neither (left over after a merge, empty) is reported `Stale:` and takes nothing. The mark
 //! comes from git alone, so every worktree sees it.
-//! Usage: `just next-issue` (from the repo root, or pass the `issues` directory as argument).
+//! Usage: `just next-issue` (from the repo root, or pass the `issues` directory as argument); `--convert` turns
+//! `issues/queue.md` into the ranks of the issue files and deletes it.
 
 use std::path::Path;
 use std::process::Command;
@@ -172,7 +173,7 @@ fn from_queue(dir: &Path, queue: &str) -> (Vec<(String, String)>, bool) {
 }
 
 /// The value of `key` in the front matter (between the `---` lines that open the file) of `text`.
-pub(super) fn front_matter<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+fn front_matter<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     let mut lines = text.lines();
     if lines.next()?.trim_end() != "---" {
         return None;
@@ -213,12 +214,78 @@ fn from_ranks(dir: &Path) -> (Vec<(String, String)>, bool) {
     (entries, drift)
 }
 
+/// `text` with `rank` and `why` set in its front matter: an existing line of either key is replaced in place, a
+/// missing one is added at the end of the front matter, and a file without one gets it; nothing else changes.
+fn with_rank(text: &str, rank: usize, why: &str) -> String {
+    let mut set = vec![("rank", rank.to_string())];
+    if !why.is_empty() {
+        set.push(("why", why.to_string()));
+    }
+    let line = |(key, value): &(&str, String)| format!("{key}: {value}\n");
+    let split = text.strip_prefix("---\n").and_then(|rest| {
+        let end = if rest.starts_with("---\n") {
+            0
+        } else {
+            rest.find("\n---\n")? + 1
+        };
+        Some(rest.split_at(end))
+    });
+    let Some((matter, body)) = split else {
+        let head: String = set.iter().map(line).collect();
+        return format!("---\n{head}---\n{text}");
+    };
+    let mut out = String::from("---\n");
+    for l in matter.lines() {
+        let key = set
+            .iter()
+            .position(|(k, _)| l.strip_prefix(k).is_some_and(|r| r.starts_with(':')));
+        if let Some(i) = key {
+            out.push_str(&line(&set.remove(i)));
+        } else {
+            out.push_str(l);
+            out.push('\n');
+        }
+    }
+    out.extend(set.iter().map(line));
+    out + body
+}
+
+/// `--convert` (NXT-5): the rank of each line of `queue.md` (100 times its position) and its reason go to the front
+/// matter of its issue file, then `queue.md` is deleted. Exit 1 when a line had no file.
+fn convert(dir: &Path) -> u8 {
+    let path = dir.join("queue.md");
+    let Ok(queue) = std::fs::read_to_string(&path) else {
+        eprintln!("no {}", path.display());
+        return 2;
+    };
+    let mut drift = false;
+    for (i, (stem, why)) in queue.lines().filter_map(entry).enumerate() {
+        let file = dir.join(format!("{stem}.md"));
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            eprintln!("queue line without a file: {stem}");
+            drift = true;
+            continue;
+        };
+        let rank = 100 * (i + 1);
+        std::fs::write(&file, with_rank(&text, rank, why)).expect("issue file is writable");
+        println!("{stem}: rank {rank}");
+    }
+    std::fs::remove_file(&path).expect("queue is removable");
+    println!("removed {}", path.display());
+    u8::from(drift)
+}
+
 pub(super) fn main(args: &[String]) -> u8 {
+    let convert_flag = args.iter().any(|a| a == "--convert");
     let dir = args
-        .first()
+        .iter()
+        .find(|a| *a != "--convert")
         .cloned()
         .unwrap_or_else(|| "issues".to_string());
     let dir = Path::new(&dir);
+    if convert_flag {
+        return convert(dir);
+    }
     if !dir.is_dir() {
         eprintln!("no {} directory", dir.display());
         std::process::exit(2);
