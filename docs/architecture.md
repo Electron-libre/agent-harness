@@ -30,7 +30,7 @@ flowchart LR
 | Kind | From | Examples | Owner |
 |---|---|---|---|
 | Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `cardinal.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
-| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`, `ROADMAP.md` (the milestones the `roadmap` key points at) | the project, from the first copy |
+| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`, `ROADMAP.md` (the milestones the `roadmap` key points at), `CHANGELOG.md` (the header of the sections `release` writes) | the project, from the first copy |
 | Entries | `entries/.claude/settings.json` | the hooks, the deny rules of the review waiver and the allow rule of `cardinal run` | the source, inside a file the project owns ("Hooks and their declaration") |
 
 `.claude/cardinal.lock` records the hash of each managed file and each managed entry as written, and the format of
@@ -39,8 +39,9 @@ hash differs from the lock was edited locally: `sync` reports a conflict instead
 The fix belongs in this repository, then `sync` everywhere; there is deliberately no merge.
 
 Everything that differs between projects is a value, not code. The tools read lists from `.claude/cardinal.toml`
-(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`, `internal_dirs`), the hooks the project's commands
-(`lint_command`, `lint_files`, `format_command`, `format_files`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
+(`commit_scopes`, `root_docs`, `skipped_dirs`, `spec_files`, `internal_dirs`, `release_breaking_files`), the hooks and
+`release` the project's commands (`lint_command`, `lint_files`, `format_command`, `format_files`,
+`release_version_command`), and `cardinal` its `fixed_context_budget`; the skills tell the agent
 which key to read (`roadmap`, `architecture`, `test_conventions`, `confidential`, `user_language`); the
 change-to-documents table of `update-docs` is the project's `.claude/update-docs-map.md`. Anything else project-specific (a quality benchmark, a smoke test, the
 language-specific recipes of the `justfile`) stays in the project.
@@ -117,7 +118,8 @@ the glibc) and `aarch64-apple-darwin`, and creates the release `cardinal-<commit
 (a commit from before the rename has its `harness-<commit>` release instead). The CI of a consumer
 (`.github/install_cardinal.sh`) reads `source` and `rev` with the runner's Python 3.11+ (`tomllib`, SYN-56), then
 installs that asset, or builds it with `cargo` when there is none, so its jobs need no Rust when the source publishes
-the commit.
+the commit. The workflow fires on the main branch only: pushing a version tag `v<X.Y.Z>`, made by `release`
+(`specs/release.md`), builds nothing; the tag only names a commit a consumer can pin (`cardinal update --rev v0.2.0`).
 
 ## Hooks and their declaration
 

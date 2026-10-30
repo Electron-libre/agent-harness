@@ -20,6 +20,7 @@ mod language;
 mod language_hint;
 mod lint_gate;
 mod next_issue;
+mod release;
 mod repo_files;
 mod review_gate;
 mod rule_breaches;
@@ -112,6 +113,11 @@ pub const TOOLS: &[Tool] = &[
         name: "next-issue",
         about: "the next issue of issues/queue.md no branch or worktree has taken",
         main: next_issue::main,
+    },
+    Tool {
+        name: "release",
+        about: "[<version> [--tag]]: propose the version, write its CHANGELOG.md section, then tag it locally",
+        main: release::main,
     },
     Tool {
         name: "review-gate",

@@ -75,6 +75,20 @@ that applies the migration is the only one to print it (SYN-54). Until a project
 its lock is of a lower format than the installed `cardinal` reads and its source is a git one (SYN-55). A migration that cannot be read fails them, writing
 nothing.
 
+## Releases
+
+`just release` (`cardinal run release`, [specs/release.md](../specs/release.md)) numbers the versions of a project
+from its Conventional Commits, in three steps:
+
+| Step | What it does |
+|---|---|
+| `just release` | prints the proposed version: from the last `vX.Y.Z` tag, the major raised by a breaking commit (`!`, a `BREAKING CHANGE:` footer, or a file of `release_breaking_files`), else the minor by a `feat`, else the patch; `0.1.0` with no tag yet |
+| `just release <version>` | refuses a version lower than the proposed one, writes its section of `CHANGELOG.md` (Breaking, Added, Fixed; `First numbered release.` with no tag yet), runs `release_version_command` with the version as last argument. Reread and edit the section, then commit it. |
+| `just release <version> --tag` | once the release is committed, creates the annotated tag `v<version>` on `HEAD`, the section as its message, and prints `git push origin v<version>`: the push is the user's |
+
+A consumer of Cardinal pins a version with `cardinal update --rev v<version>` and reads in `CHANGELOG.md` what
+changed since its last pin.
+
 ## Evaluating Cardinal
 
 Cardinal is evaluated from the Claude Code session transcripts, over several of its revisions. Claude Code deletes

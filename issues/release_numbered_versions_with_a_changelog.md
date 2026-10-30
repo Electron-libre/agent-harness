@@ -52,3 +52,47 @@ split (tool, then the milestone link) if it is over.
 * The changelog is generated, then reread by the user before the tag: the commit subjects are written for developers,
   not always for the consumers.
 * Depends on the roadmap issue for the milestone link (point 4); points 1 to 3 do not.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+A tool `release` proposes the next semver from the commits since the last `vX.Y.Z` tag, writes its `CHANGELOG.md`
+section for the user to reread, then (`--tag`, after the release commit) creates the local annotated tag; never pushes.
+Means: two calls (prepare, then `--tag`) so the reread happens before the tag; the manifest is raised by a project
+command (`release_version_command`); `release.yml` fires on `main` only, so a `v*` tag push triggers nothing.
+
+## Plan
+1. [x] Tool `release` and recipe `just release`: proposal, breaking commits and `release_breaking_files`, changelog
+   section, `release_version_command`, `--tag`; seed `CHANGELOG.md`, the two keys in the seeded `cardinal.toml`,
+   docs; verified by `crates/cardinal/tests/release.rs` on temporary git repositories; makes true REL-1 to REL-8,
+   REL-10.
+2. [ ] Milestone link: the section lists the `done` milestones not yet released and marks them `Released:`;
+   `skill:issue-workflow` proposes `just release` when a milestone becomes `done`; `skill:update-docs` and
+   `docs/workflow.md` say `CHANGELOG.md` is generated; verified by `release.rs`, `just check`; makes true REL-9.
+3. [ ] Cardinal adopts it: `release_breaking_files = ["cardinal-format"]`, a `set-version` recipe as its
+   `release_version_command` (the crate and `Cargo.lock`), its first section and crate version `0.2.0`, the tag
+   `v0.2.0` created locally, the push left to the user; verified by `just check`, `git tag -n`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 7644971c7c0870502f9c92e4a4143e25827ebc61
+- First release (no version tag yet): the section holds only `First numbered release.`, any version accepted, `0.1.0` proposed.
+- Two calls: `release <version>` prepares, `release <version> --tag` tags after the release commit.
+
+## Deliverable 1
+- done: tool `release` and recipe `just release`, seeded `CHANGELOG.md` and the two keys, docs (README, usage,
+  architecture).
+- | check | result |
+  |---|---|
+  | tests | pass (`tests/release.rs`, 8) |
+  | lint | pass |
+  | specs | pass (REL-9 untraced, deliverable 2) |
+  | docs | updated |
+  | code review | low, 1 finding, fixed |
+- red: REL-1, REL-2, REL-3, REL-4, REL-5, REL-6, REL-7, REL-8, REL-10: cardinal: unknown tool `release`
+- Code review: 1 findings: a failing `release_version_command` left the section written, so a retry was refused;
+  the changelog is now restored (REL-5 amended).
+- not verified: none.
+- decisions needed: none.
