@@ -57,3 +57,4 @@ The work done before this file existed is in `issues/done/`.
 - State: in issues
 - Issues:
   - [drive_several_issues_in_a_row_from_one_session](issues/drive_several_issues_in_a_row_from_one_session.md)
+  - [link_the_next_issue_when_closing_one](issues/link_the_next_issue_when_closing_one.md)
