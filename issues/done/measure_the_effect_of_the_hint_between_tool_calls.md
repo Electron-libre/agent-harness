@@ -79,7 +79,7 @@ kept; Opus 5.5 in every group.
 ## Live probe (2026-10-30)
 * An English sentence before a `date` call in this session (transcript `a4bd7eec`, line 155): no
   `hook_additional_context` in the transcript, no context received by the agent; the replayed hook prints one.
-* Follow-up: `issues/deliver_the_hint_between_tool_calls.md`, ranked first. Deliverable 3 waits for it and for ~29
+* Follow-up: `issues/done/deliver_the_hint_between_tool_calls.md`, ranked first. Deliverable 3 waits for it and for ~29
   sessions with a delivered hint.
 
 ## Deliverables 1 and 2
@@ -97,5 +97,5 @@ kept; Opus 5.5 in every group.
 - decisions needed: none
 
 ## Closed without a measure
-2026-10-30: the `PostToolUse` mode was dropped (`issues/deliver_the_hint_between_tool_calls.md`): Claude Code often
+2026-10-30: the `PostToolUse` mode was dropped (`issues/done/deliver_the_hint_between_tool_calls.md`): Claude Code often
 runs the hook before it writes the text and the call to the transcript, so there is no hint left to measure.
