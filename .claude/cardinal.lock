@@ -8,7 +8,7 @@ e5c7e210f336a8ec28994671d57d9fb0ddb764228d46127f68775671f175239e  .claude/skills
 fa6bfeae9326bf680d57b544208d7dc990da24a694b46d712803c8fc1ee824fe  .claude/skills/issue-workflow/SKILL.md
 58528dde6d7a81b006ae4a01106d3bdb356e5779cec00ba41c8e195e5f5caa25  .claude/skills/issue-workflow/details.md
 28f9767ec4bf136a3d50a1bac3b2d86215ff56156997a67fd83beee9a930469b  .claude/skills/prioritize-issues/SKILL.md
-32c84b969053cd9b503767c689a91c1c4362e4c7d6dc20dc3f258da16a7da118  .claude/skills/update-docs/SKILL.md
+98e2beb90629a3c8fe374355c6af8d9dc5773e9f17b5e6498aec31b11d71bfd1  .claude/skills/update-docs/SKILL.md
 8e77a3c231b051e1553dce195bfe1458a14d8aca9cd7867ede28e77996589d0f  .claude/skills/write-spec/SKILL.md
 61bdad10b1c0449722ce4b9d3a409580d991222fafb87e2c78a68e4048d4e1dc+x  .github/install_cardinal.sh
 bc32a7e12c24311ccc036b49232f3458f44997761b6a1099cdfe4db1bb738121  .github/workflows/cardinal.yml

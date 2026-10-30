@@ -12,9 +12,9 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
 
 ## 1. Establish what changed
 
-- Run `git status`, `git diff` (staged + unstaged) and `git log -5 --format=%s`.
+- Given a commit range (a whole issue, `<base>..HEAD`), read `git diff <range>` and `git log <range> --format=%s`;
+  otherwise run `git status`, `git diff` (staged + unstaged) and `git log -5 --format=%s`.
 - List the changes in one line each, classified with the kinds of change of the map (step 2).
-- Given a commit range (a whole issue, `<base>..HEAD`), read `git diff <range>` instead.
 - If the diff is empty, ask which change or commit range to document.
 
 ## 2. Map each change to the documents to touch
@@ -38,10 +38,10 @@ These rows hold for every project:
 Grep the old and new names of everything touched and read each hit in context:
 
 ```sh
-rg -n "<name>" CLAUDE.md README.md AGENTS.md docs/
+rg -n "<name>" CLAUDE.md AGENTS.md docs/ <root_docs> <architecture>
 ```
 
-Also compare against the code: the entry points, the defaults, and the relative links in the docs.
+`<root_docs>` and `<architecture>` are the files these keys of `.claude/cardinal.toml` name. Also compare against the code: the entry points, the defaults, and the relative links in the docs.
 
 ## 4. Edit
 

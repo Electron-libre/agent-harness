@@ -78,6 +78,8 @@ is already near 0 (3 commits per consumer) and would not move. Out of scope: rew
    reading those pages whole; `Expected-effect: doc_lines_per_spec_line up`; verified by `just check-cardinal`
    and `just check`.
 
+3. [x] Docs pass and fixes of the `high` review of the issue.
+
 ## Decisions
 - Mode: autonomous
 - Base commit: 5295d9d
@@ -118,4 +120,26 @@ is already near 0 (3 commits per consumer) and would not move. Out of scope: rew
 - red: none (skill text, verified by `just check-cardinal`).
 - Code review: no findings
 - not verified: the effect on the consumers, until issues run with this revision (`doc_lines_per_spec_line`).
+- decisions needed: none.
+
+## Deliverable 3 (docs pass and high review of the issue)
+
+- done: the docs pass over `5295d9d..HEAD` found `docs/usage.md` (Tools) silent on the new columns: fixed; the
+  fixes of the `high` review below.
+- Code review (high, `5295d9d..HEAD`): 9 findings: fixed 1 (a root doc that is no markdown counts), 2 (the
+  `roadmap` files never count), 3 (the `architecture` file counts), 4 (`--numstat -z`, no hand parser of renames
+  and quoted names), 6 (a check for a zero `spec_lines`), 7 (`cardinal.toml` read once; the second `git show`
+  stays: `traced` filters its diff on `spec:`), 8 (the grep of `update-docs` step 3 reads the `root_docs` and the
+  `architecture`), 9 (the commit range comes first in `update-docs` step 1); not fixed 5 (the `pending` line is
+  this deliverable's, rewritten before its commit). QUA-14 amended for 1 to 3.
+- | check | result |
+  |---|---|
+  | tests | pass (`just check`) |
+  | lint | pass |
+  | specs | pass, QUA-14 amended and traced |
+  | docs | `docs/usage.md`, `update-docs` steps 1 and 3 |
+  | code review | see below |
+- red: QUA-14: `iota.doc_lines: expected "19", got Some("15")` (and 16 got 15: the quoted name) before `DocFiles` and `-z`.
+- Code review (low, the fixes): no findings
+- not verified: none.
 - decisions needed: none.

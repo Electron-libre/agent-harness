@@ -473,6 +473,25 @@ fn axes_threshold_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         .get("Rules")
         .and_then(|r| r.iter().find(|c| c[0] == "self:1111111"))
         .is_some_and(|c| c.len() == 8 && c[2..].iter().all(String::is_empty));
+    let no_spec = write(
+        &tmp.join("quality-no-spec.tsv"),
+        QUALITY,
+        &[format!(
+            "{SELF}\t1\t1\t1\t0\t0\t0\t1\t0\t0\t0\t0\t9\t1\t0\t0\t0"
+        )],
+    );
+    let (_, docs_only, _) = run(
+        dir,
+        &[
+            arg("--sessions"),
+            sessions.as_os_str(),
+            arg("--min-sessions"),
+            arg("2"),
+            arg("--quality"),
+            no_spec.as_os_str(),
+        ],
+    );
+    let docs_only = tables(&docs_only);
     let (_, bare, _) = run(dir, &[arg("--sessions"), sessions.as_os_str()]);
     let bare = tables(&bare);
     vec![
@@ -480,6 +499,16 @@ fn axes_threshold_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "a group with no quality row has empty sums, not zeros",
             cell(small.get("Quality"), "r-c", "issues").is_empty()
                 && cell(small.get("Quality"), "self:1111111", "issues") == "2",
+        ),
+        (
+            "no doc lines per spec line when the group changed no spec line",
+            cell(docs_only.get("Quality"), "self:1111111", "doc_lines") == "9"
+                && cell(
+                    docs_only.get("Quality"),
+                    "self:1111111",
+                    "doc_lines_per_spec_line",
+                )
+                .is_empty(),
         ),
         (
             "a group with no rule row keeps one row of empty cells",

@@ -731,6 +731,10 @@ fn lines_fixture(tmp: &Path, root_docs: Option<&str>) -> PathBuf {
             ("README.md", Some(&numbered(0, 2))),
             ("CLAUDE.md", Some(&numbered(0, 7))),
             ("PLAN.md", Some(&numbered(0, 4))),
+            ("GUIDE", Some(&numbered(0, 3))),
+            ("design/arch.md", Some(&numbered(0, 3))),
+            ("docs/TODO.md", Some(&numbered(0, 3))),
+            ("docs/say \"hi\".md", Some(&numbered(0, 1))),
             ("issues/iota.md", Some(iota)),
         ],
     );
@@ -776,15 +780,24 @@ fn lines_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         &[],
     );
     let l = rows(&listed);
+    let (_, configured) = run(
+        dir,
+        &lines_fixture(
+            &tmp.join("lines_configured"),
+            Some("[\"GUIDE\", \"README.md\"]\narchitecture = \"design/arch.md\"\nroadmap = [\"docs/TODO.md\"]"),
+        ),
+        &[],
+    );
+    let c = rows(&configured);
     vec![
         (
             "the spec lines leave out the README and the template of specs/".to_string(),
             has(&r, "iota", "spec_lines", "40"),
         ),
         (
-            "the doc lines count docs/ outside docs/adr/ and README.md when no root_docs is listed"
+            "the doc lines count docs/ outside docs/adr/, a quoted name included, and README.md when no root_docs is listed"
                 .to_string(),
-            has(&r, "iota", "doc_lines", "12"),
+            has(&r, "iota", "doc_lines", "16"),
         ),
         (
             "a renamed doc counts no line".to_string(),
@@ -792,7 +805,11 @@ fn lines_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
         ),
         (
             "the root files counted are the root_docs of cardinal.toml".to_string(),
-            has(&l, "iota", "doc_lines", "14"),
+            has(&l, "iota", "doc_lines", "18"),
+        ),
+        (
+            "a root doc that is no markdown and the architecture document count, the roadmap does not".to_string(),
+            has(&c, "iota", "doc_lines", "19"),
         ),
     ]
 }

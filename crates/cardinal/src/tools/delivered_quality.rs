@@ -326,63 +326,90 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
     Some(traced)
 }
 
-/// The path a `--numstat` line names after the change: the new name of a rename (`a => b`, `dir/{a => b}/c`).
-fn renamed_to(path: &str) -> String {
-    match (path.find('{'), path.find(" => "), path.rfind('}')) {
-        (Some(open), Some(arrow), Some(close)) if open < arrow && arrow < close => format!(
-            "{}{}{}",
-            &path[..open],
-            &path[arrow + 4..close],
-            &path[close + 1..]
-        )
-        .replace("//", "/"),
-        (_, Some(arrow), _) => path[arrow + 4..].to_string(),
-        _ => path.to_string(),
+fn is_markdown(path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("md"))
+}
+
+/// The files whose lines count as docs (QUA-14), read once from `.claude/cardinal.toml`: the `root_docs`
+/// (`README.md` when none), the `architecture` document, and the `roadmap` documents, which never count.
+struct DocFiles {
+    root_docs: Vec<String>,
+    architecture: Option<String>,
+    roadmap: Vec<String>,
+}
+
+impl DocFiles {
+    fn read(repo: &Path) -> Self {
+        let table: toml::Table = std::fs::read_to_string(crate::config_of(repo))
+            .ok()
+            .and_then(|text| text.parse().ok())
+            .unwrap_or_default();
+        let project = table.get("project");
+        let architecture = project
+            .and_then(|p| p.get("architecture"))
+            .and_then(toml::Value::as_str)
+            .map(str::to_string);
+        let roadmap = project
+            .and_then(|p| p.get("roadmap"))
+            .and_then(toml::Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter_map(toml::Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        DocFiles {
+            root_docs: config_names(repo, "root_docs", "README.md").0,
+            architecture,
+            roadmap,
+        }
+    }
+
+    fn is_doc(&self, path: &str) -> bool {
+        let markdown = is_markdown(path);
+        !self.roadmap.iter().any(|r| r == path)
+            && ((markdown && path.starts_with("docs/") && !path.starts_with("docs/adr/"))
+                || self.root_docs.iter().any(|r| r == path)
+                || self.architecture.as_deref() == Some(path))
     }
 }
 
 /// The added and removed lines the commits `own` change in the specs and in the docs (QUA-14): the `.md` files of
-/// `specs/` but its README and template; those of `docs/` outside `docs/adr/` and the `root_docs` of
-/// `.claude/cardinal.toml`. Renames are detected, a binary file counts 0. `None` when git cannot show the diffs.
-fn doc_spec_lines(repo: &Path, own: &[&Commit]) -> Option<(usize, usize)> {
-    let mut args = vec![
-        "-c",
-        "core.quotePath=false",
-        "show",
-        "-M",
-        "--numstat",
-        "--format=%x1e",
-    ];
+/// `specs/` but its README and template; the doc files of `docs`. Renames are detected, a binary file counts 0.
+/// `None` when git cannot show the diffs.
+fn doc_spec_lines(repo: &Path, own: &[&Commit], docs: &DocFiles) -> Option<(usize, usize)> {
+    let mut args = vec!["show", "-M", "--numstat", "-z", "--format=%x1e"];
     args.extend(own.iter().map(|c| c.hash.as_str()));
     let stats = git(repo, &args)?;
-    let root_docs = config_names(repo, "root_docs", "README.md").0;
-    let (mut specs, mut docs) = (0, 0);
-    for line in stats.lines() {
-        let mut fields = line.trim_start_matches('\x1e').splitn(3, '\t');
-        let (Some(added), Some(removed), Some(path)) =
-            (fields.next(), fields.next(), fields.next())
+    let (mut spec_lines, mut doc_lines) = (0, 0);
+    // `-z`: `<added>\t<removed>\t<path>\0`, or for a rename `<added>\t<removed>\t\0<old>\0<new>\0`
+    let mut fields = stats.split('\0');
+    while let Some(field) = fields.next() {
+        let mut parts = field.trim_start_matches(['\x1e', '\n']).splitn(3, '\t');
+        let (Some(added), Some(removed), Some(path)) = (parts.next(), parts.next(), parts.next())
         else {
             continue;
         };
+        let path = if path.is_empty() {
+            fields.next();
+            fields.next().unwrap_or_default()
+        } else {
+            path
+        };
         let count = added.parse().unwrap_or(0) + removed.parse().unwrap_or(0);
-        let path = renamed_to(path);
-        if !Path::new(&path)
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("md"))
-        {
-            continue;
-        }
-        if path.starts_with("specs/")
-            && !matches!(path.as_str(), "specs/README.md" | "specs/TEMPLATE.md")
-        {
-            specs += count;
-        } else if (path.starts_with("docs/") && !path.starts_with("docs/adr/"))
-            || root_docs.contains(&path)
-        {
-            docs += count;
+        let spec = path.starts_with("specs/")
+            && is_markdown(path)
+            && !matches!(path, "specs/README.md" | "specs/TEMPLATE.md");
+        if spec {
+            spec_lines += count;
+        } else if docs.is_doc(path) {
+            doc_lines += count;
         }
     }
-    Some((specs, docs))
+    Some((spec_lines, doc_lines))
 }
 
 /// The requirement ids recorded as seen failing in an issue file (QUA-11): the list that opens each `red:` item of
@@ -617,6 +644,7 @@ fn issue_row(
     sessions: Option<&[Session]>,
     path: &Path,
     window: Duration,
+    docs: &DocFiles,
 ) -> Option<Row> {
     let stem = path.file_stem()?.to_string_lossy().into_owned();
     let own = issue_commits(repo, log, &stem);
@@ -647,7 +675,7 @@ fn issue_row(
         .as_ref()
         .zip(red_ids(&text))
         .map(|(t, red)| t.difference(&red).count());
-    let lines = doc_spec_lines(repo, &mine);
+    let lines = doc_spec_lines(repo, &mine, docs);
     let transcript = sessions.map(|s| session_cells(log, &own, &stem, s));
     let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
@@ -746,6 +774,7 @@ pub(super) fn main(args: &[String]) -> u8 {
     let sessions = projects_root(projects_dir.as_ref())
         .ok()
         .and_then(|root| read_sessions(&root, &repo));
+    let docs = DocFiles::read(&repo);
     let mut rows: Vec<Row> = sorted_entries(&repo.join("issues/done"))
         .iter()
         .filter(|p| p.extension().is_some_and(|e| e == "md"))
@@ -756,6 +785,7 @@ pub(super) fn main(args: &[String]) -> u8 {
                 sessions.as_deref(),
                 p,
                 Duration::days(window_days),
+                &docs,
             )
         })
         .collect();
