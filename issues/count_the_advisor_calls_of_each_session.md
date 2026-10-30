@@ -64,7 +64,7 @@ a set advisor was attached (spec non-goal).
 1. [x] session-metrics advisor columns: `advisor_models`, `advisor_calls`, `advisor_input_tokens`,
    `advisor_output_tokens` after `main_context_peak`, empty with no advisor set, and the archive upgrade of the older
    headers; verified by tests of `crates/cardinal/tests/session_metrics.rs`; makes true EVA-1, EVA-18, EVA-19, EVA-20.
-2. [ ] cardinal-report advisor columns of the efficiency table; verified by tests of
+2. [x] cardinal-report advisor columns of the efficiency table; verified by tests of
    `crates/cardinal/tests/cardinal_report.rs`; makes true REP-5, REP-11.
 3. [ ] The advisor metrics of `Expected-effect:` and their `too few` rule; verified by tests of `commit-check` and
    `cardinal_report.rs`; makes true VRD-1, VRD-10.
@@ -79,5 +79,13 @@ a set advisor was attached (spec non-goal).
   an archive written before them (or before `main_context_peak`) is upgraded by column name.
 - red: EVA-1, EVA-18, EVA-19, EVA-20: every check failed, `header names every column` first (the header had no
   advisor column).
+- Code review: no findings
+- not verified: none.
+
+## Deliverable 2
+- done: the efficiency table of `cardinal-report` gives `advisor_models`, `advisor_sessions` and the medians of the
+  advisor calls and tokens over the sessions that set one; `evaluate-harness` reads them with `advisor_sessions`.
+- red: REP-5, REP-11: `the report prints an efficiency table with its columns` and the three advisor checks failed
+  (no advisor column).
 - Code review: no findings
 - not verified: none.

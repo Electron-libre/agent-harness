@@ -224,6 +224,11 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
         "input_tokens",
         "main_context_peak",
         "peak_sessions",
+        "advisor_models",
+        "advisor_sessions",
+        "advisor_calls",
+        "advisor_input_tokens",
+        "advisor_output_tokens",
         "validations",
         "other_messages",
     ];
@@ -253,6 +258,7 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
         let column = |c: &'static str| per_session(&move |r: &Row| number(r, c));
         let peaks = main_context_peaks(&g.sessions);
         let peak_sessions = peaks.len().to_string();
+        let advised = |c: &str| median_or_empty(filled(&g.sessions, c));
         vec![vec![
             issues.len().to_string(),
             projects,
@@ -268,6 +274,11 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
             }),
             median_or_empty(peaks),
             peak_sessions,
+            mix(&g.sessions, "advisor_models"),
+            advisor_sessions(&g.sessions).to_string(),
+            advised("advisor_calls"),
+            advised("advisor_input_tokens"),
+            advised("advisor_output_tokens"),
             column("validations"),
             column("other_messages"),
         ]]
@@ -277,9 +288,19 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
 /// The `main_context_peak` of the sessions that have one (REP-9, REP-10): an archived row written before the column
 /// is left out rather than counted as 0.
 fn main_context_peaks(sessions: &[&Row]) -> Vec<u64> {
+    filled(sessions, "main_context_peak")
+}
+
+/// The sessions that set an advisor (REP-11): those whose `advisor_calls` is not empty.
+fn advisor_sessions(sessions: &[&Row]) -> usize {
+    filled(sessions, "advisor_calls").len()
+}
+
+/// The values of `column` in the sessions whose cell is not empty.
+fn filled(sessions: &[&Row], column: &str) -> Vec<u64> {
     sessions
         .iter()
-        .filter_map(|r| value(r, "main_context_peak").parse().ok())
+        .filter_map(|r| value(r, column).parse().ok())
         .collect()
 }
 

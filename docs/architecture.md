@@ -269,7 +269,7 @@ The choices behind them:
   `--archive` can keep the rows outside the repositories and the history outlives the retention of the transcripts.
 - **A moving format**: an unreadable line, an unknown type or a missing field counts in its own column rather than
   skewing the others (EVA-9). An archive written before `main_context_peak` or the advisor columns is upgraded with empty cells (EVA-20), which the
-  report leaves out of its median, counting next to it the sessions it rests on; a verdict on the peak is
+  report leaves out of its median, counting next to it the sessions it rests on (`peak_sessions`; `advisor_sessions` for the advisor columns, empty when no advisor was set, REP-11); a verdict on the peak is
   `confounded` when they are fewer than `--min-sessions` (`no data` when there are none) (EVA-17, REP-9, REP-10, VRD-9).
 - **Signals, not verdicts**: medians per session, so one long session does not weigh as ten; groups of consecutive
   revisions of at least `--min-sessions` (10) sessions, since a `self:` revision often covers one issue; the sample
