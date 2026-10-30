@@ -19,7 +19,7 @@ compared.
   context size.
 * The top-level sums are what is billed, so `input_tokens`, `cache_read_tokens` and `cache_creation_tokens` stay
   right; only the peak is wrong.
-* Found by the `high` review of `issues/count_the_advisor_calls_of_each_session.md`.
+* Found by the `high` review of `issues/done/count_the_advisor_calls_of_each_session.md`.
 
 # Approach
 1. When `usage.iterations` holds entries of type `message`, take the largest per-iteration sum of input and cache as

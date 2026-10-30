@@ -35,7 +35,7 @@ Advisor
 # Resources
 * `files/.claude/skills/issue-workflow/SKILL.md` (steps 1, 2, 3.5, end of issue).
 * https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool (suggested system prompt for coding).
-* `issues/count_the_advisor_calls_of_each_session.md`.
+* `issues/done/count_the_advisor_calls_of_each_session.md`.
 
 # Hints
 * The advisor never replaces the `low` and `high` reviews nor the stop of step 2: they stay never lifted.
