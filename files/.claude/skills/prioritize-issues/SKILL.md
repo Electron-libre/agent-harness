@@ -5,7 +5,7 @@ description: Re-rank the open issues in `issues/queue.md` by reading the roadmap
 
 # Prioritize the issues
 
-Talk to the user in the `user_language` of `.claude/cardinal.toml` (skills, code, docs and the queue stay in English). The queue is
+Talk to the user in the `user_language` of `.claude/cardinal.local.toml`, else of `.claude/cardinal.toml` (skills, code, docs and the queue stay in English). The queue is
 `issues/queue.md`, one line per open issue, first = next (`just next-issue` reads it). Don't implement
 anything here.
 

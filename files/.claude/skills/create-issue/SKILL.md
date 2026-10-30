@@ -16,7 +16,7 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    covers it, propose extending it instead of creating a new file.
 2. **Gather the facts** from what was actually observed (logs, smoke runs, code, `git log`, the `roadmap` documents of `.claude/cardinal.toml`). Don't invent
    findings; if a fact is missing, say so in the issue or ask the user.
-3. **Write the file** in English (the conversation with the user stays in the `user_language` of `.claude/cardinal.toml`), with this template:
+3. **Write the file** in English (the conversation with the user stays in the `user_language` of `.claude/cardinal.local.toml`, else of `.claude/cardinal.toml`), with this template:
 
    ```markdown
    # <Title: what to achieve, imperative>

@@ -33,7 +33,8 @@ architecture = "docs/architecture.md"
 test_conventions = "CLAUDE.md"
 # What must never be named in an issue or a committed file (create-issue); generic wording only.
 confidential = "nothing is confidential"
-# Language of the conversation with the user (skills, code, docs and issues stay in English).
+# Language of the conversation with the user (skills, code, docs and issues stay in English); each person may override
+# it in the `[project]` table of `.claude/cardinal.local.toml`, which git ignores.
 user_language = "English"
 # Bytes of the memory files and skill descriptions every session loads; `check`, `sync` and `update` warn above it.
 # fixed_context_budget = 12000

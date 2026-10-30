@@ -55,7 +55,7 @@ scope: any other key (the shared ones stay shared), a user-level file outside th
    through the binary (hook with both files, `sync` then `git check-ignore`); makes true LNG-12, SYN-59.
 2. [x] `rule-breaches`: the personal value of the repository root, as it is at measure time, wins over the committed
    one; verified by a test through the binary; makes true BRE-10, BRE-14.
-3. [ ] Skills, seed comment and docs point at `.claude/cardinal.local.toml`, else `.claude/cardinal.toml`
+3. [x] Skills, seed comment and docs point at `.claude/cardinal.local.toml`, else `.claude/cardinal.toml`
    (`issue-workflow`, `prioritize-issues`, `create-issue`, `audit-instructions`, `evaluate-harness`,
    `docs/architecture.md`); verified by `just check-cardinal` and a reread.
 
@@ -105,6 +105,26 @@ one, else the committed one.
 
 red: BRE-14, BRE-10: the English blocks of a session whose personal `user_language` is English were breaches
 (`s.jsonl:2 intermediate`), and the German one was judged.
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none
+
+## Deliverable 3
+
+done: the five skills, the seeded comment and `docs/usage.md` name `.claude/cardinal.local.toml` first.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | n/a |
+| docs | `docs/usage.md`, seed comment |
+| code review | see below |
+
+red: none (no test: wording of skills and docs)
 
 Code review: no findings
 

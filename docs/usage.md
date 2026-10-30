@@ -30,6 +30,10 @@ The seeded `roadmap` key names `ROADMAP.md`, the milestones `skill:create-issue`
 project seeded before names `docs/TODO.md`, which nothing seeds: `sync` copies `ROADMAP.md` when it is missing, and
 the project points its key at it by hand.
 
+The seeded `user_language` is the default language of the conversation. Each person may set their own in a
+`[project]` table of `.claude/cardinal.local.toml`, which the managed `.claude/.gitignore` keeps out of git: the
+`language-hint` hook, rule `user-language` of `rule-breaches` and the skills read it first.
+
 With a local directory source (this repository), `cardinal run` builds the source's crate with `cargo`, so a hook runs
 the tools of the working tree, or of the last build that compiled.
 
