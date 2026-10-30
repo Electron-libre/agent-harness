@@ -63,14 +63,15 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    reason to the user, who can move it. If the new issue changes the case for others, say so and suggest
    `skill:prioritize-issues` rather than silently reshuffling. Run `just next-issue` and check it reports
    no drift. Then attach it to a milestone of the `roadmap` documents of `.claude/cardinal.toml`: add its link
-   (relative to the roadmap file) under that milestone's issues, set the milestone `in issues` when it was not, and
-   name it in the `# Milestone` section of the issue; or tell the user it has none. Never create or reorder a
-   milestone unasked: the milestones and their order are the user's.
+   (relative to the roadmap file) under that milestone's issues, set a `shaped` milestone `in issues`, name it in
+   the `# Milestone` section of the issue and run `just check-issue` again; or tell the user it has none. An `idea`
+   or `done` milestone takes an issue only on the user's agreement. Never create or reorder a milestone unasked: the
+   milestones, their order and their states are the user's.
 6. **Commit**: commit the issue files alone (the new issue files, `issues/queue.md` and the roadmap file step 5 edited), added then named on
    the commit line (`git add <files>`, then `git commit -m <msg> -- <files>`; never `git add -A`), with
    `skill:commit-message`; other modified or staged files stay out of the commit. Two exceptions: an issue
    written inside another deliverable (a review finding) is committed with that deliverable, not on its own;
-   when `issues/queue.md` already held changes that are not this skill's, ask before committing.
+   when `issues/queue.md` or the roadmap file already held changes that are not this skill's, ask before committing.
 7. **Deliver**: give the path, rank, milestone, commit hash (if step 6 committed) and one line (no other recap), and
    offer to start `skill:issue-workflow` on it.
 

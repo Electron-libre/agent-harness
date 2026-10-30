@@ -115,3 +115,27 @@ format does not change and the `roadmap` value of an existing project is its own
 - Code review: no findings
 - not verified: an agent following the new steps in a real session.
 - decisions needed: none.
+
+## Review of the whole issue (high)
+3. [x] Fix the findings of the `high` review: the milestone set `done` on the Merge back path, the ask before
+   committing a roadmap file with changes not of `create-issue`, no state change of an `idea` or `done` milestone
+   unasked, `check-issue` re-run after the `# Milestone` section, the rank of an issue with no milestone, the seeded
+   example milestone in a comment.
+
+- done: the six fixes above.
+
+| check | result |
+|---|---|
+| tests | pass |
+| lint | pass |
+| specs | pass |
+| docs | none to change (the docs state the behaviour, not these details) |
+| code review | high: 9 findings; low on the fixes, see below |
+
+- red: none (wording fixes of the harness content).
+- Code review: no findings (low, on the fixes). High: 9 findings; 6 fixed above; not fixed: the orphan `ROADMAP.md` of a project seeded before
+  (its `roadmap` key is its own, a rewrite would need a format raise; `docs/usage.md` says to point it by hand), the
+  `done` state set by code in `close-issue` (decision 2 a: no code), the `low` review a close now needs when
+  `close-issue` rewrites `ROADMAP.md` (the gate's rule for any document outside `issues/`).
+- not verified: an agent following the new steps in a real session.
+- decisions needed: none.
