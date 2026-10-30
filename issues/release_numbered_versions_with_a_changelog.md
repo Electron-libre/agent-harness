@@ -44,7 +44,7 @@ split (tool, then the milestone link) if it is over.
 * `.github/workflows/release.yml`, `specs/tool-binaries.md` (the `cardinal-<commit>` releases).
 * `docs/adr/0002-rev-pins-the-resolved-commit.md`, `docs/adr/0014-the-source-declares-the-format-cardinal-must-read.md`.
 * `AGENTS.md` (commit types and the breaking marker), `ROADMAP.md`,
-  `issues/plan_the_milestones_in_a_roadmap_before_they_become_issues.md` (milestone format, a dependency).
+  `issues/done/plan_the_milestones_in_a_roadmap_before_they_become_issues.md` (milestone format, a dependency).
 
 # Hints
 * Check that `release.yml` does not also fire on a `v*` tag push, or that it does nothing harmful then.

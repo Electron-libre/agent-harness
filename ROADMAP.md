@@ -11,7 +11,7 @@ The work done before this file existed is in `issues/done/`.
   word of what changed.
 - State: in issues
 - Issues:
-  - [plan_the_milestones_in_a_roadmap_before_they_become_issues](issues/plan_the_milestones_in_a_roadmap_before_they_become_issues.md)
+  - [plan_the_milestones_in_a_roadmap_before_they_become_issues](issues/done/plan_the_milestones_in_a_roadmap_before_they_become_issues.md)
   - [release_numbered_versions_with_a_changelog](issues/release_numbered_versions_with_a_changelog.md)
 
 ## Team use
