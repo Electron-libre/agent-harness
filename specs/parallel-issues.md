@@ -9,7 +9,7 @@ adrs: [0003, 0008, 0009, 0011, 0018]
 ## Intent
 
 Two agents drive two different issues at once, each in its own git worktree and branch, so that neither one's
-uncommitted files, index, build artifacts or queue changes leak into the other's work. Merging back stays a
+uncommitted files, index or build artifacts leak into the other's work. Merging back stays a
 deliberate step run from the main branch.
 
 ## Requirements
@@ -23,7 +23,7 @@ deliberate step run from the main branch.
 - **PAR-10** (deterministic) `finish-issue <stem> --force` must remove the worktree and delete the branch even when the branch is not detected as merged (its content is not all on the main branch), and must still refuse a worktree with uncommitted changes; without `--force`, work that is not on the main branch must never be deleted.
 - **PAR-11** (deterministic) `finish-issue`, with or without `--force`, must fail, removing nothing, when its working directory is the worktree to remove or inside it, with a message that names the main worktree to run it from.
 - **PAR-7** (deterministic) `finish-issue` must refuse a worktree with uncommitted changes or holding another worktree (an agent worktree nested in it, which `git status` there does not show), and must not remove a worktree other than the one named after the issue stem.
-- **PAR-8** (deterministic) `close-issue` (with or without `--relink`) must refuse to run in a worktree other than the main one, and must refuse to close an issue whose `issues/` directory is in such a worktree, whatever directory it runs from, so that the queue is edited at merge time on the main branch and never on an issue branch.
+- **PAR-8** (deterministic) `close-issue` (with or without `--relink`) must refuse to run in a worktree other than the main one, and must refuse to close an issue whose `issues/` directory is in such a worktree, whatever directory it runs from, so that an issue is closed at merge time on the main branch and never on an issue branch.
 - **PAR-9** (deterministic) The hooks that use the git directory (the code review gate and its marker and waiver) must resolve it per worktree, so a review recorded in one worktree is not seen by another.
 - **PAR-13** (deterministic) `start-issue` must make git ignore `/.claude/worktrees/` in every worktree of the repository, through the `info/exclude` file of the git common directory, adding the line only when it is missing, so that `git status` in the main worktree never lists an issue worktree, even when the project's `.gitignore` un-ignores `.claude/`.
 - **PAR-14** (deterministic) `close-issue` (with or without `--relink`) and the spec traceability check must take the files they scan in a git repository from git (the tracked and the untracked files, without the ignored ones), so that they never read or rewrite a file of a worktree nested in the one they scan, whether or not git ignores its directory, while an untracked file of the scanned worktree and a directory named `worktrees` anywhere are still scanned.

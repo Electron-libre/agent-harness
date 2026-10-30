@@ -88,7 +88,7 @@ fn taken_checks(script: &Path) -> Vec<(&'static str, bool)> {
     let (code, all) = run(&repo);
     out.push((
         "all taken is said",
-        code == Some(0) && all.contains("Every issue") && !all.contains("Next:"),
+        code == Some(0) && all.contains("Every open issue") && !all.contains("Next:"),
     ));
     let (_, elsewhere) = {
         let o = tool_command(script)
@@ -103,7 +103,7 @@ fn taken_checks(script: &Path) -> Vec<(&'static str, bool)> {
     };
     out.push((
         "git is queried in the repository of the issues directory",
-        elsewhere.contains("Every issue"),
+        elsewhere.contains("Every open issue"),
     ));
     git(&repo, &["branch", "-D", "d"]);
     git(&repo, &["branch", "-m", "trunk", "d"]);

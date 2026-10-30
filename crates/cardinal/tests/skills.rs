@@ -42,7 +42,7 @@ const REQUIRED_PASSAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "prioritize-issues",
-        "commit `issues/queue.md` alone",
+        "commit the re-ranked issue files alone",
         "the validated order is committed without a further ask",
     ),
     (

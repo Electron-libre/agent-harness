@@ -315,8 +315,8 @@ pub(super) fn main(args: &[String]) -> u8 {
         .collect();
 
     match free.first() {
-        None if entries.is_empty() => println!("The queue is empty."),
-        None => println!("Every issue of the queue is taken."),
+        None if entries.is_empty() => println!("No open issue."),
+        None => println!("Every open issue is taken."),
         Some((_, (stem, why))) => {
             println!(
                 "Next: issues/{stem}.md\n  {}\n  why here: {why}",

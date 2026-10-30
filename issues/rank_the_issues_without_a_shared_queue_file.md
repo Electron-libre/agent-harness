@@ -1,3 +1,7 @@
+---
+rank: 100
+why: for team use, and its risk of conflict is not measured yet
+---
 # Rank the issues without a shared queue file
 
 # Goal
@@ -54,7 +58,7 @@ the consumer (no merge commit, rebase then fast-forward; none in the session tra
    verified by `tests/next_issue.rs`; makes true NXT-1, NXT-2, NXT-3, NXT-4 (~350 lines).
 2. [x] `next-issue --convert` writes the ranks from `issues/queue.md` and deletes it; verified by
    `tests/next_issue.rs`; makes true NXT-5 (~200 lines).
-3. [ ] Format 5: `cardinal-format` and `FORMAT` to 5, `migrations/5.toml` (warns the citations of
+3. [x] Format 5: `cardinal-format` and `FORMAT` to 5, `migrations/5.toml` (warns the citations of
    `issues/queue.md`), `seed/issues/queue.md` dropped, `create-issue`, `prioritize-issues`, `issue-workflow`
    (`details.md`) and the docs say the rank, `close-issue` keeps dropping a line only when the queue exists; this
    repository converted; verified by `just check`, `tests/skills.rs` and `just next-issue` (~400 lines).
@@ -105,4 +109,23 @@ the consumer (no merge commit, rebase then fast-forward; none in the session tra
   a newline is doubled (not fixed: an issue file holds its title and body after it, `check-issue`), and a queue line
   with no reason keeps an older `why` of the file (not fixed: the files of a format 4 queue hold no `why`).
 - not verified: none
+- decisions needed: none
+
+## Deliverable 3
+- done: format 5 (`cardinal-format`, `FORMAT`, `migrations/5.toml`), `seed/issues/queue.md` dropped, the skills and
+  docs rank each issue in its front matter, `next-issue` says `Every open issue is taken.` / `No open issue.`, this
+  repository converted with `just next-issue --convert`.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | pass (PAR intent and PAR-8 reworded) |
+| docs | `README.md`, `CLAUDE.md`, `ROADMAP.md`, `docs/workflow.md`, `docs/usage.md`, `docs/architecture.md`, ADR 0019 accepted |
+| code review | low, run |
+
+- red: none (the format and the docs; the test of the migrations named the format 5 as one above the source, now
+  `99.toml`).
+- Code review: no findings
+- not verified: the migration on a consumer (RetroDoc) before its update: its `cardinal update` is the user's.
 - decisions needed: none

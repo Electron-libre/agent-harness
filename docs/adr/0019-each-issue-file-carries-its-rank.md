@@ -1,6 +1,6 @@
 # 0019. Each issue file carries its rank
 
-Status: Proposed
+Status: Accepted
 Date: 2026-10-30
 
 ## Context

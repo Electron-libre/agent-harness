@@ -5,8 +5,9 @@
 //! (`../issues/foo.md` from `docs/`), so no document keeps pointing at the old path; the relative links of the moved
 //! issue are rebased so they still resolve from `issues/done/`. The files are those git lists (tracked and
 //! untracked, not ignored), so the issue worktrees nested under `.claude/worktrees/` keep their own files.
-//! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: the
-//! queue is edited at merge time, on the main worktree.
+//! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: an issue
+//! is closed at merge time, on the main worktree. Drops its line from `issues/queue.md` while that file exists
+//! (format 4; the format 5 ranks each issue in its own file, ADR 0019).
 //! Usage: `just close-issue issues/foo.md`; `just close-issue --relink` fixes the references to
 //! every issue already in `issues/done/` (run it once to repair old dangling paths).
 

@@ -62,7 +62,7 @@ Then keep the Claude Code transcripts a year, the evaluation reads them:
 
 ```mermaid
 flowchart LR
-  create["create-issue"] --> queue["issues/queue.md"]
+  create["create-issue"] --> queue["rank of each<br/>issues/NAME.md"]
   queue -->|just next-issue| work["issue-workflow"]
   work -->|plan validated| deliver["test, code, docs,<br/>review, commit"]
   deliver -->|each deliverable| deliver

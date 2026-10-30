@@ -88,7 +88,7 @@ fn the_migrations_apply_in_increasing_format_from_a_lock_without_a_format() {
     // above the format of the source, or below the one of the lock: not applied
     put(
         source.path(),
-        "migrations/5.toml",
+        "migrations/99.toml",
         &rewrite("three", "four"),
     );
     put(source.path(), "migrations/1.toml", &rewrite("one", "zero"));

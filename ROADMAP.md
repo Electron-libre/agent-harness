@@ -1,7 +1,7 @@
 # Roadmap
 
 The planned work of Cardinal, grouped into milestones, in the order they are meant to land. A milestone becomes
-issues once it is shaped; `issues/queue.md` orders those issues. States: `idea`, `shaped`, `in issues`, `done`;
+issues once it is shaped; the `rank` of each issue file orders those issues. States: `idea`, `shaped`, `in issues`, `done`;
 `just release` adds `- Released: v<version>` to a `done` one.
 The work done before this file existed is in `issues/done/`.
 

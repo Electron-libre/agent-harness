@@ -30,7 +30,7 @@ flowchart LR
 | Kind | From | Examples | Owner |
 |---|---|---|---|
 | Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `.claude/.gitignore` (ignores the personal configuration), `cardinal.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
-| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`, `ROADMAP.md` (the milestones the `roadmap` key points at), `CHANGELOG.md` (the header of the sections `release` writes) | the project, from the first copy |
+| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `ROADMAP.md` (the milestones the `roadmap` key points at), `CHANGELOG.md` (the header of the sections `release` writes) | the project, from the first copy |
 | Entries | `entries/.claude/settings.json` | the hooks, the deny rules of the review waiver and the allow rule of `cardinal run` | the source, inside a file the project owns ("Hooks and their declaration") |
 
 `.claude/cardinal.lock` records the hash of each managed file and each managed entry as written, and the format of
@@ -309,7 +309,8 @@ the design:
   `CLAUDE_PROJECT_DIR`, its own `.claude/settings.json` declares them, and `cardinal run` takes the revision of the
   `cardinal.toml` it finds from the `cwd`; the review marker and waiver are per worktree (PAR-9). `.claude/` is tracked,
   so each worktree holds its own copy of Cardinal's files (a project that does not track it gets bare worktrees).
-- **Queue**: edited only at merge time, in the main worktree (PAR-8).
+- **Order**: each issue carries its `rank` (ADR 0019), so a branch edits only its own issues; closing happens at
+  merge time, in the main worktree (PAR-8).
 - **Cost**: each worktree has its own `target/` (measured once, on this repository and a 24-core machine: 239 MB and a
   cold build in 4 s; a larger project may want a shared `CARGO_TARGET_DIR`, which is then the project's choice).
 
