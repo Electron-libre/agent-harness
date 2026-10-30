@@ -400,8 +400,9 @@ enum Waiver {
     Text(PathBuf, String),
 }
 
-/// The output of `git args` run on the index git commits (`index`, when git handed one, else the repository's).
-fn on_index(cwd: &Path, index: Option<&Path>, args: &[&str]) -> Vec<u8> {
+/// The output of `git args` run on the index git commits (`index`, when git handed one, else the repository's), or
+/// `None` when git fails: unlike `git`, a failed read must not pass for an empty one.
+fn on_index(cwd: &Path, index: Option<&Path>, args: &[&str]) -> Option<Vec<u8>> {
     let mut git = Command::new("git");
     git.args(args).current_dir(cwd).stderr(Stdio::null());
     if let Some(index) = index {
@@ -411,67 +412,94 @@ fn on_index(cwd: &Path, index: Option<&Path>, args: &[&str]) -> Vec<u8> {
         .ok()
         .filter(|o| o.status.success())
         .map(|o| o.stdout)
-        .unwrap_or_default()
 }
 
-/// What the index git commits changes against `HEAD`: the status letter and the path of each file.
-fn staged(cwd: &Path, index: Option<&Path>) -> Vec<(String, String)> {
-    let fields = names(&on_index(
+/// A file the index git commits changes against `HEAD`, as `git diff --raw` gives it.
+struct Staged {
+    status: String,
+    path: String,
+    /// The mode and the object id in `HEAD`, then in the index.
+    before: (String, String),
+    after: (String, String),
+}
+
+/// What the index git commits changes against `HEAD`; empty when git cannot tell (no `HEAD`).
+fn staged(cwd: &Path, index: Option<&Path>) -> Vec<Staged> {
+    let raw = on_index(
         cwd,
         index,
         &[
             "diff",
             "--cached",
             "HEAD",
-            "--name-status",
+            "--raw",
+            "--no-abbrev",
             "--no-renames",
             "-z",
         ],
-    ));
+    )
+    .unwrap_or_default();
+    let fields = names(&raw);
     let (pairs, _) = fields.as_chunks::<2>();
     pairs
         .iter()
-        .map(|[status, path]| (status.clone(), path.clone()))
+        .filter_map(|[meta, path]| {
+            let [old_mode, new_mode, old_id, new_id, status] = meta
+                .trim_start_matches(':')
+                .split_whitespace()
+                .collect::<Vec<_>>()[..]
+            else {
+                return None;
+            };
+            Some(Staged {
+                status: status.to_string(),
+                path: path.clone(),
+                before: (old_mode.to_string(), old_id.to_string()),
+                after: (new_mode.to_string(), new_id.to_string()),
+            })
+        })
         .collect()
 }
 
 /// Whether the index git commits (the temporary one of `commit -a` or `commit -- <paths>` when git handed one)
 /// differs from `HEAD` under `issues/` only: the other changes of the work tree stay out of the commit.
-fn records_issues_only(staged: &[(String, String)]) -> bool {
-    !staged.is_empty() && staged.iter().all(|(_, f)| f.starts_with(ISSUES_DIR))
+fn records_issues_only(staged: &[Staged]) -> bool {
+    !staged.is_empty() && staged.iter().all(|f| f.path.starts_with(ISSUES_DIR))
 }
 
 /// Whether the index git commits differs from `HEAD`, outside `issues/`, only by the rewrites `close-issue` makes for
-/// the issues whose move to `issues/done/` it records: each such file is modified, and equal to its `HEAD` content
-/// rewritten (REV-20).
-fn records_close_only(cwd: &Path, index: Option<&Path>, staged: &[(String, String)]) -> bool {
-    let done = format!("{ISSUES_DIR}done/");
+/// the issues whose move to `issues/done/` it records: each such file is a regular file `close-issue` rewrites, its
+/// mode kept and its content equal to its `HEAD` content rewritten (REV-20).
+fn records_close_only(cwd: &Path, staged: &[Staged]) -> bool {
+    let moved =
+        |status: &str, path: String| staged.iter().any(|f| f.status == status && f.path == path);
     let closed: HashSet<String> = staged
         .iter()
-        .filter(|(status, path)| status == "D" && path.starts_with(ISSUES_DIR))
-        .filter_map(|(_, path)| path[ISSUES_DIR.len()..].strip_suffix(".md"))
-        .filter(|stem| !stem.contains('/'))
-        .filter(|stem| staged.contains(&("A".to_string(), format!("{done}{stem}.md"))))
+        .filter(|f| f.status == "D")
+        .filter_map(|f| f.path.strip_prefix(ISSUES_DIR)?.strip_suffix(".md"))
+        .filter(|stem| !stem.contains('/') && moved("A", format!("{ISSUES_DIR}done/{stem}.md")))
         .map(str::to_string)
         .collect();
     if closed.is_empty() {
         return false;
     }
     let issues = [ISSUES_DIR.trim_end_matches('/').to_string()];
+    let text = |id: &str| String::from_utf8(on_index(cwd, None, &["cat-file", "blob", id])?).ok();
     staged
         .iter()
-        .filter(|(_, path)| !path.starts_with(ISSUES_DIR))
-        .all(|(status, path)| {
-            if status != "M" {
+        .filter(|f| !f.path.starts_with(ISSUES_DIR))
+        .all(|f| {
+            let regular = ["100644", "100755"].contains(&f.before.0.as_str());
+            if f.status != "M" || !regular || f.before.0 != f.after.0 {
                 return false;
             }
-            let text = |rev: &str| {
-                String::from_utf8(on_index(cwd, index, &["show", &format!("{rev}:{path}")])).ok()
-            };
-            let (Some(before), Some(after)) = (text("HEAD"), text("")) else {
+            if !close_issue::rewrites(cwd, Path::new(&f.path)) {
+                return false;
+            }
+            let (Some(before), Some(after)) = (text(&f.before.1), text(&f.after.1)) else {
                 return false;
             };
-            let parts: Vec<String> = path.split('/').map(str::to_string).collect();
+            let parts: Vec<String> = f.path.split('/').map(str::to_string).collect();
             close_issue::rewritten(&parts, &before, &issues, &closed, false) == after
         })
 }
@@ -507,16 +535,11 @@ fn refusal(cwd: &Path, index: Option<&Path>) -> Option<Refusal> {
             waiver = Waiver::Absent;
         }
     }
-    let staged = if snap.head.is_empty() {
-        Vec::new()
-    } else {
-        staged(cwd, index)
-    };
-    if snap.files.is_empty()
-        || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR))
-        || records_issues_only(&staged)
-        || records_close_only(cwd, index, &staged)
-    {
+    if snap.files.is_empty() || snap.files.iter().all(|f| f.starts_with(ISSUES_DIR)) {
+        return None;
+    }
+    let staged = staged(cwd, index);
+    if records_issues_only(&staged) || records_close_only(cwd, &staged) {
         return None;
     }
     // fail closed: a waiver that cannot be read or stamped could never be spent, so the review alone judges the commit

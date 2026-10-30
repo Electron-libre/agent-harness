@@ -63,6 +63,9 @@ requires the index blob to be equal (no normalisation, no record under `.git/`).
    other path outside `issues/` is modified and equals the rewrite of its `HEAD` content; the docs of the waiver of
    `issue-workflow` say so; verified by tests of `native` in a temporary repository (close passes; milestone edit,
    edited word on a rewritten line, added file, no staged move refused); makes true REV-20.
+2. [x] Fixes of the `high` review: the gate reads `git diff --raw` (modes, object ids) and refuses a submodule, a
+   changed mode, a failed read and a file `close-issue` never rewrites (`close_issue::rewrites`); verified by three
+   more cases of `close_checks`; makes true REV-20.
 
 ## Decisions
 - Mode: autonomous
@@ -87,4 +90,27 @@ requires the index blob to be equal (no normalisation, no record under `.git/`).
 - red: REV-20: `FAIL - native lets through the close of an issue with the references close-issue rewrote`
 - Code review: no findings (`low`; the test file was out of its scope).
 - not verified: a real close through the installed hook (needs `cargo install` after the commit).
+- decisions needed: none.
+
+## Deliverable 2
+
+- done: the fixes of the `high` review of `c9bc30e..ece8b3f` (8 findings).
+
+| check | result |
+|---|---|
+| tests | `just check` green (`close_checks`: 10 cases) |
+| lint | clippy -D warnings clean |
+| specs | REV-20 reworded (regular files, mode kept, files `close-issue` rewrites) |
+| docs | spec, doc comments |
+| code review | see below |
+
+- red: REV-20: `FAIL - native refuses a close with a file whose mode changed`, `... a submodule moved`, `... a reference
+  rewritten in a file close-issue never rewrites`
+- High review: 8 findings. Fixed: failed read passing as empty (submodule, non-UTF-8 path), mode change, files
+  `close-issue` never rewrites, `staged` computed eagerly, two `git show` per file (now `cat-file` on the ids of
+  `--raw`), test tempdir leaked on panic. Not fixed: a nested `issues/` directory (REV-9 and REV-20 cover the root
+  `issues/` only, as the existing exemption); `on_index` kept beside `git` since it must tell a failed read from an
+  empty one (said in its doc).
+- Code review: no findings (`low` on the fixes).
+- not verified: none beyond deliverable 1.
 - decisions needed: none.

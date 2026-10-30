@@ -862,8 +862,9 @@ fn first_commit_checks(hook: &Path, project: &Path) -> Vec<(&'static str, bool)>
 /// A repository with `issues/foo.md` cited from the roadmap, a doc and another issue, closed by `close-issue` and
 /// staged, then changed by `edit` (which stages what the commit records); whether `native` lets the commit through without any review.
 fn close_passes(hook: &Path, edit: impl Fn(&Path)) -> bool {
-    let project = tempfile::tempdir().unwrap().keep();
-    for dir in ["issues", "docs"] {
+    let tmp = tempfile::tempdir().unwrap();
+    let project = tmp.path().to_path_buf();
+    for dir in ["issues", "docs", "script"] {
         fs::create_dir_all(project.join(dir)).unwrap();
     }
     sh(&project, &["init", "-q", "."]);
@@ -883,6 +884,12 @@ fn close_passes(hook: &Path, edit: impl Fn(&Path)) -> bool {
         "See [foo](../issues/foo.md#goal).\n",
     )
     .unwrap();
+    // close-issue never rewrites a shell script, nor a submodule
+    fs::write(project.join("script/x.sh"), "cat issues/foo.md\n").unwrap();
+    let sub = project.join("sub");
+    fs::create_dir(&sub).unwrap();
+    sh(&sub, &["init", "-q", "."]);
+    sh(&sub, &["commit", "-q", "--allow-empty", "-m", "one"]);
     sh(&project, &["add", "-A"]);
     sh(&project, &["commit", "-qm", "init"]);
     let closed = Command::new(hook)
@@ -893,9 +900,7 @@ fn close_passes(hook: &Path, edit: impl Fn(&Path)) -> bool {
     assert!(closed.status.success(), "close-issue failed");
     sh(&project, &["add", "-A"]);
     edit(&project);
-    let passes = native_run(hook, &project, &[]).0 == 0;
-    let _ = fs::remove_dir_all(&project);
-    passes
+    native_run(hook, &project, &[]).0 == 0
 }
 
 /// Replaces `from` by `to` in the file `name` of `project`, and stages it when `staged`.
@@ -938,6 +943,23 @@ fn close_checks(hook: &Path) -> Vec<(&'static str, bool)> {
         (
             "native refuses a close with a file deleted outside issues/",
             !close_passes(hook, |p| sh(p, &["rm", "-qf", "--", "docs/a.md"])),
+        ),
+        (
+            "native refuses a close with a file whose mode changed",
+            !close_passes(hook, |p| sh(p, &["update-index", "--chmod=+x", "docs/a.md"])),
+        ),
+        (
+            "native refuses a close with a submodule moved",
+            !close_passes(hook, |p| {
+                sh(&p.join("sub"), &["commit", "-q", "--allow-empty", "-m", "two"]);
+                sh(p, &["add", "sub"]);
+            }),
+        ),
+        (
+            "native refuses a close with a reference rewritten in a file close-issue never rewrites",
+            !close_passes(hook, |p| {
+                replace_in(p, "script/x.sh", "issues/foo.md", "issues/done/foo.md", true);
+            }),
         ),
         (
             "native refuses rewritten references when the move of the issue is not staged",

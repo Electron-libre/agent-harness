@@ -44,19 +44,33 @@ fn is_text_file(path: &Path) -> bool {
             .is_some_and(|e| ["md", "rs", "toml", "yaml", "yml", "txt", "json"].contains(&e))
 }
 
+/// The names of the directories whose files `close-issue` never rewrites in the repository at `root`.
+fn skipped_dirs(root: &Path) -> Vec<String> {
+    let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
+    skipped.extend(config_list(root, "skipped_dirs"));
+    skipped
+}
+
+/// Whether `skipped` names a directory of `path` (relative to the root).
+fn in_skipped_dir(path: &Path, skipped: &[String]) -> bool {
+    path.parent()
+        .into_iter()
+        .flat_map(Path::components)
+        .any(|c| skipped.iter().any(|s| c.as_os_str() == s.as_str()))
+}
+
+/// Whether `close-issue` rewrites the references of the file `path` (relative to the repository at `root`): the commit
+/// gate accepts a rewrite only where the tool makes one (`review_gate`, REV-20).
+pub(super) fn rewrites(root: &Path, path: &Path) -> bool {
+    is_text_file(path) && !in_skipped_dir(path, &skipped_dirs(root))
+}
+
 /// The text files of the work tree at `root`, as git lists them (so never those of a nested worktree, ADR 0008),
 /// except under a directory named like one of `skipped`. Exits with an error when git cannot list them, since the
 /// references would stay dangling.
 fn text_files(root: &Path, skipped: &[String]) -> Vec<std::path::PathBuf> {
-    let skipped_dir = |path: &Path| {
-        let mut dirs = path
-            .strip_prefix(root)
-            .unwrap_or(path)
-            .parent()
-            .into_iter()
-            .flat_map(Path::components);
-        dirs.any(|c| skipped.iter().any(|s| c.as_os_str() == s.as_str()))
-    };
+    let skipped_dir =
+        |path: &Path| in_skipped_dir(path.strip_prefix(root).unwrap_or(path), skipped);
     let files = match repo_files::repo_files(root, &[]) {
         Ok(Some(files)) => files,
         Ok(None) => vec![],
@@ -318,8 +332,7 @@ pub(super) fn rewritten(
 /// Rewrite the references to the given closed issues of the `issues/` directory `issues` (relative to `root`) in
 /// every text file under `root`; `moved` is the stem of the issue just moved, whose own links are rebased.
 fn relink(root: &Path, issues: &[String], stems: &HashSet<String>, moved: Option<&str>) {
-    let mut skipped: Vec<String> = SKIPPED_DIRS.iter().map(|s| (*s).to_string()).collect();
-    skipped.extend(config_list(root, "skipped_dirs"));
+    let skipped = skipped_dirs(root);
     let moved = moved.map(|stem| {
         let mut path = issues.to_vec();
         path.extend(["done".to_string(), format!("{stem}.md")]);
