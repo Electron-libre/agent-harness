@@ -190,6 +190,11 @@ fn commit_check_refuses_an_expected_effect_it_cannot_read() {
             "",
         ),
         (
+            "advisor metrics",
+            message("Expected-effect: advisor_calls up\nExpected-effect: advisor_input_tokens down\nExpected-effect: advisor_output_tokens down"),
+            "",
+        ),
+        (
             "quality ratio",
             message("Expected-effect: findings_per_review down"),
             "",

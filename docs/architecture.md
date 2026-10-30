@@ -268,9 +268,11 @@ The choices behind them:
 - **No text**: no reader prints a message, a tool input or a commit text (EVA-10, BRE-11, QUA-10, REP-8), so
   `--archive` can keep the rows outside the repositories and the history outlives the retention of the transcripts.
 - **A moving format**: an unreadable line, an unknown type or a missing field counts in its own column rather than
-  skewing the others (EVA-9). An archive written before `main_context_peak` or the advisor columns is upgraded with empty cells (EVA-20), which the
-  report leaves out of its median, counting next to it the sessions it rests on (`peak_sessions`; `advisor_sessions` for the advisor columns, empty when no advisor was set, REP-11); a verdict on the peak is
-  `confounded` when they are fewer than `--min-sessions` (`no data` when there are none) (EVA-17, REP-9, REP-10, VRD-9).
+  skewing the others (EVA-9). An archive written before `main_context_peak` or the advisor columns is upgraded with
+  empty cells, as the advisor cells of a session that set no advisor are, which the report leaves out of its median,
+  counting next to it the sessions it rests on (`peak_sessions`, `advisor_sessions`); a verdict on one of these
+  metrics is `confounded` when they are fewer than `--min-sessions` (`no data` when there are none) (EVA-17, EVA-19,
+  EVA-20, REP-9, REP-10, REP-11, VRD-9, VRD-10).
 - **Signals, not verdicts**: medians per session, so one long session does not weigh as ten; groups of consecutive
   revisions of at least `--min-sessions` (10) sessions, since a `self:` revision often covers one issue; the sample
   size and the mix of models, versions and projects next to each number (REP-4, REP-5). The numbers are never turned

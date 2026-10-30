@@ -540,13 +540,19 @@ fn dominant<'a>(group: &Group<'a>, column: &str) -> Option<&'a str> {
         .map(|(name, _)| name)
 }
 
-/// Whether `group` holds fewer sessions with a value of `metric` than `min` (VRD-9): only `main_context_peak` can be
-/// missing from a session row.
+/// Whether `group` holds fewer sessions with a value of `metric` than `min` (VRD-9, VRD-10): only
+/// `main_context_peak` and the advisor columns can be missing from a session row.
 fn too_few_values(group: &Group, metric: &str, min: usize) -> bool {
-    metric == "main_context_peak" && main_context_peaks(&group.sessions).len() < min
+    match metric {
+        "main_context_peak" => main_context_peaks(&group.sessions).len() < min,
+        "advisor_calls" | "advisor_input_tokens" | "advisor_output_tokens" => {
+            advisor_sessions(&group.sessions) < min
+        }
+        _ => false,
+    }
 }
 
-/// The verdict of each expectation of `changes` (VRD-5, VRD-6, VRD-9), from the groups before and after its change.
+/// The verdict of each expectation of `changes` (VRD-5, VRD-6, VRD-9, VRD-10), from the groups before and after its change.
 fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
     // Per row: the revisions holding its change, and the index of its after group.
     let placed: Vec<(HashSet<&str>, Option<usize>)> = changes

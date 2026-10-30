@@ -1,6 +1,6 @@
 ---
 id: EVA
-status: draft
+status: accepted
 adrs: [0002, 0003, 0006, 0008, 0010]
 ---
 

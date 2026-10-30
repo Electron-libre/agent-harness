@@ -66,7 +66,7 @@ a set advisor was attached (spec non-goal).
    headers; verified by tests of `crates/cardinal/tests/session_metrics.rs`; makes true EVA-1, EVA-18, EVA-19, EVA-20.
 2. [x] cardinal-report advisor columns of the efficiency table; verified by tests of
    `crates/cardinal/tests/cardinal_report.rs`; makes true REP-5, REP-11.
-3. [ ] The advisor metrics of `Expected-effect:` and their `too few` rule; verified by tests of `commit-check` and
+3. [x] The advisor metrics of `Expected-effect:` and their `too few` rule; verified by tests of `commit-check` and
    `cardinal_report.rs`; makes true VRD-1, VRD-10.
 
 ## Decisions
@@ -87,5 +87,14 @@ a set advisor was attached (spec non-goal).
   advisor calls and tokens over the sessions that set one; `evaluate-harness` reads them with `advisor_sessions`.
 - red: REP-5, REP-11: `the report prints an efficiency table with its columns` and the three advisor checks failed
   (no advisor column).
+- Code review: no findings
+- not verified: none.
+
+## Deliverable 3
+- done: `advisor_calls`, `advisor_input_tokens` and `advisor_output_tokens` are `Expected-effect:` metrics; a group
+  with fewer `advisor_sessions` than `--min-sessions` makes their verdict `confounded`; the three specs are back to
+  `accepted`.
+- red: VRD-1, VRD-10: `commit-check` refused `Expected-effect: advisor_calls up`; `advisor metrics set by fewer
+  sessions than the threshold confound` failed (the verdict was `helped`).
 - Code review: no findings
 - not verified: none.

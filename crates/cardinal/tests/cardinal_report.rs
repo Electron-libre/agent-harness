@@ -15,6 +15,7 @@ const SELF: &str = "self:1111111111111111111111111111111111111111";
 /// A session row: the columns that vary, the others fixed (input 1, output 10, cache read 2, cache creation 3); the
 /// main context peak is 100 per turn unless `peak` is `None` (an archived row written before the column); with an
 /// `advisor` set, `calls` calls of 1,000 input and 10 output tokens each, else empty advisor cells.
+#[derive(Clone)]
 struct S<'a> {
     project: &'a str,
     issues: &'a str,
@@ -794,7 +795,7 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: VRD-5, VRD-6, VRD-7, VRD-9
+// spec: VRD-5, VRD-6, VRD-7, VRD-9, VRD-10
 fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let one = |sessions: Vec<S<'static>>, changes: &[String]| {
         verdict(&verdicts(dir, tmp, &sessions, changes, &[]))
@@ -815,6 +816,25 @@ fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ],
         two("p1", "rb", 2, 5),
     );
+    let advised = |revision: &'static str, calls: u64| -> Vec<S<'static>> {
+        let day = if revision == "ra" { 1 } else { 2 };
+        vec![
+            S {
+                advisor: "claude-opus-5-5",
+                calls,
+                ..base("p1", revision, day, 5)
+            };
+            2
+        ]
+    };
+    let advisor_after = pair(
+        advised("ra", 6),
+        vec![advised("rb", 2).remove(0), base("p1", "rb", 2, 5)],
+    );
+    let advisor_before = pair(
+        vec![advised("ra", 6).remove(0), base("p1", "ra", 1, 5)],
+        advised("rb", 2),
+    );
     vec![
         (
             "two changes with the same after group confound each other",
@@ -827,6 +847,18 @@ fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "a main context peak held by fewer sessions than the threshold confounds, before or after",
             one(peak_after, &[change('a', "main_context_peak", "rb")]) == ["confounded"]
                 && one(peak_before, &[change('a', "main_context_peak", "rb")]) == ["confounded"],
+        ),
+        (
+            "advisor metrics set by fewer sessions than the threshold confound, before or after",
+            one(advisor_after, &[change('a', "advisor_calls", "rb")]) == ["confounded"]
+                && one(advisor_before, &[change('a', "advisor_output_tokens", "rb")]) == ["confounded"],
+        ),
+        (
+            "advisor metrics every session sets get a verdict",
+            one(
+                pair(advised("ra", 6), advised("rb", 2)),
+                &[change('a', "advisor_input_tokens", "rb")],
+            ) == ["helped"],
         ),
         (
             "a main context peak every session holds gets a verdict",
