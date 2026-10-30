@@ -10,10 +10,11 @@ The work done before this file existed is in `issues/done/`.
 - Goal: plan the work above the issues, and ship numbered releases with a changelog that consumers can pin.
 - Why: what is planned but not yet an issue has no home in the repository, and the consumers pin commits with no
   word of what changed.
-- State: in issues
+- State: done
+- Released: v0.2.0
 - Issues:
   - [plan_the_milestones_in_a_roadmap_before_they_become_issues](issues/done/plan_the_milestones_in_a_roadmap_before_they_become_issues.md)
-  - [release_numbered_versions_with_a_changelog](issues/release_numbered_versions_with_a_changelog.md)
+  - [release_numbered_versions_with_a_changelog](issues/done/release_numbered_versions_with_a_changelog.md)
 
 ## Team use
 

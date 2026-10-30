@@ -55,7 +55,7 @@ split (tool, then the milestone link) if it is over.
 
 # Tracking
 
-Plan: validated
+Plan: validated (done)
 
 ## Understanding
 A tool `release` proposes the next semver from the commits since the last `vX.Y.Z` tag, writes its `CHANGELOG.md`
@@ -147,3 +147,9 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 - Code review: 10 findings (high), all fixed; low: no findings
 - not verified: none.
 - decisions needed: none.
+
+## Close
+- Milestone `Plan and release` set `done`; first release `v0.2.0`: section written by `just release 0.2.0`, crate
+  `0.2.0`, tag created locally (push left to the user).
+- The low review of the release commit found a breaking commit with a non-Conventional subject ignored: fixed in a
+  commit of its own (REL-2 test extended); the section below `## [Unreleased]` is REL-4 as decided.
