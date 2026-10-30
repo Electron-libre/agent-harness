@@ -4,6 +4,13 @@ The notable changes of each version, newest first ([Keep a Changelog](https://ke
 [Semantic Versioning](https://semver.org/)). Each section is written by `just release <version>` from the commits,
 then reread before the release is committed.
 
+## [1.1.0] - 2026-10-30
+
+### Added
+
+- end close-issue on the next issue to work on
+- end the close report on a link to the next issue
+
 ## [1.0.0] - 2026-10-30
 
 ### Milestones
