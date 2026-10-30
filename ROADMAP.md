@@ -46,8 +46,11 @@ The work done before this file existed is in `issues/done/`.
   instructions grew one issue at a time, and every verdict is observational.
 - State: in issues
 - Issues:
+  - [show_the_cache_read_share_in_the_efficiency_table](issues/show_the_cache_read_share_in_the_efficiency_table.md)
+  - [report_the_tokens_spent_per_closed_issue](issues/report_the_tokens_spent_per_closed_issue.md)
   - [judge_the_delegated_exploration_before_keeping_it](issues/judge_the_delegated_exploration_before_keeping_it.md)
   - [count_the_skills_a_session_should_have_loaded](issues/count_the_skills_a_session_should_have_loaded.md)
+  - [detect_token_waste_in_the_transcripts](issues/detect_token_waste_in_the_transcripts.md)
   - [audit_the_shared_instructions_for_conflicts_and_stale_guidance](issues/audit_the_shared_instructions_for_conflicts_and_stale_guidance.md)
   - [replay_a_reference_task_set_to_compare_two_harness_variants](issues/replay_a_reference_task_set_to_compare_two_harness_variants.md)
 
