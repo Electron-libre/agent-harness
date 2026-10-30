@@ -101,7 +101,8 @@ fn run(args: &[String]) -> Result<(), String> {
     }
 }
 
-/// Write the section of `version` and run the version command (REL-3 to REL-6).
+/// Write the section of `version`, run the version command and mark the milestones it delivers (REL-3 to REL-6,
+/// REL-9).
 fn prepare(root: &Path, version: Version) -> Result<(), String> {
     let (proposal, last, commits) = proposed(root)?;
     if last.is_some() && version < proposal {
@@ -118,6 +119,22 @@ fn prepare(root: &Path, version: Version) -> Result<(), String> {
     }
     let today = chrono::Local::now().format("%Y-%m-%d");
     let mut new = format!("## [{version}] - {today}\n");
+    let roadmaps: Vec<(std::path::PathBuf, String, Vec<String>)> = project_list(root, "roadmap")
+        .into_iter()
+        .filter_map(|rel| {
+            let path = root.join(rel);
+            let text = std::fs::read_to_string(&path).ok()?;
+            let (marked, names) = mark_released(&text, version);
+            Some((path, marked, names))
+        })
+        .collect();
+    let milestones: Vec<String> = roadmaps
+        .iter()
+        .flat_map(|(_, _, names)| names.iter().map(|n| format!("- {n}\n")))
+        .collect();
+    if !milestones.is_empty() {
+        let _ = write!(new, "\n### Milestones\n\n{}", milestones.concat());
+    }
     if last.is_none() {
         let _ = write!(new, "\n{FIRST}\n");
     }
@@ -153,6 +170,12 @@ fn prepare(root: &Path, version: Version) -> Result<(), String> {
             return Err(format!(
                 "the release_version_command `{command} {version}` failed"
             ));
+        }
+    }
+    for (path, marked, names) in &roadmaps {
+        if !names.is_empty() {
+            std::fs::write(path, marked)
+                .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
         }
     }
     println!(
@@ -255,6 +278,42 @@ fn classify(message: &str, touches_listed: bool) -> Commit {
         kind,
         description: description.trim().into(),
     }
+}
+
+/// A roadmap with the line `- Released: v<version>` added after the `State:` line of each milestone (a `## `
+/// section) that is `done` and has no `Released:` line, and the names of those milestones.
+fn mark_released(text: &str, version: Version) -> (String, Vec<String>) {
+    let mut names = Vec::new();
+    let mut out = String::new();
+    let mut lines = text.split_inclusive('\n').peekable();
+    while let Some(line) = lines.next() {
+        out.push_str(line);
+        let Some(name) = line.strip_prefix("## ") else {
+            continue;
+        };
+        let mut body = Vec::new();
+        while let Some(next) = lines.next_if(|l| !l.starts_with("## ")) {
+            body.push(next);
+        }
+        let field = |l: &str, key: &str| l.trim_start_matches(['-', ' ']).starts_with(key);
+        let done = body.iter().position(|l| {
+            field(l, "State:") && l.split_once(':').is_some_and(|(_, v)| v.trim() == "done")
+        });
+        let released = body.iter().any(|l| field(l, "Released:"));
+        for (i, l) in body.iter().enumerate() {
+            out.push_str(l);
+            if Some(i) == done && !released {
+                if !l.ends_with('\n') {
+                    out.push('\n');
+                }
+                let _ = writeln!(out, "- Released: v{version}");
+            }
+        }
+        if done.is_some() && !released {
+            names.push(name.trim().to_string());
+        }
+    }
+    (out, names)
 }
 
 /// The section of `version` in a changelog, from its heading to the next `## ` heading, trimmed.

@@ -68,7 +68,7 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
    section, `release_version_command`, `--tag`; seed `CHANGELOG.md`, the two keys in the seeded `cardinal.toml`,
    docs; verified by `crates/cardinal/tests/release.rs` on temporary git repositories; makes true REL-1 to REL-8,
    REL-10.
-2. [ ] Milestone link: the section lists the `done` milestones not yet released and marks them `Released:`;
+2. [x] Milestone link: the section lists the `done` milestones not yet released and marks them `Released:`;
    `skill:issue-workflow` proposes `just release` when a milestone becomes `done`; `skill:update-docs` and
    `docs/workflow.md` say `CHANGELOG.md` is generated; verified by `release.rs`, `just check`; makes true REL-9.
 3. [ ] Cardinal adopts it: `release_breaking_files = ["cardinal-format"]`, a `set-version` recipe as its
@@ -94,5 +94,20 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 - red: REL-1, REL-2, REL-3, REL-4, REL-5, REL-6, REL-7, REL-8, REL-10: cardinal: unknown tool `release`
 - Code review: 1 findings: a failing `release_version_command` left the section written, so a retry was refused;
   the changelog is now restored (REL-5 amended).
+- not verified: none.
+- decisions needed: none.
+
+## Deliverable 2
+- done: the section lists the released milestones and marks them `Released:`; issue-workflow proposes a release,
+  update-docs leaves `CHANGELOG.md` to the tool; workflow, usage, roadmaps; spec `accepted`.
+- | check | result |
+  |---|---|
+  | tests | pass (`tests/release.rs`, 9) |
+  | lint | pass |
+  | specs | pass, `release.md` accepted |
+  | docs | updated |
+  | code review | low, no findings |
+- red: REL-9: the changelog had no `### Milestones` section
+- Code review: no findings
 - not verified: none.
 - decisions needed: none.

@@ -163,7 +163,8 @@ the commands left to the user).
   `issues/done/`, drops the issue from `issues/queue.md` and rewrites `issues/<name>.md` to
   `issues/done/<name>.md` in every other document that cites it, relative Markdown links included) and include the
   move and those edits in the final commit. Never move it unasked. When it was the last open issue of its milestone
-  in the `roadmap` documents of `.claude/cardinal.toml`, set that milestone `done` in the same commit.
+  in the `roadmap` documents of `.claude/cardinal.toml`, set that milestone `done` in the same commit, then propose a
+  release to the user (`just release` prints the version it would number): theirs to trigger.
 - To know which issue comes next, run `just next-issue` (first entry of `issues/queue.md` that no branch or
   worktree has taken) instead of reading the issue files. An issue is taken when a branch named after its stem
   exists or a worktree has it checked out; never start a taken one, `Every issue of the queue is taken.` means

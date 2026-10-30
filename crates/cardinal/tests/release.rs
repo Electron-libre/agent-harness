@@ -309,3 +309,31 @@ fn refuses_to_tag_an_uncommitted_missing_or_tagged_release() {
         "tag exists"
     );
 }
+
+// spec: REL-9
+#[test]
+fn lists_and_marks_the_done_milestones_not_yet_released() {
+    let dir = repo();
+    std::fs::write(
+        dir.path().join("ROADMAP.md"),
+        "# Roadmap\n\n## Old\n\n- Goal: a\n- State: done\n- Released: v0.2.0\n\n## New\n\n- Goal: b\n- State: done\n- Issues:\n  - x\n\n## Later\n\n- Goal: c\n- State: in issues\n",
+    )
+    .unwrap();
+    config(dir.path(), "[project]\nroadmap = [\"ROADMAP.md\"]\n");
+    tag(dir.path(), "v0.2.0");
+    commit(dir.path(), "feat: add a flag", "a.txt");
+    let out = release(dir.path(), &["0.3.0"]);
+    assert!(out.status.success(), "{out:?}");
+    let today = chrono::Local::now().format("%Y-%m-%d");
+    assert!(
+        changelog(dir.path()).contains(&format!(
+            "## [0.3.0] - {today}\n\n### Milestones\n\n- New\n\n### Added\n\n- add a flag\n"
+        )),
+        "{}",
+        changelog(dir.path())
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("ROADMAP.md")).unwrap(),
+        "# Roadmap\n\n## Old\n\n- Goal: a\n- State: done\n- Released: v0.2.0\n\n## New\n\n- Goal: b\n- State: done\n- Released: v0.3.0\n- Issues:\n  - x\n\n## Later\n\n- Goal: c\n- State: in issues\n"
+    );
+}
