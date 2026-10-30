@@ -67,7 +67,7 @@ configuration (no key, unreadable file), and must read a single-quoted literal `
   - 1 (lock line of `.github/install_cardinal.sh` left out of 7c6f144): fixed in deliverable 2.
   - 2 (indented key, tab before `=` now fail): fixed in deliverable 2.
   - 3 (keys of any table read), 5 (sed instead of a TOML parser): filed as
-    `issues/read_the_ci_installer_configuration_with_a_toml_parser.md`.
+    `issues/done/read_the_ci_installer_configuration_with_a_toml_parser.md`.
   - 4 (one message for three causes): wording made true for all three (`no source read from`); `'''` strings go to
     the new issue.
   - 6 (no test of a literal `rev` holding a full hash): not fixed, the release path needs a fake release, and the
