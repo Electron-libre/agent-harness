@@ -1,9 +1,9 @@
-# Plan the epics in a roadmap before they become issues
+# Plan the milestones in a roadmap before they become issues
 
 # Goal
 What is planned but not yet an issue has no home in the repository: it stays in the user's head or in the agent's
 memory, out of reach of the skills that rank and write the issues. Give each project a roadmap document that groups
-the planned work into epics, each epic turning into issues when it is shaped, so the queue follows a macro plan
+the planned work into milestones, each milestone turning into issues when it is shaped, so the queue follows a macro plan
 instead of being the plan.
 
 # Findings
@@ -17,20 +17,21 @@ instead of being the plan.
   issues), invisible to the other sessions and to the user's review.
 
 # Approach
-Decided with the user before the issue was written: one file, epics ordered by the user, no mechanical check yet.
+Decided with the user before the issue was written: the word "milestone" (not "epic", too connoted), one file,
+milestones ordered by the user, no mechanical check yet. A milestone carries no date unless the project gives it one.
 
 1. Seed a `docs/roadmap.md` (copied once, owned by the project) and point the seeded `roadmap` key at it. One section
-   per epic, in the order the user wants: goal, why, state (`idea`, `shaped`, `in issues`, `done`), the issues it
+   per milestone, in the order the user wants: goal, why, state (`idea`, `shaped`, `in issues`, `done`), the issues it
    produced (links).
-2. `skill:create-issue` attaches the new issue to an epic (adds the link under it and names the epic in the issue), or
+2. `skill:create-issue` attaches the new issue to a milestone (adds the link under it and names the milestone in the issue), or
    says it has none.
-3. `skill:prioritize-issues` ranks the queue along the order of the epics; it never reorders the epics themselves
+3. `skill:prioritize-issues` ranks the queue along the order of the milestones; it never reorders the milestones themselves
    (the user's call).
-4. Turning a `shaped` epic into issues sized by the limit of `skill:issue-workflow` step 1: a step of
+4. Turning a `shaped` milestone into issues sized by the limit of `skill:issue-workflow` step 1: a step of
    `skill:create-issue` or a skill of its own, to choose at step 1.
-5. Optional: `just close-issue` sets the epic `done` when its last issue closes.
+5. Optional: `just close-issue` sets the milestone `done` when its last issue closes.
 
-Out of scope for now: a mechanical check of the epic links (an issue with no epic, a `done` epic with an open issue)
+Out of scope for now: a mechanical check of the milestone links (an issue with no milestone, a `done` milestone with an open issue)
 in `just check-issue`; reconsider once the roadmap is in use and drift is measured.
 
 This repository adopts it too: write its own `docs/roadmap.md` with the current themes and point its `roadmap` key at
