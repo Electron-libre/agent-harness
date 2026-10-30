@@ -12,6 +12,10 @@ commit_scopes = ["sync", "files"]
 root_docs = ["README.md"]
 # Directories that scripts do not scan besides .git, node_modules and the build output (target).
 skipped_dirs = []
+# The release tool (`just release`): the recipe that writes the version into the crate and its lock, and the file
+# whose change makes a commit breaking: a raised format is one an older `cardinal` cannot read (ADR 0014).
+release_version_command = "just set-version"
+release_breaking_files = ["cardinal-format"]
 # Where the agent finds the context of the project (issue-workflow, create-issue, prioritize-issues).
 roadmap = ["ROADMAP.md"]
 architecture = "docs/architecture.md"

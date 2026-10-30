@@ -34,6 +34,11 @@ check-cardinal:
 check-specs *args:
     @cargo run -q -p cardinal -- run check-specs {{args}}
 
+# Write `version` into the crate and its lock (the `release_version_command` of `just release`).
+set-version version:
+    sed -i.bak '/^\[package\]/,/^\[/s/^version = ".*"/version = "{{version}}"/' crates/cardinal/Cargo.toml && rm crates/cardinal/Cargo.toml.bak
+    cargo update --workspace --offline -q
+
 # Bring this repository in step with its own `files/` and `seed/`.
 sync *args:
     cargo run -q -p cardinal -- sync {{args}}

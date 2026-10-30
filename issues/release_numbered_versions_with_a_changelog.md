@@ -71,7 +71,7 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 2. [x] Milestone link: the section lists the `done` milestones not yet released and marks them `Released:`;
    `skill:issue-workflow` proposes `just release` when a milestone becomes `done`; `skill:update-docs` and
    `docs/workflow.md` say `CHANGELOG.md` is generated; verified by `release.rs`, `just check`; makes true REL-9.
-3. [ ] Cardinal adopts it: `release_breaking_files = ["cardinal-format"]`, a `set-version` recipe as its
+3. [x] Cardinal adopts it: `release_breaking_files = ["cardinal-format"]`, a `set-version` recipe as its
    `release_version_command` (the crate and `Cargo.lock`), its first section and crate version `0.2.0`, the tag
    `v0.2.0` created locally, the push left to the user; verified by `just check`, `git tag -n`.
 
@@ -79,6 +79,8 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 - Mode: autonomous
 - Base commit: 7644971c7c0870502f9c92e4a4143e25827ebc61
 - First release (no version tag yet): the section holds only `First numbered release.`, any version accepted, `0.1.0` proposed.
+- The first release `v0.2.0` (section, crate version, local tag) is made at the close, after `just close-issue` sets
+  the milestone `done`, so its section lists the milestone this issue completes.
 - Two calls: `release <version>` prepares, `release <version> --tag` tags after the release commit.
 
 ## Deliverable 1
@@ -110,4 +112,19 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 - red: REL-9: the changelog had no `### Milestones` section
 - Code review: no findings
 - not verified: none.
+- decisions needed: none.
+
+## Deliverable 3
+- done: `release_version_command = "just set-version"` (crate and `Cargo.lock`), `release_breaking_files =
+  ["cardinal-format"]`; the release `v0.2.0` itself waits for the close (Decisions).
+- | check | result |
+  |---|---|
+  | tests | pass |
+  | lint | pass |
+  | specs | pass |
+  | docs | n/a (the project's own configuration) |
+  | code review | low, 1 finding, fixed |
+- red: none
+- Code review: 1 findings: `set-version` rewrote any `version =` line; now only the one of `[package]`.
+- not verified: none; `just set-version 0.9.9` then `0.1.0` round-tripped the crate and its lock.
 - decisions needed: none.
