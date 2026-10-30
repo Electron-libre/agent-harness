@@ -19,8 +19,9 @@ instead of being the plan.
 # Approach
 Decided with the user before the issue was written: the word "milestone" (not "epic", too connoted), one file,
 milestones ordered by the user, no mechanical check yet. A milestone carries no date unless the project gives it one.
+The file is `ROADMAP.md` at the root, the usual place beside `README.md` and `CHANGELOG.md`.
 
-1. Seed a `docs/roadmap.md` (copied once, owned by the project) and point the seeded `roadmap` key at it. One section
+1. Seed a `ROADMAP.md` (copied once, owned by the project) and point the seeded `roadmap` key at it. One section
    per milestone, in the order the user wants: goal, why, state (`idea`, `shaped`, `in issues`, `done`), the issues it
    produced (links).
 2. `skill:create-issue` attaches the new issue to a milestone (adds the link under it and names the milestone in the issue), or
@@ -34,7 +35,7 @@ milestones ordered by the user, no mechanical check yet. A milestone carries no 
 Out of scope for now: a mechanical check of the milestone links (an issue with no milestone, a `done` milestone with an open issue)
 in `just check-issue`; reconsider once the roadmap is in use and drift is measured.
 
-This repository adopts it too: write its own `docs/roadmap.md` with the current themes and point its `roadmap` key at
+This repository adopts it too: write its own `ROADMAP.md` with the current milestones and point its `roadmap` key at
 it (keeping `issues/queue.md` if the skills still need it there).
 
 # Resources
@@ -51,3 +52,5 @@ it (keeping `issues/queue.md` if the skills still need it there).
 * The roadmap is a document of the project, never managed content: `cardinal sync` must not rewrite it.
 * `delivered-quality` excludes the `roadmap` files from the doc lines: keep the new file listed in the key so editing
   the roadmap is not counted as documentation work.
+* A root document that the skills cite goes in `root_docs`, whose files `delivered-quality` counts as doc lines;
+  QUA-14 subtracts the `roadmap` files, so `ROADMAP.md` stays uncounted as long as the `roadmap` key lists it.
