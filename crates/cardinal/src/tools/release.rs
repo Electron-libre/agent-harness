@@ -5,7 +5,7 @@
 //! Never commits nor pushes: it prints the push command.
 
 use std::fmt::{self, Write as _};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// The header of a new `CHANGELOG.md`, the text of the seeded one.
@@ -23,13 +23,17 @@ const FIRST: &str = "First numbered release.";
 struct Version(u64, u64, u64);
 
 impl Version {
-    /// `X.Y.Z`, an optional leading `v`.
+    /// `X.Y.Z`, numbers without a leading zero, an optional leading `v`.
     fn parse(text: &str) -> Option<Version> {
         let mut parts = text.strip_prefix('v').unwrap_or(text).split('.');
         let mut next = || {
             parts
                 .next()
-                .filter(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))?
+                .filter(|p| {
+                    !p.is_empty()
+                        && p.bytes().all(|b| b.is_ascii_digit())
+                        && (p.len() == 1 || !p.starts_with('0'))
+                })?
                 .parse()
                 .ok()
         };
@@ -101,82 +105,88 @@ fn run(args: &[String]) -> Result<(), String> {
     }
 }
 
-/// Write the section of `version`, run the version command and mark the milestones it delivers (REL-3 to REL-6,
-/// REL-9).
+/// Write the section of `version`, mark the milestones it delivers and run the version command (REL-3 to REL-6,
+/// REL-9); on a failure, the files written are put back.
 fn prepare(root: &Path, version: Version) -> Result<(), String> {
     let (proposal, last, commits) = proposed(root)?;
-    if last.is_some() && version < proposal {
-        return Err(format!(
-            "{version} is lower than {proposal}, the version the commits since v{} call for",
-            last.unwrap_or(proposal)
-        ));
-    }
     let path = root.join(CHANGELOG);
-    let before = std::fs::read_to_string(&path).ok();
+    let before = match std::fs::read_to_string(&path) {
+        Ok(text) => Some(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
+    };
     let text = before.clone().unwrap_or_else(|| HEADER.to_string());
     if section(&text, version).is_some() {
         return Err(format!("{CHANGELOG} already has a section for {version}"));
     }
+    let mut roadmaps = Vec::new();
+    let mut milestones = String::new();
+    for rel in super::config_list(root, "roadmap").unwrap_or_default() {
+        let path = root.join(rel);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let (marked, names) = mark_released(&text, version);
+        if !names.is_empty() {
+            for name in names {
+                let _ = writeln!(milestones, "- {name}");
+            }
+            roadmaps.push((path, Some(text), marked));
+        }
+    }
     let today = chrono::Local::now().format("%Y-%m-%d");
     let mut new = format!("## [{version}] - {today}\n");
-    let roadmaps: Vec<(std::path::PathBuf, String, Vec<String>)> = project_list(root, "roadmap")
-        .into_iter()
-        .filter_map(|rel| {
-            let path = root.join(rel);
-            let text = std::fs::read_to_string(&path).ok()?;
-            let (marked, names) = mark_released(&text, version);
-            Some((path, marked, names))
-        })
-        .collect();
-    let milestones: Vec<String> = roadmaps
-        .iter()
-        .flat_map(|(_, _, names)| names.iter().map(|n| format!("- {n}\n")))
-        .collect();
     if !milestones.is_empty() {
-        let _ = write!(new, "\n### Milestones\n\n{}", milestones.concat());
+        let _ = write!(new, "\n### Milestones\n\n{milestones}");
     }
-    if last.is_none() {
-        let _ = write!(new, "\n{FIRST}\n");
-    }
-    for (kind, title) in [
-        (Kind::Breaking, "Breaking"),
-        (Kind::Added, "Added"),
-        (Kind::Fixed, "Fixed"),
-    ] {
-        let lines: Vec<String> = commits
-            .iter()
-            .filter(|c| last.is_some() && c.kind == kind)
-            .map(|c| format!("- {}\n", c.description))
-            .collect();
-        if !lines.is_empty() {
-            let _ = write!(new, "\n### {title}\n\n{}", lines.concat());
+    if let Some(last) = last {
+        if commits.is_empty() {
+            return Err(format!("no commit since v{last}: nothing to release"));
         }
-    }
-    std::fs::write(&path, insert(&text, &new))
-        .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    if let Some(command) = project_str(root, "release_version_command") {
-        let ok = Command::new("sh")
-            .arg("-c")
-            .arg(format!("{command} {version}"))
-            .current_dir(root)
-            .status()
-            .is_ok_and(|s| s.success());
-        if !ok {
-            // Leave the changelog as it was, so the same release can be prepared again.
-            let _ = match &before {
-                Some(before) => std::fs::write(&path, before),
-                None => std::fs::remove_file(&path),
-            };
+        if version < proposal {
             return Err(format!(
-                "the release_version_command `{command} {version}` failed"
+                "{version} is lower than {proposal}, the version the commits since v{last} call for"
             ));
         }
-    }
-    for (path, marked, names) in &roadmaps {
-        if !names.is_empty() {
-            std::fs::write(path, marked)
-                .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+        for (kind, title) in [
+            (Kind::Breaking, "Breaking"),
+            (Kind::Added, "Added"),
+            (Kind::Fixed, "Fixed"),
+        ] {
+            let mut lines = String::new();
+            for c in commits.iter().filter(|c| c.kind == kind) {
+                let _ = writeln!(lines, "- {}", c.description);
+            }
+            if !lines.is_empty() {
+                let _ = write!(new, "\n### {title}\n\n{lines}");
+            }
         }
+    } else {
+        let _ = write!(new, "\n{FIRST}\n");
+    }
+    let mut writes = vec![(path, before, insert(&text, &new))];
+    writes.extend(roadmaps);
+    let written =
+        write_all(&writes).and_then(|()| match project_str(root, "release_version_command") {
+            Some(command) => Command::new("sh")
+                .arg("-c")
+                .arg(format!("{command} {version}"))
+                .current_dir(root)
+                .status()
+                .is_ok_and(|s| s.success())
+                .then_some(())
+                .ok_or_else(|| format!("the release_version_command `{command} {version}` failed")),
+            None => Ok(()),
+        });
+    if let Err(e) = written {
+        // Leave the files as they were, so the same release can be prepared again.
+        for (path, before, _) in &writes {
+            let _ = match before {
+                Some(before) => std::fs::write(path, before),
+                None => std::fs::remove_file(path),
+            };
+        }
+        return Err(e);
     }
     println!(
         "{CHANGELOG}: the section of {version} is written (proposed: {proposal}).\n\
@@ -185,71 +195,81 @@ fn prepare(root: &Path, version: Version) -> Result<(), String> {
     Ok(())
 }
 
+/// Write each file its new text; `(path, text before, new text)`.
+fn write_all(writes: &[(PathBuf, Option<String>, String)]) -> Result<(), String> {
+    for (path, _, text) in writes {
+        std::fs::write(path, text).map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+    }
+    Ok(())
+}
+
 /// Tag `HEAD` with the committed section of `version` (REL-7, REL-10).
 fn tag_release(root: &Path, version: Version) -> Result<(), String> {
-    if git(root, &["diff", "--quiet", "HEAD"]).is_err() {
-        return Err("the work tree has uncommitted changes: commit the release first".into());
+    if !git(root, &["status", "--porcelain"])?.is_empty() {
+        return Err(
+            "the work tree has uncommitted changes or untracked files: commit the release first"
+                .into(),
+        );
     }
     let committed = git(root, &["show", &format!("HEAD:{CHANGELOG}")]).unwrap_or_default();
     let message = section(&committed, version)
         .ok_or_else(|| format!("the {CHANGELOG} of HEAD has no section for {version}"))?;
     let name = format!("v{version}");
-    git(root, &["tag", "-a", &name, "-m", &message])?;
+    // `verbatim`: the default cleanup would drop the `#` headings of the section.
+    git(
+        root,
+        &["tag", "-a", &name, "--cleanup=verbatim", "-m", &message],
+    )?;
     println!("Tagged {name}. To publish it: git push origin {name}");
     Ok(())
 }
 
-/// The proposed version, the last version tag reachable from `HEAD`, and the commits since it (REL-1).
+/// The proposed version, the last version tag reachable from `HEAD`, and the commits since it, none with no tag
+/// (REL-1).
 fn proposed(root: &Path) -> Result<(Version, Option<Version>, Vec<Commit>), String> {
     let last = git(root, &["tag", "--merged", "HEAD", "--list", "v*"])?
         .lines()
         .filter_map(Version::parse)
         .max();
-    let commits = commits(root, last)?;
-    let Version(major, minor, patch) = last.unwrap_or(Version(0, 0, 0));
-    let proposal = match last {
-        None => Version(0, 1, 0),
-        Some(_) if commits.iter().any(|c| c.kind == Kind::Breaking) => Version(major + 1, 0, 0),
-        Some(_) if commits.iter().any(|c| c.kind == Kind::Added) => Version(major, minor + 1, 0),
-        Some(_) => Version(major, minor, patch + 1),
+    let Some(last @ Version(major, minor, patch)) = last else {
+        return Ok((Version(0, 1, 0), None, Vec::new()));
     };
-    Ok((proposal, last, commits))
+    let commits = commits(root, last)?;
+    let proposal = if commits.iter().any(|c| c.kind == Kind::Breaking) {
+        Version(major + 1, 0, 0)
+    } else if commits.iter().any(|c| c.kind == Kind::Added) {
+        Version(major, minor + 1, 0)
+    } else {
+        Version(major, minor, patch + 1)
+    };
+    Ok((proposal, Some(last), commits))
 }
 
-/// The non-merge commits since the tag of `last` (all of them without one), oldest first.
-fn commits(root: &Path, last: Option<Version>) -> Result<Vec<Commit>, String> {
-    let range = last.map_or("HEAD".to_string(), |v| format!("v{v}..HEAD"));
+/// The non-merge commits since the tag of `last`, oldest first.
+fn commits(root: &Path, last: Version) -> Result<Vec<Commit>, String> {
+    let breaking_files = super::config_list(root, "release_breaking_files").unwrap_or_default();
     let log = git(
         root,
         &[
             "log",
             "--reverse",
             "--no-merges",
-            "--format=%x1e%H%x1f%B",
-            &range,
+            "--name-only",
+            "--format=%x1e%B%x1f",
+            &format!("v{last}..HEAD"),
         ],
     )?;
-    let breaking_files = project_list(root, "release_breaking_files");
-    let mut commits = Vec::new();
-    for record in log.split('\u{1e}').filter(|r| !r.trim().is_empty()) {
-        let (hash, message) = record.split_once('\u{1f}').unwrap_or((record, ""));
-        let touches_listed = !breaking_files.is_empty()
-            && git(
-                root,
-                &[
-                    "diff-tree",
-                    "--root",
-                    "--no-commit-id",
-                    "--name-only",
-                    "-r",
-                    hash.trim(),
-                ],
-            )?
-            .lines()
-            .any(|f| breaking_files.iter().any(|b| b == f));
-        commits.push(classify(message, touches_listed));
-    }
-    Ok(commits)
+    Ok(log
+        .split('\u{1e}')
+        .filter(|r| !r.trim().is_empty())
+        .map(|record| {
+            let (message, files) = record.split_once('\u{1f}').unwrap_or((record, ""));
+            let touches_listed = files
+                .lines()
+                .any(|f| breaking_files.iter().any(|b| b == f.trim()));
+            classify(message, touches_listed)
+        })
+        .collect())
 }
 
 /// The kind and description of a commit message; `touches_listed` when it changes a `release_breaking_files` file.
@@ -334,7 +354,7 @@ fn section(text: &str, version: Version) -> Option<String> {
 fn insert(text: &str, new: &str) -> String {
     let mut offset = 0;
     for line in text.split_inclusive('\n') {
-        if line.starts_with("## ") {
+        if line.starts_with("## ") && !line.starts_with("## [Unreleased]") {
             return format!("{}{new}\n{}", &text[..offset], &text[offset..]);
         }
         offset += line.len();
@@ -356,18 +376,6 @@ fn project_str(root: &Path, key: &str) -> Option<String> {
         .map(str::trim)
         .filter(|c| !c.is_empty())
         .map(String::from)
-}
-
-fn project_list(root: &Path, key: &str) -> Vec<String> {
-    project_value(root, key)
-        .and_then(|v| {
-            v.as_array().map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            })
-        })
-        .unwrap_or_default()
 }
 
 /// The output of `git <args>` in `root`, or its error.

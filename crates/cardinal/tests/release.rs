@@ -146,7 +146,9 @@ fn refuses_a_malformed_taken_written_or_too_low_version() {
         &["commit", "-qm", "docs: changelog", "--no-verify"],
     );
     let before = changelog(dir.path());
-    for version in ["1.2", "0.3.x", "v0.2.0", "0.2.0", "0.2.1", "0.4.0"] {
+    for version in [
+        "1.2", "0.3.x", "0.03.0", "v0.2.0", "0.2.0", "0.2.1", "0.4.0",
+    ] {
         let out = release(dir.path(), &[version]);
         assert!(!out.status.success(), "{version} accepted: {out:?}");
         assert_eq!(
@@ -278,7 +280,10 @@ fn prepares_then_tags_locally_and_never_pushes() {
         git(dir.path(), &["rev-parse", "HEAD"])
     );
     let message = git(dir.path(), &["tag", "-l", "--format=%(contents)", "v0.3.0"]);
-    assert!(message.contains("- add a flag"), "{message}");
+    assert!(
+        message.starts_with("## [0.3.0] - ") && message.contains("### Added\n\n- add a flag"),
+        "{message}"
+    );
     assert_eq!(git(remote.path(), &["tag", "-l"]), "", "nothing pushed");
 }
 
@@ -336,4 +341,71 @@ fn lists_and_marks_the_done_milestones_not_yet_released() {
         std::fs::read_to_string(dir.path().join("ROADMAP.md")).unwrap(),
         "# Roadmap\n\n## Old\n\n- Goal: a\n- State: done\n- Released: v0.2.0\n\n## New\n\n- Goal: b\n- State: done\n- Released: v0.3.0\n- Issues:\n  - x\n\n## Later\n\n- Goal: c\n- State: in issues\n"
     );
+}
+
+// spec: REL-3
+#[test]
+fn refuses_a_release_with_no_commit_since_the_last_tag() {
+    let dir = repo();
+    tag(dir.path(), "v0.3.0");
+    let out = release(dir.path(), &["0.3.1"]);
+    assert!(!out.status.success(), "{out:?}");
+    assert!(!dir.path().join("CHANGELOG.md").exists());
+}
+
+// spec: REL-4
+#[test]
+fn the_section_goes_below_the_unreleased_one() {
+    let dir = repo();
+    std::fs::write(
+        dir.path().join("CHANGELOG.md"),
+        "# Changelog\n\n## [Unreleased]\n\n- soon\n\n## [0.2.0] - 2026-01-01\n\nFirst numbered release.\n",
+    )
+    .unwrap();
+    git(dir.path(), &["add", "-A"]);
+    git(
+        dir.path(),
+        &["commit", "-qm", "docs: changelog", "--no-verify"],
+    );
+    tag(dir.path(), "v0.2.0");
+    commit(dir.path(), "fix: a", "a.txt");
+    assert!(release(dir.path(), &["0.2.1"]).status.success());
+    let today = chrono::Local::now().format("%Y-%m-%d");
+    assert_eq!(
+        changelog(dir.path()),
+        format!("# Changelog\n\n## [Unreleased]\n\n- soon\n\n## [0.2.1] - {today}\n\n### Fixed\n\n- a\n\n## [0.2.0] - 2026-01-01\n\nFirst numbered release.\n")
+    );
+}
+
+// spec: REL-5
+#[test]
+fn a_failing_version_command_leaves_the_roadmap_as_it_was() {
+    let dir = repo();
+    let roadmap = "# Roadmap\n\n## M\n\n- State: done\n";
+    std::fs::write(dir.path().join("ROADMAP.md"), roadmap).unwrap();
+    config(
+        dir.path(),
+        "[project]\nroadmap = [\"ROADMAP.md\"]\nrelease_version_command = \"false\"\n",
+    );
+    assert!(!release(dir.path(), &["0.2.0"]).status.success());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("ROADMAP.md")).unwrap(),
+        roadmap
+    );
+}
+
+// spec: REL-10
+#[test]
+fn refuses_to_tag_with_an_untracked_file() {
+    let dir = repo();
+    commit(dir.path(), "feat: a", "a.txt");
+    assert!(release(dir.path(), &["0.2.0"]).status.success());
+    git(dir.path(), &["add", "-A"]);
+    git(
+        dir.path(),
+        &["commit", "-qm", "chore: release v0.2.0", "--no-verify"],
+    );
+    std::fs::write(dir.path().join("VERSION"), "0.2.0\n").unwrap();
+    assert!(!release(dir.path(), &["0.2.0", "--tag"]).status.success());
+    assert_eq!(git(dir.path(), &["tag", "-l", "v0.2.0"]), "");
 }

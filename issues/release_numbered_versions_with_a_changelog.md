@@ -74,6 +74,7 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 3. [x] Cardinal adopts it: `release_breaking_files = ["cardinal-format"]`, a `set-version` recipe as its
    `release_version_command` (the crate and `Cargo.lock`), its first section and crate version `0.2.0`, the tag
    `v0.2.0` created locally, the push left to the user; verified by `just check`, `git tag -n`.
+4. [x] Fixes of the `high` review of the issue: verified by `release.rs`; amends REL-3, REL-4, REL-5, REL-10.
 
 ## Decisions
 - Mode: autonomous
@@ -127,4 +128,22 @@ command (`release_version_command`); `release.yml` fires on `main` only, so a `v
 - red: none
 - Code review: 1 findings: `set-version` rewrote any `version =` line; now only the one of `[package]`.
 - not verified: none; `just set-version 0.9.9` then `0.1.0` round-tripped the crate and its lock.
+- decisions needed: none.
+
+## Deliverable 4 (high review of the issue)
+- done: the 10 findings of the `high` review fixed: tag message kept verbatim, an unreadable changelog refused,
+  versions with a leading zero refused, untracked files block `--tag`, the section below `## [Unreleased]`, the
+  roadmaps restored on a failure, nothing to release refused, one `git log` for the files, the shared `config_list`,
+  the first release branch made explicit.
+- | check | result |
+  |---|---|
+  | tests | pass (`tests/release.rs`, 13) |
+  | lint | pass |
+  | specs | pass, `release.md` accepted again |
+  | docs | updated (`docs/usage.md`) |
+  | code review | high, 10 findings, fixed; low, no findings |
+- red: REL-3, REL-4, REL-7, REL-10: `0.03.0` accepted; no refusal with no commit; the section above `## [Unreleased]`;
+  the tag message stripped of its headings; a tag made with an untracked file
+- Code review: 10 findings (high), all fixed; low: no findings
+- not verified: none.
 - decisions needed: none.
