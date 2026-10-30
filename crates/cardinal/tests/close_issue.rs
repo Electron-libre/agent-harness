@@ -356,6 +356,50 @@ fn queue_checks(script: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+// spec: CLS-7
+/// After the move, the output ends on the issue `next-issue` offers once the closed one is gone; `--relink` names none.
+fn prints_the_next_issue(script: &Path) -> Vec<(&'static str, bool)> {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    std::fs::create_dir_all(root.join("issues")).unwrap();
+    std::fs::write(root.join("issues/foo.md"), "---\nrank: 1\n---\n# Foo\n").unwrap();
+    std::fs::write(root.join("issues/bar.md"), "---\nrank: 2\n---\n# Bar\n").unwrap();
+    assert!(Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(root)
+        .status()
+        .unwrap()
+        .success());
+    let stdout = |arg: &str| {
+        let out = tool_command(script)
+            .arg(arg)
+            .current_dir(root)
+            .output()
+            .unwrap();
+        (
+            out.status.success(),
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+        )
+    };
+    let (first, first_out) = stdout("issues/foo.md");
+    let (relink, relink_out) = stdout("--relink");
+    let (last, last_out) = stdout("issues/bar.md");
+    vec![
+        (
+            "closing an issue ends on the next one and its title",
+            first && first_out.trim_end().ends_with("Next: issues/bar.md\n  Bar"),
+        ),
+        (
+            "--relink names no next issue",
+            relink && !relink_out.contains("Next:"),
+        ),
+        (
+            "closing the last issue ends on `No open issue.`",
+            last && last_out.trim_end().ends_with("No open issue."),
+        ),
+    ]
+}
+
 // spec: CLS-1
 #[test]
 fn close_issue() {
@@ -448,6 +492,7 @@ fn close_issue() {
         .into_iter()
         .chain(skips_the_nested_worktrees(&script))
         .chain(relinks_the_markdown_links(&script))
+        .chain(prints_the_next_issue(&script))
     {
         check(name, ok);
     }

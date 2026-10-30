@@ -23,7 +23,7 @@ flowchart LR
 | Rank it | agent proposes, user decides | `rank` and `why` in the front matter of the issue (ADR 0019), `skill:prioritize-issues` to re-rank all |
 | Pick the next one | anyone | `just next-issue`: the open issue of lowest rank no branch or worktree has taken |
 | Drive it to done | agent, with one validation stop | `skill:issue-workflow` |
-| Close it | agent in the main worktree, on the user's agreement; the user after a parallel issue | `just close-issue issues/NAME.md`: moves it to `issues/done/`; the agent sets its milestone `done` when it was the last |
+| Close it | agent in the main worktree, on the user's agreement; the user after a parallel issue | `just close-issue issues/NAME.md`: moves it to `issues/done/` and prints the next issue; the agent sets its milestone `done` when it was the last |
 | Release | user, on the agent's proposal when a milestone becomes `done` | `just release <version>` writes the `CHANGELOG.md` section and marks the milestone `Released:`; reread, commit, `just release <version> --tag`; the user pushes the tag |
 
 ## Inside issue-workflow

@@ -7,7 +7,7 @@
 //! untracked, not ignored), so the issue worktrees nested under `.claude/worktrees/` keep their own files.
 //! Refuses to run in a linked git worktree, and to close an issue of one named by path from elsewhere: an issue
 //! is closed at merge time, on the main worktree. Drops its line from `issues/queue.md` while that file exists
-//! (format 4; the format 5 ranks each issue in its own file, ADR 0019).
+//! (format 4; the format 5 ranks each issue in its own file, ADR 0019). Ends on the issue `next-issue` then offers.
 //! Usage: `just close-issue issues/foo.md`; `just close-issue --relink` fixes the references to
 //! every issue already in `issues/done/` (run it once to repair old dangling paths).
 
@@ -504,5 +504,6 @@ pub(super) fn main(args: &[String]) -> u8 {
         }
         None => eprintln!("not inside a git repository: references to {stem} were not updated"),
     }
+    println!("{}", super::next_issue::next(dir));
     0
 }

@@ -50,3 +50,31 @@ Longer autonomy
 * `close-issue` refuses in a linked worktree: the next issue it prints is computed in the main worktree, where
   `next-issue` sees every branch and worktree.
 * Edit `files/`, then `just sync`; `just check-cardinal` fails on a drifted copy.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+After a close, the user sees at once which issue to start next, as a link. Out of scope: `--relink`, starting the
+next issue. Means as the issue's: `close-issue` prints it (shared with `next-issue`), the skill turns it into a link.
+
+## Plan
+1. [x] Print the next issue at close: `next_issue.rs` exposes the selection of its first free issue, `close-issue`
+   prints it after the move and the relink; verified by a test of `tests/close_issue.rs`; makes true CLS-7 (~120
+   lines).
+2. [ ] Link it in the reports: `skill:issue-workflow` Rules end the close report on `[<title>](issues/<stem>.md)`
+   (or the line saying there is none), and "Merge back" of `details.md` names it after the commands left to the
+   user; `just sync`; verified by `just check-cardinal` and the `low` review (~15 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: b20acc3e71000533f48c421e6dcd99d0e63a6f29
+- 1 a: the close prints the next issue's path and title, not its `why`.
+
+## Summary of deliverable 1
+- done: `close-issue` ends on the issue `next-issue` offers (`next_issue::next`, shared selection: `ordered`, `taken_by`, `offer`).
+- red: CLS-7: `FAIL - closing an issue ends on the next one and its title`, `FAIL - closing the last issue ends on \`No open issue.\``.
+- checks: `just check` ok (fmt, clippy, tests, specs); docs: `docs/workflow.md`, recipe comment, `just sync`.
+- Code review: no findings
+- not verified: none. decisions needed: none.
