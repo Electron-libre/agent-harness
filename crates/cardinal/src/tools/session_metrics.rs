@@ -197,9 +197,10 @@ impl Session {
             .unwrap_or_default();
         if main {
             // An advised message's top-level usage adds up its executor iterations: its context is the largest one.
+            let advised = iterations.iter().any(|i| i["type"] == "advisor_message");
             let context = iterations
                 .iter()
-                .filter(|i| i["type"] == "message")
+                .filter(|i| advised && i["type"] == "message")
                 .map(context_tokens)
                 .max()
                 .unwrap_or_else(|| context_tokens(usage));

@@ -69,3 +69,27 @@ Code review: no findings
 not verified: a real advised transcript run through `session-metrics` (the fixture uses the measured numbers).
 
 decisions needed: none
+
+## Summary of the review of the whole issue
+done: the `high` review of `a8d2b18..HEAD`; the peak rule now fires only on a message with an `advisor_message` iteration (EVA-16 says so), and a check pins the top-level peak of a message with one partial `message` iteration.
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy -D warnings clean |
+| specs | EVA-16 reworded, still traced, spec `accepted` |
+| docs | none to change |
+| code review | `high` on the issue, then `low` on the fixes |
+
+red: EVA-16: `FAIL - a message with no advisor iteration keeps its top-level peak` (2, not 4)
+
+Code review: 7 findings
+- Rule fired on any `message` iteration, partial fields gave a low peak, spec criterion vs its parenthesis: fixed, the trigger is an `advisor_message` iteration.
+- No check on a non-advised message with an iteration: fixed, check on the `none` session.
+- Doc comment over 120 columns: fixed.
+- Iterations only on the last line of a split message: not fixed, real advised transcripts (2.1.312) repeat `iterations` on every line.
+- The billed `tokens` closure next to `context_tokens`: not fixed, the billed columns keep each key apart, the context sums them.
+
+not verified: none
+
+decisions needed: none

@@ -337,7 +337,8 @@ const ADVISOR_CALL: &str =
 const ADVISOR_RESULT: &str = "{\"type\":\"advisor_tool_result\",\"tool_use_id\":\"srv\",\"content\":{\"type\":\"advisor_redacted_result\",\"encrypted_content\":\"SECRET advice\"}}";
 
 /// The sessions `advised` (an advisor called in the main transcript and a sub-agent), `idle` (an advisor set, never
-/// called), `none` (no advisor set) and `peaked` (an advised message whose top-level usage adds up two contexts) under the returned projects directory.
+/// called), `none` (no advisor set) and `peaked` (an advised message whose top-level usage adds up two
+/// contexts) under the returned projects directory.
 fn advisor_fixture(tmp: &Path) -> PathBuf {
     let proj = tmp.join("advisor/projects/-p");
     std::fs::create_dir_all(proj.join("advised/subagents")).unwrap();
@@ -469,6 +470,10 @@ fn advisor_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         (
             "the billed tokens of an advised message stay the top-level sums",
             col("peaked", "input_tokens") == "4" && col("peaked", "cache_read_tokens") == "28546",
+        ),
+        (
+            "a message with no advisor iteration keeps its top-level peak",
+            col("none", "main_context_peak") == "4",
         ),
         ("the advice is never printed", !stdout.contains("SECRET")),
     ]
