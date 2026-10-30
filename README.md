@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo/cardinal-wordmark.svg" alt="Cardinal, set the course for your agents" width="480"></p>
+
 # Cardinal
 
 Cardinal is one agent harness for many projects. This repository holds the Claude Code skills, hooks, checks, `just`
