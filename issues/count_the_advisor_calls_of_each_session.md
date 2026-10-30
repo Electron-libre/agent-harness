@@ -98,3 +98,23 @@ a set advisor was attached (spec non-goal).
   sessions than the threshold confound` failed (the verdict was `helped`).
 - Code review: no findings
 - not verified: none.
+
+## Deliverable 4: docs and high review of the issue
+- done: `skill:update-docs` over `5ba0c86..HEAD` (nothing stale left); `/code-review high` fixes: a change of the most
+  frequent `advisor_models` confounds a verdict on an advisor metric (VRD-10 amended); the efficiency row reads the
+  advisor calls once.
+- red: VRD-10: `a change of the most frequent advisor confounds an advisor metric, not another one` failed (the
+  verdict was `helped`).
+- Code review (high): 6 findings.
+  1. The peak is doubled on a message with an advisor call: outside EVA-18 to EVA-20, so it is filed as
+     `issues/measure_the_main_context_peak_of_an_advised_message.md`.
+  2. A change of the advisor set does not confound: fixed (VRD-10).
+  3. A set advisor that is never attached counts in `advisor_sessions`: not fixed, a non-goal of the spec (the
+     transcript cannot tell); the probe showed an equal Opus advisor attached.
+  4. Calls with no `advisorModel` field are blanked: not fixed, no transcript shows it (every advised line carries
+     the field).
+  5. `too_few_values` has a branch per optional metric: not fixed, two cases; generalize at the third.
+  6. The advisor calls are parsed twice: fixed.
+- Code review: 1 findings (low): the table and the verdict count the advisor sessions apart; not fixed, both
+  are `filled(…, "advisor_calls").len()`.
+- not verified: none.

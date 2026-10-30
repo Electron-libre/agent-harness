@@ -258,6 +258,7 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
         let column = |c: &'static str| per_session(&move |r: &Row| number(r, c));
         let peaks = main_context_peaks(&g.sessions);
         let peak_sessions = peaks.len().to_string();
+        let calls = filled(&g.sessions, "advisor_calls");
         let advised = |c: &str| median_or_empty(filled(&g.sessions, c));
         vec![vec![
             issues.len().to_string(),
@@ -275,8 +276,8 @@ fn efficiency(groups: &[Group], anonymous: bool) -> Table {
             median_or_empty(peaks),
             peak_sessions,
             mix(&g.sessions, "advisor_models"),
-            advisor_sessions(&g.sessions).to_string(),
-            advised("advisor_calls"),
+            calls.len().to_string(),
+            median_or_empty(calls),
             advised("advisor_input_tokens"),
             advised("advisor_output_tokens"),
             column("validations"),
@@ -540,15 +541,22 @@ fn dominant<'a>(group: &Group<'a>, column: &str) -> Option<&'a str> {
         .map(|(name, _)| name)
 }
 
+/// The metrics read from the sessions that set an advisor (REP-11).
+const ADVISOR_METRICS: [&str; 3] = [
+    "advisor_calls",
+    "advisor_input_tokens",
+    "advisor_output_tokens",
+];
+
 /// Whether `group` holds fewer sessions with a value of `metric` than `min` (VRD-9, VRD-10): only
 /// `main_context_peak` and the advisor columns can be missing from a session row.
 fn too_few_values(group: &Group, metric: &str, min: usize) -> bool {
-    match metric {
-        "main_context_peak" => main_context_peaks(&group.sessions).len() < min,
-        "advisor_calls" | "advisor_input_tokens" | "advisor_output_tokens" => {
-            advisor_sessions(&group.sessions) < min
-        }
-        _ => false,
+    if metric == "main_context_peak" {
+        main_context_peaks(&group.sessions).len() < min
+    } else if ADVISOR_METRICS.contains(&metric) {
+        advisor_sessions(&group.sessions) < min
+    } else {
+        false
     }
 }
 
@@ -591,8 +599,13 @@ fn verdicts(groups: &[Group], tables: &[Table], changes: &[Row], min: usize) {
         let verdict = match (before_index, after_index, &before_value, &after_value) {
             (Some(b), Some(a), Some((_, bv)), Some((_, av))) => {
                 let (before, after) = (&groups[b], &groups[*a]);
+                // an advisor metric also moves with the advisor set (VRD-10)
+                let advisor = ADVISOR_METRICS
+                    .contains(&metric)
+                    .then_some("advisor_models");
                 let mix_changed = ["models", "versions", "project"]
-                    .iter()
+                    .into_iter()
+                    .chain(advisor)
                     .any(|c| dominant(before, c) != dominant(after, c));
                 let other_change = changes
                     .iter()

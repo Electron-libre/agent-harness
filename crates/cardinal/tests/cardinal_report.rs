@@ -795,7 +795,7 @@ fn verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
-// spec: VRD-5, VRD-6, VRD-7, VRD-9, VRD-10
+// spec: VRD-5, VRD-6, VRD-7, VRD-9
 fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let one = |sessions: Vec<S<'static>>, changes: &[String]| {
         verdict(&verdicts(dir, tmp, &sessions, changes, &[]))
@@ -816,25 +816,6 @@ fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         ],
         two("p1", "rb", 2, 5),
     );
-    let advised = |revision: &'static str, calls: u64| -> Vec<S<'static>> {
-        let day = if revision == "ra" { 1 } else { 2 };
-        vec![
-            S {
-                advisor: "claude-opus-5-5",
-                calls,
-                ..base("p1", revision, day, 5)
-            };
-            2
-        ]
-    };
-    let advisor_after = pair(
-        advised("ra", 6),
-        vec![advised("rb", 2).remove(0), base("p1", "rb", 2, 5)],
-    );
-    let advisor_before = pair(
-        vec![advised("ra", 6).remove(0), base("p1", "ra", 1, 5)],
-        advised("rb", 2),
-    );
     vec![
         (
             "two changes with the same after group confound each other",
@@ -847,18 +828,6 @@ fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
             "a main context peak held by fewer sessions than the threshold confounds, before or after",
             one(peak_after, &[change('a', "main_context_peak", "rb")]) == ["confounded"]
                 && one(peak_before, &[change('a', "main_context_peak", "rb")]) == ["confounded"],
-        ),
-        (
-            "advisor metrics set by fewer sessions than the threshold confound, before or after",
-            one(advisor_after, &[change('a', "advisor_calls", "rb")]) == ["confounded"]
-                && one(advisor_before, &[change('a', "advisor_output_tokens", "rb")]) == ["confounded"],
-        ),
-        (
-            "advisor metrics every session sets get a verdict",
-            one(
-                pair(advised("ra", 6), advised("rb", 2)),
-                &[change('a', "advisor_input_tokens", "rb")],
-            ) == ["helped"],
         ),
         (
             "a main context peak every session holds gets a verdict",
@@ -881,6 +850,79 @@ fn verdict_edge_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     ]
 }
 
+// spec: VRD-10
+fn advisor_verdict_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
+    let one = |sessions: Vec<S<'static>>, changes: &[String]| {
+        verdict(&verdicts(dir, tmp, &sessions, changes, &[]))
+    };
+    let advised = |revision: &'static str, calls: u64| -> Vec<S<'static>> {
+        let day = if revision == "ra" { 1 } else { 2 };
+        vec![
+            S {
+                advisor: "claude-opus-5-5",
+                calls,
+                ..base("p1", revision, day, 5)
+            };
+            2
+        ]
+    };
+    let advisor_after = pair(
+        advised("ra", 6),
+        vec![advised("rb", 2).remove(0), base("p1", "rb", 2, 5)],
+    );
+    let advisor_before = pair(
+        vec![advised("ra", 6).remove(0), base("p1", "ra", 1, 5)],
+        advised("rb", 2),
+    );
+    vec![
+        (
+            "advisor metrics set by fewer sessions than the threshold confound, before or after",
+            one(advisor_after, &[change('a', "advisor_calls", "rb")]) == ["confounded"]
+                && one(
+                    advisor_before,
+                    &[change('a', "advisor_output_tokens", "rb")],
+                ) == ["confounded"],
+        ),
+        (
+            "a change of the most frequent advisor confounds an advisor metric, not another one",
+            one(
+                pair(
+                    advised("ra", 6),
+                    advised("rb", 2)
+                        .into_iter()
+                        .map(|s| S {
+                            advisor: "claude-haiku-5-5",
+                            ..s
+                        })
+                        .collect(),
+                ),
+                &[change('a', "advisor_calls", "rb")],
+            ) == ["confounded"]
+                && one(
+                    pair(
+                        advised("ra", 6),
+                        vec![
+                            S {
+                                advisor: "claude-haiku-5-5",
+                                turns: 4,
+                                ..advised("rb", 2).remove(0)
+                            };
+                            2
+                        ],
+                    ),
+                    &[change('a', "turns", "rb")],
+                ) == ["helped"],
+        ),
+        (
+            "advisor metrics every session sets get a verdict",
+            one(
+                pair(advised("ra", 6), advised("rb", 2)),
+                &[change('a', "advisor_input_tokens", "rb")],
+            ) == ["helped"],
+        ),
+    ]
+}
+
 #[test]
 fn cardinal_report() {
     let dir = std::path::PathBuf::from("/tools");
@@ -893,6 +935,7 @@ fn cardinal_report() {
         .chain(refusal_checks(&dir, temp.path()))
         .chain(verdict_checks(&dir, temp.path()))
         .chain(verdict_edge_checks(&dir, temp.path()))
+        .chain(advisor_verdict_checks(&dir, temp.path()))
         .collect();
     let mut failed = false;
     for (name, ok) in checks {
