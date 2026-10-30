@@ -364,12 +364,37 @@ fn prints_the_next_issue(script: &Path) -> Vec<(&'static str, bool)> {
     std::fs::create_dir_all(root.join("issues")).unwrap();
     std::fs::write(root.join("issues/foo.md"), "---\nrank: 1\n---\n# Foo\n").unwrap();
     std::fs::write(root.join("issues/bar.md"), "---\nrank: 2\n---\n# Bar\n").unwrap();
-    assert!(Command::new("git")
-        .args(["init", "-q"])
-        .current_dir(root)
-        .status()
-        .unwrap()
-        .success());
+    std::fs::write(root.join("issues/baz.md"), "---\nrank: 3\n---\n# Baz\n").unwrap();
+    let git = |args: &[&str]| {
+        let ok = Command::new("git")
+            .args([
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?} failed");
+    };
+    git(&["init", "-q", "-b", "trunk", "."]);
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "init", "--no-verify"]);
+    let worktree = root.join("baz-worktree");
+    git(&[
+        "worktree",
+        "add",
+        "-q",
+        "-b",
+        "baz",
+        worktree.to_str().unwrap(),
+    ]);
     let stdout = |arg: &str| {
         let out = tool_command(script)
             .arg(arg)
@@ -383,7 +408,10 @@ fn prints_the_next_issue(script: &Path) -> Vec<(&'static str, bool)> {
     };
     let (first, first_out) = stdout("issues/foo.md");
     let (relink, relink_out) = stdout("--relink");
-    let (last, last_out) = stdout("issues/bar.md");
+    let (taken, taken_out) = stdout("issues/bar.md");
+    git(&["worktree", "remove", "--force", worktree.to_str().unwrap()]);
+    git(&["branch", "-D", "baz"]);
+    let (last, last_out) = stdout("issues/baz.md");
     vec![
         (
             "closing an issue ends on the next one and its title",
@@ -392,6 +420,10 @@ fn prints_the_next_issue(script: &Path) -> Vec<(&'static str, bool)> {
         (
             "--relink names no next issue",
             relink && !relink_out.contains("Next:"),
+        ),
+        (
+            "an issue taken by a worktree is skipped: `Every open issue is taken.`",
+            taken && taken_out.trim_end().ends_with("Every open issue is taken."),
         ),
         (
             "closing the last issue ends on `No open issue.`",

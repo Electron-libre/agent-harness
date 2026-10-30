@@ -329,43 +329,58 @@ fn convert(dir: &Path) -> u8 {
     u8::from(drift)
 }
 
-/// The open issues of `dir` in order, with their `why`: the lines of `issues/queue.md` while it exists (NXT-4), else
-/// the ranks (NXT-1); and whether the order drifted (reported on stderr).
-fn ordered(dir: &Path) -> (Vec<(String, String)>, bool) {
-    match std::fs::read_to_string(dir.join("queue.md")) {
-        Ok(queue) => from_queue(dir, &queue),
-        Err(_) => from_ranks(dir),
+/// The open issues of a directory in order, with their `why`, and the branches that may take them.
+struct Queue {
+    entries: Vec<(String, String)>,
+    drift: bool,
+    branches: Vec<Branch>,
+}
+
+impl Queue {
+    /// The lines of `issues/queue.md` while it exists (NXT-4), else the ranks (NXT-1); the drift is reported on stderr.
+    fn read(dir: &Path) -> Self {
+        let (entries, drift) = match std::fs::read_to_string(dir.join("queue.md")) {
+            Ok(queue) => from_queue(dir, &queue),
+            Err(_) => from_ranks(dir),
+        };
+        let stems: Vec<&str> = entries.iter().map(|(s, _)| s.as_str()).collect();
+        let branches = branches(dir, &stems);
+        Queue {
+            entries,
+            drift,
+            branches,
+        }
     }
-}
 
-/// The branch that takes the issue `stem`, if any (PAR-4).
-fn taken_by<'a>(branches: &'a [Branch], stem: &str) -> Option<&'a Branch> {
-    branches.iter().find(|b| b.name == stem && b.taken)
-}
+    /// The branch that takes the issue `stem`, if any (PAR-4).
+    fn taken_by(&self, stem: &str) -> Option<&Branch> {
+        self.branches.iter().find(|b| b.name == stem && b.taken)
+    }
 
-/// What `next-issue` offers first: `Next: issues/<stem>.md` and the title of the `free` issue, else the line saying
-/// there is none among `entries`.
-fn offer(dir: &Path, entries: &[(&str, &str)], free: Option<&(&str, &str)>) -> String {
-    match free {
-        None if entries.is_empty() => "No open issue.".to_string(),
-        None => "Every open issue is taken.".to_string(),
-        Some((stem, _)) => format!("Next: issues/{stem}.md\n  {}", title(dir, stem)),
+    /// The issues no branch takes, with their position in the order: `(index, stem, why)`.
+    fn free(&self) -> Vec<(usize, &str, &str)> {
+        self.entries
+            .iter()
+            .enumerate()
+            .filter(|(_, (s, _))| self.taken_by(s).is_none())
+            .map(|(i, (s, w))| (i, s.as_str(), w.as_str()))
+            .collect()
+    }
+
+    /// What `next-issue` offers first: `Next: issues/<stem>.md` and the title of the first free issue, else the line
+    /// saying there is none.
+    fn offer(&self, dir: &Path) -> String {
+        match self.free().first() {
+            None if self.entries.is_empty() => "No open issue.".to_string(),
+            None => "Every open issue is taken.".to_string(),
+            Some((_, stem, _)) => format!("Next: issues/{stem}.md\n  {}", title(dir, stem)),
+        }
     }
 }
 
 /// The issue `next-issue` offers first in `dir` (CLS-7: `close-issue` prints it after a close).
 pub(super) fn next(dir: &Path) -> String {
-    let (entries, _) = ordered(dir);
-    let entries: Vec<(&str, &str)> = entries
-        .iter()
-        .map(|(s, w)| (s.as_str(), w.as_str()))
-        .collect();
-    let stems: Vec<&str> = entries.iter().map(|(s, _)| *s).collect();
-    let branches = branches(dir, &stems);
-    let free = entries
-        .iter()
-        .find(|(s, _)| taken_by(&branches, s).is_none());
-    offer(dir, &entries, free)
+    Queue::read(dir).offer(dir)
 }
 
 pub(super) fn main(args: &[String]) -> u8 {
@@ -383,30 +398,18 @@ pub(super) fn main(args: &[String]) -> u8 {
         eprintln!("no {} directory", dir.display());
         std::process::exit(2);
     }
-    let (entries, drift) = ordered(dir);
-    let entries: Vec<(&str, &str)> = entries
-        .iter()
-        .map(|(s, w)| (s.as_str(), w.as_str()))
-        .collect();
-
-    let stems: Vec<&str> = entries.iter().map(|(s, _)| *s).collect();
-    let branches = branches(dir, &stems);
-    let taken = |stem: &str| taken_by(&branches, stem).map(|b| b.worktree.as_deref());
-    let stale = |stem: &str| branches.iter().any(|b| b.name == stem && !b.taken);
-    let free: Vec<(usize, &(&str, &str))> = entries
-        .iter()
-        .enumerate()
-        .filter(|(_, (s, _))| taken(s).is_none())
-        .collect();
-
-    println!("{}", offer(dir, &entries, free.first().map(|(_, e)| *e)));
-    if let Some((_, (_, why))) = free.first() {
+    let queue = Queue::read(dir);
+    let free = queue.free();
+    println!("{}", queue.offer(dir));
+    if let Some((_, _, why)) = free.first() {
         println!("  why here: {why}");
-        for (i, (s, _)) in free.iter().skip(1) {
+        for (i, s, _) in free.iter().skip(1) {
             println!("{:>3}. {s}", i + 1);
         }
     }
-    for (stem, _) in &entries {
+    let taken = |stem: &str| queue.taken_by(stem).map(|b| b.worktree.as_deref());
+    let stale = |stem: &str| queue.branches.iter().any(|b| b.name == stem && !b.taken);
+    for (stem, _) in &queue.entries {
         if let Some(path) = taken(stem) {
             println!(
                 "Taken: {stem}{}",
@@ -414,10 +417,10 @@ pub(super) fn main(args: &[String]) -> u8 {
             );
         }
     }
-    for (stem, _) in &entries {
+    for (stem, _) in &queue.entries {
         if stale(stem) {
             println!("Stale: {stem} (branch with no worktree and nothing off the main branch; run `just finish-issue {stem}`)");
         }
     }
-    std::process::exit(i32::from(drift));
+    std::process::exit(i32::from(queue.drift));
 }

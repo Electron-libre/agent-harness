@@ -66,6 +66,8 @@ next issue. Means as the issue's: `close-issue` prints it (shared with `next-iss
 2. [x] Link it in the reports: `skill:issue-workflow` Rules end the close report on `[<title>](issues/<stem>.md)`
    (or the line saying there is none), and "Merge back" of `details.md` names it after the commands left to the
    user; `just sync`; verified by `just check-cardinal` and the `low` review (~15 lines).
+3. [x] Fixes of the `high` review: one `Queue` shared by `next-issue` and `close-issue`, CLS-7 test of a taken
+   issue, no link from the stale `issues/` of a linked worktree in "Merge back".
 
 ## Decisions
 - Mode: autonomous
@@ -85,3 +87,13 @@ next issue. Means as the issue's: `close-issue` prints it (shared with `next-iss
 - checks: `just check` ok, `just check-cardinal` ok.
 - Code review: no findings
 - not verified: an agent following the rule at a real close. decisions needed: none.
+
+## Summary of deliverable 3 (high review of b20acc3..65d545e)
+- done: the findings below.
+- red: none (refactor and test of an existing behaviour).
+- checks: `just check` ok, `just check-cardinal` ok.
+- Code review: 7 findings (high). Fixed: stale link in "Merge back", taken case untested, duplicated selection,
+  `offer` signature. Not fixed: the drift diagnostics of `next-issue` on stderr at close (kept: they qualify the
+  offered issue, a ghost queue line or an issue missing from the queue), the format 4 `(no file)` line and the
+  emptied `queue.md` (format 4 only, reported by those same diagnostics).
+- not verified: none. decisions needed: none.
