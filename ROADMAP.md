@@ -22,7 +22,7 @@ The work done before this file existed is in `issues/done/`.
 - Why: no project uses Cardinal in a team yet; these are the blockers an audit found.
 - State: in issues
 - Issues:
-  - [read_the_user_language_from_a_personal_file](issues/read_the_user_language_from_a_personal_file.md)
+  - [read_the_user_language_from_a_personal_file](issues/done/read_the_user_language_from_a_personal_file.md)
   - [rank_the_issues_without_a_shared_queue_file](issues/rank_the_issues_without_a_shared_queue_file.md)
 
 ## Longer autonomy

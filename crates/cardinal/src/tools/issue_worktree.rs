@@ -196,7 +196,9 @@ fn start(cwd: &Path, issue: &str) -> Result<String, String> {
     // git ignores the personal configuration, so the checkout lacks it (PAR-17)
     let personal = main.join(crate::PERSONAL_CONFIG);
     if personal.is_file() {
-        std::fs::copy(&personal, dir.join(crate::PERSONAL_CONFIG))
+        let copy = dir.join(crate::PERSONAL_CONFIG);
+        std::fs::create_dir_all(copy.parent().unwrap())
+            .and_then(|()| std::fs::copy(&personal, &copy))
             .map_err(|e| format!("cannot copy {}: {e}", personal.display()))?;
     }
     Ok(dir.display().to_string())
