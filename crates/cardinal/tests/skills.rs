@@ -338,3 +338,20 @@ fn skills() {
         failures.len()
     );
 }
+
+/// The skills read the `roadmap` documents of the seeded configuration: a new project must get them from `seed/`.
+#[test]
+fn seeded_roadmap_is_seeded() {
+    let seed = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../seed");
+    let roadmap = config_list(&seed, "roadmap");
+    assert!(
+        !roadmap.is_empty(),
+        "the seeded configuration names no roadmap"
+    );
+    for doc in roadmap {
+        assert!(
+            seed.join(&doc).is_file(),
+            "the seeded roadmap '{doc}' is not seeded"
+        );
+    }
+}

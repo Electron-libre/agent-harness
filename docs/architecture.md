@@ -30,7 +30,7 @@ flowchart LR
 | Kind | From | Examples | Owner |
 |---|---|---|---|
 | Managed | `files/` | skills, `.claude/rules/` (always-on rules, loaded at launch with no import), `cardinal.just`, `AGENTS.md`, `specs/README.md`, the CI workflow and its `install_cardinal.sh` | the source: an edit in a project is a conflict |
-| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md` | the project, from the first copy |
+| Seeded | `seed/` | `.claude/cardinal.toml` defaults, `.claude/settings.json`, `.claude/update-docs-map.md`, `justfile`, `issues/queue.md`, `ROADMAP.md` (the milestones the `roadmap` key points at) | the project, from the first copy |
 | Entries | `entries/.claude/settings.json` | the hooks, the deny rules of the review waiver and the allow rule of `cardinal run` | the source, inside a file the project owns ("Hooks and their declaration") |
 
 `.claude/cardinal.lock` records the hash of each managed file and each managed entry as written, and the format of

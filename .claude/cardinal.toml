@@ -13,7 +13,7 @@ root_docs = ["README.md"]
 # Directories that scripts do not scan besides .git, node_modules and the build output (target).
 skipped_dirs = []
 # Where the agent finds the context of the project (issue-workflow, create-issue, prioritize-issues).
-roadmap = ["issues/queue.md"]
+roadmap = ["ROADMAP.md"]
 architecture = "docs/architecture.md"
 # Where the rules for writing tests are (issue-workflow, step "test first").
 test_conventions = "CLAUDE.md"

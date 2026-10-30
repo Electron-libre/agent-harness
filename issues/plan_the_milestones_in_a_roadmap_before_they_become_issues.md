@@ -55,3 +55,47 @@ still need it there).
   the roadmap is not counted as documentation work.
 * A root document that the skills cite goes in `root_docs`, whose files `delivered-quality` counts as doc lines;
   QUA-14 subtracts the `roadmap` files, so `ROADMAP.md` stays uncounted as long as the `roadmap` key lists it.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Seed a `ROADMAP.md` of milestones and point the seeded `roadmap` key at it; teach `create-issue`, `prioritize-issues`
+and the closing of an issue to keep it. Out of scope: any mechanical check of the milestone links. No migration: the
+format does not change and the `roadmap` value of an existing project is its own (the old default was never seeded).
+
+## Plan
+1. [x] Seed the roadmap: `seed/ROADMAP.md` (template from this repository's draft: intro, states, one example
+   milestone), seeded `roadmap = ["ROADMAP.md"]`, this repository's key moved to `ROADMAP.md`, the seeded table of
+   `docs/architecture.md`; verified by a test of `tests/skills.rs` that every file the seeded `roadmap`
+   key lists is seeded by `seed/` (~60 lines).
+2. [ ] Keep the roadmap from the skills: `create-issue` attaches each new issue to a milestone (link under it, an
+   optional `# Milestone` section in the issue) or says it has none, and cuts a `shaped` milestone into issues sized by
+   the limit of `issue-workflow` step 1 (state set to `in issues`); `prioritize-issues` ranks along the order of the
+   milestones and never reorders them; the closing rule of `issue-workflow` sets a milestone `done` when its last
+   issue closes; verified by new `REQUIRED_PASSAGES` of `tests/skills.rs`, then `just sync` (~90 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 107a8ccad8dde13bd052e9601fb01e55896e7f4a
+- Shaped milestone into issues: a step of `create-issue`, no new skill (fixed context).
+- Milestone `done`: an instruction of the closing rule of `issue-workflow`, no code in `close-issue`.
+- This repository's `roadmap` key: `["ROADMAP.md"]` alone; the skills read `issues/queue.md` directly.
+- An issue names its milestone in an optional `# Milestone` section (`check-issue` accepts unknown sections).
+
+## Summary of deliverable 1
+- done: `seed/ROADMAP.md` seeded, the seeded and this repository's `roadmap` keys point at `ROADMAP.md`, the seeded table of `docs/architecture.md` lists it.
+
+| check | result |
+|---|---|
+| tests | pass (`seeded_roadmap_is_seeded` new) |
+| lint | pass |
+| specs | pass (no spec: harness content) |
+| docs | `docs/architecture.md` |
+| code review | low, clean |
+
+- red: none (no spec id); the test failed first with `the seeded roadmap 'docs/TODO.md' is not seeded`.
+- Code review: no findings
+- not verified: a real `cardinal init` in a fresh project (SYN-4 already copies any file of `seed/`).
+- decisions needed: none.
