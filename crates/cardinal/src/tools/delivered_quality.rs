@@ -2,13 +2,13 @@
 //! tab-separated row per file of `issues/done/`, with the commits of the issue, the fixes inside it, and the fixes
 //! and reverts of its files on the default branch after its close. Signals, not verdicts: a fix after a feature may
 //! come from a new need. The sessions that made its commits give the failed checks and the typed messages of its
-//! span. With `--summary`, the columns are summed per Cardinal revision. No text of a commit, an issue or a message
+//! span, and the lines it changed in the specs and in the docs. With `--summary`, the columns are summed per Cardinal revision. No text of a commit, an issue or a message
 //! is printed.
 //! Usage: `cardinal run delivered-quality [repo] [--projects <dir>] [--window-days <n>] [--summary]` (default the
 //! current directory, the `projects/` of the configuration directory (EVA-15) and 30 days).
 
 use super::check_specs::{
-    citation, citation_list, is_req_id, markers, name_matches, spec_patterns,
+    citation, citation_list, config_names, is_req_id, markers, name_matches, spec_patterns,
 };
 use super::transcripts;
 
@@ -21,8 +21,8 @@ use transcripts::{
     revision, sessions, sorted_entries, subagents, typed_text, Place,
 };
 
-const SUMMARY_HEADER: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
-const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
+const SUMMARY_HEADER: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tspec_lines\tdoc_lines\tsessions\tfailed_checks\tvalidations\tother_messages";
+const HEADER: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tspec_lines\tdoc_lines\tsessions\tfailed_checks\tvalidations\tother_messages";
 
 /// The paths whose later fixes say nothing of the issue's work: the issue files, the docs and the lock of the sync.
 const UNRELATED_PREFIXES: &[&str] = &["issues/", "docs/"];
@@ -326,6 +326,65 @@ fn traced(repo: &Path, own: &[&Commit]) -> Option<BTreeSet<String>> {
     Some(traced)
 }
 
+/// The path a `--numstat` line names after the change: the new name of a rename (`a => b`, `dir/{a => b}/c`).
+fn renamed_to(path: &str) -> String {
+    match (path.find('{'), path.find(" => "), path.rfind('}')) {
+        (Some(open), Some(arrow), Some(close)) if open < arrow && arrow < close => format!(
+            "{}{}{}",
+            &path[..open],
+            &path[arrow + 4..close],
+            &path[close + 1..]
+        )
+        .replace("//", "/"),
+        (_, Some(arrow), _) => path[arrow + 4..].to_string(),
+        _ => path.to_string(),
+    }
+}
+
+/// The added and removed lines the commits `own` change in the specs and in the docs (QUA-14): the `.md` files of
+/// `specs/` but its README and template; those of `docs/` outside `docs/adr/` and the `root_docs` of
+/// `.claude/cardinal.toml`. Renames are detected, a binary file counts 0. `None` when git cannot show the diffs.
+fn doc_spec_lines(repo: &Path, own: &[&Commit]) -> Option<(usize, usize)> {
+    let mut args = vec![
+        "-c",
+        "core.quotePath=false",
+        "show",
+        "-M",
+        "--numstat",
+        "--format=%x1e",
+    ];
+    args.extend(own.iter().map(|c| c.hash.as_str()));
+    let stats = git(repo, &args)?;
+    let root_docs = config_names(repo, "root_docs", "README.md").0;
+    let (mut specs, mut docs) = (0, 0);
+    for line in stats.lines() {
+        let mut fields = line.trim_start_matches('\x1e').splitn(3, '\t');
+        let (Some(added), Some(removed), Some(path)) =
+            (fields.next(), fields.next(), fields.next())
+        else {
+            continue;
+        };
+        let count = added.parse().unwrap_or(0) + removed.parse().unwrap_or(0);
+        let path = renamed_to(path);
+        if !Path::new(&path)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("md"))
+        {
+            continue;
+        }
+        if path.starts_with("specs/")
+            && !matches!(path.as_str(), "specs/README.md" | "specs/TEMPLATE.md")
+        {
+            specs += count;
+        } else if (path.starts_with("docs/") && !path.starts_with("docs/adr/"))
+            || root_docs.contains(&path)
+        {
+            docs += count;
+        }
+    }
+    Some((specs, docs))
+}
+
 /// The requirement ids recorded as seen failing in an issue file (QUA-11): the list that opens each `red:` item of
 /// its `# Tracking` section, an item running over its indented continuation lines, the list ending at the first
 /// word that is not an id (`red: ABC-3, ABC-4: <failure>` names ABC-3 and ABC-4, `red: none (ABC-3)` none); `None`
@@ -588,6 +647,7 @@ fn issue_row(
         .as_ref()
         .zip(red_ids(&text))
         .map(|(t, red)| t.difference(&red).count());
+    let lines = doc_spec_lines(repo, &mine);
     let transcript = sessions.map(|s| session_cells(log, &own, &stem, s));
     let mut cells = vec![
         revision(repo, &(log[first].date - Duration::seconds(1)).to_rfc3339()),
@@ -601,6 +661,8 @@ fn issue_row(
         cell(findings),
         cell(traced.map(|t| t.len())),
         cell(without_red),
+        cell(lines.map(|l| l.0)),
+        cell(lines.map(|l| l.1)),
     ];
     cells.extend((0..4).map(|k| cell(transcript.map(|t| t[k]))));
     Some(Row {

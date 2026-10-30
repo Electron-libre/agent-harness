@@ -59,3 +59,46 @@ Measure first for 3: check that the column separates the two consumers' history 
 * Watch the fixed context: approach 2 adds a step to the longest skill; keep it to one line in `SKILL.md` and put
   the detail in `details.md` if needed.
 * A pure refactor or a test seam still needs no doc (the "n/a" rows met in the summaries were justified).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Make a behaviour change update its user doc and architecture document, not only its spec, and measure it. The
+metric is the ratio of doc lines to spec lines changed per issue, not "commits with a spec and no doc": that one
+is already near 0 (3 commits per consumer) and would not move. Out of scope: rewriting the consumers' docs.
+
+## Plan
+1. [x] Measure: `spec_lines` and `doc_lines` in `delivered-quality`, `doc_lines_per_spec_line` in the quality
+   table of `cardinal-report` and among the metrics of `Expected-effect`; verified by tests of the binary on
+   git fixtures; makes true QUA-14, QUA-1, REP-6, VRD-1.
+2. [ ] Route the docs: the generic behaviour row of `update-docs` names the `docs/` page of the capability and the
+   `architecture` document; `issue-workflow` runs `update-docs` once on `base..HEAD` after the last deliverable,
+   reading those pages whole; `Expected-effect: doc_lines_per_spec_line up`; verified by `just check-cardinal`
+   and `just check`.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 5295d9d
+- Root docs counted in `doc_lines`: the `root_docs` of `.claude/cardinal.toml` (1 a).
+- Metric: the ratio of doc lines to spec lines, not the commits with a spec and no doc (2 a).
+
+## Deliverable 1
+
+- done: `delivered-quality` prints `spec_lines` and `doc_lines` (root docs from `root_docs`), `cardinal-report`
+  their ratio `doc_lines_per_spec_line`, accepted as an `Expected-effect` metric; the three specs back to `accepted`.
+- | check | result |
+  |---|---|
+  | tests | pass (`just check`) |
+  | lint | pass |
+  | specs | pass, QUA-14 traced |
+  | docs | `docs/architecture.md` readers table, `root_docs` comment of the seed and of `.claude/cardinal.toml` |
+  | code review | see below |
+- red: QUA-14, REP-6, VRD-1: `iota.spec_lines: expected "40", got Some("")`; `quality-a.tsv has other columns than
+  expected`; `commit_check_refuses_an_expected_effect_it_cannot_read` failed on `doc_lines_per_spec_line up`.
+- Code review: no findings
+- Measured on the two consumers, per revision, `doc_lines / spec_lines`: 0.36, 2.45, 2.06, 1.24 in one, 0.70, 0.29,
+  0.39, 0.19 in the other: the column separates the revisions.
+- not verified: the zero divisor of `doc_lines_per_spec_line` is covered by the shared `ratio`, not by its own check.
+- decisions needed: none.

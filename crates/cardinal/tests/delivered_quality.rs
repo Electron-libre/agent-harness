@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const COLUMNS: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
+const COLUMNS: &str = "issue\trevision\tclosed\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tspec_lines\tdoc_lines\tsessions\tfailed_checks\tvalidations\tother_messages";
 
 fn sh(dir: &Path, args: &[&str]) {
     let ok = Command::new("git")
@@ -689,6 +689,114 @@ fn traced_marker_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     )]
 }
 
+/// `n` numbered lines starting at `from`.
+fn numbered(from: usize, n: usize) -> String {
+    (from..from + n)
+        .flat_map(|i| ["line ".to_string(), i.to_string(), "\n".to_string()])
+        .collect()
+}
+
+/// A repository where `iota` changes specs, docs, ADRs and root files, `kappa` only renames a doc; with `root_docs`,
+/// its `.claude/cardinal.toml` lists them.
+fn lines_fixture(tmp: &Path, root_docs: Option<&str>) -> PathBuf {
+    let repo = tmp.join("proj");
+    std::fs::create_dir_all(&repo).unwrap();
+    sh(&repo, &["init", "-q", "-b", "main"]);
+    let mut sync = vec![
+        (".claude/harness.toml", Some(toml("r1"))),
+        ("docs/guide.md", Some(numbered(0, 10))),
+        ("docs/a.md", Some(numbered(0, 3))),
+        ("issues/iota.md", Some("# iota\n".to_string())),
+        ("issues/kappa.md", Some("# kappa\n".to_string())),
+    ];
+    if let Some(list) = root_docs {
+        sync.push((
+            ".claude/cardinal.toml",
+            Some(format!("[project]\nroot_docs = {list}\n")),
+        ));
+    }
+    let sync: Vec<(&str, Option<&str>)> = sync.iter().map(|(p, b)| (*p, b.as_deref())).collect();
+    commit_at(&repo, "2026-01-01T00:00:00Z", "chore: sync", &sync);
+    let iota = "# iota\n\n# Tracking\n\n## Plan\n1. [x] one\n";
+    let guide = format!("{}{}", numbered(0, 5), numbered(100, 5));
+    commit_at(
+        &repo,
+        "2026-01-02T00:00:00Z",
+        "feat(files): iota",
+        &[
+            ("specs/a.md", Some(&numbered(0, 40))),
+            ("specs/README.md", Some(&numbered(0, 3))),
+            ("docs/guide.md", Some(&guide)),
+            ("docs/adr/0001-x.md", Some(&numbered(0, 20))),
+            ("README.md", Some(&numbered(0, 2))),
+            ("CLAUDE.md", Some(&numbered(0, 7))),
+            ("PLAN.md", Some(&numbered(0, 4))),
+            ("issues/iota.md", Some(iota)),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-03T00:00:00Z",
+        "docs: close iota",
+        &[
+            ("issues/iota.md", None),
+            ("issues/done/iota.md", Some(iota)),
+        ],
+    );
+    let kappa = "# kappa\n\n# Tracking\n\n## Plan\n1. [x] one\n";
+    commit_at(
+        &repo,
+        "2026-01-04T00:00:00Z",
+        "refactor(files): kappa",
+        &[
+            ("docs/a.md", None),
+            ("docs/b.md", Some(&numbered(0, 3))),
+            ("issues/kappa.md", Some(kappa)),
+        ],
+    );
+    commit_at(
+        &repo,
+        "2026-01-05T00:00:00Z",
+        "docs: close kappa",
+        &[
+            ("issues/kappa.md", None),
+            ("issues/done/kappa.md", Some(kappa)),
+        ],
+    );
+    repo
+}
+
+// spec: QUA-14
+fn lines_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let (_, out) = run(dir, &lines_fixture(&tmp.join("lines"), None), &[]);
+    let r = rows(&out);
+    let (_, listed) = run(
+        dir,
+        &lines_fixture(&tmp.join("lines_root_docs"), Some("[\"PLAN.md\"]")),
+        &[],
+    );
+    let l = rows(&listed);
+    vec![
+        (
+            "the spec lines leave out the README and the template of specs/".to_string(),
+            has(&r, "iota", "spec_lines", "40"),
+        ),
+        (
+            "the doc lines count docs/ outside docs/adr/ and README.md when no root_docs is listed"
+                .to_string(),
+            has(&r, "iota", "doc_lines", "12"),
+        ),
+        (
+            "a renamed doc counts no line".to_string(),
+            has(&r, "kappa", "doc_lines", "0") && has(&r, "kappa", "spec_lines", "0"),
+        ),
+        (
+            "the root files counted are the root_docs of cardinal.toml".to_string(),
+            has(&l, "iota", "doc_lines", "14"),
+        ),
+    ]
+}
+
 /// A transcript line of `kind` in `cwd` at `ts`, with `fields` merged in.
 fn line(kind: &str, cwd: &Path, ts: &str, fields: &serde_json::Value) -> String {
     let mut line = serde_json::json!({"type": kind, "cwd": cwd, "timestamp": ts, "sessionId": "x", "gitBranch": "main"});
@@ -826,10 +934,10 @@ fn summary_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     );
     let (ok, out) = run(dir, &repo, &["--summary"]);
     let expected = [
-        "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages",
-        "r1\t1\t2\t3\t1\t2\t3\t3\t7\t0\t0\t\t\t\t",
-        "r2\t2\t3\t2\t0\t0\t0\t3\t\t0\t0\t\t\t\t",
-        "a0\t1\t1\t1\t0\t0\t0\t0\t0\t0\t0\t\t\t\t",
+        "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tspec_lines\tdoc_lines\tsessions\tfailed_checks\tvalidations\tother_messages",
+        "r1\t1\t2\t3\t1\t2\t3\t3\t7\t0\t0\t0\t1\t\t\t\t",
+        "r2\t2\t3\t2\t0\t0\t0\t3\t\t0\t0\t0\t0\t\t\t\t",
+        "a0\t1\t1\t1\t0\t0\t0\t0\t0\t0\t0\t0\t0\t\t\t\t",
     ];
     let lines: Vec<&str> = out.lines().collect();
     if lines != expected {
@@ -851,6 +959,7 @@ fn delivered_quality() {
         .chain(unread_checks(&dir, &tmp))
         .chain(traced_checks(&dir, &tmp))
         .chain(traced_marker_checks(&dir, &tmp))
+        .chain(lines_checks(&dir, &tmp))
         .chain(session_checks(&dir, &tmp))
         .chain(summary_checks(&dir, &tmp))
         .collect();

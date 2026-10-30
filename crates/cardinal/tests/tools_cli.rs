@@ -195,6 +195,11 @@ fn commit_check_refuses_an_expected_effect_it_cannot_read() {
             "",
         ),
         (
+            "docs ratio",
+            message("Expected-effect: doc_lines_per_spec_line up"),
+            "",
+        ),
+        (
             "fixed context",
             message("Expected-effect: total_bytes up"),
             "",

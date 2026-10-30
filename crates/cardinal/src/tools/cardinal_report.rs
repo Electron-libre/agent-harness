@@ -13,7 +13,7 @@ use super::cardinal_changes::{HEADER as CHANGES, RULE_METRIC};
 use super::session_metrics::HEADER as SESSIONS;
 
 const BREACHES: &str = "rule\trevision\tapplied\tbreached\tbreaches\tblocked";
-const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tsessions\tfailed_checks\tvalidations\tother_messages";
+const QUALITY: &str = "revision\tissues\tdeliverables\tcommits\tfixes_in_issue\tfixes_after\treverts_after\treviews\treview_findings\ttraced\ttraced_without_red\tspec_lines\tdoc_lines\tsessions\tfailed_checks\tvalidations\tother_messages";
 const CONTEXT: &str =
     "project\trevision\tcommit\tclaude_md_bytes\tagents_md_bytes\tskill_description_bytes\tskills";
 const USAGE: &str = "usage: cardinal run cardinal-report --sessions <file> [--breaches <file>] [--quality <file>]... [--context <file>] [--changes <file>] [--min-sessions <n>] [--anonymous]";
@@ -345,6 +345,8 @@ fn quality(groups: &[Group], files: &[Vec<Row>]) -> Table {
         "review_findings",
         "traced",
         "traced_without_red",
+        "spec_lines",
+        "doc_lines",
         "sessions",
         "failed_checks",
         "validations",
@@ -360,7 +362,11 @@ fn quality(groups: &[Group], files: &[Vec<Row>]) -> Table {
             }
         })
         .collect();
-    columns.extend(["fixes_after_per_issue", "findings_per_review"]);
+    columns.extend([
+        "fixes_after_per_issue",
+        "findings_per_review",
+        "doc_lines_per_spec_line",
+    ]);
     table("Quality", &columns, groups, |g| {
         let rows = of_group(files.iter().flatten(), g);
         let total = |c: &str| sum(&rows, c);
@@ -370,6 +376,7 @@ fn quality(groups: &[Group], files: &[Vec<Row>]) -> Table {
             .collect();
         cells.push(ratio(total("fixes_after"), total("issues")));
         cells.push(ratio(total("review_findings"), total("reviews")));
+        cells.push(ratio(total("doc_lines"), total("spec_lines")));
         vec![cells]
     })
 }
@@ -486,7 +493,9 @@ fn fixed_context(groups: &[Group], context: &[Row]) -> Table {
 /// finite number.
 fn metric_value(tables: &[Table], g: usize, metric: &str) -> Option<(String, f64)> {
     let (title, column, key) = match metric {
-        "fixes_after_per_issue" | "findings_per_review" => ("Quality", metric, None),
+        "fixes_after_per_issue" | "findings_per_review" | "doc_lines_per_spec_line" => {
+            ("Quality", metric, None)
+        }
         "total_bytes" => ("Fixed context", metric, None),
         _ => match metric.strip_prefix(RULE_METRIC) {
             Some(rule) => ("Rules", "breached_share", Some(("rule", rule))),

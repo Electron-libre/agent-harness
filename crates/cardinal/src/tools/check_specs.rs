@@ -436,7 +436,7 @@ pub(super) fn name_matches(pattern: &str, name: &str) -> bool {
 /// The names of the list `key` of `.claude/cardinal.toml`, `default` when it is absent or empty, and the problems
 /// of the key: a value that is not a list of strings (TRC-16), an entry holding a path separator (TRC-15). A
 /// `cardinal.toml` that does not parse gives the default, its problem being reported with the `skipped_dirs`.
-fn config_names(root: &Path, key: &str, default: &str) -> (Vec<String>, Vec<String>) {
+pub(super) fn config_names(root: &Path, key: &str, default: &str) -> (Vec<String>, Vec<String>) {
     let path = crate::config_of(root);
     let table: toml::Table = std::fs::read_to_string(&path)
         .ok()
