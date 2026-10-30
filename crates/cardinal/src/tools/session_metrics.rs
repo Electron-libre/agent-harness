@@ -188,12 +188,6 @@ impl Session {
         self.output += tokens("output_tokens");
         self.cache_read += tokens("cache_read_input_tokens");
         self.cache_creation += tokens("cache_creation_input_tokens");
-        if main {
-            let context = tokens("input_tokens")
-                + tokens("cache_read_input_tokens")
-                + tokens("cache_creation_input_tokens");
-            self.main_peak = self.main_peak.max(context);
-        }
         self.thinking += usage["output_tokens_details"]["thinking_tokens"]
             .as_u64()
             .unwrap_or(0);
@@ -201,12 +195,19 @@ impl Session {
             .as_array()
             .map(Vec::as_slice)
             .unwrap_or_default();
+        if main {
+            // An advised message's top-level usage adds up its executor iterations: its context is the largest one.
+            let context = iterations
+                .iter()
+                .filter(|i| i["type"] == "message")
+                .map(context_tokens)
+                .max()
+                .unwrap_or_else(|| context_tokens(usage));
+            self.main_peak = self.main_peak.max(context);
+        }
         for advice in iterations.iter().filter(|i| i["type"] == "advisor_message") {
-            let tokens = |key: &str| advice[key].as_u64().unwrap_or(0);
-            self.advisor_input += tokens("input_tokens")
-                + tokens("cache_read_input_tokens")
-                + tokens("cache_creation_input_tokens");
-            self.advisor_output += tokens("output_tokens");
+            self.advisor_input += context_tokens(advice);
+            self.advisor_output += advice["output_tokens"].as_u64().unwrap_or(0);
         }
     }
 
@@ -281,6 +282,18 @@ impl Session {
         ]
         .join("\t")
     }
+}
+
+/// The input and cache tokens of a usage or of one of its iterations: the size of the context it read.
+fn context_tokens(usage: &Value) -> u64 {
+    [
+        "input_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
+    ]
+    .iter()
+    .map(|key| usage[key].as_u64().unwrap_or(0))
+    .sum()
 }
 
 /// The new row of an archived session, keeping the archived project and revision when the new one lost its revision

@@ -35,3 +35,37 @@ Advisor
 # Resources
 * `crates/cardinal/src/tools/session_metrics.rs` (`Session::assistant`), `crates/cardinal/tests/session_metrics.rs`.
 * `specs/evaluation.md` (EVA-16, EVA-19).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+The main context peak of an advised message is the largest sum of input and cache over its `message` iterations,
+not the top-level sum; the billed token columns stay the top-level sums. Archived rows are not rewritten.
+
+## Plan
+1. [x] Peak of an advised message: `Session::assistant` takes the largest `message` iteration when there is one; the spec says archived rows keep the old peak; verified by a check of `advisor_checks` (top-level 39,469, iterations 19,933 → peak 19,933); makes true EVA-16.
+
+## Decisions
+- Mode: autonomous
+- Base commit: a8d2b18
+
+## Summary of deliverable 1
+done: the main context peak of an advised message is its largest `message` iteration; `context_tokens` shared with the advisor input sum; EVA-16 amended (archived rows keep the old peak).
+
+| check | result |
+|---|---|
+| tests | `just check` green |
+| lint | clippy -D warnings clean |
+| specs | EVA-16 traced, spec `accepted` |
+| docs | no doc describes how the peak is computed beyond EVA-16 |
+| code review | `low`, see below |
+
+red: EVA-16: `FAIL - the peak of an advised message is its largest message iteration` (39469, not 19933)
+
+Code review: no findings
+
+not verified: a real advised transcript run through `session-metrics` (the fixture uses the measured numbers).
+
+decisions needed: none

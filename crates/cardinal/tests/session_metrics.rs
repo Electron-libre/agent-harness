@@ -337,7 +337,7 @@ const ADVISOR_CALL: &str =
 const ADVISOR_RESULT: &str = "{\"type\":\"advisor_tool_result\",\"tool_use_id\":\"srv\",\"content\":{\"type\":\"advisor_redacted_result\",\"encrypted_content\":\"SECRET advice\"}}";
 
 /// The sessions `advised` (an advisor called in the main transcript and a sub-agent), `idle` (an advisor set, never
-/// called) and `none` (no advisor set) under the returned projects directory.
+/// called), `none` (no advisor set) and `peaked` (an advised message whose top-level usage adds up two contexts) under the returned projects directory.
 fn advisor_fixture(tmp: &Path) -> PathBuf {
     let proj = tmp.join("advisor/projects/-p");
     std::fs::create_dir_all(proj.join("advised/subagents")).unwrap();
@@ -401,10 +401,12 @@ fn advisor_fixture(tmp: &Path) -> PathBuf {
         "{\"type\":\"message\",\"input_tokens\":2,\"output_tokens\":26}",
     );
     std::fs::write(proj.join("none.jsonl"), none).unwrap();
+    let peaked = line("assistant", cwd, "2026-01-01T00:00:00.000Z", ",\"advisorModel\":\"claude-opus-5-5\",\"message\":{\"id\":\"p1\",\"model\":\"claude-opus-5-5\",\"content\":[],\"usage\":{\"input_tokens\":4,\"cache_read_input_tokens\":28546,\"cache_creation_input_tokens\":10919,\"output_tokens\":9,\"iterations\":[{\"type\":\"message\",\"input_tokens\":2,\"cache_read_input_tokens\":9012,\"cache_creation_input_tokens\":10522},{\"type\":\"advisor_message\",\"input_tokens\":30000},{\"type\":\"message\",\"input_tokens\":2,\"cache_read_input_tokens\":19534,\"cache_creation_input_tokens\":397}]}}");
+    std::fs::write(proj.join("peaked.jsonl"), peaked).unwrap();
     tmp.join("advisor/projects")
 }
 
-// spec: EVA-18, EVA-19
+// spec: EVA-16, EVA-18, EVA-19
 fn advisor_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
     let out = tool_command(dir.join("session_metrics.rs"))
         .arg(advisor_fixture(tmp))
@@ -459,6 +461,14 @@ fn advisor_checks(dir: &Path, tmp: &Path) -> Vec<(&'static str, bool)> {
         (
             "no advisor set gives empty advisor cells",
             advisor_cells("none") == ["", "", "", ""].map(String::from),
+        ),
+        (
+            "the peak of an advised message is its largest message iteration",
+            col("peaked", "main_context_peak") == "19933",
+        ),
+        (
+            "the billed tokens of an advised message stay the top-level sums",
+            col("peaked", "input_tokens") == "4" && col("peaked", "cache_read_tokens") == "28546",
         ),
         ("the advice is never printed", !stdout.contains("SECRET")),
     ]
