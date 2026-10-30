@@ -386,9 +386,11 @@ fn convert_writes_the_ranks_of_the_queue_and_drops_it() {
         ("a.md", "---\nmilestone: m1\nrank: 7\n---\n# Title A\n\nBody.\n"),
         ("b.md", "# Title B\n\nBody.\n"),
         ("c.md", "# Title C\n"),
+        ("d.md", "---\nrank: 7\nwhy: old reason\n---\n# Title D\n"),
+        ("e.md", "---\r\nmilestone: m1\r\n---\r\n# Title E\r\n"),
         (
             "queue.md",
-            "# Queue\n\nProse.\n\n- [b](b.md) - needed first\n- [ghost](ghost.md) - gone\n- [a](a.md) - second\n",
+            "# Queue\n\nProse.\n\n- [b](b.md) - needed first\n- [ghost](ghost.md) - gone\n- [a](a.md) - it's second\n- [d](d.md)\n- [e](e.md) - crlf\n",
         ),
     ]);
     let out = tool_command("next_issue.rs")
@@ -400,22 +402,109 @@ fn convert_writes_the_ranks_of_the_queue_and_drops_it() {
     let read = |f: &str| std::fs::read_to_string(root.path().join("issues").join(f)).unwrap();
     assert_eq!(
         read("b.md"),
-        "---\nrank: 100\nwhy: needed first\n---\n# Title B\n\nBody.\n"
+        "---\nrank: 100\nwhy: 'needed first'\n---\n# Title B\n\nBody.\n"
     );
     assert_eq!(
         read("a.md"),
-        "---\nmilestone: m1\nrank: 300\nwhy: second\n---\n# Title A\n\nBody.\n"
+        "---\nmilestone: m1\nrank: 300\nwhy: 'it''s second'\n---\n# Title A\n\nBody.\n"
     );
     assert_eq!(read("c.md"), "# Title C\n");
+    assert_eq!(read("d.md"), "---\nrank: 400\n---\n# Title D\n");
+    assert_eq!(
+        read("e.md"),
+        "---\r\nmilestone: m1\r\nrank: 500\r\nwhy: 'crlf'\r\n---\r\n# Title E\r\n"
+    );
     assert!(err.contains("queue line without a file: ghost"), "{err}");
     assert!(!root.path().join("issues/queue.md").exists());
 
     let (_, next, err) = next_in(root.path());
     assert!(
-        next.contains("Next: issues/b.md") && next.contains("  2. a\n  3. c\n"),
+        next.contains("Next: issues/b.md\n  Title B\n  why here: needed first\n")
+            && next.contains("  2. a\n  3. d\n  4. e\n  5. c\n"),
         "{next}"
     );
     assert!(err.contains("issue without a rank: c"), "{err}");
+}
+
+// spec: NXT-5
+/// `--convert` in a linked worktree would rewrite every issue on an issue branch: it refuses, changing nothing.
+#[test]
+fn convert_refuses_in_a_linked_worktree() {
+    let root = tempfile::tempdir().unwrap();
+    let repo = root.path().join("repo");
+    std::fs::create_dir_all(repo.join("issues")).unwrap();
+    std::fs::write(repo.join("issues/a.md"), "# Title A\n").unwrap();
+    std::fs::write(repo.join("issues/queue.md"), "- [a](a.md) - one\n").unwrap();
+    git(&repo, &["init", "-q", "-b", "trunk", "."]);
+    git(&repo, &["add", "-A"]);
+    git(&repo, &["commit", "-qm", "init", "--no-verify"]);
+    let linked = root.path().join("linked");
+    git(
+        &repo,
+        &["worktree", "add", "-q", "-b", "a", linked.to_str().unwrap()],
+    );
+    let out = tool_command("next_issue.rs")
+        .args(["--convert", "issues"])
+        .current_dir(&linked)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("linked worktree"),
+        "{out:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(linked.join("issues/a.md")).unwrap(),
+        "# Title A\n"
+    );
+    assert!(linked.join("issues/queue.md").exists());
+}
+
+// spec: NXT-6
+/// An issue ranked by a format 5 skill while the queue still exists is hidden by it: `next-issue` says how to convert.
+#[test]
+fn a_rank_hidden_by_the_queue_hints_at_the_conversion() {
+    let root = issues_dir(&[
+        ("a.md", "# Title A\n"),
+        ("b.md", "---\nrank: 150\n---\n# Title B\n"),
+        ("queue.md", "- [a](a.md) - first\n"),
+    ]);
+    let (_, _, err) = next_in(root.path());
+    assert!(err.contains("issue missing from the queue: b"), "{err}");
+    assert!(err.contains("just next-issue --convert"), "{err}");
+
+    let root = issues_dir(&[
+        ("a.md", "# Title A\n"),
+        ("queue.md", "- [a](a.md) - first\n"),
+    ]);
+    let (_, _, err) = next_in(root.path());
+    assert!(!err.contains("--convert"), "{err}");
+}
+
+// spec: NXT-1
+/// The front matter ends at its closing `---`, a quoted value is read without its quotes, and the title is the first
+/// heading after it.
+#[test]
+fn the_front_matter_is_read_as_a_block() {
+    let a = "---\n# a comment\nrank: '200'\nwhy: \"later\"\n---\n# Title A\n";
+    let root = issues_dir(&[
+        ("a.md", a),
+        ("b.md", "---\nrank: 100\n---\n# Title B\n"),
+        ("c.md", "---\nnot closed\n\n# Title C\n\nrank: 1\n"),
+    ]);
+    let (code, out, err) = next_in(root.path());
+    assert_eq!(code, Some(1), "{out}{err}");
+    assert!(
+        out.contains("Next: issues/b.md") && out.contains("  2. a\n  3. c\n"),
+        "{out}"
+    );
+    assert!(
+        err.contains("issue without a rank: c") && !err.contains("rank: a"),
+        "{err}"
+    );
+    let root = issues_dir(&[("a.md", a)]);
+    let (_, out, _) = next_in(root.path());
+    assert!(out.contains("  Title A\n  why here: later\n"), "{out}");
 }
 
 /// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).

@@ -1,6 +1,6 @@
 ---
 rank: 100
-why: for team use, and its risk of conflict is not measured yet
+why: 'for team use, and its risk of conflict is not measured yet'
 ---
 # Rank the issues without a shared queue file
 
@@ -62,6 +62,9 @@ the consumer (no merge commit, rebase then fast-forward; none in the session tra
    `issues/queue.md`), `seed/issues/queue.md` dropped, `create-issue`, `prioritize-issues`, `issue-workflow`
    (`details.md`) and the docs say the rank, `close-issue` keeps dropping a line only when the queue exists; this
    repository converted; verified by `just check`, `tests/skills.rs` and `just next-issue` (~400 lines).
+4. [x] Fixes of the `high` review of the issue: the front matter read as a closed block with unquoted values, the
+   `why` single-quoted, the line endings kept, `--convert` refused in a linked worktree, the hint of NXT-6;
+   verified by `tests/next_issue.rs`; makes true NXT-1, NXT-5, NXT-6 as amended.
 
 ## Decisions
 - Mode: autonomous
@@ -128,4 +131,28 @@ the consumer (no merge commit, rebase then fast-forward; none in the session tra
   `99.toml`).
 - Code review: no findings
 - not verified: the migration on a consumer (RetroDoc) before its update: its `cardinal update` is the user's.
+- decisions needed: none
+
+## Deliverable 4 (review of the issue)
+- done: `code-review high` on `1e361ed..HEAD` gave 10 findings; fixed: (1) the migration did not warn a stock
+  consumer, now `next-issue` hints at `--convert` once a file has a rank (NXT-6); (2) `create-issue` converts a
+  left queue first; (3) CRLF and a closing `---` at the end of the file are kept; (4) a line with no reason removes
+  the `why`; (5) the front matter must be closed, quotes are read off; (6) `why` is written single-quoted, valid
+  YAML (the two issues of this repository too); (7) the title skips the front matter; (8) `--convert` refuses in a
+  linked worktree. Not fixed: (9) one front matter reader shared by the four tools: a refactor of three other
+  tools, outside this issue; (10) the copy of the entries into `&str` pairs in `main`: a few lines, it keeps the
+  rest of `main` unchanged.
+
+| check | result |
+|---|---|
+| tests | pass (`tests/next_issue.rs`, 9 tests) |
+| lint | pass |
+| specs | pass (NXT-1, NXT-5 amended, NXT-6 added) |
+| docs | `docs/usage.md`, ADR 0019, `create-issue`, `prioritize-issues` |
+| code review | low, run |
+
+- red: NXT-1, NXT-5, NXT-6: `issue without a rank: c` missing for an unclosed front matter, `why: needed first`
+  where `why: 'needed first'` was expected, no hint naming `--convert`, `--convert` exit 0 in a linked worktree.
+- Code review: no findings
+- not verified: none
 - decisions needed: none

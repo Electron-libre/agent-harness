@@ -9,6 +9,7 @@
 //! Usage: `just next-issue` (from the repo root, or pass the `issues` directory as argument); `--convert` turns
 //! `issues/queue.md` into the ranks of the issue files and deletes it.
 
+use std::fmt::Write as _;
 use std::path::Path;
 use std::process::Command;
 
@@ -16,7 +17,9 @@ fn title(dir: &Path, stem: &str) -> String {
     std::fs::read_to_string(dir.join(format!("{stem}.md")))
         .ok()
         .and_then(|t| {
-            t.lines()
+            let body = split_front_matter(&t).map_or(0, |(_, _, body)| body);
+            t[body..]
+                .lines()
                 .find_map(|l| l.strip_prefix("# ").map(str::to_string))
         })
         .unwrap_or_else(|| "(no file)".to_string())
@@ -169,19 +172,55 @@ fn from_queue(dir: &Path, queue: &str) -> (Vec<(String, String)>, bool) {
             drift = true;
         }
     }
+    let ranked = issue_stems(dir).iter().any(|s| {
+        std::fs::read_to_string(dir.join(format!("{s}.md")))
+            .is_ok_and(|t| front_matter(&t, "rank").is_some())
+    });
+    if ranked {
+        eprintln!("hint: issue files carry a `rank` that issues/queue.md hides: run `just next-issue --convert` in the main worktree (NXT-6)");
+    }
     (entries, drift)
 }
 
-/// The value of `key` in the front matter (between the `---` lines that open the file) of `text`.
-fn front_matter<'a>(text: &'a str, key: &str) -> Option<&'a str> {
-    let mut lines = text.lines();
-    if lines.next()?.trim_end() != "---" {
+/// The lines of the front matter of `text` (between a first line `---` and the next `---`, line endings kept) and
+/// the offsets of its closing line and of the body; `None` when the file opens no closed front matter.
+fn split_front_matter(text: &str) -> Option<(Vec<&str>, usize, usize)> {
+    let mut lines = text.split_inclusive('\n');
+    let first = lines.next()?;
+    if first.trim_end() != "---" {
         return None;
     }
-    lines
-        .take_while(|l| l.trim_end() != "---")
+    let (mut at, mut matter) = (first.len(), Vec::new());
+    for l in lines {
+        if l.trim_end() == "---" {
+            return Some((matter, at, at + l.len()));
+        }
+        at += l.len();
+        matter.push(l);
+    }
+    None
+}
+
+/// `value` without the single (a doubled `'` inside stands for one) or double quotes around it.
+fn unquote(value: &str) -> String {
+    let inner = |q: char| {
+        (value.len() >= 2 && value.starts_with(q) && value.ends_with(q))
+            .then(|| &value[1..value.len() - 1])
+    };
+    if let Some(v) = inner('\'') {
+        v.replace("''", "'")
+    } else {
+        inner('"').unwrap_or(value).to_string()
+    }
+}
+
+/// The value of `key` in the front matter of `text`, unquoted.
+fn front_matter(text: &str, key: &str) -> Option<String> {
+    let (matter, _, _) = split_front_matter(text)?;
+    matter
+        .iter()
         .find_map(|l| l.strip_prefix(key)?.strip_prefix(':'))
-        .map(str::trim)
+        .map(|v| unquote(v.trim()))
 }
 
 /// The order of the `rank` of each issue file (NXT-1): ranked first, by rank then stem, then the unranked ones,
@@ -191,7 +230,7 @@ fn from_ranks(dir: &Path) -> (Vec<(String, String)>, bool) {
     let mut unranked = Vec::new();
     for stem in issue_stems(dir) {
         let text = std::fs::read_to_string(dir.join(format!("{stem}.md"))).unwrap_or_default();
-        let why = front_matter(&text, "why").unwrap_or("").to_string();
+        let why = front_matter(&text, "why").unwrap_or_default();
         match front_matter(&text, "rank").and_then(|r| r.parse().ok()) {
             Some(rank) => ranked.push((rank, stem, why)),
             None => unranked.push((stem, why)),
@@ -214,45 +253,60 @@ fn from_ranks(dir: &Path) -> (Vec<(String, String)>, bool) {
     (entries, drift)
 }
 
-/// `text` with `rank` and `why` set in its front matter: an existing line of either key is replaced in place, a
-/// missing one is added at the end of the front matter, and a file without one gets it; nothing else changes.
+/// `text` with `rank` and `why` (single-quoted; removed when empty) set in its front matter: an existing line of
+/// either key is replaced in place with the line ending of the file, a missing one is added at the end of the front
+/// matter, and a file without one gets it; nothing else changes.
 fn with_rank(text: &str, rank: usize, why: &str) -> String {
-    let mut set = vec![("rank", rank.to_string())];
-    if !why.is_empty() {
-        set.push(("why", why.to_string()));
-    }
-    let line = |(key, value): &(&str, String)| format!("{key}: {value}\n");
-    let split = text.strip_prefix("---\n").and_then(|rest| {
-        let end = if rest.starts_with("---\n") {
-            0
-        } else {
-            rest.find("\n---\n")? + 1
-        };
-        Some(rest.split_at(end))
-    });
-    let Some((matter, body)) = split else {
-        let head: String = set.iter().map(line).collect();
+    let mut set = vec![
+        ("rank", Some(rank.to_string())),
+        (
+            "why",
+            (!why.is_empty()).then(|| format!("'{}'", why.replace('\'', "''"))),
+        ),
+    ];
+    let Some((matter, closing, _)) = split_front_matter(text) else {
+        let head: String = set
+            .iter()
+            .filter_map(|(k, v)| Some(format!("{k}: {}\n", v.as_ref()?)))
+            .collect();
         return format!("---\n{head}---\n{text}");
     };
-    let mut out = String::from("---\n");
-    for l in matter.lines() {
+    let eol = if text.starts_with("---\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let mut out = text[..text.find('\n').map_or(0, |i| i + 1)].to_string();
+    for l in matter {
         let key = set
             .iter()
             .position(|(k, _)| l.strip_prefix(k).is_some_and(|r| r.starts_with(':')));
         if let Some(i) = key {
-            out.push_str(&line(&set.remove(i)));
+            if let (k, Some(v)) = set.remove(i) {
+                let _ = write!(out, "{k}: {v}{eol}");
+            }
         } else {
             out.push_str(l);
-            out.push('\n');
         }
     }
-    out.extend(set.iter().map(line));
-    out + body
+    for (k, v) in set {
+        if let Some(v) = v {
+            let _ = write!(out, "{k}: {v}{eol}");
+        }
+    }
+    out + &text[closing..]
 }
 
 /// `--convert` (NXT-5): the rank of each line of `queue.md` (100 times its position) and its reason go to the front
 /// matter of its issue file, then `queue.md` is deleted. Exit 1 when a line had no file.
 fn convert(dir: &Path) -> u8 {
+    if let Some((top, main)) = super::close_issue::linked_worktree(dir) {
+        eprintln!(
+            "{} is a linked worktree: convert the queue in the main worktree {main}",
+            top.display()
+        );
+        return 1;
+    }
     let path = dir.join("queue.md");
     let Ok(queue) = std::fs::read_to_string(&path) else {
         eprintln!("no {}", path.display());

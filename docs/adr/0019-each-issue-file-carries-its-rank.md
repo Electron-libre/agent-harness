@@ -13,8 +13,8 @@ file but resurrects the lines removed on one side when the other side edited nex
 merges ignore it.
 
 ## Decision
-Each open issue carries its rank in its own front matter: `rank: <n>` (gaps of 100, lowest first) and `why: <why
-here>`. `next-issue` sorts the files, issues of the same rank by stem, reports a missing rank and the ties.
+Each open issue carries its rank in its own front matter: `rank: <n>` (gaps of 100, lowest first) and `why: '<why
+here>'`. `next-issue` sorts the files, issues of the same rank by stem, reports a missing rank and the ties.
 `create-issue` picks a rank between its neighbours, `prioritize-issues` rewrites the ranks, `close-issue` only moves
 the file. The format of the source rises to 5 (ADR 0014); `next-issue --convert` turns a format 4 queue into ranks,
 and `next-issue` keeps reading `issues/queue.md` while it exists, for the sources of the format 4 (ADR 0016).

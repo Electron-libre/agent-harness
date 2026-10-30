@@ -352,8 +352,8 @@ fn repo_root(dir: &Path) -> Option<std::path::PathBuf> {
         .then(|| std::path::PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()))
 }
 
-/// `Some(message)` when `dir` is in a git worktree other than the main one.
-fn linked_worktree(dir: &Path) -> Option<String> {
+/// The top of the worktree of `dir` and the path of the main worktree, when they differ.
+pub(super) fn linked_worktree(dir: &Path) -> Option<(std::path::PathBuf, String)> {
     let top = repo_root(dir)?;
     let out = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
@@ -366,13 +366,16 @@ fn linked_worktree(dir: &Path) -> Option<String> {
     }
     let main = list.lines().find_map(|l| l.strip_prefix("worktree "))?;
     let same = std::fs::canonicalize(main).ok()? == std::fs::canonicalize(&top).ok()?;
-    (!same).then(|| format!("{} is a linked worktree: merge its branch, then close the issue in the main worktree {main}", top.display()))
+    (!same).then(|| (top, main.to_string()))
 }
 
 /// Exit with an error when `dir` is in a linked worktree (PAR-8).
 fn refuse_linked_worktree(dir: &Path) {
-    if let Some(message) = linked_worktree(dir) {
-        eprintln!("{message}");
+    if let Some((top, main)) = linked_worktree(dir) {
+        eprintln!(
+            "{} is a linked worktree: merge its branch, then close the issue in the main worktree {main}",
+            top.display()
+        );
         std::process::exit(1);
     }
 }

@@ -57,19 +57,20 @@ Show the user your results as `.claude/rules/reports-to-the-user.md` says.
    just check-issue issues/<name>.md
    ```
 
-5. **Rank**: a new issue has a priority, so rank it. Run `just next-issue` (the open issues, lowest rank first),
+5. **Rank**: a new issue has a priority, so rank it. An `issues/queue.md` left from the format 4 is converted
+   first (`just next-issue --convert`, in the main worktree). Run `just next-issue` (the open issues, lowest rank first),
    read the issues around the candidate places, then open the file with a front matter
 
    ```markdown
    ---
    rank: <n>
-   why: <why here>
+   why: '<why here>'
    ---
    ```
 
    at the place that value and dependencies justify (not by reflex at the end; the "why" names what it comes
    after or unblocks): `<n>` halfway between the ranks of its neighbours (`rank` of the files, gaps of 100), never
-   editing another issue to make room; a tie with a neighbour is reported by `just next-issue` and settled by
+   editing another issue to make room (the `why` in single quotes, a `'` inside doubled); a tie with a neighbour is reported by `just next-issue` and settled by
    `skill:prioritize-issues`. Say the rank and the
    reason to the user, who can move it. If the new issue changes the case for others, say so and suggest
    `skill:prioritize-issues` rather than silently reshuffling. Run `just next-issue` and check it lists the issue

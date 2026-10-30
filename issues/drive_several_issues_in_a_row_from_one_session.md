@@ -1,6 +1,6 @@
 ---
 rank: 200
-why: last: low priority by the user's choice; a comfort, one session per issue works today
+why: 'last: low priority by the user''s choice; a comfort, one session per issue works today'
 ---
 # Drive several issues in a row from one session
 
