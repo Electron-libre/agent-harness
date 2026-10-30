@@ -113,6 +113,11 @@ fn a_marked_commit_a_footer_or_a_listed_file_is_breaking() {
             "a.txt",
         ),
         ("feat: raise the format", "cardinal-format"),
+        ("raise the format", "cardinal-format"),
+        (
+            "change a default\n\nBREAKING CHANGE: the default moved",
+            "a.txt",
+        ),
     ] {
         let dir = repo();
         config(

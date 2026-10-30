@@ -275,20 +275,14 @@ fn commits(root: &Path, last: Version) -> Result<Vec<Commit>, String> {
 /// The kind and description of a commit message; `touches_listed` when it changes a `release_breaking_files` file.
 fn classify(message: &str, touches_listed: bool) -> Commit {
     let subject = message.lines().next().unwrap_or("").trim();
-    let Some((head, description)) = subject.split_once(": ") else {
-        return Commit {
-            kind: Kind::Unlisted,
-            description: subject.into(),
-        };
-    };
-    let kind_of = head.split(['(', '!']).next().unwrap_or("");
+    let (head, description) = subject.split_once(": ").unwrap_or(("", subject));
     let footer = message
         .lines()
         .any(|l| l.starts_with("BREAKING CHANGE:") || l.starts_with("BREAKING-CHANGE:"));
     let kind = if head.ends_with('!') || footer || touches_listed {
         Kind::Breaking
     } else {
-        match kind_of {
+        match head.split(['(', '!']).next().unwrap_or("") {
             "feat" => Kind::Added,
             "fix" => Kind::Fixed,
             _ => Kind::Unlisted,
