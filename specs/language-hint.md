@@ -9,13 +9,14 @@ adrs: [0005]
 ## Intent
 
 The hook `cardinal run language-hint` sends the agent back once when its last reply is not in the `user_language` of
-`.claude/cardinal.toml` (a Stop hook), a rule the agent breaks although it is always in its context. It judges the text with the test of rule `user-language` (BRE-10, `specs/rule-breaches.md`), so the hook and
-the measure agree on what a breach is.
+`.claude/cardinal.toml` (a Stop hook), a rule the agent breaks although it is always in its context. It judges the
+text with the test of rule `user-language` (BRE-10, `specs/rule-breaches.md`), so the hook and the measure agree on
+what a breach is.
 
 ## Requirements
 
 - **LNG-1** (deterministic) On a Stop event, the hook must exit 0 and print nothing when the event sets `stop_hook_active`.
-- **LNG-2** (deterministic) On a Stop event (any `hook_event_name` but `PostToolUse`), the hook must judge the `last_assistant_message` of the event, and, when the event has none, the text blocks of the last assistant line holding text in the transcript at its `transcript_path`, joined by a blank line, provided no message the user typed (the filter of `transcripts.rs`) comes after that line.
+- **LNG-2** (deterministic) On a Stop event (`hook_event_name` `Stop`), the hook must judge the `last_assistant_message` of the event, and, when the event has none, the text blocks of the last assistant line holding text in the transcript at its `transcript_path`, joined by a blank line, provided no message the user typed (the filter of `transcripts.rs`) comes after that line.
 - **LNG-3** (deterministic) The hook must read `user_language` in the `[project]` table of the configuration (`.claude/cardinal.toml`) at the root of the work tree holding the `cwd` of the event, and in that of `CLAUDE_PROJECT_DIR` when the event has no `cwd`, it is outside a git work tree or that work tree has neither.
 - **LNG-4** (deterministic) The hook must judge the text with the same function as BRE-10: at least 20 words once inline code and fenced code blocks are removed, and more stop words of the other language than of `user_language`.
 - **LNG-5** (deterministic) On a Stop event, when the text breaks the test of LNG-4, the hook must exit 2 with exactly one line on stderr that names `user_language`, holds `the user_language of .claude/cardinal.toml` and asks to give the reply again in it, quoting no text of the reply.
@@ -24,7 +25,7 @@ the measure agree on what a breach is.
 - **LNG-8** (deterministic) withdrawn: the hint after a tool call, dropped because Claude Code often runs `PostToolUse` before it writes the text and the call to the transcript.
 - **LNG-9** (deterministic) withdrawn: the hint after a tool call, dropped because Claude Code often runs `PostToolUse` before it writes the text and the call to the transcript.
 - **LNG-10** (deterministic) withdrawn: the hint after a tool call, dropped because Claude Code often runs `PostToolUse` before it writes the text and the call to the transcript.
-- **LNG-11** (deterministic) On a `PostToolUse` event (a declaration an older Cardinal left in the settings), the hook must exit 0 and print nothing.
+- **LNG-11** (deterministic) On any event but Stop (such as the `PostToolUse` declaration an older Cardinal left in the settings), the hook must exit 0 and print nothing.
 
 ## Scenarios
 

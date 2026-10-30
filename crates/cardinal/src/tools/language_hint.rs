@@ -66,10 +66,11 @@ pub(super) fn main(_args: &[String]) -> u8 {
     let Ok(event) = serde_json::from_str::<Value>(&input) else {
         return 0;
     };
-    // a `PostToolUse` declaration an older Cardinal left in the settings (LNG-11)
-    if event["hook_event_name"] == "PostToolUse"
-        || event["stop_hook_active"].as_bool().unwrap_or(false)
-    {
+    // any other event, such as the `PostToolUse` declaration an older Cardinal left in the settings (LNG-11)
+    if event["hook_event_name"] != "Stop" {
+        return 0;
+    }
+    if event["stop_hook_active"].as_bool().unwrap_or(false) {
         return 0;
     }
     let Some(language) = user_language(&event) else {

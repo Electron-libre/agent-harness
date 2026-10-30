@@ -28,7 +28,7 @@ it cannot arrive cheaply: the Stop hook already keeps the final replies in the `
 * `specs/language-hint.md`: LNG-7 to LNG-10 may be amended or removed.
 
 # Resources
-* `crates/cardinal/src/tools/language_hint.rs` (`after_call`, `text_before_call`)
+* `crates/cardinal/src/tools/language_hint.rs` (`after_call`, `text_before_call`, removed in `1b8ce83`)
 * `specs/language-hint.md`, `issues/done/measure_the_effect_of_the_hint_between_tool_calls.md` (`# Tracking`)
 
 # Hints
@@ -75,3 +75,15 @@ for the transcript is the only fix, and it would not see the blocks that are nev
 - not verified: the removal of the entry from the consumers' settings (`cardinal sync` there, SYN-31).
 - decisions needed: none
 - follow-up: `is_hint` and BRE-13 still read the `hook_additional_context` attachment, for the transcripts of before.
+
+## Deliverable 2 (fixes of the `high` review)
+- done: the hook judges only a `Stop` event (LNG-2, LNG-11 widened to any other event), its two guards split; BRE-13
+  scenario dated to the withdrawal (the `hinted` count between calls stops at that revision); Intent rewrapped; the
+  Resources name the commit that removed `after_call`.
+- checks: `just check` ok.
+- red: LNG-11: on `SubagentStop` the hook exited 2 with `Your last reply is not in French, ...`.
+- Code review: no findings (`low`)
+- review `high`: 7 findings: 5 fixed here; the queue entry and the `issues/done/` link of LNG's non-goal are settled
+  by `just close-issue`.
+- not verified: none
+- decisions needed: none

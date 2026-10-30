@@ -154,6 +154,10 @@ fn with_no_last_message_the_last_assistant_text_of_the_transcript_is_judged() {
     put(dir.path(), "t.jsonl", &new_turn);
     let run = hook(dir.path(), &event);
     assert!(silent_pass(&run), "{run:?}");
+    // nor does any other event but Stop
+    let event = json!({"hook_event_name": "SubagentStop", "cwd": dir.path(), "last_assistant_message": ENGLISH});
+    let run = hook(dir.path(), &event);
+    assert!(silent_pass(&run), "{run:?}");
 }
 
 // spec: LNG-3
@@ -198,7 +202,7 @@ fn the_language_name_is_read_in_any_case_and_an_as_are_not_english() {
 
 // spec: LNG-11
 #[test]
-fn a_tool_call_left_declared_by_an_older_cardinal_gets_nothing() {
+fn an_event_but_stop_such_as_a_call_left_declared_by_an_older_cardinal_gets_nothing() {
     let dir = tempdir().unwrap();
     repo(dir.path(), Some("French"));
     let lines = [
@@ -209,6 +213,10 @@ fn a_tool_call_left_declared_by_an_older_cardinal_gets_nothing() {
     let transcript: String = lines.iter().map(|l| l.to_string() + "\n").collect();
     put(dir.path(), "t.jsonl", &transcript);
     let event = json!({"hook_event_name": "PostToolUse", "cwd": dir.path(), "transcript_path": dir.path().join("t.jsonl"), "tool_name": "Bash", "tool_use_id": "t1", "last_assistant_message": ENGLISH});
+    let run = hook(dir.path(), &event);
+    assert!(silent_pass(&run), "{run:?}");
+    // nor does any other event but Stop
+    let event = json!({"hook_event_name": "SubagentStop", "cwd": dir.path(), "last_assistant_message": ENGLISH});
     let run = hook(dir.path(), &event);
     assert!(silent_pass(&run), "{run:?}");
 }
