@@ -17,6 +17,15 @@ const AN_AS: &str = "Bilan : an premier, an deuxième, an troisième, an quatri�
 /// The words every hint holds, by which `rule-breaches` finds it.
 const MARK: &str = "the user_language of .claude/cardinal.toml";
 
+/// A `.claude/cardinal.toml` that names `language`.
+fn repo_config(dir: &Path, language: &str) {
+    put(
+        dir,
+        ".claude/cardinal.toml",
+        &format!("[cardinal]\nsource = \"x\"\n\n[project]\nuser_language = \"{language}\"\n"),
+    );
+}
+
 /// A git repository whose `.claude/cardinal.toml` names `language` (none when `None`).
 fn repo(dir: &Path, language: Option<&str>) {
     let ok = Command::new("git")
@@ -246,6 +255,20 @@ fn the_personal_language_wins_over_the_shared_one() {
         "a personal language with no stop words is not judged"
     );
 
+    put(dir.path(), ".claude/cardinal.toml", "[project\n");
+    put(
+        dir.path(),
+        ".claude/cardinal.local.toml",
+        "[project]\nuser_language = \"English\"\n",
+    );
+    let run = hook(dir.path(), &stop(dir.path(), FRENCH));
+    assert_eq!(
+        run.code,
+        Some(2),
+        "personal value read past a broken shared file: {run:?}"
+    );
+
+    repo_config(dir.path(), "French");
     for personal in ["[project\n", "[project]\ncommit_scopes = []\n"] {
         put(dir.path(), ".claude/cardinal.local.toml", personal);
         let run = hook(dir.path(), &stop(dir.path(), ENGLISH));

@@ -18,6 +18,7 @@ it is when the measure runs, since the transcripts it reads are personal too and
 shared value is read at the session's `start`.
 
 ## Consequences
-Each member sets their language once per clone. A measure run after a person changed their language judges their
+Each member sets their language once per clone; `start-issue` copies the file into each issue worktree, which
+git would otherwise leave without it. A measure run after a person changed their language judges their
 older sessions against the new one. The shared keys (`commit_scopes`, `roadmap`…) stay shared: a personal file that
 sets one is not read for it.

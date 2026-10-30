@@ -296,6 +296,8 @@ the design:
 - **Taken** is the worktree itself, or a branch holding commits not on the main branch (PAR-3): `next-issue` reads
   `git for-each-ref`, `git worktree list`, `git cherry` and `git merge-tree --write-tree`, so every worktree sees it and
   no file needs cleaning. A leftover branch with neither is listed `Stale:` for `finish-issue` to clean (PAR-4, PAR-6).
+- **Personal configuration**: `start-issue` copies the git-ignored `.claude/cardinal.local.toml` of the main
+  worktree into the new one (PAR-17), so the person's `user_language` follows them.
 - **Nesting**: `start-issue` makes git ignore `/.claude/worktrees/` (PAR-13), and the scanners (`close-issue`,
   `check-specs`, `spec-coverage`) take their files from git (`repo_files.rs`, `git ls-files -co --exclude-standard`, PAR-14,
   [ADR 0009](adr/0009-scanners-list-the-repository-files-through-git.md)), which never lists a nested worktree.

@@ -1,7 +1,6 @@
 //! Whether a reply is in the conversation language (`user_language` of `.claude/cardinal.local.toml`, else of
-//! `.claude/cardinal.toml`): the test of rule
-//! `user-language` (BRE-10, `specs/rule-breaches.md`), shared by `rule-breaches` and the `language-hint` hook
-//! (`specs/language-hint.md`) so the measure and the hook agree on what a breach is.
+//! `.claude/cardinal.toml`): the test of rule `user-language` (BRE-10, `specs/rule-breaches.md`), shared by
+//! `rule-breaches` and the `language-hint` hook (`specs/language-hint.md`) so the measure and the hook agree on what a breach is.
 
 use serde_json::Value;
 use std::path::Path;

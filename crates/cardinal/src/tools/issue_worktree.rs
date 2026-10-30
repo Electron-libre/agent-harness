@@ -193,6 +193,12 @@ fn start(cwd: &Path, issue: &str) -> Result<String, String> {
         ],
     )?;
     exclude_worktrees(&main)?;
+    // git ignores the personal configuration, so the checkout lacks it (PAR-17)
+    let personal = main.join(crate::PERSONAL_CONFIG);
+    if personal.is_file() {
+        std::fs::copy(&personal, dir.join(crate::PERSONAL_CONFIG))
+            .map_err(|e| format!("cannot copy {}: {e}", personal.display()))?;
+    }
     Ok(dir.display().to_string())
 }
 

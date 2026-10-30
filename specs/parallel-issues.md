@@ -1,7 +1,7 @@
 ---
 id: PAR
 status: accepted
-adrs: [0003, 0008, 0009, 0011]
+adrs: [0003, 0008, 0009, 0011, 0018]
 ---
 
 # Parallel issue isolation
@@ -30,6 +30,7 @@ deliberate step run from the main branch.
 - **PAR-16** (deterministic) Outside a git repository, the spec traceability check must scan every `.rs` file of the root it is given that TRC-9 and TRC-10 let it read, those of `.claude/worktrees/` included.
 - **PAR-15** (deterministic) `finish-issue` must also remove the worktree of an issue started before PAR-1 placed it under `.claude/worktrees/`, at `<repo>-<stem>` next to the main worktree, under the same conditions as PAR-6, PAR-7, PAR-10 and PAR-11.
 - **PAR-12** (deterministic) `cardinal run format-code` must run `cargo fmt` from the directory of the edited file, so that cargo formats the project holding that file (the main worktree, an issue worktree, a crate in a subdirectory) and not the one of `CLAUDE_PROJECT_DIR`.
+- **PAR-17** (deterministic) `start-issue` must copy the `.claude/cardinal.local.toml` of the main worktree, when it has one, to the same path of the new worktree, so a person's preferences (ADR 0018) follow them into each issue worktree.
 
 ## Scenarios
 

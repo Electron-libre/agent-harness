@@ -126,6 +126,18 @@ fn start_makes_git_ignore_the_worktrees(c: &Ctx) -> Checks {
     ]
 }
 
+const PERSONAL: &str = ".claude/cardinal.local.toml";
+const PERSONAL_TEXT: &str = "[project]\nuser_language = \"English\"\n";
+
+// spec: PAR-17
+fn start_copies_the_personal_configuration(c: &Ctx) -> Checks {
+    let copied = std::fs::read_to_string(c.wt("x").join(PERSONAL)).ok();
+    vec![(
+        "start copies the personal configuration of the main worktree into the new one",
+        copied.as_deref() == Some(PERSONAL_TEXT),
+    )]
+}
+
 // spec: PAR-2
 fn start_refuses_and_changes_nothing(c: &Ctx) -> Checks {
     let before = c.entries();
@@ -414,6 +426,10 @@ fn issue_worktree() {
     }
     // a project that tracks `.claude/` against a global gitignore un-ignores it
     std::fs::write(repo.join(".gitignore"), "!.claude/\n").unwrap();
+    // the managed `.claude/.gitignore` and a personal configuration it ignores
+    std::fs::create_dir_all(repo.join(".claude")).unwrap();
+    std::fs::write(repo.join(".claude/.gitignore"), "cardinal.local.toml\n").unwrap();
+    std::fs::write(repo.join(PERSONAL), PERSONAL_TEXT).unwrap();
     git_ok(&repo, &["init", "-q", "-b", "trunk", "."]);
     git_ok(&repo, &["add", "-A"]);
     git_ok(&repo, &["commit", "-qm", "init", "--no-verify"]);
@@ -430,6 +446,7 @@ fn issue_worktree() {
     for checks in [
         start_creates_the_worktree(&c),
         start_makes_git_ignore_the_worktrees(&c),
+        start_copies_the_personal_configuration(&c),
         start_refuses_and_changes_nothing(&c),
         finish_needs_a_merged_branch(&c),
         finish_removes_only_a_clean_worktree(&c),

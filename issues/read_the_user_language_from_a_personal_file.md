@@ -131,3 +131,36 @@ Code review: no findings
 not verified: none
 
 decisions needed: none
+
+## Deliverable 4 (high review fixes)
+
+done: `start-issue` copies the personal file into each issue worktree (PAR-17); the hook reads the personal value past
+a broken shared file; the hint names the personal file next to its mark; doc comments rewrapped.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | PAR-17 added, `accepted` |
+| docs | ADR 0018, `docs/usage.md`, `docs/architecture.md` |
+| code review | see below |
+
+red: PAR-17: `start copies the personal configuration of the main worktree into the new one` failed (no file in the
+worktree).
+
+High review (`703b389..63b18b8`): 7 findings.
+- worktree lacks the personal file, hook and measure disagree: fixed (PAR-17 copy).
+- managed `.claude/.gitignore` conflicts with a project's own: kept, decision 2 a; such a project resolves it once.
+- hint points at the shared file only: fixed (suffix naming `.claude/cardinal.local.toml`, mark kept).
+- broken shared file hides the personal value: fixed.
+- personal file read once per session: not fixed, one small read per transcript is negligible.
+- "once per clone" ignores worktrees: fixed with the copy, docs say so.
+- doc comment wrapping: fixed in the Rust files; the SKILL.md lines already exceed 120 columns elsewhere.
+
+Code review: no findings
+
+not verified: none
+
+decisions needed: none
+
+Status: done, awaiting the agreement to close.

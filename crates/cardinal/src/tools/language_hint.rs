@@ -1,7 +1,7 @@
 //! `language-hint`, a Stop hook: when the last reply of the agent is not in the `user_language` of
-//! `.claude/cardinal.local.toml`, else of `.claude/cardinal.toml`, as the test of rule `user-language` judges it (`language.rs`), it exits 2 with a one-line
-//! hint so the agent gives it again, letting go once the agent retried (`stop_hook_active`). It lets go whenever the
-//! text cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
+//! `.claude/cardinal.local.toml`, else of `.claude/cardinal.toml`, as the test of rule `user-language` judges it
+//! (`language.rs`), it exits 2 with a one-line hint so the agent gives it again, letting go once the agent retried
+//! (`stop_hook_active`). It lets go whenever the text cannot be judged, so it never blocks for its own failure. Spec: `specs/language-hint.md`.
 
 use super::language::{Language, HINT_MARK};
 use super::transcripts::{git, typed_text};
@@ -25,10 +25,9 @@ fn user_language(event: &Value) -> Option<Language> {
         .and_then(|cwd| root_at(Path::new(cwd)))
         .or_else(|| root_at(Path::new(&project)))?;
     let shared = std::fs::read_to_string(crate::config_of(&root))
-        .ok()?
-        .parse()
-        .ok()?;
-    Language::of(&root, Some(&shared))
+        .ok()
+        .and_then(|text| text.parse().ok());
+    Language::of(&root, shared.as_ref())
 }
 
 /// The text blocks of the last assistant line holding text in the transcript, joined by a blank line; `None` when a
@@ -86,6 +85,9 @@ pub(super) fn main(_args: &[String]) -> u8 {
         return 0;
     }
     let name = language.name;
-    eprintln!("Your last reply is not in {name}, {HINT_MARK}: give it again in {name}.");
+    eprintln!(
+        "Your last reply is not in {name}, {HINT_MARK} (or of {}, which overrides it): give it again in {name}.",
+        crate::PERSONAL_CONFIG
+    );
     2
 }
