@@ -35,8 +35,9 @@ The file is `ROADMAP.md` at the root, the usual place beside `README.md` and `CH
 Out of scope for now: a mechanical check of the milestone links (an issue with no milestone, a `done` milestone with an open issue)
 in `just check-issue`; reconsider once the roadmap is in use and drift is measured.
 
-This repository adopts it too: write its own `ROADMAP.md` with the current milestones and point its `roadmap` key at
-it (keeping `issues/queue.md` if the skills still need it there).
+This repository adopts it too: its `ROADMAP.md` was drafted by hand with the user on 2026-10-30, before this issue;
+step 1 starts from that draft (format, states). Point its `roadmap` key at it (keeping `issues/queue.md` if the skills
+still need it there).
 
 # Resources
 * `.claude/cardinal.toml` and `seed/.claude/cardinal.toml` (the `roadmap` key), `docs/architecture.md` (seeded versus
