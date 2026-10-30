@@ -579,7 +579,8 @@ fn record(path: &Path) -> Option<Record> {
         .map(|c| (c.clone(), worktree(&c)))
         .collect();
     let config = committed_config(&repo, &start_text);
-    let language = config.as_ref().and_then(Language::of_config);
+    // the personal file has no history: read as it is now, as the transcripts are (BRE-14)
+    let language = Language::of(&repo, config.as_ref());
     let context = Context {
         worktrees,
         managed: managed_paths(&repo, &start_text),

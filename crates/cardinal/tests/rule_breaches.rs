@@ -671,6 +671,60 @@ fn language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
     ]
 }
 
+// spec: BRE-14
+fn personal_language_checks(dir: &Path, tmp: &Path) -> Vec<(String, bool)> {
+    let tmp = tmp.join("personal");
+    let projects = tmp.join("projects");
+    let mut expected = Vec::new();
+    for (name, personal) in [("en", "English"), ("de", "German")] {
+        let repo = new_repo(&tmp.join(name));
+        commit_at(
+            &repo,
+            "2026-01-01T00:00:00Z",
+            "chore: sync",
+            &[(
+                ".claude/cardinal.toml",
+                "[cardinal]\nsource = \"x\"\nrev = \"r1\"\n\n[project]\nuser_language = \"French\"\n",
+            )],
+        );
+        // written after the session's start, never committed: read as it is when the measure runs
+        std::fs::write(
+            repo.join(".claude/cardinal.local.toml"),
+            format!("[project]\nuser_language = \"{personal}\"\n"),
+        )
+        .unwrap();
+        let mut t = Transcript::new(&repo, "2026-02-01T10:00:00.000Z");
+        t.typed("go");
+        t.text("m1", ENGLISH);
+        let french = t.text("m2", FRENCH);
+        t.write(&projects.join(format!("-{name}/s.jsonl")));
+        if name == "en" {
+            expected.push(format!(
+                "s\ten\tr1\tuser-language\tbreach\ts.jsonl:{french}\tfinal"
+            ));
+        }
+    }
+    let (ok, out) = run(dir, &projects, false);
+    let rows: Vec<String> = out.lines().skip(1).map(str::to_string).collect();
+    let (_, summary) = run(dir, &projects, true);
+    let summary: Vec<&str> = summary.lines().collect();
+    let want_summary = [SUMMARY, "user-language\tr1\t1\t1\t1\t0"];
+    if rows != expected || summary != want_summary {
+        println!("{out}{}", summary.join("\n"));
+    }
+    vec![
+        ("the personal language rule succeeds".to_string(), ok),
+        (
+            "the personal user_language wins over the committed one".to_string(),
+            rows == expected,
+        ),
+        (
+            "a personal language with no stop words leaves the session unjudged".to_string(),
+            summary == want_summary,
+        ),
+    ]
+}
+
 const HINT: &str =
     "Your text is not in French, the user_language of .claude/cardinal.toml: write in French.";
 
@@ -752,6 +806,7 @@ fn rule_breaches() {
         .chain(commit_checks(&dir, &tmp))
         .chain(language_checks(&dir, &tmp))
         .chain(language_kind_checks(&dir, &tmp))
+        .chain(personal_language_checks(&dir, &tmp))
         .collect();
     let mut failed = false;
     for (name, ok) in checks {

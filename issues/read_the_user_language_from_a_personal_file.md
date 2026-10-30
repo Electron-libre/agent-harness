@@ -53,7 +53,7 @@ scope: any other key (the shared ones stay shared), a user-level file outside th
 1. [x] Personal file and hook: managed `files/.claude/.gitignore` ignoring `cardinal.local.toml`, one reader of the
    personal value in `language.rs`, used by `language-hint`; ADR 0018 and the spec amendments; verified by tests
    through the binary (hook with both files, `sync` then `git check-ignore`); makes true LNG-12, SYN-59.
-2. [ ] `rule-breaches`: the personal value of the repository root, as it is at measure time, wins over the committed
+2. [x] `rule-breaches`: the personal value of the repository root, as it is at measure time, wins over the committed
    one; verified by a test through the binary; makes true BRE-10, BRE-14.
 3. [ ] Skills, seed comment and docs point at `.claude/cardinal.local.toml`, else `.claude/cardinal.toml`
    (`issue-workflow`, `prioritize-issues`, `create-issue`, `audit-instructions`, `evaluate-harness`,
@@ -87,5 +87,27 @@ Code review: no findings
 
 not verified: a consumer that already has its own `.claude/.gitignore` gets a sync conflict on it (SYN-3), as for
 any managed path.
+
+decisions needed: none
+
+## Deliverable 2
+
+done: rule `user-language` judges a session against the personal `user_language` of its repository when there is
+one, else the committed one.
+
+| check | result |
+|---|---|
+| tests | pass (`just check`) |
+| lint | pass |
+| specs | BRE `accepted` |
+| docs | n/a (no page states where the rule reads the language) |
+| code review | see below |
+
+red: BRE-14, BRE-10: the English blocks of a session whose personal `user_language` is English were breaches
+(`s.jsonl:2 intermediate`), and the German one was judged.
+
+Code review: no findings
+
+not verified: none
 
 decisions needed: none

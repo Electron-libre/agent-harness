@@ -65,13 +65,8 @@ impl Language {
         }
     }
 
-    /// The language named by the `user_language` of the `[project]` table of a `.claude/cardinal.toml`.
-    pub(super) fn of_config(config: &toml::Table) -> Option<Language> {
-        Language::named(name_in(config)?)
-    }
-
     /// The language named by the personal configuration of the project at `root` when it is valid TOML and names one,
-    /// else by the shared configuration `shared`; `None` when the one that names it has no stop words (LNG-12).
+    /// else by the shared configuration `shared`; `None` when the one that names it has no stop words (LNG-12, BRE-14).
     pub(super) fn of(root: &Path, shared: Option<&toml::Table>) -> Option<Language> {
         let personal = std::fs::read_to_string(root.join(crate::PERSONAL_CONFIG))
             .ok()
