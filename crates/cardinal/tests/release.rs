@@ -50,10 +50,20 @@ fn tag(dir: &Path, name: &str) {
     git(dir, &["tag", "-a", name, "-m", name]);
 }
 
+/// Run the tool with the identity and signing settings of `git_out`, which a CI runner lacks.
 fn release(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_cardinal"))
         .args(["tool", "release"])
         .args(args)
+        .env("GIT_CONFIG_COUNT", "4")
+        .env("GIT_CONFIG_KEY_0", "user.email")
+        .env("GIT_CONFIG_VALUE_0", "t@t")
+        .env("GIT_CONFIG_KEY_1", "user.name")
+        .env("GIT_CONFIG_VALUE_1", "t")
+        .env("GIT_CONFIG_KEY_2", "commit.gpgsign")
+        .env("GIT_CONFIG_VALUE_2", "false")
+        .env("GIT_CONFIG_KEY_3", "tag.gpgsign")
+        .env("GIT_CONFIG_VALUE_3", "false")
         .current_dir(dir)
         .output()
         .unwrap()
