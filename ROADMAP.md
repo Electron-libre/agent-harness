@@ -21,6 +21,7 @@ The work done before this file existed is in `issues/done/`.
 - Goal: let several people share a project driven by Cardinal without stepping on each other.
 - Why: no project uses Cardinal in a team yet; these are the blockers an audit found.
 - State: done
+- Released: v1.0.0
 - Issues:
   - [read_the_user_language_from_a_personal_file](issues/done/read_the_user_language_from_a_personal_file.md)
   - [rank_the_issues_without_a_shared_queue_file](issues/done/rank_the_issues_without_a_shared_queue_file.md)
