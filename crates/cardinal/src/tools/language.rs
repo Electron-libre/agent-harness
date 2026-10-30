@@ -19,8 +19,8 @@ const ENGLISH_WORDS: &[&str] = &[
 /// The words every hint of the `language-hint` hook holds, by which `rule-breaches` finds it in a transcript.
 pub(super) const HINT_MARK: &str = "the user_language of .claude/cardinal.toml";
 
-/// Whether a transcript line is a hint of the `language-hint` hook: the context it added after a tool call, or the
-/// feedback of its Stop hook.
+/// Whether a transcript line is a hint of the `language-hint` hook: the context its withdrawn `PostToolUse` mode added
+/// after a tool call, or the feedback of its Stop hook.
 pub(super) fn is_hint(line: &Value) -> bool {
     let attachment = &line["attachment"];
     let added = line["type"] == "attachment"

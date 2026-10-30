@@ -29,7 +29,49 @@ it cannot arrive cheaply: the Stop hook already keeps the final replies in the `
 
 # Resources
 * `crates/cardinal/src/tools/language_hint.rs` (`after_call`, `text_before_call`)
-* `specs/language-hint.md`, `issues/measure_the_effect_of_the_hint_between_tool_calls.md` (`# Tracking`)
+* `specs/language-hint.md`, `issues/done/measure_the_effect_of_the_hint_between_tool_calls.md` (`# Tracking`)
 
 # Hints
 * The user finds the language hints already work rather well: keep this small.
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Measured on 2026-10-30 (session `5a68f5ea`, a probe `PostToolUse` hook logging the transcript at hook time): the hook
+runs and its output reaches the agent, but only when the transcript is already written. Fast calls lose the race, and
+some text blocks never reach the transcript. Out of scope: the Stop hook, which keeps working.
+
+### Measure
+| call | `tool_use` line at hook time | text block in the transcript | hint |
+|---|---|---|---|
+| `python3 -c 'time.sleep(2)'` (~3 s) | yes | yes | delivered (`hook_additional_context`, line 93) |
+| 3 fast calls (`grep`, `sed`, `true`, < 0.5 s) | no | — | silent |
+| 7 text blocks of the session | — | 3 written, 4 never written (still absent after the turn went on) | — |
+
+The `PostToolUse` event carries no text of the agent (`tool_input`, `tool_response`, `tool_use_id` only), so waiting
+for the transcript is the only fix, and it would not see the blocks that are never written.
+
+## Plan
+1. [x] Drop the `PostToolUse` mode: remove `after_call` and `text_before_call`, the `PostToolUse` entry of
+   `entries/.claude/settings.json` (then `just sync`), LNG-7 to LNG-10 and their scenarios and non-goals, their tests,
+   the row of `docs/architecture.md`; verified by `just check` and `just check-cardinal`; makes true LNG-1 to LNG-6
+   alone (the Stop hook), and LNG-11.
+
+## Decisions
+- Mode: autonomous
+- 1 a: drop the mode rather than wait for the transcript.
+- 2 a: close `issues/done/measure_the_effect_of_the_hint_between_tool_calls.md` with this deliverable, moot without the mode.
+- Base commit: eceb70ab8a3de3335ff43b8d991279ac638a2b16
+
+## Deliverable 1
+- done: `PostToolUse` mode of `language-hint` dropped; LNG-7 to LNG-10 withdrawn, LNG-11 added (a `PostToolUse` event a
+  stale declaration still sends gets nothing); hook entry removed from `entries/` and synced; README and architecture
+  rows updated; `issues/done/measure_the_effect_of_the_hint_between_tool_calls.md` closed without a measure.
+- checks: `just check` ok (fmt, clippy, tests, specs).
+- Code review: no findings
+- red: LNG-11: the hook printed `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"Your text before this tool call is not in French, ..."}}`
+- not verified: the removal of the entry from the consumers' settings (`cardinal sync` there, SYN-31).
+- decisions needed: none
+- follow-up: `is_hint` and BRE-13 still read the `hook_additional_context` attachment, for the transcripts of before.

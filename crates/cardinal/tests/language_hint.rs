@@ -1,6 +1,5 @@
 //! Behavior test for the hook `cardinal tool language-hint` (`specs/language-hint.md`): a temp repository with a
-//! `user_language`, a `Stop` event (the exit code and the hint on stderr) or a `PostToolUse` event with a transcript
-//! (the added context on stdout) on stdin.
+//! `user_language` and a `Stop` event (the exit code and the hint on stderr) on stdin.
 
 mod common;
 
@@ -197,203 +196,19 @@ fn the_language_name_is_read_in_any_case_and_an_as_are_not_english() {
     assert!(silent_pass(&hook(dir.path(), &stop(dir.path(), AN_AS))));
 }
 
-fn typed(text: &str) -> Value {
-    json!({"type": "user", "message": {"role": "user", "content": text}})
-}
-
-fn text(message: &str, text: &str) -> Value {
-    json!({"type": "assistant", "message": {"id": message, "content": [{"type": "text", "text": text}]}})
-}
-
-fn call(message: &str, id: &str) -> Value {
-    json!({"type": "assistant", "message": {"id": message, "content": [{"type": "tool_use", "id": id, "name": "Bash", "input": {}}]}})
-}
-
-fn result(id: &str) -> Value {
-    json!({"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": id, "content": "SECRET"}]}})
-}
-
-fn added_context(text: &str) -> Value {
-    json!({"type": "attachment", "attachment": {"type": "hook_additional_context", "content": [text], "hookName": "PostToolUse:Bash", "toolUseID": "t"}})
-}
-
-/// Runs the hook on the `PostToolUse` event of call `id`, with `lines` as the transcript.
-fn after_call(dir: &Path, lines: &[Value], id: &str) -> Run {
+// spec: LNG-11
+#[test]
+fn a_tool_call_left_declared_by_an_older_cardinal_gets_nothing() {
+    let dir = tempdir().unwrap();
+    repo(dir.path(), Some("French"));
+    let lines = [
+        json!({"type": "user", "message": {"role": "user", "content": "go"}}),
+        json!({"type": "assistant", "message": {"id": "m1", "content": [{"type": "text", "text": ENGLISH}]}}),
+        json!({"type": "assistant", "message": {"id": "m1", "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {}}]}}),
+    ];
     let transcript: String = lines.iter().map(|l| l.to_string() + "\n").collect();
-    put(dir, "t.jsonl", &transcript);
-    let event = json!({"hook_event_name": "PostToolUse", "cwd": dir, "transcript_path": dir.join("t.jsonl"), "tool_name": "Bash", "tool_use_id": id});
-    hook(dir, &event)
-}
-
-/// The added context of a run that printed one: `None` when it printed something else.
-fn context(run: &Run) -> Option<String> {
-    let out: Value = serde_json::from_str(run.stdout.trim()).ok()?;
-    let output = &out["hookSpecificOutput"];
-    (output["hookEventName"] == "PostToolUse")
-        .then(|| output["additionalContext"].as_str())??
-        .to_string()
-        .into()
-}
-
-// spec: LNG-9
-#[test]
-fn text_before_a_call_in_the_other_language_gets_one_added_context() {
-    let dir = tempdir().unwrap();
-    repo(dir.path(), Some("French"));
-    let lines = [typed("go"), text("m1", ENGLISH), call("m1", "t1")];
-    let run = after_call(dir.path(), &lines, "t1");
-    assert_eq!(run.code, Some(0), "{run:?}");
-    assert!(run.stderr.is_empty(), "{run:?}");
-    let hint = context(&run).unwrap_or_else(|| panic!("no added context: {run:?}"));
-    assert_eq!(hint.lines().count(), 1, "{hint}");
-    assert!(hint.contains("French") && hint.contains(MARK), "{hint}");
-    assert!(!hint.contains("deliverable"), "quotes the text: {hint}");
-}
-
-// spec: LNG-8
-#[test]
-fn one_added_context_per_turn() {
-    let dir = tempdir().unwrap();
-    repo(dir.path(), Some("French"));
-    let hint = context(&after_call(
-        dir.path(),
-        &[typed("go"), text("m1", ENGLISH), call("m1", "t1")],
-        "t1",
-    ))
-    .unwrap();
-    let mut lines = vec![
-        typed("go"),
-        text("m1", ENGLISH),
-        call("m1", "t1"),
-        result("t1"),
-        added_context(&hint),
-        text("m2", ENGLISH),
-        call("m2", "t2"),
-    ];
-    let run = after_call(dir.path(), &lines, "t2");
-    assert!(silent_pass(&run), "a second hint in the turn: {run:?}");
-    // a context added by another hook does not count
-    lines[4] = added_context("PostToolUse hook modified a file after your edit");
-    assert!(context(&after_call(dir.path(), &lines, "t2")).is_some());
-    // a new typed message opens a new turn
-    lines[4] = added_context(&hint);
-    lines.extend([
-        result("t2"),
-        typed("next"),
-        text("m3", ENGLISH),
-        call("m3", "t3"),
-    ]);
-    assert!(context(&after_call(dir.path(), &lines, "t3")).is_some());
-}
-
-// spec: LNG-7
-#[test]
-fn only_the_text_since_the_last_user_line_is_judged_once_per_message() {
-    let dir = tempdir().unwrap();
-    repo(dir.path(), Some("French"));
-    // parallel calls of one message: the first call judges the text, the next ones judge nothing
-    let parallel = [
-        typed("go"),
-        text("m1", ENGLISH),
-        call("m1", "t1"),
-        call("m1", "t2"),
-    ];
-    assert!(context(&after_call(dir.path(), &parallel, "t1")).is_some());
-    assert!(silent_pass(&after_call(dir.path(), &parallel, "t2")));
-    // a tool result between the English text and the call: only the French text after it is judged
-    let earlier = [
-        typed("go"),
-        text("m1", ENGLISH),
-        call("m1", "t1"),
-        result("t1"),
-        text("m2", FRENCH),
-        call("m2", "t2"),
-    ];
-    assert!(silent_pass(&after_call(dir.path(), &earlier, "t2")));
-    // the text blocks of the message are joined: two short English blocks make one long text
-    let split = [
-        typed("go"),
-        text("m1", &ENGLISH[..60]),
-        text("m1", &ENGLISH[60..]),
-        call("m1", "t1"),
-    ];
-    assert!(context(&after_call(dir.path(), &split, "t1")).is_some());
-    // a call not in the transcript judges nothing
-    assert!(silent_pass(&after_call(dir.path(), &parallel, "t9")));
-}
-
-// spec: LNG-10
-#[test]
-fn text_before_a_call_that_passes_or_cannot_be_judged_adds_nothing() {
-    let dir = tempdir().unwrap();
-    repo(dir.path(), Some("French"));
-    for message in [FRENCH, "The tests pass, so I commit it and move on."] {
-        let lines = [typed("go"), text("m1", message), call("m1", "t1")];
-        let run = after_call(dir.path(), &lines, "t1");
-        assert!(silent_pass(&run), "{message}: {run:?}");
-    }
-    let lines = [typed("go"), text("m1", ENGLISH), call("m1", "t1")];
-    for language in [None, Some("German")] {
-        let dir = tempdir().unwrap();
-        repo(dir.path(), language);
-        assert!(silent_pass(&after_call(dir.path(), &lines, "t1")));
-    }
-    let event = json!({"hook_event_name": "PostToolUse", "cwd": dir.path(), "transcript_path": dir.path().join("missing.jsonl"), "tool_use_id": "t1"});
-    assert!(silent_pass(&hook(dir.path(), &event)));
-}
-
-fn command(name: &str) -> Value {
-    json!({"type": "user", "message": {"role": "user", "content": format!("<command-name>/{name}</command-name>")}})
-}
-
-fn stop_feedback(text: &str) -> Value {
-    json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": format!("Stop hook feedback:\n[cardinal run language-hint]: {text}")}})
-}
-
-// spec: LNG-7, LNG-8
-#[test]
-fn a_command_the_user_typed_opens_a_turn_and_a_stop_hint_counts() {
-    let dir = tempdir().unwrap();
-    repo(dir.path(), Some("French"));
-    let hint = context(&after_call(
-        dir.path(),
-        &[typed("go"), text("m1", ENGLISH), call("m1", "t1")],
-        "t1",
-    ))
-    .unwrap();
-    // a slash command opens a new turn: the hint of the turn before does not count
-    let lines = [
-        typed("go"),
-        text("m1", ENGLISH),
-        call("m1", "t1"),
-        result("t1"),
-        added_context(&hint),
-        command("issue-workflow"),
-        text("m2", ENGLISH),
-        call("m2", "t2"),
-    ];
-    assert!(context(&after_call(dir.path(), &lines, "t2")).is_some());
-    // nor is the reply of the turn before joined to the text of the command's turn
-    let split = [
-        typed("go"),
-        text("m1", &ENGLISH[..60]),
-        command("x"),
-        text("m2", &ENGLISH[60..]),
-        call("m2", "t1"),
-    ];
-    assert!(silent_pass(&after_call(dir.path(), &split, "t1")));
-    // the hint of the Stop hook counts in its turn
-    let lines = [
-        typed("go"),
-        text("m1", ENGLISH),
-        stop_feedback(&hint),
-        text("m2", ENGLISH),
-        call("m2", "t1"),
-    ];
-    assert!(silent_pass(&after_call(dir.path(), &lines, "t1")));
-    // a meta line holding the words but not Stop hook feedback is no hint
-    let other =
-        json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": hint}});
-    let lines = [typed("go"), other, text("m2", ENGLISH), call("m2", "t1")];
-    assert!(context(&after_call(dir.path(), &lines, "t1")).is_some());
+    put(dir.path(), "t.jsonl", &transcript);
+    let event = json!({"hook_event_name": "PostToolUse", "cwd": dir.path(), "transcript_path": dir.path().join("t.jsonl"), "tool_name": "Bash", "tool_use_id": "t1", "last_assistant_message": ENGLISH});
+    let run = hook(dir.path(), &event);
+    assert!(silent_pass(&run), "{run:?}");
 }

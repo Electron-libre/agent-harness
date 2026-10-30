@@ -67,14 +67,6 @@
             "command": "cardinal run format-code"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cardinal run language-hint"
-          }
-        ]
       }
     ],
     "Stop": [

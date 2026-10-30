@@ -95,3 +95,7 @@ kept; Opus 5.5 in every group.
 - Code review: no findings (no code changed)
 - not verified: why the hint is not delivered (the follow-up measures it)
 - decisions needed: none
+
+## Closed without a measure
+2026-10-30: the `PostToolUse` mode was dropped (`issues/deliver_the_hint_between_tool_calls.md`): Claude Code often
+runs the hook before it writes the text and the call to the transcript, so there is no hint left to measure.
