@@ -273,6 +273,111 @@ fn next_issue() {
     assert!(!failed, "a check failed: see the FAIL lines");
 }
 
+/// Runs `next-issue issues` in `root`: (exit code, stdout, stderr).
+fn next_in(root: &Path) -> (Option<i32>, String, String) {
+    let out = tool_command("next_issue.rs")
+        .arg("issues")
+        .current_dir(root)
+        .output()
+        .unwrap();
+    (
+        out.status.code(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
+}
+
+/// A directory `issues/` holding the given files, outside any git repository.
+fn issues_dir(files: &[(&str, &str)]) -> tempfile::TempDir {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("issues")).unwrap();
+    for (name, text) in files {
+        std::fs::write(root.path().join("issues").join(name), text).unwrap();
+    }
+    root
+}
+
+// spec: NXT-1
+/// The order comes from the `rank` of each issue file, lowest first, a tie broken by the stem.
+#[test]
+fn the_rank_of_each_file_orders_the_issues() {
+    let root = issues_dir(&[
+        ("a.md", "---\nrank: 200\nwhy: later\n---\n# Title A\n"),
+        (
+            "b.md",
+            "---\nrank: 100\nwhy: needed first\n---\n# Title B\n",
+        ),
+        ("c.md", "---\nrank: 1000\n---\n# Title C\n"),
+    ]);
+    let (code, out, err) = next_in(root.path());
+    assert_eq!(code, Some(0), "{out}{err}");
+    assert!(
+        out.contains("Next: issues/b.md\n  Title B\n  why here: needed first\n"),
+        "{out}"
+    );
+    assert!(out.contains("  2. a\n  3. c\n"), "{out}");
+
+    let root = issues_dir(&[
+        ("b.md", "---\nrank: 100\n---\n# Title B\n"),
+        ("a.md", "---\nrank: 100\n---\n# Title A\n"),
+    ]);
+    let (_, out, _) = next_in(root.path());
+    assert!(out.contains("Next: issues/a.md"), "{out}");
+}
+
+// spec: NXT-2
+/// An issue with no rank, or a rank that is not a number, comes after the ranked ones and is reported.
+#[test]
+fn an_issue_without_a_rank_comes_last_and_is_reported() {
+    let root = issues_dir(&[
+        ("a.md", "---\nrank: 100\n---\n# Title A\n"),
+        ("b.md", "---\nrank: soon\n---\n# Title B\n"),
+        ("c.md", "# Title C\n"),
+    ]);
+    let (code, out, err) = next_in(root.path());
+    assert_eq!(code, Some(1), "{out}{err}");
+    assert!(
+        out.contains("Next: issues/a.md") && out.contains("  2. b\n  3. c\n"),
+        "{out}"
+    );
+    assert!(
+        err.contains("issue without a rank: b") && err.contains("issue without a rank: c"),
+        "{err}"
+    );
+}
+
+// spec: NXT-3
+/// Two issues of the same rank (two branches picked it) are reported, without failing.
+#[test]
+fn a_shared_rank_is_reported() {
+    let root = issues_dir(&[
+        ("a.md", "---\nrank: 100\n---\n# Title A\n"),
+        ("b.md", "---\nrank: 100\n---\n# Title B\n"),
+        ("c.md", "---\nrank: 200\n---\n# Title C\n"),
+    ]);
+    let (code, out, err) = next_in(root.path());
+    assert_eq!(code, Some(0), "{out}{err}");
+    assert!(err.contains("same rank 100: a, b"), "{err}");
+    assert!(!err.contains("same rank 200"), "{err}");
+}
+
+// spec: NXT-4
+/// While `issues/queue.md` exists (a source of the format 4), its lines give the order, not the ranks.
+#[test]
+fn the_queue_file_wins_over_the_ranks_while_it_exists() {
+    let root = issues_dir(&[
+        ("a.md", "---\nrank: 100\n---\n# Title A\n"),
+        ("b.md", "---\nrank: 200\n---\n# Title B\n"),
+        ("queue.md", "- [b](b.md) - first\n- [a](a.md) - second\n"),
+    ]);
+    let (code, out, err) = next_in(root.path());
+    assert_eq!(code, Some(0), "{out}{err}");
+    assert!(
+        out.contains("Next: issues/b.md") && out.contains("why here: first"),
+        "{out}"
+    );
+}
+
 /// `cardinal tool <name>` for the script path the checks were written against (`next_issue.rs` is `next-issue`).
 fn tool_command(script: impl AsRef<std::path::Path>) -> std::process::Command {
     let stem = script

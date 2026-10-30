@@ -38,3 +38,46 @@ conflict. Keep one readable order of the issues without that conflict.
 # Hints
 * The queue format is read by consumers' `cardinal`: a change of its meaning raises `cardinal-format` and `FORMAT`
   (ADR 0014) and declares a migration (ADR 0017).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Move the order of the open issues from `issues/queue.md` into a `rank`/`why` front matter of each issue file, so a
+branch only edits its own issue (candidate 1). Measured: 0 conflict on `issues/queue.md` in this repository and in
+the consumer (no merge commit, rebase then fast-forward; none in the session transcripts). Out of scope: renumbering.
+
+## Plan
+1. [x] Spec NXT, ADR 0019, `next-issue` orders the files by their `rank`, reports the missing ranks and the ties,
+   keeps reading `issues/queue.md` while it exists; PAR-4 says "the first free issue" instead of "of the queue";
+   verified by `tests/next_issue.rs`; makes true NXT-1, NXT-2, NXT-3, NXT-4 (~350 lines).
+2. [ ] `next-issue --convert` writes the ranks from `issues/queue.md` and deletes it; verified by
+   `tests/next_issue.rs`; makes true NXT-5 (~200 lines).
+3. [ ] Format 5: `cardinal-format` and `FORMAT` to 5, `migrations/5.toml` (warns the citations of
+   `issues/queue.md`), `seed/issues/queue.md` dropped, `create-issue`, `prioritize-issues`, `issue-workflow`
+   (`details.md`) and the docs say the rank, `close-issue` keeps dropping a line only when the queue exists; this
+   repository converted; verified by `just check`, `tests/skills.rs` and `just next-issue` (~400 lines).
+
+## Decisions
+- Mode: autonomous
+- Base commit: 1e361ed01134c61c02f32efc3a85d179cfc6b010
+- Rank: a front matter `rank` (gaps of 100) and `why`, like the specs.
+- Conversion: `next-issue --convert`, run by the agent that `migrations/5.toml` warns; not in `sync`.
+
+## Deliverable 1
+- done: `next-issue` orders the issue files by their front matter `rank`, reports the missing ranks and the ties;
+  `issues/queue.md` still gives the order while it exists.
+
+| check | result |
+|---|---|
+| tests | pass (`tests/next_issue.rs`, 5 tests) |
+| lint | pass |
+| specs | pass (NXT draft, NXT-5 untraced until deliverable 2) |
+| docs | n/a here: the skills and docs that describe the queue change with the format 5 (deliverable 3) |
+| code review | low, run |
+
+- red: NXT-1, NXT-2, NXT-3: `no issues/queue.md` (exit 2) where the ranks were expected.
+- Code review: no findings
+- not verified: none
+- decisions needed: none

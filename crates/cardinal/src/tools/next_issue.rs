@@ -1,5 +1,7 @@
-//! Print the next issue to work on: the first line of `issues/queue.md`, with its title and the rest of
-//! the queue. Reports (stderr) issues missing from the queue and queue lines without a file.
+//! Print the next issue to work on: the open issue of lowest `rank` in its front matter, with its title, its `why`
+//! and the rest of the order (ADR 0019). Reports (stderr) the issues without a rank and the shared ranks. While
+//! `issues/queue.md` exists (format 4), its lines give the order, and the issues missing from it and its lines
+//! without a file are reported.
 //! An issue is taken, and skipped, when a git worktree has a branch named after its stem checked out, or when such
 //! a branch holds work that is not on the branch of the main worktree (patch-equivalent commits and a squash of any
 //! number of commits count as on it: merging the branch would change no file). A branch with neither (left over after a merge, empty) is reported `Stale:` and takes nothing. The mark
@@ -130,18 +132,29 @@ fn branches(dir: &Path, stems: &[&str]) -> Vec<Branch> {
         .collect()
 }
 
-pub(super) fn main(args: &[String]) -> u8 {
-    let dir = args
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "issues".to_string());
-    let dir = Path::new(&dir);
-    let Ok(queue) = std::fs::read_to_string(dir.join("queue.md")) else {
-        eprintln!("no {}/queue.md", dir.display());
-        std::process::exit(2);
-    };
-    let entries: Vec<(&str, &str)> = queue.lines().filter_map(entry).collect();
+/// The stems of the issue files of `dir` (`queue.md` excluded), sorted.
+fn issue_stems(dir: &Path) -> Vec<String> {
+    let mut stems: Vec<String> = std::fs::read_dir(dir)
+        .map(|d| {
+            d.flatten()
+                .map(|e| e.path())
+                .filter(|p| p.is_file() && p.extension().is_some_and(|x| x == "md"))
+                .filter_map(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+                .filter(|s| s != "queue")
+                .collect()
+        })
+        .unwrap_or_default();
+    stems.sort();
+    stems
+}
 
+/// The order of a format 4 `queue.md` (NXT-4): its entries, and whether it drifted from the files.
+fn from_queue(dir: &Path, queue: &str) -> (Vec<(String, String)>, bool) {
+    let entries: Vec<(String, String)> = queue
+        .lines()
+        .filter_map(entry)
+        .map(|(s, w)| (s.to_string(), w.to_string()))
+        .collect();
     let mut drift = false;
     for (stem, _) in &entries {
         if !dir.join(format!("{stem}.md")).is_file() {
@@ -149,27 +162,75 @@ pub(super) fn main(args: &[String]) -> u8 {
             drift = true;
         }
     }
-    let mut unlisted: Vec<String> = std::fs::read_dir(dir)
-        .map(|d| {
-            d.flatten()
-                .filter_map(|e| {
-                    e.path()
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().into_owned())
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    unlisted.retain(|s| {
-        s != "queue"
-            && dir.join(format!("{s}.md")).is_file()
-            && !entries.iter().any(|(e, _)| e == s)
-    });
-    unlisted.sort();
-    for s in &unlisted {
-        eprintln!("issue missing from the queue: {s}");
-        drift = true;
+    for s in issue_stems(dir) {
+        if !entries.iter().any(|(e, _)| *e == s) {
+            eprintln!("issue missing from the queue: {s}");
+            drift = true;
+        }
     }
+    (entries, drift)
+}
+
+/// The value of `key` in the front matter (between the `---` lines that open the file) of `text`.
+pub(super) fn front_matter<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    let mut lines = text.lines();
+    if lines.next()?.trim_end() != "---" {
+        return None;
+    }
+    lines
+        .take_while(|l| l.trim_end() != "---")
+        .find_map(|l| l.strip_prefix(key)?.strip_prefix(':'))
+        .map(str::trim)
+}
+
+/// The order of the `rank` of each issue file (NXT-1): ranked first, by rank then stem, then the unranked ones,
+/// reported (NXT-2); a shared rank is reported without drift (NXT-3).
+fn from_ranks(dir: &Path) -> (Vec<(String, String)>, bool) {
+    let mut ranked: Vec<(u64, String, String)> = Vec::new();
+    let mut unranked = Vec::new();
+    for stem in issue_stems(dir) {
+        let text = std::fs::read_to_string(dir.join(format!("{stem}.md"))).unwrap_or_default();
+        let why = front_matter(&text, "why").unwrap_or("").to_string();
+        match front_matter(&text, "rank").and_then(|r| r.parse().ok()) {
+            Some(rank) => ranked.push((rank, stem, why)),
+            None => unranked.push((stem, why)),
+        }
+    }
+    ranked.sort();
+    for group in ranked.chunk_by(|a, b| a.0 == b.0).filter(|g| g.len() > 1) {
+        let stems: Vec<&str> = group.iter().map(|(_, s, _)| s.as_str()).collect();
+        eprintln!("same rank {}: {}", group[0].0, stems.join(", "));
+    }
+    for (stem, _) in &unranked {
+        eprintln!("issue without a rank: {stem}");
+    }
+    let drift = !unranked.is_empty();
+    let entries = ranked
+        .into_iter()
+        .map(|(_, s, w)| (s, w))
+        .chain(unranked)
+        .collect();
+    (entries, drift)
+}
+
+pub(super) fn main(args: &[String]) -> u8 {
+    let dir = args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "issues".to_string());
+    let dir = Path::new(&dir);
+    if !dir.is_dir() {
+        eprintln!("no {} directory", dir.display());
+        std::process::exit(2);
+    }
+    let (entries, drift) = match std::fs::read_to_string(dir.join("queue.md")) {
+        Ok(queue) => from_queue(dir, &queue),
+        Err(_) => from_ranks(dir),
+    };
+    let entries: Vec<(&str, &str)> = entries
+        .iter()
+        .map(|(s, w)| (s.as_str(), w.as_str()))
+        .collect();
 
     let stems: Vec<&str> = entries.iter().map(|(s, _)| *s).collect();
     let branches = branches(dir, &stems);

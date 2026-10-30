@@ -111,7 +111,7 @@ pub const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "next-issue",
-        about: "the next issue of issues/queue.md no branch or worktree has taken",
+        about: "the open issue of lowest rank no branch or worktree has taken",
         main: next_issue::main,
     },
     Tool {
