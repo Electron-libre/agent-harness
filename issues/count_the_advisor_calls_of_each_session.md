@@ -48,3 +48,36 @@ Advisor
   advisor was available; read the pair.
 * Opus 5.x, Sonnet 5.5, Haiku 5.5, Fable and Mythos advisors return an encrypted result: count the call, never its text
   (EVA output holds no message text).
+
+# Tracking
+
+Plan: validated
+
+## Understanding
+Measured on 2026-10-30 (Claude Code 2.1.312, Sonnet + Opus advisor, and Opus + Opus): a call is a `server_tool_use`
+block named `advisor` followed by an `advisor_tool_result` (`advisor_redacted_result` content); its tokens are an
+`advisor_message` entry of `usage.iterations` (with its `model`), absent from the top-level `usage`. Opus + Opus is
+attached too. So all the columns are supported; the 44,000 earlier lines simply held no call. Out of scope: whether
+a set advisor was attached (spec non-goal).
+
+## Plan
+1. [x] session-metrics advisor columns: `advisor_models`, `advisor_calls`, `advisor_input_tokens`,
+   `advisor_output_tokens` after `main_context_peak`, empty with no advisor set, and the archive upgrade of the older
+   headers; verified by tests of `crates/cardinal/tests/session_metrics.rs`; makes true EVA-1, EVA-18, EVA-19, EVA-20.
+2. [ ] cardinal-report advisor columns of the efficiency table; verified by tests of
+   `crates/cardinal/tests/cardinal_report.rs`; makes true REP-5, REP-11.
+3. [ ] The advisor metrics of `Expected-effect:` and their `too few` rule; verified by tests of `commit-check` and
+   `cardinal_report.rs`; makes true VRD-1, VRD-10.
+
+## Decisions
+- Mode: autonomous
+- Base commit: 5ba0c86f53022bedc9e3fd3192b5d09773080505
+- Answers 1 a, 2 a, 3 a: two token columns (input, output); empty cells with no advisor set, 0 when set and not called; the advisor metrics join `Expected-effect:`.
+
+## Deliverable 1
+- done: `session-metrics` prints `advisor_models`, `advisor_calls`, `advisor_input_tokens`, `advisor_output_tokens`;
+  an archive written before them (or before `main_context_peak`) is upgraded by column name.
+- red: EVA-1, EVA-18, EVA-19, EVA-20: every check failed, `header names every column` first (the header had no
+  advisor column).
+- Code review: no findings
+- not verified: none.

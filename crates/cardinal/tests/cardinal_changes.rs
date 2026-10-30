@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::process::Command;
 
-const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+const SESSIONS: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\tadvisor_models\tadvisor_calls\tadvisor_input_tokens\tadvisor_output_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
@@ -59,7 +59,7 @@ fn sessions(path: &Path, rows: &[(&str, u32)]) {
     let mut text = format!("{SESSIONS}\n");
     for (i, (revision, day)) in rows.iter().enumerate() {
         let start = format!("2026-02-{day:02}T00:00:00.000Z");
-        let mut cells = vec![String::new(); 23];
+        let mut cells = vec![String::new(); 27];
         cells[0] = format!("s{i}");
         cells[1] = "p".into();
         cells[3] = (*revision).into();

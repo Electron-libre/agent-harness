@@ -1,6 +1,6 @@
 ---
 id: EVA
-status: accepted
+status: draft
 adrs: [0002, 0003, 0006, 0008, 0010]
 ---
 
@@ -15,7 +15,7 @@ measures; it does not judge.
 
 ## Requirements
 
-- **EVA-1** (deterministic) `session-metrics [projects_dir]` must print a header line then one tab-separated row per session (one `<session>.jsonl` of a project directory, default EVA-15), with the columns `session`, `project`, `issues`, `revision`, `models`, `versions`, `start`, `duration_s`, `turns`, `tool_calls`, `input_tokens`, `output_tokens`, `thinking_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `main_context_peak`, `hook_refusals`, `skills`, `validations`, `other_messages`, `unreadable_lines`, `unknown_lines`, `missing_fields`.
+- **EVA-1** (deterministic) `session-metrics [projects_dir]` must print a header line then one tab-separated row per session (one `<session>.jsonl` of a project directory, default EVA-15), with the columns `session`, `project`, `issues`, `revision`, `models`, `versions`, `start`, `duration_s`, `turns`, `tool_calls`, `input_tokens`, `output_tokens`, `thinking_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `main_context_peak`, `advisor_models`, `advisor_calls`, `advisor_input_tokens`, `advisor_output_tokens`, `hook_refusals`, `skills`, `validations`, `other_messages`, `unreadable_lines`, `unknown_lines`, `missing_fields`.
 - **EVA-2** (deterministic) An assistant message must be counted once per `message.id`, whatever the number of lines that repeat it: one turn, its `message.usage` tokens added once (`thinking_tokens` from `output_tokens_details.thinking_tokens`, 0 when absent), its model counted once; `tool_calls` counts the `tool_use` blocks of all its lines.
 - **EVA-3** (deterministic) The transcripts of a session's sub-agents (`<session>/subagents/*.jsonl`) must be added to that session's row (turns, tool calls, tokens, hook refusals, skills, skipped lines), and must not produce a row of their own nor add typed messages.
 - **EVA-4** (deterministic) A typed message (the same filter as `audit-sources`: a `user` line, not meta, not sidechain, not a tool result nor injected text) must count in `validations` when, trimmed, lower-cased and stripped of trailing `.` and `!`, it is one of `ok`, `okay`, `yes`, `y`, `oui`, `go`, `continue`, `lgtm`, `vas-y` or `c'est bon`, or answers the questions of a stop (only comma-separated items of a number then one letter from `a` to `h`, such as `1 a, 2 c`: two items at least, or one with a space, so `4k` is not one); any other typed message counts in `other_messages`.
@@ -32,9 +32,14 @@ measures; it does not judge.
 - **EVA-15** (deterministic) Without a projects directory given, `session-metrics`, `rule-breaches`, `audit-sources`, `fixed-context` and `delivered-quality` must read the `projects/` directory of the configuration directory (`CLAUDE_CONFIG_DIR` when set and not empty, else the `.claude/` directory of the home directory, as AUD-2); when neither `CLAUDE_CONFIG_DIR` nor `HOME` is set and not empty, each must fail with a message naming both variables, except `delivered-quality`, whose transcript columns are then empty (QUA-7); when that default `projects/` cannot be read (missing, not a directory, not readable), each must print on stderr a warning naming it and the reason, then its usual output with no session (`delivered-quality` its empty transcript columns, QUA-7) and exit as with no transcript.
 - **EVA-16** (deterministic) `main_context_peak` must be the largest, over the assistant messages of the session's own transcript that are not sidechain (counted once per `message.id` as EVA-2, sub-agents excluded, written in their own transcript or inline), of the sum of the `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` of its `message.usage`: the size of the main context at its largest turn; 0 when the main transcript has no such message.
 - **EVA-17** (deterministic) With `--archive`, an archive whose header is the one of EVA-1 without `main_context_peak` (written before that column) must be merged as if it had the current header, each of its rows given an empty `main_context_peak`.
+- **EVA-18** (deterministic) `advisor_models` must list the distinct top-level `advisorModel` values of the assistant lines of the session, sub-agents included, joined by `,` in order of first appearance; empty when no line carries one.
+- **EVA-19** (deterministic) `advisor_calls` must count the `server_tool_use` blocks named `advisor` of all the assistant lines of the session, sub-agents included (counted as `tool_calls` counts the `tool_use` blocks, EVA-2, and not in `tool_calls`); `advisor_input_tokens` the sum, over the entries of type `advisor_message` of the `message.usage.iterations` of each assistant message counted once per `message.id` (EVA-2), of their `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens`, and `advisor_output_tokens` that of their `output_tokens`; the three cells are empty when `advisor_models` is (no advisor was set, which is not 0 calls), 0 when an advisor was set and not called.
+- **EVA-20** (deterministic) With `--archive`, an archive whose header is the one of EVA-1 without the four advisor columns (written before them), or the one of EVA-17, must be merged as if it had the current header, each of its rows given empty cells for the columns its header lacks.
 
 ## Scenarios
 
+- (EVA-19) Given a Sonnet session whose `advisorModel` is Opus and whose one assistant message, split over three lines, holds a `server_tool_use` block named `advisor`, an `advisor_tool_result` block and usage iterations `message`, `advisor_message` (21,110 input and 479 output tokens), `message`, when the row is printed, then `advisor_calls` is 1, `advisor_input_tokens` 21110, `advisor_output_tokens` 479, `tool_calls` 0 and `input_tokens` holds none of the advisor's tokens.
+- (EVA-19) Given a session with no `advisorModel`, when the row is printed, then the four advisor cells are empty.
 - (EVA-2) Given an assistant message split over three lines with the same `message.id`, each carrying the same usage and one `tool_use`, when the row is printed, then `turns` is 1, the tokens are those of one usage and `tool_calls` is 3.
 - (EVA-8) Given a project whose configuration moved from `rev = "a"` to `rev = "b"` in a commit at 10:00, when a session starts at 09:00, then its revision is `a`; at 11:00, `b`.
 - (EVA-8) Given a session run in a linked worktree on a branch that changed the pin, when the revision is read, then it is the pin of the default branch, since the branch may be gone.
@@ -45,6 +50,10 @@ measures; it does not judge.
 
 ## Non-goals
 
+- Whether the advisor set was attached to the requests: an advisor less capable than the main model is not, yet its
+  `advisorModel` is written; `advisor_models` records the setting, `advisor_calls` the calls that happened.
+- The advice: its result block (`advisor_tool_result`, often `advisor_redacted_result`, encrypted) is never read
+  (EVA-10).
 - Judging a session (good, bad, rule broken): the detectors and the report are other issues.
 - The price in money of the tokens: models and prices change; the tokens by kind are enough to price later.
 - A complete list of the line types: an unknown type is counted, not an error.

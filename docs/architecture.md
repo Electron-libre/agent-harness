@@ -249,7 +249,7 @@ flowchart LR
 
 | Reader | One row per | Measures | Spec |
 |---|---|---|---|
-| `session-metrics` | session | tokens, the peak of the main context (sub-agents apart), turns, tool calls, hook refusals, skill calls, typed messages | [`evaluation.md`](../specs/evaluation.md) |
+| `session-metrics` | session | tokens, the peak of the main context (sub-agents apart), turns, tool calls, the advisor set and its calls and tokens, hook refusals, skill calls, typed messages | [`evaluation.md`](../specs/evaluation.md) |
 | `rule-breaches` | finding (`--summary`: rule and revision) | the rules a program can check, `breach` or `blocked`; a language breach is `hinted`, `final` or `intermediate` | [`rule-breaches.md`](../specs/rule-breaches.md) |
 | `delivered-quality` | done issue (`--summary`: revision) | deliverables, fixes inside and after, review findings, failed checks, traced ids, lines changed in the specs and in the docs | [`delivered-quality.md`](../specs/delivered-quality.md) |
 | `fixed-context` | project and revision | the bytes every session pays before any work, the skills shipped | [`cardinal-report.md`](../specs/cardinal-report.md) |
@@ -268,7 +268,7 @@ The choices behind them:
 - **No text**: no reader prints a message, a tool input or a commit text (EVA-10, BRE-11, QUA-10, REP-8), so
   `--archive` can keep the rows outside the repositories and the history outlives the retention of the transcripts.
 - **A moving format**: an unreadable line, an unknown type or a missing field counts in its own column rather than
-  skewing the others (EVA-9). An archive written before `main_context_peak` is upgraded with an empty cell, which the
+  skewing the others (EVA-9). An archive written before `main_context_peak` or the advisor columns is upgraded with empty cells (EVA-20), which the
   report leaves out of its median, counting next to it the sessions it rests on; a verdict on the peak is
   `confounded` when they are fewer than `--min-sessions` (`no data` when there are none) (EVA-17, REP-9, REP-10, VRD-9).
 - **Signals, not verdicts**: medians per session, so one long session does not weigh as ten; groups of consecutive

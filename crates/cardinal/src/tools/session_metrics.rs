@@ -16,10 +16,19 @@ use transcripts::{
     result_text, revision, sessions, subagents, typed_text, Place,
 };
 
-pub(super) const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
+pub(super) const HEADER: &str = "session\tproject\tissues\trevision\tmodels\tversions\tstart\tduration_s\tturns\ttool_calls\tinput_tokens\toutput_tokens\tthinking_tokens\tcache_read_tokens\tcache_creation_tokens\tmain_context_peak\tadvisor_models\tadvisor_calls\tadvisor_input_tokens\tadvisor_output_tokens\thook_refusals\tskills\tvalidations\tother_messages\tunreadable_lines\tunknown_lines\tmissing_fields";
 
-/// The column added after `cache_creation_tokens` (EVA-16): an archive written before it is upgraded.
-const PEAK_COLUMN: &str = "main_context_peak";
+/// The columns added since the first archives, newest last (EVA-17, EVA-20): an archive written before them is
+/// upgraded, its rows given empty cells for the columns its header lacks.
+const ADDED_COLUMNS: &[&[&str]] = &[
+    &["main_context_peak"],
+    &[
+        "advisor_models",
+        "advisor_calls",
+        "advisor_input_tokens",
+        "advisor_output_tokens",
+    ],
+];
 
 /// The line types seen in the transcripts; any other is counted in `unknown_lines`, since the format moves.
 const KNOWN_TYPES: &[&str] = &[
@@ -48,6 +57,10 @@ const CONVERSATION_TYPES: &[&str] = &["user", "assistant", "attachment", "system
 struct Session {
     place: Place,
     models: Vec<String>,
+    advisors: Vec<String>,
+    advisor_calls: u64,
+    advisor_input: u64,
+    advisor_output: u64,
     versions: Vec<String>,
     messages: HashSet<String>,
     turns: u64,
@@ -127,6 +140,7 @@ impl Session {
         match kind {
             // a sub-agent written in the main transcript (older versions) is not the main context
             "assistant" => self.assistant(
+                line,
                 &line["message"],
                 main && line["isSidechain"].as_bool() != Some(true),
             ),
@@ -135,11 +149,16 @@ impl Session {
         }
     }
 
-    fn assistant(&mut self, message: &Value, main: bool) {
+    fn assistant(&mut self, line: &Value, message: &Value, main: bool) {
+        push_distinct(&mut self.advisors, line["advisorModel"].as_str());
         let blocks = message["content"]
             .as_array()
             .map(Vec::as_slice)
             .unwrap_or_default();
+        self.advisor_calls += blocks
+            .iter()
+            .filter(|b| b["type"] == "server_tool_use" && b["name"] == "advisor")
+            .count() as u64;
         for block in blocks.iter().filter(|b| b["type"] == "tool_use") {
             self.tool_calls += 1;
             if block["name"] == "Skill" {
@@ -178,6 +197,17 @@ impl Session {
         self.thinking += usage["output_tokens_details"]["thinking_tokens"]
             .as_u64()
             .unwrap_or(0);
+        let iterations = usage["iterations"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        for advice in iterations.iter().filter(|i| i["type"] == "advisor_message") {
+            let tokens = |key: &str| advice[key].as_u64().unwrap_or(0);
+            self.advisor_input += tokens("input_tokens")
+                + tokens("cache_read_input_tokens")
+                + tokens("cache_creation_input_tokens");
+            self.advisor_output += tokens("output_tokens");
+        }
     }
 
     fn user(&mut self, line: &Value, main: bool) {
@@ -212,6 +242,14 @@ impl Session {
             (Some((s, text)), Some(e)) => (text.clone(), (e - *s).num_seconds().to_string()),
             _ => (String::new(), String::new()),
         };
+        // no advisor set is not 0 calls (EVA-19)
+        let advised = |n: u64| {
+            if self.advisors.is_empty() {
+                String::new()
+            } else {
+                n.to_string()
+            }
+        };
         [
             id.to_string(),
             project.to_string(),
@@ -229,6 +267,10 @@ impl Session {
             self.cache_read.to_string(),
             self.cache_creation.to_string(),
             self.main_peak.to_string(),
+            self.advisors.join(","),
+            advised(self.advisor_calls),
+            advised(self.advisor_input),
+            advised(self.advisor_output),
             pairs(&self.hooks),
             pairs(&self.skills),
             self.validations.to_string(),
@@ -253,20 +295,40 @@ fn keep_resolved(old: &str, new: &str) -> String {
     new.join("\t")
 }
 
-/// An archived row written before `main_context_peak`, given an empty one (EVA-17).
-fn with_empty_peak(row: &str) -> String {
-    let at = HEADER
+/// The headers of the archives written before the columns of `ADDED_COLUMNS`, each with the columns it lacks.
+fn older_headers() -> Vec<(String, Vec<&'static str>)> {
+    (0..ADDED_COLUMNS.len())
+        .map(|since| {
+            let lacked: Vec<&str> = ADDED_COLUMNS[since..].concat();
+            let header = HEADER
+                .split('\t')
+                .filter(|c| !lacked.contains(c))
+                .collect::<Vec<_>>()
+                .join("\t");
+            (header, lacked)
+        })
+        .collect()
+}
+
+/// An archived row written before the `lacked` columns, given empty cells for them (EVA-17, EVA-20).
+fn with_empty(row: &str, lacked: &[&str]) -> String {
+    let mut cells = row.split('\t');
+    HEADER
         .split('\t')
-        .position(|c| c == PEAK_COLUMN)
-        .unwrap_or(0);
-    let mut cells: Vec<&str> = row.split('\t').collect();
-    cells.insert(at.min(cells.len()), "");
-    cells.join("\t")
+        .map(|c| {
+            if lacked.contains(&c) {
+                ""
+            } else {
+                cells.next().unwrap_or_default()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\t")
 }
 
 /// Merges `rows` into the archive at `path`: a session already there is replaced, one absent from `rows` is kept, and
-/// the file stays one header then rows sorted by start. An archive written before `main_context_peak` is upgraded;
-/// one with another header is left unchanged.
+/// the file stays one header then rows sorted by start. An archive written before a column of `ADDED_COLUMNS` is
+/// upgraded; one with another header is left unchanged.
 fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
     let existing = match std::fs::read_to_string(path) {
         Ok(text) => text,
@@ -274,26 +336,28 @@ fn archive(path: &Path, rows: &[String]) -> Result<(), String> {
         Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
     };
     let mut lines = existing.lines();
-    let before_peak = HEADER.replacen(&format!("\t{PEAK_COLUMN}"), "", 1);
-    let upgrade = match lines.next() {
-        Some(header) if header == before_peak => true,
-        Some(header) if header != HEADER => {
-            return Err(format!(
-                "{} has other columns than this script: archive elsewhere",
-                path.display()
-            ))
-        }
-        _ => false,
+    let lacked = match lines.next() {
+        Some(header) if header != HEADER => older_headers()
+            .into_iter()
+            .find(|(older, _)| older == header)
+            .map(|(_, lacked)| lacked)
+            .ok_or_else(|| {
+                format!(
+                    "{} has other columns than this script: archive elsewhere",
+                    path.display()
+                )
+            })?,
+        _ => Vec::new(),
     };
     let session = |row: &str| row.split('\t').next().unwrap_or_default().to_string();
     let start = |row: &str| row.split('\t').nth(6).unwrap_or_default().to_string();
     let mut merged: BTreeMap<String, String> = lines
         .filter(|l| !l.is_empty())
         .map(|l| {
-            let row = if upgrade {
-                with_empty_peak(l)
-            } else {
+            let row = if lacked.is_empty() {
                 l.to_string()
+            } else {
+                with_empty(l, &lacked)
             };
             (session(&row), row)
         })
