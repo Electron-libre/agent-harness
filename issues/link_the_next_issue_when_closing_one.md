@@ -63,7 +63,7 @@ next issue. Means as the issue's: `close-issue` prints it (shared with `next-iss
 1. [x] Print the next issue at close: `next_issue.rs` exposes the selection of its first free issue, `close-issue`
    prints it after the move and the relink; verified by a test of `tests/close_issue.rs`; makes true CLS-7 (~120
    lines).
-2. [ ] Link it in the reports: `skill:issue-workflow` Rules end the close report on `[<title>](issues/<stem>.md)`
+2. [x] Link it in the reports: `skill:issue-workflow` Rules end the close report on `[<title>](issues/<stem>.md)`
    (or the line saying there is none), and "Merge back" of `details.md` names it after the commands left to the
    user; `just sync`; verified by `just check-cardinal` and the `low` review (~15 lines).
 
@@ -78,3 +78,10 @@ next issue. Means as the issue's: `close-issue` prints it (shared with `next-iss
 - checks: `just check` ok (fmt, clippy, tests, specs); docs: `docs/workflow.md`, recipe comment, `just sync`.
 - Code review: no findings
 - not verified: none. decisions needed: none.
+
+## Summary of deliverable 2
+- done: `skill:issue-workflow` ends the close report on a link to the next issue; "Merge back" ends on the one `next-issue` offers.
+- red: none (rule text).
+- checks: `just check` ok, `just check-cardinal` ok.
+- Code review: no findings
+- not verified: an agent following the rule at a real close. decisions needed: none.
